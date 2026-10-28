@@ -26,7 +26,6 @@ import {
   useRef,
   useState,
 } from "react";
-import type { WalkingRouteGeoJSON, WalkingRouteInfo, WalkStep } from "@/components/Map";
 import { ROUTE_STRIP_HEIGHT_PX } from "@/components/RouteStrip";
 import dynamic from "next/dynamic";
 import MapLoadingFallback from "./MapLoadingFallback";
@@ -67,7 +66,7 @@ import {
   computeCategoryBounds,
   nearestBoundsAround,
 } from "@/lib/mapBounds";
-import { buildWalkingRouteUrl, parseWalkSteps, decideWalkResume } from "@/lib/walkRoute";
+import { useWalkingRoute } from "@/lib/useWalkingRoute";
 import { useBoxesList, toVenue } from "@/lib/useBoxesList";
 import { useEventsFeed } from "@/lib/useEvents";
 import { useEventDetail } from "@/lib/useEventDetail";
@@ -370,9 +369,8 @@ export default function MapWrapper({
   // recenter counter so Map.tsx re-centers even if userLocation hasn't changed.
   //
   // WHY declared here (moved up from its original spot near handleMoveEnd):
-  // handleWalkRoute below (#207) also calls this to request location when a
-  // Walk tap has none, instead of falling back to PUEBLO_CENTER — it must be
-  // declared before handleWalkRoute's useCallback deps array references it.
+  // useWalkingRoute below (#207) also calls this to request location when a
+  // Walk tap has none, instead of falling back to PUEBLO_CENTER.
   const handleLocateRequest = useCallback(() => {
     userRequestedAtRef.current = Date.now();
     setRecenterRequestId((n) => n + 1);
@@ -391,254 +389,11 @@ export default function MapWrapper({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geo.request, geo.state]);
 
-  // ── Walking route (#134) ──────────────────────────────────────────────────────
-  // walkingRoute: the fetched GeoJSON for the current walking route, or null.
-  // walkingRouteInfo: human-readable distance + duration text for the overlay.
-  // walkingRouteSteps: turn-by-turn steps from Mapbox (pre-localized via language= param).
-  // walkingRouteVenueId: which venue the current route targets — used to clear
-  //   the route when selection changes to a different venue (or is cleared).
-  //
-  // WHY MapWrapper owns the fetch: the Directions API call requires the Mapbox
-  // token (NEXT_PUBLIC_MAPBOX_TOKEN), which is available client-side. Keeping
-  // the fetch here separates data-fetching from map rendering, matching the
-  // existing pattern (MapWrapper handles all state, Map.tsx is a controlled
-  // component). Map.tsx just receives walkingRoute + walkingRouteInfo as props.
-  const [walkingRoute, setWalkingRoute] = useState<WalkingRouteGeoJSON | null>(null);
-  const [walkingRouteInfo, setWalkingRouteInfo] = useState<WalkingRouteInfo | null>(null);
-  const [walkingRouteSteps, setWalkingRouteSteps] = useState<WalkStep[] | null>(null);
-  const [walkingRouteVenueId, setWalkingRouteVenueId] = useState<string | null>(null);
-
-  // ── Step-through directions (#555) ──────────────────────────────────────────
-  // activeStepIndex: which turn the stepper panel (BottomSheet's RouteStrip /
-  // DesktopVenueWindow) is showing. Lives here, not inside the panel, because
-  // the phone strip and the venue card both render the stepper for the same
-  // route and must agree on the current turn. Reset to 0 wherever the route
-  // itself resets: a fresh fetch, walkingRouteVenueId clearing, or an
-  // explicit clear (see fetchWalkingRoute / the clearing effect below /
-  // handleWalkRoute's toggle-off / handleClearWalkingRoute).
-  const [activeStepIndex, setActiveStepIndex] = useState(0);
-  // focusPoint/focusRequestId: the camera target Map.tsx's step-through
-  // focus effect watches. A separate pair from recenterRequestId — bumping
-  // that one would fly the camera to the USER, fighting the turn the stepper
-  // just centered on (see requestStepLocationRefresh's own WHY comment below).
-  const [focusPoint, setFocusPoint] = useState<{ lng: number; lat: number } | null>(null);
-  const [focusRequestId, setFocusRequestId] = useState(0);
-
-  // ── Walk-without-location (#207) ─────────────────────────────────────────────
-  // walkAwaitingVenueIdRef: the venue a Walk tap is waiting on geolocation for.
-  //   Set when handleWalkRoute is called with no userLocation (instead of
-  //   falling back to PUEBLO_CENTER); consumed by the resume effect below once
-  //   geo.state resolves. A ref, not state — read only inside that effect,
-  //   never rendered; same "avoid a stale closure" reasoning as walkReqSeq.
-  // walkLocationHintVenueId: which venue's Walk tap resulted in a denied/
-  //   unavailable geolocation request — drives the localized "share your
-  //   location" hint in DirectionButtons. Render-gated on selectedVenueId in
-  //   the JSX below, same pattern as walkingRouteVenueId.
-  const walkAwaitingVenueIdRef = useRef<string | null>(null);
-  const [walkLocationHintVenueId, setWalkLocationHintVenueId] = useState<string | null>(null);
-
-  // ── Stale-route race guard (FIX 1 — hardened) ───────────────────────────────
-  // handleWalkRoute is async. If the user taps Walk on venue A then selects
-  // venue B before A's fetch resolves, A's resolution must NOT commit state —
-  // doing so would draw A's route line on the map while B is selected.
-  //
-  // WHY a monotonic sequence counter instead of keying on venue.id (original
-  // design): keying on venue.id lets two overlapping Walk taps for the SAME
-  // venue both pass the guard — the older, slower response can overwrite the
-  // newer one if userLocation changed between taps (last-resolve-wins instead
-  // of last-request-wins). A monotonic integer gives each fetch a unique token
-  // regardless of which venue it targets.
-  //
-  // WHY a ref (not state): the counter is read inside an async closure. State
-  // would capture a stale value at fetch launch; a ref always reflects the
-  // current value at resolution time.
-  //
-  // WHY the seq is bumped on toggle-off and clear (but NOT in the
-  // selectedVenueId-change effect): bumping on explicit user actions (toggle-off,
-  // handleClearWalkingRoute) ensures a pending fetch can never repopulate a
-  // route the user just cleared. We intentionally do NOT touch the seq in the
-  // selectedVenueId-change effect — not touching it lets a same-task
-  // select+walk-for-the-new-venue succeed. The render-gate below (gating
-  // walkingRoute on walkingRouteVenueId === selectedVenueId) is the real safety
-  // net for the selection-switch case.
-  const walkReqSeq = useRef(0);
-
-  // Clear walking route when selected venue changes to a different venue or is deselected.
-  // WHY: if the user taps a new pin or deselects, the old route is stale and visually
-  // disconnected — clearing it avoids a confusing "whose route is this?" state.
-  // queueMicrotask satisfies the react-hooks/set-state-in-effect rule: setState must not
-  // be called synchronously at the top level of an effect body (cascading-render risk).
-  //
-  // WHY we do NOT touch walkReqSeq here: see the comment above walkReqSeq. The
-  // render-gate on the Map line prop (walkingRouteVenueId === selectedVenueId)
-  // prevents a stale-venue route from ever drawing, so there is no need to
-  // invalidate in-flight fetches here. Bumping the seq here would break the
-  // same-task select+walk-for-new-venue flow (latent footgun if future UX
-  // allows it).
+  // #739: the bottom sheet takes the location card's space; dismiss (not
+  // just hide) so it doesn't pop back when the sheet closes.
   useEffect(() => {
-    if (selectedVenueId !== walkingRouteVenueId) {
-      queueMicrotask(() => {
-        setWalkingRoute(null);
-        setWalkingRouteInfo(null);
-        setWalkingRouteSteps(null);
-        setWalkingRouteVenueId(null);
-        setActiveStepIndex(0);
-      });
-    }
-    // #207: a stale "share your location" hint belongs to the venue that
-    // triggered it, not whatever is selected now — drop it on selection
-    // change, same invariant as the walking route itself just above.
-    if (selectedVenueId !== walkLocationHintVenueId) {
-      queueMicrotask(() => setWalkLocationHintVenueId(null));
-    }
-    // #739: the bottom sheet takes the location card's space; dismiss (not
-    // just hide) so it doesn't pop back when the sheet closes.
     if (selectedVenueId !== null) queueMicrotask(() => setLocationFailure(null));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVenueId]);
-
-  /**
-   * Fetch a walking route from Mapbox Directions API and draw it on the map.
-   * origin is passed explicitly (not read from userLocation) so the resume
-   * effect below can call this with a just-resolved geo.state.position
-   * without waiting on a re-render to see it (#207).
-   */
-  const fetchWalkingRoute = useCallback(async (venue: Venue, origin: { lat: number; lng: number }) => {
-    // Mint a unique request token. Any earlier in-flight fetch — including one
-    // for the SAME venue — that resolves after this point will compare its seq
-    // snapshot to walkReqSeq.current and bail if they differ (latest-REQUEST-wins).
-    const seq = ++walkReqSeq.current;
-
-    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-    if (!token) {
-      // No token — Directions API will fail. Fail silently; map still works.
-      console.warn("[MapWrapper] NEXT_PUBLIC_MAPBOX_TOKEN missing — walking route unavailable");
-      return;
-    }
-
-    // WHY steps=true: enables turn-by-turn instruction text in the response.
-    // WHY language=${locale}: Mapbox returns pre-localized instruction strings,
-    // so Spanish users get Spanish turn instructions without client-side translation.
-    const url = buildWalkingRouteUrl(
-      origin.lng, origin.lat,
-      venue.lng, venue.lat,
-      token,
-      locale,
-    );
-
-    try {
-      const res = await fetch(url);
-      if (!res.ok) {
-        console.warn("[MapWrapper] Directions API error:", res.status);
-        return;
-      }
-      const data = await res.json() as {
-        routes?: Array<{
-          geometry: { type: "LineString"; coordinates: number[][] };
-          distance: number;  // meters
-          duration: number;  // seconds
-          legs?: Array<{
-            steps?: Array<{
-              maneuver?: {
-                instruction?: string;
-                location?: number[];
-                type?: string;
-                modifier?: string;
-              };
-              distance: number; // meters
-            }>;
-          }>;
-        }>;
-      };
-
-      // Stale-route guard: bail if a newer Walk request (or a clear/toggle-off)
-      // has been issued since this fetch was initiated. Uses the monotonic seq
-      // so same-venue double-taps are caught too (latest-REQUEST-wins, not
-      // latest-resolve-wins).
-      if (walkReqSeq.current !== seq) return;
-
-      const route = data.routes?.[0];
-      if (!route) return;
-
-      // Convert distance (m) → miles and duration (s) → "N min".
-      const miles = (route.distance / 1609.34).toFixed(1);
-      const minutes = Math.round(route.duration / 60);
-
-      // Parse turn-by-turn steps via the extracted pure function (FIX 3).
-      const steps = parseWalkSteps(route);
-
-      setWalkingRoute({
-        type: "Feature",
-        properties: {},
-        geometry: route.geometry,
-      });
-      setWalkingRouteInfo({
-        distance: `${miles} mi`,
-        duration: `${minutes} min`,
-      });
-      setWalkingRouteSteps(steps.length > 0 ? steps : null);
-      setWalkingRouteVenueId(venue.id);
-      setActiveStepIndex(0);
-    } catch (err) {
-      // Network failure — fail silently. The user can still use the Bus/Drive deeplinks.
-      console.warn("[MapWrapper] Directions fetch failed:", err);
-    }
-  }, [locale]);
-
-  /**
-   * Handle a Walk tap: toggle off an active route, fetch one from the user's
-   * real location, or — if location hasn't been shared yet — request it
-   * instead of silently drawing from PUEBLO_CENTER (#207). A walking route
-   * from downtown when the user is elsewhere is misleading; Bus/Drive are
-   * unaffected because their Google Maps deeplinks omit origin entirely and
-   * let Google use the device's own location.
-   */
-  const handleWalkRoute = useCallback((venue: Venue) => {
-    // If user re-taps Walk on the already-active route, clear it (toggle off).
-    if (walkingRouteVenueId === venue.id) {
-      // Bump the seq so any pending fetch (same venue, stale userLocation) cannot
-      // repopulate the route after the user explicitly toggled it off.
-      walkReqSeq.current++;
-      setWalkingRoute(null);
-      setWalkingRouteInfo(null);
-      setWalkingRouteSteps(null);
-      setWalkingRouteVenueId(null);
-      setActiveStepIndex(0);
-      return;
-    }
-
-    // A fresh tap deserves a fresh outcome — drop any stale hint from a
-    // previous denied attempt before trying again.
-    setWalkLocationHintVenueId(null);
-
-    if (!userLocation) {
-      // No shared location yet. Ask for it via the SAME geolocation flow the
-      // locate button uses (geo.request(), wrapped by handleLocateRequest) —
-      // not a second getCurrentPosition implementation. The resume effect
-      // below picks up the result: fetches the route on grant, shows the
-      // hint on denial. Skip re-requesting if already awaiting this exact
-      // venue (rapid double-tap while the browser's permission prompt is open).
-      if (walkAwaitingVenueIdRef.current !== venue.id) {
-        walkAwaitingVenueIdRef.current = venue.id;
-        handleLocateRequest();
-      }
-      return;
-    }
-
-    void fetchWalkingRoute(venue, userLocation);
-  }, [walkingRouteVenueId, userLocation, handleLocateRequest, fetchWalkingRoute]);
-
-  /** Clear the walking route (e.g. when Walk button is tapped while route is active). */
-  const handleClearWalkingRoute = useCallback(() => {
-    // Bump seq so any pending fetch cannot repopulate the route after an
-    // explicit clear — same invariant as the toggle-off branch above.
-    walkReqSeq.current++;
-    setWalkingRoute(null);
-    setWalkingRouteInfo(null);
-    setWalkingRouteSteps(null);
-    setWalkingRouteVenueId(null);
-    setActiveStepIndex(0);
-  }, []);
 
   /**
    * Refreshes the user's location on each step-through arrow tap (#555)
@@ -663,27 +418,6 @@ export default function MapWrapper({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geo.request, geo.state]);
 
-  /**
-   * Move the step-through stepper to a new turn (#555): updates which step
-   * is active, points the map's focus effect at that turn's own coordinate,
-   * and refreshes the user's location so the dot is current for the new
-   * vantage point — the three things a "Next"/"Back" tap or an "All turns"
-   * row click all need, in one place so the phone strip and the desktop
-   * card can share it.
-   */
-  const handleStepChange = useCallback((index: number) => {
-    setActiveStepIndex(index);
-    // A step with no coordinate (malformed response only — see parseWalkSteps)
-    // still advances and still refreshes location; only the camera hop is
-    // skipped, so the person keeps a readable instruction either way.
-    const location = walkingRouteSteps?.[index]?.location;
-    if (location) {
-      setFocusPoint({ lng: location[0], lat: location[1] });
-      setFocusRequestId((n) => n + 1);
-    }
-    requestStepLocationRefresh();
-  }, [walkingRouteSteps, requestStepLocationRefresh]);
-
   // ── Blessing boxes (slice 1, map-first rework 2026-09-18) — live layer,
   // fetched ONCE client-side (useBoxesList's full PublicBlessingBox shape,
   // stripped to plain Venues by its toVenue for the pins) and merged into
@@ -697,8 +431,8 @@ export default function MapWrapper({
   // boxesById/boxOverrides let the open card show the box's full record
   // (status, host note, most-needed, check-ins) that the plain Venue shape
   // doesn't carry, and stay current after a check-in without a refetch.
-  // WHY declared THIS early (2026-09-18 fix): the Walk-resume effect below
-  // reads boxVenues in its own body and dependency array — a dependency
+  // WHY declared THIS early (2026-09-18 fix): the walking route's findVenue
+  // below reads boxVenues in its own body and dependency array — a dependency
   // array is evaluated during THIS render pass, not deferred like an effect
   // body, so boxVenues must already be a assigned `const` by the time
   // JS execution reaches that array literal, or it's a ReferenceError
@@ -786,46 +520,27 @@ export default function MapWrapper({
   // Only re-run when geo.state (object ref) changes — same pattern as the location-card effect.
   }, [geo.state]);
 
-  // ── Resume a Walk request once its triggered geolocation resolves (#207) ────
-  // handleWalkRoute stashes the tapped venue's id in walkAwaitingVenueIdRef and
-  // calls handleLocateRequest() instead of falling back to PUEBLO_CENTER when
-  // userLocation is null. This effect watches geo.state for that request's
-  // resolution and applies decideWalkResume's verdict (fetch / show-hint / noop).
-  useEffect(() => {
-    const awaitingId = walkAwaitingVenueIdRef.current;
-    if (!awaitingId) return;
-    if (geo.state.permission === "prompt") return; // still waiting on the browser
-    // WHY this second guard: useGeolocation's Permissions API onchange listener
-    // can independently flip permission to "granted" (position still null,
-    // since onchange doesn't call getCurrentPosition) slightly BEFORE the
-    // getCurrentPosition call this same Walk tap triggered delivers its actual
-    // fix. Treating {granted, position:null} as "resolved" here would consume
-    // the ref and show the hint prematurely, then silently drop the real
-    // position when it arrives a moment later (the ref is one-shot). Both
-    // getCurrentPosition branches (success/error) always settle (first try
-    // plus the one low-accuracy retry, each bounded by its timeout option),
-    // so this can't wait forever.
-    if (geo.state.permission === "granted" && geo.state.position === null) return;
-
-    walkAwaitingVenueIdRef.current = null; // one resolution per request
-
-    const action = decideWalkResume(awaitingId, selectedVenueId, geo.state);
-    if (action.kind === "fetch") {
-      // Includes boxVenues (map-first rework, 2026-09-18) — a box card's
-      // address doubles as its own Walk trigger (walk restore pass,
-      // 2026-09-19, see BoxCardBody's own header), sharing this same
-      // handleWalkRoute/fetchWalkingRoute path every other venue's Walk
-      // button uses, so a Walk tap awaiting location can target a box id,
-      // not just allVenues.
-      const venue = allVenues.find((v) => v.id === awaitingId) ?? boxVenues.find((v) => v.id === awaitingId);
-      if (venue) void fetchWalkingRoute(venue, action.origin);
-    } else if (action.kind === "show-hint") {
-      setWalkLocationHintVenueId(awaitingId);
-    }
-    // action.kind === "noop": the venue that asked is no longer selected —
-    // nothing to attach the result to (see decideWalkResume's WHY comment).
-  // Only re-run when geo.state (object ref) changes — same pattern as the location-card effect.
-  }, [geo.state, selectedVenueId, fetchWalkingRoute, boxVenues]);
+  // ── Walking route (#134, #207, #555) — see useWalkingRoute's header ────────
+  // findVenue covers boxes too: a box card's address is its own Walk trigger.
+  const findWalkVenue = useCallback(
+    (id: string) => allVenues.find((v) => v.id === id) ?? boxVenues.find((v) => v.id === id),
+    [boxVenues],
+  );
+  const {
+    route: walkingRoute,
+    routeVenueId: walkingRouteVenueId,
+    focusPoint,
+    focusRequestId,
+    walkFor,
+  } = useWalkingRoute({
+    locale,
+    userLocation,
+    geoState: geo.state,
+    selectedVenueId,
+    requestLocation: handleLocateRequest,
+    refreshLocation: requestStepLocationRefresh,
+    findVenue: findWalkVenue,
+  });
 
   // Handle map moveend: update drift state (called from Map's onMoveEnd prop).
   // Runs from a DOM event callback, not from a React effect.
@@ -911,8 +626,8 @@ export default function MapWrapper({
       // Switching to Saved/Menu on desktop always drops any open venue card
       // — the panel now shows a different view, so the pin highlight and
       // any walking route should clear with it (judgment call flagged in
-      // the coder's report; the `selectedVenueId !== walkingRouteVenueId`
-      // effect below already clears a stale route once this fires).
+      // the coder's report; useWalkingRoute's selection effect already
+      // clears a stale route once this fires).
       setSelectedVenueId(null);
       setSelectedEventId(null); // the panel now shows a different view (#759)
       setWindowExpanded(false);
@@ -1433,6 +1148,21 @@ export default function MapWrapper({
   }, []);
 
   /**
+   * Shared blur handler for the popover rows themselves (ViewSuggestion's
+   * button, SearchResultsPopover's "see all" row) — also the tail of
+   * handleSearchBlur, needed because Tab-ing further (past the last row)
+   * blurs the ROW, not the input, so handleSearchBlur never sees it.
+   */
+  const handleSuggestionRowBlur = useCallback((e: React.FocusEvent) => {
+    const next = e.relatedTarget;
+    if (next instanceof Node && searchAreaRef.current?.contains(next)) return;
+    blurTimerRef.current = setTimeout(() => {
+      setIsPopoverOpen(false);
+      setActiveIndex(-1);
+    }, 150);
+  }, []);
+
+  /**
    * Close the popover on blur — UNLESS focus is moving to one of our own
    * rows (ViewSuggestion's button, SearchResultsPopover's "see all" row).
    *
@@ -1452,30 +1182,10 @@ export default function MapWrapper({
    */
   const handleSearchBlur = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     // Leaving the box commits the search for analytics (#738); before the
-    // early return so tabbing into our own popover still counts.
+    // containment check so tabbing into our own popover still counts.
     commitSearch();
-    const next = e.relatedTarget;
-    if (next instanceof Node && searchAreaRef.current?.contains(next)) return;
-    blurTimerRef.current = setTimeout(() => {
-      setIsPopoverOpen(false);
-      setActiveIndex(-1);
-    }, 150);
-  }, [commitSearch]);
-
-  /**
-   * Shared blur handler for the popover rows themselves (ViewSuggestion's
-   * button, SearchResultsPopover's "see all" row) — same containment check
-   * as handleSearchBlur, needed because Tab-ing further (past the last row)
-   * blurs the ROW, not the input, so handleSearchBlur never sees it.
-   */
-  const handleSuggestionRowBlur = useCallback((e: React.FocusEvent) => {
-    const next = e.relatedTarget;
-    if (next instanceof Node && searchAreaRef.current?.contains(next)) return;
-    blurTimerRef.current = setTimeout(() => {
-      setIsPopoverOpen(false);
-      setActiveIndex(-1);
-    }, 150);
-  }, []);
+    handleSuggestionRowBlur(e);
+  }, [commitSearch, handleSuggestionRowBlur]);
 
   /**
    * Close the popover for good: state down AND the input blurred.
@@ -1628,23 +1338,6 @@ export default function MapWrapper({
     [selectVenue, showVenueOnMap],
   );
 
-  // A box pin now opens the SAME in-map card every other venue uses
-  // (map-first rework, 2026-09-18) — no special-case here at all; the map
-  // view is never rendered when mapUnavailable, so there's no redirect
-  // branch to thread through on this path either.
-  const handleSelectVenueFromMap = useCallback(
-    (id: string) => {
-      selectVenue(id);
-    },
-    [selectVenue],
-  );
-
-  const handleMapReady = useCallback(
-    (map: mapboxgl.Map) => {
-      setMapboxMap(map);
-    },
-    [setMapboxMap],
-  );
 
   // Derive the active option id for aria-activedescendant.
   const activeDescendantId =
@@ -2001,7 +1694,7 @@ export default function MapWrapper({
             userLocation={userLocation}
             userDistances={userDistances}
             recenterRequestId={recenterRequestId}
-            onSelectVenue={handleSelectVenueFromMap}
+            onSelectVenue={selectVenue}
             events={events}
             selectedEventId={selectedEventId}
             onSelectEvent={selectEvent}
@@ -2010,7 +1703,7 @@ export default function MapWrapper({
             // so on /es every pin label and tooltip stayed English. Event pins
             // need the visitor's language; place pins' aria/tooltips now follow it too.
             locale={locale}
-            onMapReady={handleMapReady}
+            onMapReady={setMapboxMap}
             onMoveEnd={handleMoveEnd}
             walkingRoute={walkingRouteVenueId === selectedVenueId ? walkingRoute : null}
             focusPoint={focusPoint}
@@ -2332,26 +2025,7 @@ export default function MapWrapper({
             setSelectedVenueId(null);
             closeEventCard();
           }}
-          onWalkRoute={handleWalkRoute}
-          isWalkRouteActive={
-            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
-          }
-          onClearWalkRoute={handleClearWalkingRoute}
-          walkRouteInfo={
-            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
-              ? walkingRouteInfo
-              : null
-          }
-          walkRouteSteps={
-            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
-              ? walkingRouteSteps
-              : null
-          }
-          activeStepIndex={activeStepIndex}
-          onStepChange={handleStepChange}
-          showWalkLocationHint={
-            selectedVenueId !== null && walkLocationHintVenueId === selectedVenueId
-          }
+          walk={walkFor(selectedVenueId)}
         />
       )}
 
@@ -2405,14 +2079,7 @@ export default function MapWrapper({
                     ? { label: t("panel.backToSaved", locale), onClick: backToSaved }
                     : undefined
                 }
-                onWalkRoute={handleWalkRoute}
-                isWalkRouteActive={walkingRouteVenueId === sidePanelView.id}
-                onClearWalkRoute={handleClearWalkingRoute}
-                walkRouteInfo={walkingRouteVenueId === sidePanelView.id ? walkingRouteInfo : null}
-                walkRouteSteps={walkingRouteVenueId === sidePanelView.id ? walkingRouteSteps : null}
-                activeStepIndex={activeStepIndex}
-                onStepChange={handleStepChange}
-                showWalkLocationHint={walkLocationHintVenueId === sidePanelView.id}
+                walk={walkFor(sidePanelView.id)}
               />
             );
           }

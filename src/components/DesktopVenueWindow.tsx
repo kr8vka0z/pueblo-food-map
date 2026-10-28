@@ -48,7 +48,8 @@ import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import { safeUrl } from "@/lib/safeUrl";
 import { track, EVENTS } from "@/lib/analytics";
-import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
+import DirectionButtons from "@/components/DirectionButtons";
+import type { Walk } from "@/lib/useWalkingRoute";
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/lib/categories";
 import { formatMiles } from "@/lib/distance";
@@ -99,26 +100,8 @@ interface DesktopVenueWindowProps {
   onClose: () => void;
   /** Locale forwarded from MapWrapper. Defaults to "en". */
   locale?: Locale;
-  /** Called when the user taps the Walk direction button. MapWrapper fetches the route. */
-  onWalkRoute?: (venue: Venue) => void;
-  /** True when a walking route for this venue is currently drawn on the map. */
-  isWalkRouteActive?: boolean;
-  /** Called when the user taps Walk while a route is active (clears it). */
-  onClearWalkRoute?: () => void;
-  /** Walking route distance + duration for the in-card readout (threaded from MapWrapper). */
-  walkRouteInfo?: RouteInfo | null;
-  /** Turn-by-turn steps from Mapbox (pre-localized). Shown as a collapsible list in DirectionButtons. */
-  walkRouteSteps?: WalkStep[] | null;
-  /**
-   * True when this venue's Walk tap requested geolocation and it was denied
-   * or is unavailable (#207). Tells DirectionButtons to show the localized
-   * "share your location" hint instead of silently doing nothing.
-   */
-  showWalkLocationHint?: boolean;
-  /** Which turn the step-through stepper is showing (#555) — same as BottomSheet's identical prop, MapWrapper-owned so desktop and mobile agree with the map's camera focus. */
-  activeStepIndex?: number;
-  /** Moves the stepper to a different turn (#555) — Back/Next or an "All turns" row tap. */
-  onStepChange?: (index: number) => void;
+  /** Walking directions for this card (useWalkingRoute's walkFor). */
+  walk?: Walk;
   /**
    * "← Saved" back-link (#682 8b) — present only when this card was opened
    * from the Saved list on desktop. Renders above the persistent header bar;
@@ -141,14 +124,7 @@ export default function DesktopVenueWindow({
   onCollapse,
   onClose,
   locale: localeProp,
-  onWalkRoute,
-  isWalkRouteActive = false,
-  onClearWalkRoute,
-  walkRouteInfo,
-  walkRouteSteps,
-  showWalkLocationHint = false,
-  activeStepIndex = 0,
-  onStepChange = () => {},
+  walk,
   backTo,
   eventHere = null,
 }: DesktopVenueWindowProps) {
@@ -288,15 +264,15 @@ export default function DesktopVenueWindow({
           walkSteps provides the collapsible turn-by-turn list. */}
       <DirectionButtons
         venue={venue}
-        onWalk={onWalkRoute ?? (() => {})}
+        onWalk={walk?.onWalk ?? (() => {})}
         locale={locale}
-        isRouteActive={isWalkRouteActive}
-        onClearRoute={onClearWalkRoute}
-        routeInfo={isWalkRouteActive ? walkRouteInfo : null}
-        walkSteps={isWalkRouteActive ? walkRouteSteps : null}
-        showLocationHint={showWalkLocationHint}
-        activeStepIndex={activeStepIndex}
-        onStepChange={onStepChange}
+        isRouteActive={walk?.isActive ?? false}
+        onClearRoute={walk?.onClear}
+        routeInfo={walk?.info}
+        walkSteps={walk?.steps}
+        showLocationHint={walk?.showLocationHint}
+        activeStepIndex={walk?.activeStepIndex}
+        onStepChange={walk?.onStepChange}
       />
     </div>
   );
@@ -338,15 +314,15 @@ export default function DesktopVenueWindow({
           walkSteps provides the collapsible turn-by-turn list. */}
       <DirectionButtons
         venue={venue}
-        onWalk={onWalkRoute ?? (() => {})}
+        onWalk={walk?.onWalk ?? (() => {})}
         locale={locale}
-        isRouteActive={isWalkRouteActive}
-        onClearRoute={onClearWalkRoute}
-        routeInfo={isWalkRouteActive ? walkRouteInfo : null}
-        walkSteps={isWalkRouteActive ? walkRouteSteps : null}
-        showLocationHint={showWalkLocationHint}
-        activeStepIndex={activeStepIndex}
-        onStepChange={onStepChange}
+        isRouteActive={walk?.isActive ?? false}
+        onClearRoute={walk?.onClear}
+        routeInfo={walk?.info}
+        walkSteps={walk?.steps}
+        showLocationHint={walk?.showLocationHint}
+        activeStepIndex={walk?.activeStepIndex}
+        onStepChange={walk?.onStepChange}
       />
 
       {/* Report an issue — secondary action (#70) */}
@@ -483,14 +459,7 @@ export default function DesktopVenueWindow({
           onCheckinSuccess={onCheckinSuccess}
           showHistoryLink={false}
           nameId={`venue-window-title-${venue.id}`}
-          onWalkRoute={onWalkRoute ? () => onWalkRoute(box) : undefined}
-          isWalkRouteActive={isWalkRouteActive}
-          onClearWalkRoute={onClearWalkRoute}
-          walkRouteInfo={isWalkRouteActive ? walkRouteInfo : null}
-          walkRouteSteps={isWalkRouteActive ? walkRouteSteps : null}
-          showWalkLocationHint={showWalkLocationHint}
-          activeStepIndex={activeStepIndex}
-          onStepChange={onStepChange}
+          walk={walk}
           actions={
             <>
               <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} isBox />

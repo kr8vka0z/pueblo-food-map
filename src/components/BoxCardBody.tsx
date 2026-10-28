@@ -41,7 +41,7 @@
  * result and asked to KEEP the in-app walking route (2026-09-19, walk
  * restore pass): the address stays the one visible control (no icon, no
  * extra row) but now DOUBLES as that Walk trigger when a map is present.
- * `onWalkRoute` presence is the switch: absent (BoxHistoryContent, no map
+ * `walk` presence is the switch: absent (BoxHistoryContent, no map
  * to draw a route on) → the address is a plain external `<a>` to Google
  * Maps, unchanged from before. Present (BottomSheet/DesktopVenueWindow,
  * always forwarded from MapWrapper's own `handleWalkRoute`) → the address
@@ -92,7 +92,8 @@ import BoxCheckinPanel from "@/components/BoxCheckinPanel";
 import AdoptBoxForm from "@/components/AdoptBoxForm";
 import BoxAlertSignupForm from "@/components/BoxAlertSignupForm";
 import PhotoViewer from "@/components/PhotoViewer";
-import { googleMapsUrl, WalkRouteStatus, type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
+import { googleMapsUrl, WalkRouteStatus } from "@/components/DirectionButtons";
+import type { Walk } from "@/lib/useWalkingRoute";
 import { categoryColors } from "@/lib/categories";
 import {
   STATUS_DOT_CLASS,
@@ -138,32 +139,13 @@ interface BoxCardBodyProps {
   /**
    * In-app walking directions (walk restore pass, 2026-09-19) — see this
    * file's own header for the full rationale. Absent (default): the address
-   * renders as a plain external `<a>` to Google Maps, exactly as before
-   * (BoxHistoryContent's use — no map on that page to draw a route on).
-   * Present: the address becomes a `<button>` that calls this on tap,
-   * mirroring DirectionButtons' own Walk button (same callback contract the
-   * caller already wires for ordinary venues — MapWrapper's
-   * `handleWalkRoute`, which self-toggles off on a second tap for the same
-   * venue, so this needs no separate "already active" branch here).
+   * renders as a plain external `<a>` to Google Maps (BoxHistoryContent — no
+   * map on that page to draw a route on). Present: the address becomes a
+   * `<button>` calling `walk.onWalk(box)`, the SAME callback DirectionButtons'
+   * own Walk button uses (it self-toggles off on a second tap), and the
+   * active-route readout renders below it.
    */
-  onWalkRoute?: () => void;
-  /** True when a walking route for this box is currently drawn on the map. Drives the active-route readout below the address and the address's own aria-label. */
-  isWalkRouteActive?: boolean;
-  /** Renders the readout's standalone "Clear route" control (see WalkRouteStatus's own `onClearRoute` doc for why the box card needs this while ordinary venues don't — the address stays labeled as the address, never relabels to "Clear route"). */
-  onClearWalkRoute?: () => void;
-  /** Walking route distance + duration for the in-card readout (threaded from MapWrapper via BottomSheet/DesktopVenueWindow, same as DirectionButtons' own prop). */
-  walkRouteInfo?: RouteInfo | null;
-  /**
-   * Turn-by-turn steps from Mapbox (pre-localized), same as DirectionButtons'
-   * own prop — passed straight through to WalkRouteStatus below.
-   */
-  walkRouteSteps?: WalkStep[] | null;
-  /** True when this box's Walk tap requested geolocation and it was denied or is unavailable (#207) — same as DirectionButtons' own prop. */
-  showWalkLocationHint?: boolean;
-  /** Which turn the step-through stepper is showing (#555) — same as WalkRouteStatus's own prop. */
-  activeStepIndex?: number;
-  /** Moves the stepper to a different turn (#555) — same as WalkRouteStatus's own prop. */
-  onStepChange?: (index: number) => void;
+  walk?: Walk;
 }
 
 /**
@@ -313,14 +295,7 @@ export default function BoxCardBody({
   photoRadiusClassName = "",
   actions,
   nameId,
-  onWalkRoute,
-  isWalkRouteActive = false,
-  onClearWalkRoute,
-  walkRouteInfo = null,
-  walkRouteSteps = null,
-  showWalkLocationHint = false,
-  activeStepIndex = 0,
-  onStepChange = () => {},
+  walk,
 }: BoxCardBodyProps) {
   const { locale } = useLocale();
   const [adoptOpen, setAdoptOpen] = useState(false);
@@ -329,7 +304,7 @@ export default function BoxCardBody({
   // Per-instance id for the "share your location" hint (#207) — shared with
   // WalkRouteStatus's own <p id>, same reasoning as DirectionButtons' own
   // identical field. Always called (Rules of Hooks) even in link mode
-  // (onWalkRoute absent); unused in that branch.
+  // (walk absent); unused in that branch.
   const walkLocationHintId = useId();
   const hasSponsors = box.box.adopters.length > 0;
   const mostNeededChips = box.box.mostNeeded
@@ -389,11 +364,11 @@ export default function BoxCardBody({
           <StatusPill box={box} locale={locale} overlay={false} />
 
           <div className="-mt-2 flex flex-col items-start">
-            {onWalkRoute ? (
+            {walk ? (
               <button
                 type="button"
-                onClick={onWalkRoute}
-                aria-describedby={showWalkLocationHint ? walkLocationHintId : undefined}
+                onClick={() => walk.onWalk(box)}
+                aria-describedby={walk.showLocationHint ? walkLocationHintId : undefined}
                 aria-label={`${box.address} — ${t("directions.walkAriaLabel", locale, { name: box.name })}`}
                 className="inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
               >
@@ -410,18 +385,18 @@ export default function BoxCardBody({
                 {box.address}
               </a>
             )}
-            {onWalkRoute && (
+            {walk && (
               <WalkRouteStatus
                 venue={box}
                 locale={locale}
-                isRouteActive={isWalkRouteActive}
-                routeInfo={walkRouteInfo}
-                walkSteps={walkRouteSteps}
-                showLocationHint={showWalkLocationHint}
+                isRouteActive={walk.isActive}
+                routeInfo={walk.info}
+                walkSteps={walk.steps}
+                showLocationHint={walk.showLocationHint}
                 locationHintId={walkLocationHintId}
-                onClearRoute={onClearWalkRoute}
-                activeStepIndex={activeStepIndex}
-                onStepChange={onStepChange}
+                onClearRoute={walk.onClear}
+                activeStepIndex={walk.activeStepIndex}
+                onStepChange={walk.onStepChange}
               />
             )}
           </div>
@@ -653,11 +628,11 @@ export default function BoxCardBody({
         {/* Address — the text itself is the directions link/trigger (mockup
             v3, option B — Kyle's pick, no icon, no button row). See this
             file's own header for the full walk-restore rationale.
-            `onWalkRoute` absent (BoxHistoryContent, no map on that page):
+            `walk` absent (BoxHistoryContent, no map on that page):
             plain external `<a>` to Google Maps, NO preset travelmode (fix
             pass, item 4) — many box visitors walk or ride the bus, so
             Google Maps itself lets the person pick a mode once it opens.
-            `onWalkRoute` present (BottomSheet/DesktopVenueWindow): a
+            `walk` present (BottomSheet/DesktopVenueWindow): a
             `<button>` that starts the SAME in-app walking route
             DirectionButtons' own Walk button does — same style as the link
             (underlined sage text, no icon, min-h 44px) so the card looks
@@ -670,11 +645,11 @@ export default function BoxCardBody({
             voice-control user saying "click <the address>" must find a
             match inside the accessible name. */}
         <div className="-mt-2 flex flex-col items-start">
-          {onWalkRoute ? (
+          {walk ? (
             <button
               type="button"
-              onClick={onWalkRoute}
-              aria-describedby={showWalkLocationHint ? walkLocationHintId : undefined}
+              onClick={() => walk.onWalk(box)}
+              aria-describedby={walk.showLocationHint ? walkLocationHintId : undefined}
               aria-label={`${box.address} — ${t("directions.walkAriaLabel", locale, { name: box.name })}`}
               className="inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
             >
@@ -691,18 +666,18 @@ export default function BoxCardBody({
               {box.address}
             </a>
           )}
-          {onWalkRoute && (
+          {walk && (
             <WalkRouteStatus
               venue={box}
               locale={locale}
-              isRouteActive={isWalkRouteActive}
-              routeInfo={walkRouteInfo}
-              walkSteps={walkRouteSteps}
-              showLocationHint={showWalkLocationHint}
+              isRouteActive={walk.isActive}
+              routeInfo={walk.info}
+              walkSteps={walk.steps}
+              showLocationHint={walk.showLocationHint}
               locationHintId={walkLocationHintId}
-              onClearRoute={onClearWalkRoute}
-              activeStepIndex={activeStepIndex}
-              onStepChange={onStepChange}
+              onClearRoute={walk.onClear}
+              activeStepIndex={walk.activeStepIndex}
+              onStepChange={walk.onStepChange}
             />
           )}
         </div>

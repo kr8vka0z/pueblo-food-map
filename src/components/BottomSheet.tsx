@@ -52,7 +52,7 @@
  *
  * Route strip (#509, walk-route standard for every venue card): starting a
  * walking route (a box's address tap, or an ordinary place's Walk button —
- * both call the SAME `onWalkRoute`) shrinks this sheet to a short `RouteStrip`
+ * both call the SAME `walk.onWalk`) shrinks this sheet to a short `RouteStrip`
  * instead of leaving the full card covering the map. This is the one place
  * v2's retired snap-point model comes back — but scoped ONLY to while a
  * route is active, and only ever between two points (full card / strip), not
@@ -97,7 +97,8 @@ import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import HoursList from "@/components/HoursList";
-import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
+import DirectionButtons from "@/components/DirectionButtons";
+import type { Walk } from "@/lib/useWalkingRoute";
 import RouteStrip, { ROUTE_STRIP_HEIGHT_PX } from "@/components/RouteStrip";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 import type { PublicEventDetail } from "@/lib/events";
@@ -193,26 +194,8 @@ interface BottomSheetProps {
   inert?: boolean;
   /** Override locale for testing. If omitted, reads from LocaleContext. */
   locale?: Locale;
-  /** Called when the user taps the Walk direction button. MapWrapper fetches the route. */
-  onWalkRoute?: (venue: Venue) => void;
-  /** True when a walking route for this venue is currently drawn on the map. */
-  isWalkRouteActive?: boolean;
-  /** Called when the user taps Walk while a route is active (clears it). */
-  onClearWalkRoute?: () => void;
-  /** Walking route distance + duration for the in-card readout (threaded from MapWrapper). */
-  walkRouteInfo?: RouteInfo | null;
-  /** Turn-by-turn steps from Mapbox (pre-localized). Shown as a collapsible list in DirectionButtons. */
-  walkRouteSteps?: WalkStep[] | null;
-  /**
-   * True when this venue's Walk tap requested geolocation and it was denied
-   * or is unavailable (#207). Tells DirectionButtons to show the localized
-   * "share your location" hint instead of silently doing nothing.
-   */
-  showWalkLocationHint?: boolean;
-  /** Which turn the step-through stepper is showing (#555) — owned by MapWrapper so the map's camera focus agrees with every stepper instance. */
-  activeStepIndex?: number;
-  /** Moves the stepper to a different turn (#555) — Back/Next or an "All turns" row tap, in either the RouteStrip sheet or the full card's own readout. */
-  onStepChange?: (index: number) => void;
+  /** Walking directions for this card (useWalkingRoute's walkFor). Absent: no Walk route (Walk does nothing, a box address stays a plain link). */
+  walk?: Walk;
 }
 
 // ─── BottomSheet ─────────────────────────────────────────────────────────────
@@ -230,17 +213,11 @@ export default function BottomSheet({
   forceExpanded,
   inert,
   locale: localeProp,
-  onWalkRoute,
-  isWalkRouteActive = false,
-  onClearWalkRoute,
-  walkRouteInfo,
-  walkRouteSteps,
-  showWalkLocationHint = false,
-  activeStepIndex = 0,
-  onStepChange = () => {},
+  walk,
 }: BottomSheetProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
+  const isWalkRouteActive = walk?.isActive ?? false;
   const [expanded, setExpanded] = useState(false);
 
   // ── Grab bar toggle + swipe (#666) ──────────────────────────────────────
@@ -736,19 +713,19 @@ export default function BottomSheet({
               position as the ordinary header row's own trio. */}
           {venue && showStrip && (
             // #509: strip replaces the full card entirely while a route is
-            // active and not revealed — same trigger (onWalkRoute) and
-            // onClearWalkRoute callback contract every card branch below
+            // active and not revealed — same `walk` object (onWalk /
+            // onClear) contract every card branch below
             // already wires, so RouteStrip needs no knowledge of box vs
             // ordinary venue.
             <RouteStrip
               venueName={venue.name}
-              routeInfo={walkRouteInfo ?? null}
+              routeInfo={walk?.info ?? null}
               locale={locale}
               onShowCard={() => setCardRevealed(true)}
-              onClearRoute={onClearWalkRoute}
-              walkSteps={walkRouteSteps}
-              activeStepIndex={activeStepIndex}
-              onStepChange={onStepChange}
+              onClearRoute={walk?.onClear}
+              walkSteps={walk?.steps}
+              activeStepIndex={walk?.activeStepIndex}
+              onStepChange={walk?.onStepChange}
             />
           )}
 
@@ -818,14 +795,7 @@ export default function BottomSheet({
                     expanded={expanded}
                     onRequestExpand={() => setExpandedState(true)}
                     detailSectionId={DETAIL_SECTION_ID}
-                    onWalkRoute={onWalkRoute ? () => onWalkRoute(box) : undefined}
-                    isWalkRouteActive={isWalkRouteActive}
-                    onClearWalkRoute={onClearWalkRoute}
-                    walkRouteInfo={isWalkRouteActive ? walkRouteInfo : null}
-                    walkRouteSteps={isWalkRouteActive ? walkRouteSteps : null}
-                    showWalkLocationHint={showWalkLocationHint}
-                    activeStepIndex={activeStepIndex}
-                    onStepChange={onStepChange}
+                    walk={walk}
                     actions={
                       <>
                         <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} isBox />
@@ -986,15 +956,15 @@ export default function BottomSheet({
                     so this branch is guaranteed non-box already. */}
                 <DirectionButtons
                   venue={venue}
-                  onWalk={onWalkRoute ?? (() => {})}
+                  onWalk={walk?.onWalk ?? (() => {})}
                   locale={locale}
                   isRouteActive={isWalkRouteActive}
-                  onClearRoute={onClearWalkRoute}
-                  routeInfo={isWalkRouteActive ? walkRouteInfo : null}
-                  walkSteps={isWalkRouteActive ? walkRouteSteps : null}
-                  showLocationHint={showWalkLocationHint}
-                  activeStepIndex={activeStepIndex}
-                  onStepChange={onStepChange}
+                  onClearRoute={walk?.onClear}
+                  routeInfo={walk?.info}
+                  walkSteps={walk?.steps}
+                  showLocationHint={walk?.showLocationHint}
+                  activeStepIndex={walk?.activeStepIndex}
+                  onStepChange={walk?.onStepChange}
                 />
 
                 {/* Detail section (#666) — ALWAYS mounted now (the old

@@ -121,7 +121,6 @@ const es: Record<string, string> = {
 
   // Splash page (#68, #100)
   "splash.purpose": "Un mapa comunitario y gratuito de recursos alimentarios en el condado de Pueblo.",
-  "splash.cta.primary": "Encuentra comida cerca de mí",
   "splash.microcopy": "Solo usamos tu ubicación para mostrar alimentos cercanos. Nada se guarda.",
   "splash.tour": "Ver cómo funciona", // [CHECK]
 
@@ -175,7 +174,6 @@ const es: Record<string, string> = {
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
   "menu.tour": "Aprende a usar este mapa", // [CHECK]
   "menu.language": "Language / Idioma",
-  "menu.verEnEspanol": "Ver en español →",
   "menu.listView": "Vista de lista",
   "menu.mapView": "Vista de mapa",
 

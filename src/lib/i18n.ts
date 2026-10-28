@@ -1109,6 +1109,15 @@ const enClient: Record<string, string> = {
   "resources.faq.a4": "Dial 2-1-1 or (866) 760-6489, or text your ZIP code to 898-211, and ask about emergency food near you. The Food Resource Hotline at 855-855-4626 (Monday to Thursday 8:30 a.m. to 4:30 p.m., Friday 8 a.m. to noon) can connect you with food pantries and free meal sites. You can also look at the food pantries on this map and check their hours before you go.",
 };
 
+// Spanish that English pages show too, through a literal t(key, "es"): the
+// splash's second button and the menu's link to the /es pages. Kept in every
+// bundle so they never fall back to English before i18n.es.ts loads (a
+// fallback there also broke hydration). i18n.test.ts checks the list.
+export const ES_ON_EVERY_PAGE: Record<string, string> = {
+  "splash.cta.primary": "Encuentra comida cerca de mí",
+  "menu.verEnEspanol": "Ver en español →",
+};
+
 let en: Record<string, string> = enClient;
 // Browser: null until Spanish is loaded (see the file header).
 let es: Record<string, string> | null = null;
@@ -1124,7 +1133,7 @@ if (import.meta.env.SSR || import.meta.env.MODE === "test") {
     import("@/lib/i18n.server"),
   ]);
   en = { ...enClient, ...serverEn };
-  es = { ...esClient, ...serverEs };
+  es = { ...ES_ON_EVERY_PAGE, ...esClient, ...serverEs };
 }
 
 /** True once t() can answer in Spanish. */
@@ -1134,7 +1143,7 @@ export function hasSpanish(): boolean {
 
 /** Registers the Spanish client strings (SpanishMessages.tsx, loadSpanish()). */
 export function setSpanish(dict: Record<string, string>): void {
-  es ??= dict;
+  es ??= { ...ES_ON_EVERY_PAGE, ...dict };
 }
 
 /** Loads the Spanish strings in the browser; resolves at once if already there. */
@@ -1159,7 +1168,7 @@ export function t(
   locale: Locale = "en",
   vars?: Record<string, string>,
 ): string {
-  const dict = locale === "es" && es ? es : en;
+  const dict = locale === "es" ? (es ?? ES_ON_EVERY_PAGE) : en;
   // Defensive fallback: if the ES key is missing, use EN.
   const raw = dict[key] ?? en[key] ?? key;
   return vars ? interpolate(raw, vars) : raw;

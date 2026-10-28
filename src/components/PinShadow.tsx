@@ -6,7 +6,7 @@
  * repaints the pin, which on a pan is every frame for ~130 pins. Plain
  * shapes paint for almost nothing.
  *
- * ponytail: the 4px blur is faked by three stacked, ever-wider translucent
+ * ponytail: the 4px blur is faked by five stacked, ever-wider translucent
  * copies of the shape, offset 2px down. Close to the old shadow at pin size;
  * if a pin ever grows large enough to show the steps, switch to a real
  * feGaussianBlur defined once for the whole map.
@@ -18,12 +18,15 @@ import type { ReactNode } from "react";
 export const PIN_PATH =
   "M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0";
 
-// Extra stroke width (px) and opacity per copy: about 0.24 black at the
-// shape's edge-in, fading out over ~3 px, like the old 4px blur.
+// Extra stroke width (px) and opacity per copy. Stacked, they give about
+// 0.12 black at the shape's edge, fading to nothing 4 px out: the falloff of
+// the old 4px CSS blur, in 1 px steps.
 const LAYERS = [
-  { grow: 6, opacity: 0.04 },
-  { grow: 3.5, opacity: 0.06 },
-  { grow: 1, opacity: 0.14 },
+  { grow: 8, opacity: 0.01 },
+  { grow: 6, opacity: 0.015 },
+  { grow: 4, opacity: 0.025 },
+  { grow: 2, opacity: 0.03 },
+  { grow: 1, opacity: 0.04 },
 ];
 
 interface PinShadowProps {

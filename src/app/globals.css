@@ -529,6 +529,14 @@ html[data-splash-seen] [data-splash-pending] {
   display: none;
 }
 
+/* The reverse for the map-screen stand-in (#730, MapScreenStandIn.tsx): while
+   the gate is unresolved it shows only for those same visitors, so a
+   first-time visitor sees the splash alone. Once resolved, React drops the
+   pending copy and shows the stand-in only until MapWrapper mounts. */
+html:not([data-splash-seen]) [data-map-standin-pending] {
+  display: none;
+}
+
 /* Thinner variant for the smaller text (purpose line, microcopy) — a lighter
    0.5px outline so it doesn't read as heavy at small sizes. */
 .splash-text-outline-sm {

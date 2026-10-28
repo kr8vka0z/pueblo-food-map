@@ -1119,6 +1119,15 @@ server HTML (/ and /es)
     and globals.css hides [data-splash-pending] until React unmounts it
     (full page loads only: React never executes a script it renders on a
     client-side navigation)
+  → MapScreenStandIn (#730) sits beside it with data-map-standin-pending: a
+    still, aria-hidden, inert copy of the search bar and bottom nav (real
+    SearchBar, BottomNav's classes from bottomNavShared.tsx), shown by
+    globals.css only when data-splash-seen is set, so a returning visitor
+    sees the map screen's frame at first paint instead of a blank page.
+    Once the gate resolves it becomes MapWrapper's next/dynamic `loading`
+    placeholder (through a context, labels from HomeShell so the i18n
+    dictionary stays out of the blocking bundle) and disappears when
+    MapWrapper mounts. Its boxes match the real ones exactly, so nothing moves.
 
 HomePageClient.tsx layout effect resolves the gate (shouldSkipSplash(), same
 rules as the script). On client-side navigation this is the only gate: its

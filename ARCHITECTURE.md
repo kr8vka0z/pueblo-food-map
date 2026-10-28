@@ -524,11 +524,11 @@ or a malformed `maneuver.location` — the stepper flies the camera to that
 coordinate, so a locationless step would crash it. `WalkStepper`
 (`DirectionButtons.tsx`, #555) shows one turn at a time with Back/Next
 (disabled at the ends, never hidden) and reuses `WalkStepsList` for its
-"All turns" disclosure. `MapWrapper.handleStepChange` is the one place a step
+"All turns" disclosure. `useWalkingRoute`'s `stepTo` is the one place a step
 change lands: it sets `activeStepIndex`, moves the camera via
-`focusPoint`/`focusRequestId`, and calls `requestStepLocationRefresh`, which
-re-reads the user's position without bumping `recenterRequestId` (that would
-start a competing flyTo).
+`focusPoint`/`focusRequestId`, and calls `refreshLocation` (MapWrapper's
+`requestStepLocationRefresh`), which re-reads the user's position without
+bumping `recenterRequestId` (that would start a competing flyTo).
 
 **Walk without a location (#207).** Walk never uses `PUEBLO_CENTER` as the
 origin — a route from downtown would mislead (Bus/Drive deep links omit
@@ -537,18 +537,18 @@ null:
 
 ```
 Walk tapped, userLocation === null
-  → handleWalkRoute stashes venue.id in walkAwaitingVenueIdRef
-  → calls handleLocateRequest()   (same geo.request() flow "Near me" uses)
+  → useWalkingRoute's walk() stashes venue.id in awaitingVenueIdRef
+  → calls requestLocation()   (MapWrapper's handleLocateRequest: the same geo.request() flow "Near me" uses)
   → resume effect watches geo.state, applies decideWalkResume(awaitingVenueId, selectedVenueId, geo.state):
-      granted + position     → fetchWalkingRoute(venue, position)   — draws the real route
-      denied / failed        → setWalkLocationHintVenueId(venue.id) — "share your location" hint, no route
+      granted + position     → fetchRoute(venue, position)    — draws the real route
+      denied / failed        → setHintVenueId(venue.id)       — "share your location" hint, no route
       stale (venue no longer selected) → noop, nothing drawn or shown
 ```
 
 `decideWalkResume` is pure and lives in `src/lib/walkRoute.ts`. The effect also waits out the
 transient `{granted, position:null}` state (the Permissions API can fire
 before `getCurrentPosition` succeeds) so a real grant isn't read as a denial.
-`fetchWalkingRoute` takes `origin` as a parameter so the effect can pass the
+`fetchRoute` takes `origin` as a parameter so the effect can pass the
 just-resolved position without waiting for a re-render.
 
 **Filtering pipeline** (computed in `useMemo`, run on every state change):

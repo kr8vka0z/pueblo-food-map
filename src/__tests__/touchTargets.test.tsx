@@ -406,12 +406,13 @@ describe("44px leftovers reach the 48px floor (#827)", () => {
     [
       "desktop card close",
       () => (render(<VenuePopupHeader onClose={vi.fn()} />), screen.getByRole("button", { name: "Close" })),
-      ["relative", "before:absolute", "before:-inset-0.5"],
+      // Grows down, not up: the bar's top edge is clipped (overflow-hidden).
+      ["relative", "before:absolute", "before:-inset-x-0.5", "before:top-0", "before:-bottom-1"],
     ],
     [
       "desktop box card History link",
       () => (render(<VenuePopupHeader onClose={vi.fn()} historyHref="/box/x/history" />), screen.getByRole("link", { name: "History" })),
-      ["relative", "before:absolute", "before:inset-x-0", "before:-inset-y-2"],
+      ["relative", "before:absolute", "before:inset-x-0", "before:-top-1.5", "before:-bottom-2.5"],
     ],
     [
       "location help card close",

@@ -22,8 +22,8 @@
  * prop chain (MapWrapper.tsx:1678-1682/1714-1718, BottomSheet.tsx:350/376)
  * confirms there is no additional box-specific gate that could drop them
  * before RouteStrip ever sees them; both a plain venue and a blessing box
- * go through the same `handleWalkRoute` -> `walkingRouteVenueId ===
- * selectedVenueId` gate the strip itself already depends on to render at
+ * go through the same Walk handler -> route-venue ===
+ * selectedVenueId gate (now in `useWalkingRoute`) the strip itself already depends on to render at
  * all. So the fix (RouteStrip.tsx) targets candidate 2: promote the control
  * from a text link to a real, primary-looking button — plus a proof-line
  * fallback for the rare route that truly has no steps.

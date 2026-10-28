@@ -398,7 +398,7 @@ export default function MapWrapper({
    * WITHOUT bumping recenterRequestId. handleLocateRequest's own counter
    * bump is what makes Map.tsx fly the camera to the USER — reusing it here
    * would fight the flyTo-the-turn move the same tap just triggered via
-   * focusRequestId (handleStepChange, below). Only the "ask the browser for
+   * focusRequestId (useWalkingRoute's stepTo). Only the "ask the browser for
    * a fresh reading" half of handleLocateRequest is shared; the camera stays
    * owned by the turn the stepper is on. Mirrors handleLocateRequest's own
    * "already located" guard so a tap doesn't flip the spinner on when the

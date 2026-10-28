@@ -44,7 +44,7 @@
  * `walk` presence is the switch: absent (BoxHistoryContent, no map
  * to draw a route on) → the address is a plain external `<a>` to Google
  * Maps, unchanged from before. Present (BottomSheet/DesktopVenueWindow,
- * always forwarded from MapWrapper's own `handleWalkRoute`) → the address
+ * the `walk` object MapWrapper builds with `useWalkingRoute`'s `walkFor`) → the address
  * is a `<button>` that fires the SAME callback, geolocation-request, and
  * location-hint behavior DirectionButtons' own Walk button uses for every
  * other venue, and the active-route readout (distance/duration, steps,

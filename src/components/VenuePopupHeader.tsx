@@ -31,8 +31,11 @@ export default function VenuePopupHeader({
   historyHref,
 }: VenuePopupHeaderProps) {
   const historyClassName =
-    // before:* — the 32px link's hit area reaches 48px inside the 44px bar (#827).
-    "order-1 relative before:absolute before:inset-x-0 before:-inset-y-2 flex items-center h-8 px-3 -ml-1 rounded-md " +
+    // before:* — the 32px link (6px below the bar's top) gets a 48px hit area
+    // from the bar's top edge down 4px into the body (#827). Growing upward
+    // would be clipped by DesktopVenueWindow's overflow-hidden, or overlap
+    // the "← Saved" row above.
+    "order-1 relative before:absolute before:inset-x-0 before:-top-1.5 before:-bottom-2.5 flex items-center h-8 px-3 -ml-1 rounded-md " +
     "text-xs font-medium text-[var(--color-sage-600)] " +
     "hover:text-[var(--color-sage-700)] hover:bg-[var(--color-bone-100)] transition-colors " +
     PRESS_FEEDBACK + " " +
@@ -56,9 +59,11 @@ export default function VenuePopupHeader({
           // box fills it exactly). Negative margin folds in the pre-existing
           // -mr-1 and cancels the growth so the panel's tight header layout
           // and the icon's position don't move (mobile review #11).
-          // before:* — invisible 2px-all-round overlay takes the 44px box to
-          // the 48px floor without moving the icon (#827).
-          "order-3 relative before:absolute before:-inset-0.5 flex items-center justify-center w-11 h-11 " +
+          // before:* — invisible overlay takes the 44px box to the 48px floor
+          // without moving the icon (#827): 2px each side, and 4px down into
+          // the body rather than up, where the box already touches the bar's
+          // top edge (see the History link above).
+          "order-3 relative before:absolute before:-inset-x-0.5 before:top-0 before:-bottom-1 flex items-center justify-center w-11 h-11 " +
           "-mt-1.5 -mb-1.5 -ml-1.5 -mr-[10px] rounded-md shrink-0 " +
           "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
           PRESS_FEEDBACK + " " +

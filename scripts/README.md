@@ -102,7 +102,6 @@ automated diff:
 
 | Script | Purpose | When to re-run |
 |---|---|---|
-| `geocode-pfp.py` | Geocodes the 10 hand-curated Pueblo Food Project venues against Nominatim | Only if a PFP address changes — last run 2026-05-14 |
 | `geocode-osm-missing.py` | Reverse-geocodes OSM venues missing an address (Nominatim, falling back to Mapbox, then raw coordinates) | After an OSM ingest leaves new venues with no address |
 
 ## Release and security automation
@@ -128,7 +127,6 @@ unfamiliar reader doesn't mistake them for part of the flow above:
 
 | Script | Purpose |
 |---|---|
-| `seed-admin-db.ts` | Local only: generates SQL that loads the real venue source records into a fresh local D1 (`npm run seed:admin`). Never apply it with `--remote`; remote databases change only through `wrangler d1 migrations apply` |
 | `seed-blessing-boxes.ts` | Dev-only: generates throwaway fake blessing-box SQL for staging/dev |
 | `load-real-blessing-boxes.ts` | Generates ready-to-apply SQL for Kyle's real blessing-box address list |
 | `seed-dev.sql` | Fake venue rows for the staging admin D1 database's UI states |

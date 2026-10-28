@@ -67,9 +67,9 @@ src/
   data/            Static venue data (committed TypeScript modules)
     venues.ts        Public venue list — single import for all components
     published-venues.ts  Snapshot of D1 venues, written by admin Publish (do not edit by hand)
-    grocery-osm.ts, pantries-plentiful.ts, pfp-venues.ts
-                     Scraper/hand-curated source arrays — not read by the public
-                     map since the #237 D1 cutover (seed script, tests, refresh diff)
+    grocery-osm.ts, pantries-plentiful.ts
+                     Scraper source arrays — not read by the public map since
+                     the #237 D1 cutover (tests, refresh diff)
     pueblo-bbox.ts   Pueblo County geographic constants
   lib/             Shared utilities (i18n, hours, favorites, distance, etc.)
   types/
@@ -150,9 +150,9 @@ CI enforces this automatically (blocking gate).
 | Grocery / convenience / farms | OpenStreetMap Overpass API | Automated (see below) |
 | SNAP / WIC flags | USDA FNS + CDPHE public data (matched into D1 by migration `0014`, #597) | Admin-editable in D1 directly |
 
-PFP garden coordinates geocoded against Nominatim (OpenStreetMap) on
-2026-05-14 via `scripts/geocode-pfp.py` — audit trail in
-`data/raw/pfp-geocodes.json`.
+PFP garden coordinates were geocoded against Nominatim (OpenStreetMap) on
+2026-05-14 by a one-time script, since removed; the audit trail is in
+`data/raw/pfp-geocodes.json`. They live in D1 and are edited in the admin.
 
 **Re-running the scrapers by hand does NOT update the live map.** Since the
 #237 admin cutover, the public map's data comes from Cloudflare D1 via an

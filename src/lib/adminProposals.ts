@@ -33,12 +33,15 @@ import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 // ─── Row + parsed-diff shapes ───────────────────────────────────────────────
 
-/** Mirrors the `change_proposals` CHECK constraints (migrations/0001_init_admin_schema.sql; source widened by 0020). */
+/**
+ * Mirrors the `change_proposals` CHECK constraints (migrations/0001_init_admin_schema.sql;
+ * source widened by 0020), minus 'gtfs': the CHECK still allows it, but GTFS was
+ * dropped (#133) and nothing ever writes it.
+ */
 export type ProposalStatus = "pending" | "approved" | "rejected" | "superseded";
 export type ProposalSourceValue =
   | "osm"
   | "plentiful"
-  | "gtfs"
   | "link_health"
   | "care_and_share"
   | "website"
@@ -100,10 +103,9 @@ export function parseProposalRow(row: ChangeProposalRow): ParsedProposal {
 
 /**
  * Sources whose freshness-only pings are trusted enough to blanket-approve.
- * `gtfs` is deliberately excluded (diffEngine.ts never emits a
- * freshness-only `gtfs` proposal today, and this predicate names an
- * allowlist rather than everything-but-link_health so a future new source
- * doesn't silently gain bulk-approval by omission). `link_health` can never
+ * This predicate names an allowlist rather than everything-but-link_health
+ * so a future new source doesn't silently gain bulk-approval by omission.
+ * `link_health` can never
  * qualify regardless — it is a dead-link finding routed to the venue edit
  * screen, never approved directly (see applyApprovedProposal's own header).
  * `website` (step 3): a page that loaded and changed nothing is the same

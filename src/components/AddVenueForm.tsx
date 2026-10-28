@@ -74,6 +74,7 @@ import { categoryLabels } from "@/lib/categories";
 import StaticLocationMap from "@/components/StaticLocationMap";
 import { DISPLAY_DAY_KEYS, type DayKey } from "@/lib/hours";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
+import { EMAIL_RE } from "@/lib/email";
 import type { IrregularSchedule, VenueCategory, WeeklyHours } from "@/types/venue";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -102,10 +103,9 @@ export interface IrregularEntryDraft {
 
 /**
  * Shape returned by GET /api/admin/geocode (src/app/api/admin/geocode/route.ts).
- * Declared locally rather than imported from the route module — same
- * client/server duplication this file already uses for EMAIL_RE below,
- * since the route's own validation is the authoritative trust boundary and
- * this copy only needs to describe an already-trusted response.
+ * Declared locally rather than imported from the route module: the route's
+ * own validation is the authoritative trust boundary and this copy only
+ * needs to describe an already-trusted response.
  */
 interface GeocodeMatch {
   lat: number;
@@ -236,12 +236,6 @@ const DAY_LABELS: Record<DayKey, string> = {
   sun: "Sunday",
 };
 
-// Locally scoped, not shared with src/lib/adminVenueValidation.ts (the
-// server's authoritative check) — same split SuggestForm.tsx already uses
-// against its own submit route's validate(). Client validation exists only
-// to give fast inline feedback before a round trip; the server re-checks
-// everything regardless.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function emptyHoursDraft(): HoursDraft {
   const draft = {} as HoursDraft;

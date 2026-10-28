@@ -7,7 +7,7 @@
  * the full guard order and rate-limit scopes); this component only owns
  * the form UI and the Turnstile hand-off.
  *
- * Turnstile via the shared useBoxTurnstileWidget() hook (src/lib/) — same
+ * Turnstile via the shared useTurnstile() hook (src/lib/) — same
  * dedicated invisible box key + managed-checkbox fallback BoxCheckinPanel
  * uses, mount details in that hook's own header. A click before a token
  * exists queues the submit (`pendingSubmit`) rather than blocking the
@@ -36,7 +36,7 @@ import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { getCheckinClientToken } from "@/lib/checkinClientToken";
-import { useBoxTurnstileWidget } from "@/lib/useBoxTurnstileWidget";
+import { useTurnstile } from "@/lib/useTurnstile";
 
 const PENDING_SUBMIT_TIMEOUT_MS = 15_000;
 
@@ -74,11 +74,11 @@ export default function AdoptBoxForm({ boxId, open: openProp, onOpenChange }: Ad
   const [pending, setPending] = useState<PendingSubmit | null>(null);
 
   // The container ref stays LOCAL to this component (not returned by the
-  // hook) — see useBoxTurnstileWidget.ts's own header for why (the React
+  // hook) — see useTurnstile.ts's own header for why (the React
   // Compiler ESLint rule flags a ref bundled into a hook's returned state
   // object).
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
-  const turnstile = useBoxTurnstileWidget(turnstileContainerRef);
+  const turnstile = useTurnstile(turnstileContainerRef, { box: true });
 
   async function submit(values: PendingSubmit) {
     setState("submitting");
@@ -173,7 +173,7 @@ export default function AdoptBoxForm({ boxId, open: openProp, onOpenChange }: Ad
   // likely already resolved by the time a visitor finishes typing and taps
   // submit. It also fixes a real mount-timing bug: the hook's own
   // mount-on-first-render effect runs exactly once (see
-  // useBoxTurnstileWidget.ts's own header) — if the container div were only
+  // useTurnstile.ts's own header) — if the container div were only
   // rendered after `open` flips true, that effect would have already run
   // and found no container to mount into, and nothing would ever retry.
   //

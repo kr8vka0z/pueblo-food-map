@@ -15,7 +15,7 @@
  * against firing twice under React StrictMode's dev-mode double-invoke of
  * effects — a local ref, not bundled into any returned/shared state object
  * (same rule this repo's react-hooks/refs lint rule enforces on
- * useBoxTurnstileWidget.ts's container ref).
+ * useTurnstile.ts's container ref).
  *
  * <noscript> fallback: a visitor with JS disabled gets none of the above —
  * the effect never runs, so the page would otherwise show "Stopping…"

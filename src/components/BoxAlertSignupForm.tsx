@@ -19,7 +19,7 @@ import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { getCheckinClientToken } from "@/lib/checkinClientToken";
-import { useBoxTurnstileWidget } from "@/lib/useBoxTurnstileWidget";
+import { useTurnstile } from "@/lib/useTurnstile";
 
 const PENDING_SUBMIT_TIMEOUT_MS = 15_000;
 
@@ -40,11 +40,11 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   // The container ref stays LOCAL to this component (not returned by the
-  // hook) — see useBoxTurnstileWidget.ts's own header for why (the React
+  // hook) — see useTurnstile.ts's own header for why (the React
   // Compiler ESLint rule flags a ref bundled into a hook's returned state
   // object).
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
-  const turnstile = useBoxTurnstileWidget(turnstileContainerRef);
+  const turnstile = useTurnstile(turnstileContainerRef, { box: true });
 
   async function submit(emailValue: string) {
     setState("submitting");

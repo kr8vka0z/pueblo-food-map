@@ -3,450 +3,124 @@
 /**
  * FeedbackForm — client component for the general feedback form.
  *
- * Features:
- *   - Feedback type select (required, 4 types from FEEDBACK_TYPES)
- *   - Message textarea (required)
- *   - Your email input (required — so we can follow up)
- *   - Honeypot field (hidden from real users, caught server-side)
- *   - Cloudflare Turnstile widget (bot protection)
- *   - Client-side validation with accessible error announcements
- *   - Success state with "Back to map" link
- *   - Error state with "Try again" preserving form data
- *   - Mobile-friendly: no horizontal scroll at 375px
- *   - Keyboard accessible: all controls labeled, errors linked via aria-describedby
+ * Fields: feedback type (required, FEEDBACK_TYPES), message (required) and
+ * the visitor's email (required — so we can follow up). Turnstile, the
+ * honeypot, validation focus, submit/success/error states and the shared
+ * field markup live in PublicForm.tsx.
  *
  * Reads locale from useLocale() (#289) instead of a prop passed down from
  * /feedback's page.tsx — matches the rest of the codebase's client-side
  * locale pattern (SiteFooter, ListView, HamburgerMenu).
  */
 
-import { useState, useEffect, useRef } from "react";
-import Script from "next/script";
-import Link from "next/link";
+import { useState } from "react";
 import { t, type Locale } from "@/lib/i18n";
-import { useLocale } from "@/lib/LocaleContext";
+import { EMAIL_RE } from "@/lib/email";
 import { FEEDBACK_TYPES, type FeedbackTypeKey } from "@/lib/feedbackTypes";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
+import PublicForm, { Field, PrivacyNote, type FieldErrors } from "@/components/PublicForm";
 
 const { FEEDBACK_MESSAGE, EMAIL } = FIELD_LIMITS;
 
-// ─── Validation ───────────────────────────────────────────────────────────────
-// Turnstile Window type lives in src/types/turnstile.d.ts (deduplicated in #166 8.6).
+type FeedbackField = "feedbackType" | "message" | "contactEmail";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-interface ValidationErrors {
-  feedbackType?: string;
-  message?: string;
-  contactEmail?: string;
-}
-
-function validate(
-  feedbackType: string,
-  message: string,
-  contactEmail: string,
-  locale: Locale,
-): ValidationErrors {
-  const errors: ValidationErrors = {};
-  if (!feedbackType) {
-    errors.feedbackType = t("feedback.validation.typeRequired", locale);
-  }
-  if (!message.trim()) {
-    errors.message = t("feedback.validation.messageRequired", locale);
-  }
-  if (!contactEmail.trim()) {
-    errors.contactEmail = t("feedback.validation.emailRequired", locale);
-  } else if (!EMAIL_RE.test(contactEmail)) {
-    errors.contactEmail = t("feedback.validation.emailInvalid", locale);
-  }
-  return errors;
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
+const FIELD_IDS: Record<FeedbackField, string> = {
+  feedbackType: "feedback-type",
+  message: "feedback-message",
+  contactEmail: "feedback-email",
+};
 
 export default function FeedbackForm() {
-  const { locale } = useLocale();
   const [feedbackType, setFeedbackType] = useState<string>("");
   const [message, setMessage] = useState<string>("");
   const [contactEmail, setContactEmail] = useState<string>("");
-  const [honeypot, setHoneypot] = useState<string>("");
 
-  // Turnstile state
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const [turnstileError, setTurnstileError] = useState<boolean>(false);
-  const turnstileContainerRef = useRef<HTMLDivElement>(null);
-  const turnstileWidgetId = useRef<string | null>(null);
-
-  const [errors, setErrors] = useState<ValidationErrors>({});
-  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
-
-  // ── Turnstile widget render ────────────────────────────────────────────────
-  // Called once the CF Turnstile script has loaded. Re-runs if the container
-  // mounts after script load (e.g. error state reset).
-
-  function mountTurnstile() {
-    if (!turnstileContainerRef.current || !window.turnstile) return;
-    if (turnstileWidgetId.current) return; // already mounted
-
-    const sitekey =
-      process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
-
-    turnstileWidgetId.current = window.turnstile.render(
-      turnstileContainerRef.current,
-      {
-        sitekey,
-        callback: (token) => {
-          setTurnstileToken(token);
-          setTurnstileError(false);
-        },
-        "error-callback": () => {
-          setTurnstileToken(null);
-          setTurnstileError(true);
-        },
-        "expired-callback": () => {
-          setTurnstileToken(null);
-          setTurnstileError(false);
-        },
-      },
-    );
-  }
-
-  // When the form returns from success/error states the widget container
-  // re-mounts. Try to render if the script already loaded.
-  useEffect(() => {
-    if (window.turnstile) {
-      mountTurnstile();
+  function validate(locale: Locale): FieldErrors<FeedbackField> {
+    const errors: FieldErrors<FeedbackField> = {};
+    if (!feedbackType) {
+      errors.feedbackType = t("feedback.validation.typeRequired", locale);
     }
-    return () => {
-      if (window.turnstile && turnstileWidgetId.current) {
-        window.turnstile.remove(turnstileWidgetId.current);
-        turnstileWidgetId.current = null;
-      }
-    };
-  }, []);
-
-  // ── Submission ────────────────────────────────────────────────────────────
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
-    const validationErrors = validate(feedbackType, message, contactEmail, locale);
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      // Move focus to first error for screen-reader users
-      const firstErrorId = validationErrors.feedbackType
-        ? "feedback-type-error"
-        : validationErrors.message
-        ? "feedback-message-error"
-        : "feedback-email-error";
-      document.getElementById(firstErrorId)?.focus();
-      return;
+    if (!message.trim()) {
+      errors.message = t("feedback.validation.messageRequired", locale);
     }
-
-    setErrors({});
-    setStatus("submitting");
-
-    try {
-      const res = await fetch("/feedback/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          feedbackType,
-          message: message.trim(),
-          contactEmail: contactEmail.trim(),
-          website: honeypot, // honeypot field
-          turnstileToken: turnstileToken ?? "",
-        }),
-      });
-
-      const data = (await res.json()) as { ok: boolean; error?: string };
-
-      if (data.ok) {
-        setStatus("success");
-      } else if (data.error === "rate_limit") {
-        setErrors({ message: t("feedback.error.rateLimit", locale) });
-        setStatus("idle");
-      } else if (data.error === "turnstile_failed") {
-        setTurnstileError(true);
-        setTurnstileToken(null);
-        // Reset widget so user can retry
-        if (window.turnstile && turnstileWidgetId.current) {
-          window.turnstile.reset(turnstileWidgetId.current);
-        }
-        setStatus("idle");
-      } else {
-        setStatus("error");
-      }
-    } catch {
-      setStatus("error");
+    if (!contactEmail.trim()) {
+      errors.contactEmail = t("feedback.validation.emailRequired", locale);
+    } else if (!EMAIL_RE.test(contactEmail)) {
+      errors.contactEmail = t("feedback.validation.emailInvalid", locale);
     }
+    return errors;
   }
-
-  // ── Success state ─────────────────────────────────────────────────────────
-
-  if (status === "success") {
-    return (
-      <div role="status" aria-live="polite" className="text-center py-8">
-        <h2
-          className="text-xl font-semibold text-[var(--color-ink-900)] mb-2"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          {t("feedback.success.title", locale)}
-        </h2>
-        {/* #534: --color-ink-600 undefined in globals.css @theme — mapped to
-            ink-700, DESIGN.md's documented body-text token (this is a plain
-            success-message paragraph, not the "secondary metadata"
-            role ink-500 is reserved for). */}
-        <p className="text-sm text-[var(--color-ink-700)] mb-6 leading-relaxed">
-          {t("feedback.success.body", locale)}
-        </p>
-        <Link
-          href="/"
-          className={
-            "inline-flex items-center justify-center px-5 h-10 rounded-[var(--radius-md)] " +
-            "bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
-            "text-sm font-semibold transition-colors duration-150 " +
-            "hover:bg-[var(--color-sage-700)] focus-visible:outline-none " +
-            "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
-          }
-        >
-          {t("feedback.backToMap", locale)}
-        </Link>
-      </div>
-    );
-  }
-
-  // ── Form (idle | submitting | error) ─────────────────────────────────────
-
-  // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
-  const inputBase =
-    "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
-    // #534: --color-ink-300 undefined in globals.css @theme — DESIGN.md
-    // names ink-400 explicitly as "placeholder text, icon fills, and
-    // section headers," so that's the documented replacement, not a guess.
-    "bg-white placeholder:text-[var(--color-ink-400)] " +
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-    "focus-visible:border-[var(--color-sage-500)]";
-
-  const inputBorder = (hasError: boolean) =>
-    hasError ? "border-[var(--color-danger)]" : "border-[var(--color-bone-300)]";
-
-  const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
-  const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
 
   return (
-    <>
-      {/* Cloudflare Turnstile JS — loads after page is interactive */}
-      <Script
-        src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-        strategy="afterInteractive"
-        onLoad={mountTurnstile}
-      />
-    <form onSubmit={handleSubmit} noValidate className="space-y-5">
-      {/* Global error state banner */}
-      {status === "error" && (
-        <div
-          role="alert"
-          className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 py-3"
-        >
-          <p className="text-sm font-medium text-[var(--color-danger)]">{t("feedback.error.title", locale)}</p>
-          <p className="text-sm text-[var(--color-danger)] mt-0.5">{t("feedback.error.body", locale)}</p>
-        </div>
+    <PublicForm
+      form="feedback"
+      url="/feedback/submit"
+      fieldIds={FIELD_IDS}
+      rateLimitField="message"
+      validate={validate}
+      body={() => ({ feedbackType, message: message.trim(), contactEmail: contactEmail.trim() })}
+    >
+      {(errors, locale) => (
+        <>
+          <Field id="feedback-type" label={t("feedback.type.label", locale)} required error={errors.feedbackType}>
+            {(control) => (
+              <select {...control} value={feedbackType} onChange={(e) => setFeedbackType(e.target.value)}>
+                <option value="">{t("feedback.type.placeholder", locale)}</option>
+                {(Object.keys(FEEDBACK_TYPES) as FeedbackTypeKey[]).map((key) => (
+                  <option key={key} value={key}>
+                    {t(`feedback.type.${key}`, locale)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+
+          <Field
+            id="feedback-message"
+            label={t("feedback.message.label", locale)}
+            required
+            error={errors.message}
+            controlClass="resize-y min-h-[96px]"
+          >
+            {(control) => (
+              <textarea
+                {...control}
+                rows={4}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder={t("feedback.message.placeholder", locale)}
+                maxLength={FEEDBACK_MESSAGE}
+              />
+            )}
+          </Field>
+
+          <Field
+            id="feedback-email"
+            label={t("feedback.email.label", locale)}
+            required
+            error={errors.contactEmail}
+            hint={t("feedback.email.hint", locale)}
+            after={<PrivacyNote locale={locale} />}
+          >
+            {(control) => (
+              <input
+                {...control}
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder={t("feedback.email.placeholder", locale)}
+                autoComplete="email"
+                autoCapitalize="off"
+                autoCorrect="off"
+                // Last field before submit — Enter implicitly submits, so "send".
+                enterKeyHint="send"
+                required
+                maxLength={EMAIL}
+              />
+            )}
+          </Field>
+        </>
       )}
-
-      {/* Feedback type (required) */}
-      <div>
-        <label htmlFor="feedback-type" className={labelClass}>
-          {t("feedback.type.label", locale)}{" "}
-          <span aria-hidden className="text-[var(--color-danger)]">*</span>
-        </label>
-        <select
-          id="feedback-type"
-          value={feedbackType}
-          onChange={(e) => setFeedbackType(e.target.value)}
-          aria-required="true"
-          aria-describedby={errors.feedbackType ? "feedback-type-error" : undefined}
-          aria-invalid={errors.feedbackType ? "true" : undefined}
-          className={`${inputBase} ${inputBorder(!!errors.feedbackType)}`}
-        >
-          <option value="">{t("feedback.type.placeholder", locale)}</option>
-          {(Object.keys(FEEDBACK_TYPES) as FeedbackTypeKey[]).map((key) => (
-            <option key={key} value={key}>
-              {t(`feedback.type.${key}`, locale)}
-            </option>
-          ))}
-        </select>
-        {errors.feedbackType && (
-          <p
-            id="feedback-type-error"
-            role="alert"
-            tabIndex={-1}
-            className={errorClass}
-          >
-            {errors.feedbackType}
-          </p>
-        )}
-      </div>
-
-      {/* Message (required) */}
-      <div>
-        <label htmlFor="feedback-message" className={labelClass}>
-          {t("feedback.message.label", locale)}{" "}
-          <span aria-hidden className="text-[var(--color-danger)]">*</span>
-        </label>
-        <textarea
-          id="feedback-message"
-          rows={4}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder={t("feedback.message.placeholder", locale)}
-          maxLength={FEEDBACK_MESSAGE}
-          aria-required="true"
-          aria-describedby={errors.message ? "feedback-message-error" : undefined}
-          aria-invalid={errors.message ? "true" : undefined}
-          className={`${inputBase} ${inputBorder(!!errors.message)} resize-y min-h-[96px]`}
-        />
-        {errors.message && (
-          <p
-            id="feedback-message-error"
-            role="alert"
-            tabIndex={-1}
-            className={errorClass}
-          >
-            {errors.message}
-          </p>
-        )}
-      </div>
-
-      {/* Contact email (required) */}
-      <div>
-        <label htmlFor="feedback-email" className={labelClass}>
-          {t("feedback.email.label", locale)}{" "}
-          <span aria-hidden className="text-[var(--color-danger)]">*</span>
-        </label>
-        <input
-          type="email"
-          id="feedback-email"
-          value={contactEmail}
-          onChange={(e) => setContactEmail(e.target.value)}
-          placeholder={t("feedback.email.placeholder", locale)}
-          autoComplete="email"
-          autoCapitalize="off"
-          autoCorrect="off"
-          // Last field before submit — Enter implicitly submits, so "send".
-          enterKeyHint="send"
-          required
-          maxLength={EMAIL}
-          aria-required="true"
-          aria-describedby={
-            errors.contactEmail
-              ? "feedback-email-error"
-              : "feedback-email-hint"
-          }
-          aria-invalid={errors.contactEmail ? "true" : undefined}
-          className={`${inputBase} ${inputBorder(!!errors.contactEmail)}`}
-        />
-        {errors.contactEmail ? (
-          <p
-            id="feedback-email-error"
-            role="alert"
-            tabIndex={-1}
-            className={errorClass}
-          >
-            {errors.contactEmail}
-          </p>
-        ) : (
-          <p id="feedback-email-hint" className="mt-1 text-xs text-[var(--color-ink-400)]">
-            {t("feedback.email.hint", locale)}
-          </p>
-        )}
-        {/* Privacy disclosure (#160 1.7): brief reassurance for a vulnerable population */}
-        <p className="mt-1 text-xs text-[var(--color-ink-400)]">
-          {t("privacy.emailDisclosure", locale)}{" "}
-          <Link
-            href="/privacy"
-            className="underline hover:text-[var(--color-sage-600)] transition-colors"
-          >
-            {t("privacy.linkLabel", locale)}
-          </Link>
-        </p>
-      </div>
-
-      {/* Honeypot — visually hidden from real users */}
-      <div aria-hidden="true" className="hidden">
-        <label htmlFor="feedback-website">Website</label>
-        <input
-          id="feedback-website"
-          name="website"
-          type="text"
-          tabIndex={-1}
-          autoComplete="off"
-          value={honeypot}
-          onChange={(e) => setHoneypot(e.target.value)}
-        />
-      </div>
-
-      {/* Cloudflare Turnstile widget */}
-      <div>
-        <div
-          ref={turnstileContainerRef}
-          data-testid="turnstile-widget"
-        />
-        {turnstileError && (
-          <p
-            role="alert"
-            className="mt-1 text-xs text-[var(--color-danger)]"
-          >
-            {t("form.turnstile.error", locale)}
-          </p>
-        )}
-      </div>
-
-      {/* Submit */}
-      <button
-        type="submit"
-        disabled={status === "submitting" || !turnstileToken}
-        className={
-          "w-full h-12 rounded-[var(--radius-md)] " +
-          "bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
-          "text-base font-semibold transition-colors duration-150 " +
-          "hover:bg-[var(--color-sage-700)] " +
-          "focus-visible:outline-none focus-visible:ring-2 " +
-          "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-          "disabled:opacity-60 disabled:cursor-not-allowed"
-        }
-        aria-disabled={status === "submitting" || !turnstileToken}
-      >
-        {status === "submitting"
-          ? t("feedback.submitting", locale)
-          : !turnstileToken
-          ? t("form.turnstile.verifying", locale)
-          : t("feedback.submit", locale)}
-      </button>
-
-      {/* Retry button in error state */}
-      {status === "error" && (
-        <button
-          type="button"
-          onClick={() => setStatus("idle")}
-          className={
-            "w-full h-12 rounded-[var(--radius-md)] " +
-            // #534: --color-ink-300 undefined — bone-300 is the app's
-            // documented resting-border token (DESIGN.md: "bone-300 —
-            // search bar border at rest"); borders live in the bone family
-            // here, text in the ink family, matching inputBorder() above
-            // in this same file.
-            "border border-[var(--color-bone-300)] text-[var(--color-ink-700)] " +
-            "text-base font-medium transition-colors duration-150 " +
-            "hover:bg-[var(--color-bone-100)] " +
-            "focus-visible:outline-none focus-visible:ring-2 " +
-            "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
-          }
-        >
-          {t("feedback.error.retry", locale)}
-        </button>
-      )}
-    </form>
-    </>
+    </PublicForm>
   );
 }

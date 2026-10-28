@@ -41,13 +41,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/authClient";
 import { markInternalDevice } from "@/lib/analytics";
+import { EMAIL_RE } from "@/lib/email";
 
 type FormStatus = "idle" | "sending" | "sent" | "error";
 type CodeStatus = "idle" | "verifying" | "error";
 type PasskeySignInStatus = "idle" | "authenticating" | "error";
 type PasskeyRegisterStatus = "idle" | "registering" | "error";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CODE_LENGTH = 6;
 /** Seconds "Resend code" stays disabled after each send (#684). */
 export const RESEND_COOLDOWN_SECONDS = 30;

@@ -28,7 +28,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import type { Locale } from "@/lib/i18n";
+import { hasSpanish, loadSpanish, type Locale } from "@/lib/i18n";
 
 // ─── Cookie helpers ───────────────────────────────────────────────────────────
 
@@ -116,16 +116,25 @@ export function LocaleProvider({
     if (!initialLocale) {
       const saved = readLocaleCookie();
       if (saved) {
-        queueMicrotask(() => {
-          setLocaleState((prev) => (prev !== saved ? saved : prev));
-        });
+        // Spanish strings load first, so the switch never shows a fallback (#723).
+        const ready = saved === "es" ? loadSpanish() : Promise.resolve();
+        ready.then(
+          () => setLocaleState((prev) => (prev !== saved ? saved : prev)),
+          () => undefined, // Couldn't load (offline): stay in English.
+        );
       }
     }
   }, [initialLocale]);
 
   const setLocale = useCallback((next: Locale) => {
-    setLocaleState(next);
-    writeLocaleCookie(next);
+    const apply = () => {
+      setLocaleState(next);
+      writeLocaleCookie(next);
+    };
+    // English-tree visitors don't have the Spanish strings until they ask
+    // (#723): switch once they've loaded, and stay in English if they can't.
+    if (next === "en" || hasSpanish()) apply();
+    else loadSpanish().then(apply, () => undefined);
   }, []);
 
   // Keep <html lang> in sync with the active locale for screen-reader pronunciation.
@@ -147,7 +156,7 @@ export function LocaleProvider({
  *
  * @example
  *   const { locale, setLocale } = useLocale();
- *   <button onClick={() => setLocale("es")}>{t("topbar.locale.es", locale)}</button>
+ *   <button onClick={() => setLocale("es")}>{t("menu.language", locale)}</button>
  */
 export function useLocale(): LocaleContextValue {
   return useContext(LocaleContext);

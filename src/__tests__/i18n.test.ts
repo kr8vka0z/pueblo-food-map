@@ -1,16 +1,16 @@
 import { describe, test, expect } from "vitest";
 import { I18N_DICTIONARIES, resolveEmailLang, t } from "@/lib/i18n";
+import esClient from "@/lib/i18n.es";
+import { serverEn, serverEs } from "@/lib/i18n.server";
+import { clientReachableFiles, keysUsedIn } from "@/__tests__/helpers/clientI18nKeys";
 
 const { en, es } = I18N_DICTIONARIES;
 
 /** Keys intentionally identical across locales (program names, URLs, etc.). */
 const IDENTICAL_ALLOWLIST = new Set([
   "app.name",
-  "topbar.locale.en",
-  "topbar.locale.es",
   "badge.snap",
   "badge.wic",
-  "search.shortcut",
   "menu.title",
   "menu.language",
   // #689 PR 2: only ever rendered for an ES-locale visitor (see the key's
@@ -118,4 +118,28 @@ describe("resolveEmailLang", () => {
       expect(resolveEmailLang(raw)).toBe("en");
     },
   );
+});
+
+// #723: the browser gets only the English client strings, plus the Spanish
+// ones for a Spanish visitor. A key client code uses that lives only in the
+// server file would show up in the browser as the raw key.
+describe("i18n key placement (#723)", () => {
+  const clientEn = Object.keys(en).filter((k) => !(k in serverEn));
+
+  test("every key client code can look up is in the browser dictionaries, in both languages", () => {
+    const used = keysUsedIn(clientReachableFiles(), Object.keys(en));
+    expect(used.size).toBeGreaterThan(500); // the walk really found the client code
+    expect([...used].filter((k) => !clientEn.includes(k) || !(k in esClient))).toEqual([]);
+  });
+
+  test.each([
+    ["client", clientEn, Object.keys(esClient)],
+    ["server", Object.keys(serverEn), Object.keys(serverEs)],
+  ])("%s dictionaries: same keys in English and Spanish", (_, enKeys, esKeys) => {
+    expect([...esKeys].sort()).toEqual([...enKeys].sort());
+  });
+
+  test("no key lives in both the client and the server dictionaries", () => {
+    expect(Object.keys(serverEn).filter((k) => clientEn.includes(k) || k in esClient)).toEqual([]);
+  });
 });

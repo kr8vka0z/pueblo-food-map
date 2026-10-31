@@ -93,20 +93,6 @@ jobs:
           [ "$rc" = "0" ] || exit "$rc"
           echo "date=$(TZ=America/Denver date +%F)" >> "$GITHUB_OUTPUT"
 
-      # The changelog voice leaves dependency and CI work out, so the model
-      # would write an empty section and section.sh would fail the run, then
-      # the GitHub Release. Maintenance-only releases still count, so they get
-      # this fixed line and skip the model.
-      - name: Write maintenance-only changelog section
-        if: steps.decide.outputs.maintenance == 'true'
-        env:
-          VERSION: ${{ steps.prep.outputs.version }}
-          DATE: ${{ steps.prep.outputs.date }}
-        run: |
-          printf '\n## [%s] - %s\n\n### Improved\n\n- Maintenance only: dependency and build updates, nothing visitors will notice.\n' \
-            "$VERSION" "$DATE" > "$RUNNER_TEMP/maintenance.md"
-          sed -i "/^## \[Unreleased\]/r $RUNNER_TEMP/maintenance.md" CHANGELOG.md
-
       # The PR-list file sits in the workspace (not RUNNER_TEMP) so the model's
       # Read tool can reach it; it is gitignored and never committed.
       #
@@ -128,7 +114,7 @@ jobs:
       # credential for its own), so a before/after hash fails on every run.
       # That check blocked the first scheduled cut (2026-10-04).
       - name: Write changelog section
-        if: steps.decide.outputs.run == 'true' && steps.decide.outputs.maintenance != 'true'
+        if: steps.decide.outputs.run == 'true'
         uses: anthropics/claude-code-action@16f9f71ab9c490faf367f94dd294897edc25be33 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -167,6 +153,22 @@ jobs:
             --allowedTools "Read,Edit(CHANGELOG.md)"
             --disallowedTools "Read(.git/**),Read(./.git/**),Edit(.git/**),Edit(./.git/**),Bash"
 
+      # The changelog voice leaves dependency and CI work out, so the model may
+      # leave a maintenance-only section empty, and section.sh would fail this
+      # run and then the GitHub Release. Those releases still count, so an empty
+      # section gets this fixed line. A section the model did write (its
+      # "Security updates." bullet) stays.
+      - name: Fill an empty maintenance-only changelog section
+        if: steps.decide.outputs.maintenance == 'true'
+        env:
+          VERSION: ${{ steps.prep.outputs.version }}
+          DATE: ${{ steps.prep.outputs.date }}
+        run: |
+          bash scripts/release/section.sh "$VERSION" >/dev/null 2>&1 && exit 0
+          printf '\n## [%s] - %s\n\n### Improved\n\n- Maintenance only: dependency and build updates, nothing visitors will notice.\n' \
+            "$VERSION" "$DATE" > "$RUNNER_TEMP/maintenance.md"
+          sed -i -e "/^## \[$VERSION\] - /d" -e "/^## \[Unreleased\]/r $RUNNER_TEMP/maintenance.md" CHANGELOG.md
+
       - name: Open or update release PR
         if: steps.decide.outputs.run == 'true'
         env:
@@ -176,6 +178,7 @@ jobs:
           VERSION: ${{ steps.prep.outputs.version }}
           ACTION: ${{ steps.decide.outputs.action }}
           PR_NUMBER: ${{ steps.decide.outputs.pr_number }}
+          MAINTENANCE: ${{ steps.decide.outputs.maintenance }}
         run: |
           set -euo pipefail
           # The push below carries a repo-write token, so prove it still goes
@@ -202,11 +205,6 @@ jobs:
           git switch -c "release/v$VERSION"
           git add package.json package-lock.json CHANGELOG.md
           git commit -m "chore(release): v$VERSION"
-          # Force: this branch is rebuilt from dev on every cut, either over a
-          # closed PR's leftover branch or to update the open PR in place. The
-          # push reruns the PR's checks.
-          git push --force origin "release/v$VERSION"
-
           repo_url="https://github.com/$GITHUB_REPOSITORY"
           read -r deployed_sha deployed_url < <(GH_TOKEN="$RUNS_TOKEN" gh run list --workflow deploy-dev.yml --branch dev \
             --status success --limit 1 --json headSha,url --jq '.[0] | "\(.headSha) \(.url)"' || true) || true
@@ -221,6 +219,7 @@ jobs:
           {
             echo "## What is changing"
             echo
+            if [ "$MAINTENANCE" = "true" ]; then echo "**Maintenance only:** only dependency and CI files changed."; echo; fi
             cat "$RUNNER_TEMP/section.md"
             cat <<EOF
 
@@ -244,13 +243,26 @@ jobs:
           EOF
           } > "$RUNNER_TEMP/body.md"
 
+          # Force: this branch is rebuilt from dev on every cut, either over a
+          # closed PR's leftover branch or to update the open PR in place. The
+          # push reruns the PR's checks.
+          #
+          # WHY the update writes the body BEFORE the push: decide.mjs reads the
+          # recorded cut from the branch. If the push came first and the body
+          # write failed, the next cut would see the commit already recorded and
+          # change nothing, leaving old notes and checks on new code. This way
+          # round a failure leaves the old commit recorded, so the next cut
+          # redoes both. A new PR has no such gap: no PR means a fresh cut.
+          #
           # REST, not `gh pr edit`: that command also reads project fields an
           # App token may not be allowed to see.
           if [ "$ACTION" = "update" ]; then
             gh api -X PATCH "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
               -f "title=Release v$VERSION" -F "body=@$RUNNER_TEMP/body.md" >/dev/null
+            git push --force origin "release/v$VERSION"
             url="$repo_url/pull/$PR_NUMBER"
           else
+            git push --force origin "release/v$VERSION"
             url=$(gh pr create --base main --head "release/v$VERSION" \
               --title "Release v$VERSION" --body-file "$RUNNER_TEMP/body.md")
           fi

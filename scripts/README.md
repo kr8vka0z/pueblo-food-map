@@ -111,6 +111,7 @@ schedule"). Each has a `.test.mjs` beside it except `section.sh`.
 
 | Script | Purpose | Run by |
 |---|---|---|
+| `release/decide.mjs` | Decides what a cut does: nothing, a new PR, update the open PR, or stop with a reason | `release.yml` |
 | `release/prepare.mjs` | Picks the next version, bumps it, and lists the PRs merged since the last release | `release.yml` |
 | `release/section.sh` | Extracts one version's CHANGELOG section (the GitHub Release notes; proves the section parses) | `release.yml`, `deploy-prod.yml` |
 | `release/check-push-target.sh` | Refuses to push unless `origin` still points at this repo | `release.yml`, and `security/audit-fix.sh` (so `security-fix.yml`) |

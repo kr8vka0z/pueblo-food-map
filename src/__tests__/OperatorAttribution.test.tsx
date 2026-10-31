@@ -8,7 +8,7 @@
  *      is undefined (pantry, grocery, etc.)
  *   3. BottomSheet quick-summary and full-detail both render the operator line.
  *   4. BottomSheet omits the line when venue.operator is undefined.
- *   5. No non-PFP venue in the combined venues list has an operator field.
+ *   5. Any operator field in the combined venues list is a non-empty string.
  *   6. i18n: ES locale shows "Operado por Pueblo Food Project".
  *
  * Mock strategy:
@@ -194,11 +194,15 @@ describe("BottomSheet — operator attribution (full snap)", () => {
 // ─── Data integrity ───────────────────────────────────────────────────────────
 
 describe("venues data — operator field integrity", () => {
-  test("no pantry venue in combined venues list has an operator field", () => {
+  test("any pantry venue operator field, if present, is a non-empty string", () => {
+    // Admins can set an operator on any venue, and published pantries now carry one.
     const pantries = venues.filter((v) => v.category === "pantry");
     expect(pantries.length).toBeGreaterThan(0);
     pantries.forEach((v) => {
-      expect(v.operator).toBeUndefined();
+      if (v.operator !== undefined) {
+        expect(typeof v.operator).toBe("string");
+        expect(v.operator.trim().length).toBeGreaterThan(0);
+      }
     });
   });
 

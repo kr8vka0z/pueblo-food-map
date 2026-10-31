@@ -254,12 +254,20 @@ jobs:
           # round a failure leaves the old commit recorded, so the next cut
           # redoes both. A new PR has no such gap: no PR means a fresh cut.
           #
+          # If the push then fails, the old body goes back, so the PR never
+          # describes a commit it doesn't hold.
+          #
           # REST, not `gh pr edit`: that command also reads project fields an
           # App token may not be allowed to see.
           if [ "$ACTION" = "update" ]; then
-            gh api -X PATCH "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
-              -f "title=Release v$VERSION" -F "body=@$RUNNER_TEMP/body.md" >/dev/null
-            git push --force origin "release/v$VERSION"
+            pr_api="repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"
+            gh api "$pr_api" --jq .body > "$RUNNER_TEMP/old-body.md"
+            gh api -X PATCH "$pr_api" -f "title=Release v$VERSION" -F "body=@$RUNNER_TEMP/body.md" >/dev/null
+            if ! git push --force origin "release/v$VERSION"; then
+              gh api -X PATCH "$pr_api" -F "body=@$RUNNER_TEMP/old-body.md" >/dev/null
+              echo "::error::Release NOT updated: the push failed, so the PR keeps its old commit and description. Cut again."
+              exit 1
+            fi
             url="$repo_url/pull/$PR_NUMBER"
           else
             git push --force origin "release/v$VERSION"

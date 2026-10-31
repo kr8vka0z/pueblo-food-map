@@ -18,26 +18,24 @@
  * locale (#689 supersedes #287/#386's old "metadata stays English" rule).
  *
  * #704 (SEO/AEO plan Phase 2) adds the answer-first summary paragraph and
- * the Nearby list. The summary is built HERE (client-side, via
- * buildVenueSummary — no Date/Intl, so no hydration mismatch — same
- * contract every t() call on this page already relies on) rather than
- * passed as a server-computed string prop: `locale` can diverge from the
- * page's own `tree` post-hydration (an EN-tree visitor with an `es`
- * cookie — see localizedHref.ts's own header), and the visible body must
- * always match whichever locale is currently showing, exactly like the
- * category label and every other t() string on this page. `nearby` (the
- * 3–5 nearest same-category venues) stays server-computed and passed down
- * as a prop instead — it needs the whole venue list, which this client
- * component doesn't otherwise import.
+ * the Nearby list. The summary arrives from the server in BOTH languages
+ * (`summary`, built by buildVenueSummaries) and this component picks the
+ * current one: `locale` can diverge from the page's own `tree`
+ * post-hydration (an EN-tree visitor with an `es` cookie, or the in-place
+ * language toggle — see localizedHref.ts's own header), and the visible
+ * body must always match whichever locale is currently showing, exactly
+ * like the category label and every other t() string on this page.
+ * #721: it used to be built here, which pulled venueSchema.ts (and with it
+ * the whole venue list) into the browser. `nearby` (the 3–5 nearest
+ * same-category venues) is server-computed for the same reason.
  */
 
 import Link from "next/link";
 import { Phone } from "lucide-react";
-import { t } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { localizedHref } from "@/lib/localizedHref";
-import { venuePath } from "@/lib/venueSchema";
-import { buildVenueSummary, PLACEHOLDER_ADDRESS, type NearbyVenue } from "@/lib/venueSummary";
+import { PLACEHOLDER_ADDRESS, type NearbyVenue } from "@/lib/venueSummary";
 import { formatMiles } from "@/lib/distance";
 import type { Venue } from "@/types/venue";
 import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
@@ -50,12 +48,15 @@ interface VenueContentProps {
    * to [] so every existing test/call site that doesn't pass it still
    * renders (no Nearby block) exactly as before. */
   nearby?: NearbyVenue[];
+  /** Server-built summary paragraph per language (buildVenueSummaries, #721).
+   * Optional only so tests about other parts of the page can omit it; both
+   * venue pages always pass it. Omitted → no summary paragraph. */
+  summary?: Record<Locale, string>;
 }
 
-export default function VenueContent({ venue: v, nearby = [] }: VenueContentProps) {
+export default function VenueContent({ venue: v, nearby = [], summary }: VenueContentProps) {
   const { locale, tree } = useLocale();
   const displayNotes = getDisplayNotes(v);
-  const summary = buildVenueSummary(v, locale, { includeAddress: false });
 
   const directionsHref = `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}`;
   // Fragment form, matching HomePageClient's #venue= handling — there is no
@@ -79,7 +80,7 @@ export default function VenueContent({ venue: v, nearby = [] }: VenueContentProp
             <Link
               href={localizedHref("/", tree)}
               className={
-                "inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] " +
+                "relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] " +
                 "hover:text-[var(--color-sage-700)] transition-colors " +
                 "focus-visible:outline-none focus-visible:ring-2 " +
                 "focus-visible:ring-[var(--color-sage-500)] rounded"
@@ -93,7 +94,7 @@ export default function VenueContent({ venue: v, nearby = [] }: VenueContentProp
             <Link
               href={localizedHref("/venues", tree)}
               className={
-                "inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] " +
+                "relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] " +
                 "hover:text-[var(--color-sage-700)] transition-colors " +
                 "focus-visible:outline-none focus-visible:ring-2 " +
                 "focus-visible:ring-[var(--color-sage-500)] rounded"
@@ -137,9 +138,11 @@ export default function VenueContent({ venue: v, nearby = [] }: VenueContentProp
               free pantry in {city}, CO" instead of repeating it. Meta
               description and JSON-LD description (venueSchema.ts) keep the
               full address — those are read out of page context. */}
-          <p className="mt-3 text-sm text-[var(--color-ink-700)] leading-relaxed">
-            {summary.join(" ")}
-          </p>
+          {summary && (
+            <p className="mt-3 text-sm text-[var(--color-ink-700)] leading-relaxed">
+              {summary[locale]}
+            </p>
+          )}
         </header>
 
         {/* SNAP / WIC badges */}
@@ -216,7 +219,7 @@ export default function VenueContent({ venue: v, nearby = [] }: VenueContentProp
             </h2>
             <a
               href={`tel:${v.phone}`}
-              className="inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
+              className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
             >
               <Phone size={15} className="text-[var(--color-sage-600)]" aria-hidden />
               {v.phone}
@@ -264,7 +267,8 @@ export default function VenueContent({ venue: v, nearby = [] }: VenueContentProp
               {nearby.map((n) => (
                 <li key={n.id}>
                   <Link
-                    href={localizedHref(venuePath(n.id), tree)}
+                    // Inlined venuePath (venueSchema.ts) — importing it pulled the venue list into the browser (#721).
+                    href={localizedHref(`/venue/${n.id}`, tree)}
                     className={
                       "inline-flex flex-col min-h-12 justify-center text-sm font-medium text-[var(--color-sage-700)] " +
                       "hover:text-[var(--color-sage-600)] transition-colors " +

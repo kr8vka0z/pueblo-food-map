@@ -37,7 +37,7 @@ const COLLAPSE_RUN = 3;
 const cardClass = "elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4";
 const fieldLabelClass = "mb-1 block text-sm font-medium text-[var(--color-ink-700)]";
 const inputClass =
-  "block w-full min-h-11 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-3 text-base text-[var(--color-ink-900)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
+  "block w-full min-h-12 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-3 text-base text-[var(--color-ink-900)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
 const tagTone = {
   neutral: "bg-[var(--color-bone-100)] text-[var(--color-ink-700)]",
   good: "bg-[var(--color-sage-50)] text-[var(--color-sage-700)]",
@@ -147,7 +147,7 @@ function ItemList({ items }: { items: ActivityItem[] }) {
         run.length >= COLLAPSE_RUN && run[0].kind === "action" ? (
           <li key={`${run[0].at}-${run.length}`} className="py-2">
             <details>
-              <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-[var(--color-ink-700)]">
+              <summary className="min-h-12 cursor-pointer py-2 text-sm font-medium text-[var(--color-ink-700)]">
                 {itemTag(run[0])} {run.length} · show all
               </summary>
               <ul className="divide-y divide-[var(--color-bone-200)]">
@@ -271,13 +271,13 @@ export default function ActivityLog({ days, filters, people, olderHref }: Activi
         <div className="flex gap-3 sm:col-span-2">
           <button
             type="submit"
-            className="h-11 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] font-semibold text-[var(--color-bone-50)] hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
+            className="h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] font-semibold text-[var(--color-bone-50)] hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
           >
             Show activity
           </button>
           <Link
             href="/admin/activity"
-            className="inline-flex h-11 items-center rounded-[var(--radius-md)] px-4 text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-200)]"
+            className="inline-flex h-12 items-center rounded-[var(--radius-md)] px-4 text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-200)]"
           >
             Reset
           </Link>
@@ -304,7 +304,7 @@ export default function ActivityLog({ days, filters, people, olderHref }: Activi
       {olderHref && (
         <Link
           href={olderHref}
-          className="inline-flex min-h-11 items-center rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-4 text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+          className="inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-4 text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
         >
           Show older
         </Link>

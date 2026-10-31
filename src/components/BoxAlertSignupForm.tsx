@@ -19,7 +19,7 @@ import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { getCheckinClientToken } from "@/lib/checkinClientToken";
-import { useBoxTurnstileWidget } from "@/lib/useBoxTurnstileWidget";
+import { useTurnstile } from "@/lib/useTurnstile";
 
 const PENDING_SUBMIT_TIMEOUT_MS = 15_000;
 
@@ -40,11 +40,11 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   // The container ref stays LOCAL to this component (not returned by the
-  // hook) — see useBoxTurnstileWidget.ts's own header for why (the React
+  // hook) — see useTurnstile.ts's own header for why (the React
   // Compiler ESLint rule flags a ref bundled into a hook's returned state
   // object).
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
-  const turnstile = useBoxTurnstileWidget(turnstileContainerRef);
+  const turnstile = useTurnstile(turnstileContainerRef, { box: true });
 
   async function submit(emailValue: string) {
     setState("submitting");
@@ -153,7 +153,7 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
           // The guided tour points at this (#159); it never presses it.
           data-tour="box-alerts"
           onClick={() => setOpen(true)}
-          className="inline-flex min-h-[44px] w-fit items-center text-left text-sm font-medium text-[var(--color-sage-600)] underline hover:text-[var(--color-sage-700)]"
+          className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] w-fit items-center text-left text-sm font-medium text-[var(--color-sage-600)] underline hover:text-[var(--color-sage-700)]"
         >
           {t("box.alerts.linkLabel", locale)}
         </button>
@@ -225,14 +225,14 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
           type="submit"
           disabled={busy}
           aria-disabled={busy}
-          className="min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+          className="min-h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
         >
           {busy ? t("box.alerts.submitting", locale) : t("box.alerts.submit", locale)}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="min-h-[44px] px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+          className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
         >
           {t("box.alerts.cancel", locale)}
         </button>

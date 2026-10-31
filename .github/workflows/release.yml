@@ -1,8 +1,8 @@
-# Weekly release cut: Saturday 8pm Mountain (Sun 02:00 UTC; 7pm in winter) this
-# opens a `Release vX.Y.Z` PR from `dev` into `main`. Kyle reviews it Sunday,
-# and squash-merging it (main requires linear history) deploys prod via
-# deploy-prod.yml, which then tags, publishes the GitHub Release, and opens the
-# main -> dev sync PR.
+# Release cut: nothing starts this on a timer. When Kyle says "cut the release",
+# an agent dispatches it. It opens a `Release vX.Y.Z` PR from `dev` into `main`,
+# or updates the open one in place, and squash-merging that PR (main requires
+# linear history) deploys prod via deploy-prod.yml, which then tags, publishes
+# the GitHub Release, records the cut tag, and opens the main -> dev sync PR.
 # Process + rules: AGENTS.md "Release schedule".
 #
 # WHY every push/PR here uses a GitHub App token, not GITHUB_TOKEN: pushes and
@@ -12,15 +12,12 @@
 # RELEASE_PLEASE_APP_* secret names are historical.
 #
 # WHY an edit here takes effect only after it reaches `main`: GitHub runs
-# `schedule` and `workflow_dispatch` only from the default branch's copy of a
-# workflow. If a run fails, cut the release by hand (AGENTS.md "Manual cut").
-# It always checks out `dev` on purpose — a scheduled run's default checkout
-# would be `main`.
-name: Weekly release
+# `workflow_dispatch` only from the default branch's copy of a workflow. If a
+# run fails, cut the release by hand (AGENTS.md "Manual cut"). It always checks
+# out `dev` on purpose: a dispatched run's default checkout would be `main`.
+name: Cut release
 
 on:
-  schedule:
-    - cron: "0 2 * * 0"
   workflow_dispatch:
     inputs:
       version:
@@ -32,7 +29,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: weekly-release
+  group: release-cut
   cancel-in-progress: false
 
 jobs:
@@ -42,6 +39,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      actions: read # the PR body names the latest Deploy Dev run
     steps:
       - name: Mint a GitHub App token
         id: app-token
@@ -53,7 +51,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: dev
-          # Full history + tags: prepare.mjs lists `<latest v* tag>..dev`.
+          # Full history, every branch and tag: decide.mjs compares origin/main
+          # and reads the release branch; prepare.mjs lists `<latest cut tag>..dev`.
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
@@ -61,51 +60,25 @@ jobs:
         with:
           node-version: 22
 
-      # One open release PR at a time: cutting a second while last week's is
-      # unreviewed would ship two overlapping changelogs.
-      # Also refuses to cut while a main -> dev sync PR is still open: cutting
-      # from a dev that doesn't yet contain main would base the release on stale
-      # history and the release PR would conflict.
-      #
-      # WHY the two cases differ (green skip vs red failure): an open release PR
-      # is just Kyle not having merged last week's yet, an expected state, so the
-      # run skips quietly. A sync PR is opened by a bot after every push to main
-      # and auto-merges within minutes; still open at the weekly cut means it is
-      # stuck (a conflict or a failing check) with nobody looking, and a green
-      # skip would let the release silently not happen. So that case fails the run.
-      #
-      # --limit 100 on the dev call: gh's default of 30 could push an old stuck
-      # sync PR off the list behind a busy week of Dependabot/feature PRs.
-      - name: Skip if a release PR is open, fail if a sync PR is stuck
-        id: open
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          n=$(gh pr list --base main --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("release/"))] | length')
-          sync_urls=$(gh pr list --base dev --state open --limit 100 --json headRefName,url --jq '[.[] | select(.headRefName | startswith("sync/main-")) | .url] | join(" ")')
-          s=0
-          [ -z "$sync_urls" ] || s=1
-          echo "open=$((n + s))" >> "$GITHUB_OUTPUT"
-          if [ "$n" != "0" ]; then
-            echo "::warning::A release PR is already open; skipping this cut."
-            echo "Weekly release skipped: a release PR is already open." >> "$GITHUB_STEP_SUMMARY"
-          fi
-          if [ "$s" != "0" ]; then
-            msg="Weekly release NOT cut: the main -> dev sync PR is still open ($sync_urls) and must merge first. Resolve any conflicts on the sync/* branch, keeping the merge commit (AGENTS.md \"Back-sync\"), then run the Weekly release workflow again."
-            echo "::error::$msg"
-            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-
-      # --dry-run: only picks the version and writes the PR list. The version
-      # bump happens AFTER the model step so the model can't touch package files.
-      # Exit 3 = no PRs since the last release: not a failure, just nothing to do.
-      - name: Compute version and PR list
-        id: prep
-        if: steps.open.outputs.open == '0'
+      # Rules and their reasons live in decide.mjs (tested in decide.test.mjs).
+      # Red when blocked, so a release that didn't happen never looks green.
+      - name: Decide what this cut does
+        id: decide
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           FORCE_VERSION: ${{ inputs.version }}
+        run: node scripts/release/decide.mjs
+
+      # --dry-run: only picks the version and writes the PR list. The version
+      # bump happens AFTER the model step so the model can't touch package files.
+      # Exit 3 = no PRs since the last release, but decide.mjs saw different
+      # files, so something reached dev outside a PR. That is not "no changes".
+      - name: Compute version and PR list
+        id: prep
+        if: steps.decide.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          FORCE_VERSION: ${{ steps.decide.outputs.version }}
         run: |
           set +e
           args=(--dry-run --out "$GITHUB_WORKSPACE/.release-prs.md")
@@ -113,9 +86,11 @@ jobs:
           node scripts/release/prepare.mjs "${args[@]}"
           rc=$?
           set -e
-          if [ "$rc" = "3" ]; then echo "run=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ "$rc" = "3" ]; then
+            echo "::error::Release NOT cut: dev and main hold different files but no PR is listed since the last release. Compare them with git diff."
+            exit 1
+          fi
           [ "$rc" = "0" ] || exit "$rc"
-          echo "run=true" >> "$GITHUB_OUTPUT"
           echo "date=$(TZ=America/Denver date +%F)" >> "$GITHUB_OUTPUT"
 
       # The PR-list file sits in the workspace (not RUNNER_TEMP) so the model's
@@ -123,7 +98,7 @@ jobs:
       #
       # github_token: without it the action mints its own token and revokes it
       # at the end, which would also kill the push credential checkout stored.
-      # allowed_bots "*": a schedule run's actor can be a bot, which the action
+      # allowed_bots "*": a dispatch can come from a bot, which the action
       # otherwise refuses. Safe here because this workflow has no issue/PR
       # trigger an outsider could use to feed the model a prompt.
       #
@@ -139,8 +114,8 @@ jobs:
       # credential for its own), so a before/after hash fails on every run.
       # That check blocked the first scheduled cut (2026-10-04).
       - name: Write changelog section
-        if: steps.prep.outputs.run == 'true'
-        uses: anthropics/claude-code-action@ae68417a745a5df4b2124873632bd73a2255e6f6 # v1
+        if: steps.decide.outputs.run == 'true'
+        uses: anthropics/claude-code-action@16f9f71ab9c490faf367f94dd294897edc25be33 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ steps.app-token.outputs.token }}
@@ -178,11 +153,32 @@ jobs:
             --allowedTools "Read,Edit(CHANGELOG.md)"
             --disallowedTools "Read(.git/**),Read(./.git/**),Edit(.git/**),Edit(./.git/**),Bash"
 
-      - name: Open release PR
-        if: steps.prep.outputs.run == 'true'
+      # The changelog voice leaves dependency and CI work out, so the model may
+      # leave a maintenance-only section empty, and section.sh would fail this
+      # run and then the GitHub Release. Those releases still count, so an empty
+      # section gets this fixed line. A section the model did write (its
+      # "Security updates." bullet) stays.
+      - name: Fill an empty maintenance-only changelog section
+        if: steps.decide.outputs.maintenance == 'true'
+        env:
+          VERSION: ${{ steps.prep.outputs.version }}
+          DATE: ${{ steps.prep.outputs.date }}
+        run: |
+          bash scripts/release/section.sh "$VERSION" >/dev/null 2>&1 && exit 0
+          printf '\n## [%s] - %s\n\n### Improved\n\n- Maintenance only: dependency and build updates, nothing visitors will notice.\n' \
+            "$VERSION" "$DATE" > "$RUNNER_TEMP/maintenance.md"
+          sed -i -e "/^## \[$VERSION\] - /d" -e "/^## \[Unreleased\]/r $RUNNER_TEMP/maintenance.md" CHANGELOG.md
+
+      - name: Open or update release PR
+        if: steps.decide.outputs.run == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Reads the Deploy Dev run; this job's token has actions: read.
+          RUNS_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.prep.outputs.version }}
+          ACTION: ${{ steps.decide.outputs.action }}
+          PR_NUMBER: ${{ steps.decide.outputs.pr_number }}
+          MAINTENANCE: ${{ steps.decide.outputs.maintenance }}
         run: |
           set -euo pipefail
           # The push below carries a repo-write token, so prove it still goes
@@ -209,29 +205,65 @@ jobs:
           git switch -c "release/v$VERSION"
           git add package.json package-lock.json CHANGELOG.md
           git commit -m "chore(release): v$VERSION"
-          # Re-cut of the same version (last week's PR was closed unmerged):
-          # overwrite the stale branch. Safe: the "already open" guard above
-          # guarantees no open PR is using it.
-          git push --force origin "release/v$VERSION"
+          repo_url="https://github.com/$GITHUB_REPOSITORY"
+          read -r deployed_sha deployed_url < <(GH_TOKEN="$RUNS_TOKEN" gh run list --workflow deploy-dev.yml --branch dev \
+            --status success --limit 1 --json headSha,url --jq '.[0] | "\(.headSha) \(.url)"' || true) || true
+          if [ "${deployed_sha:-}" = "$CUT_SHA" ]; then
+            deployment="[Deploy Dev]($deployed_url) succeeded on this commit."
+          elif [ -n "${deployed_sha:-}" ]; then
+            deployment="**This commit is not on the dev site yet.** The latest successful [Deploy Dev]($deployed_url) was \`${deployed_sha:0:7}\`."
+          else
+            deployment="Unknown: the latest Deploy Dev run could not be read."
+          fi
 
           {
+            echo "## What is changing"
+            echo
+            if [ "$MAINTENANCE" = "true" ]; then echo "**Maintenance only:** only dependency and CI files changed."; echo; fi
             cat "$RUNNER_TEMP/section.md"
-            cat <<'EOF'
+            cat <<EOF
 
-          ---
-          ### Sunday checklist
-          - [ ] Walk https://dev.pueblofoodmap.com/ — this is exactly what ships.
-          - [ ] Any pending prod D1 migrations? Export first — see AGENTS.md "Promotion checklist".
-          - [ ] Reply **"push pueblo-food-map to prod"**, then squash-merge this PR. Merging deploys production and publishes the GitHub Release.
+          ## Where it stands
+          - Dev site: https://dev.pueblofoodmap.com
+          - Cut from commit: [\`${CUT_SHA:0:7}\`]($repo_url/commit/$CUT_SHA)
+          - Dev deployment at that moment: $deployment
+
+          ## Pre-release checks
+          The agent marks each one Passed or Failed. Anything not checked stays Unknown.
+          - Unknown: a clean Codex review on every PR in this release
+          - Unknown: production database changes applied (AGENTS.md "Promotion checklist")
+          - Unknown: production secrets, flags and outside-service settings checked on production
+          - Unknown: a checkout walked on this build, if the payment path changed
+          - Unknown: the rollback steps in AGENTS.md "Rollback" still fit this release
+
+          ## How to undo
+          In the Cloudflare dashboard, open the pueblo-food-map Worker, go to Deployments and roll back to the previous build. Then open a revert PR into dev, or the next push to main brings the bad code back. A rollback does not undo production database changes. Full steps: AGENTS.md "Rollback".
+
+          Squash-merging this PR deploys production and publishes the GitHub Release.
           EOF
           } > "$RUNNER_TEMP/body.md"
 
-          gh pr create --base main --head "release/v$VERSION" \
-            --title "Release v$VERSION" --body-file "$RUNNER_TEMP/body.md"
-
-          # Marks the dev commit this release was cut from. The release lands
-          # on main as a squash, so the v* tag doesn't carry dev's history with
-          # it; prepare.mjs starts next week's PR list from this tag instead.
-          # Hotfixes make no cut tag (they don't come from dev).
-          git tag -f "cut/v$VERSION" "$CUT_SHA"
-          git push --force origin "cut/v$VERSION"
+          # Force: this branch is rebuilt from dev on every cut, either over a
+          # closed PR's leftover branch or to update the open PR in place. The
+          # push reruns the PR's checks.
+          #
+          # WHY the update writes the body BEFORE the push: decide.mjs reads the
+          # recorded cut from the branch. If the push came first and the body
+          # write failed, the next cut would see the commit already recorded and
+          # change nothing, leaving old notes and checks on new code. This way
+          # round a failure leaves the old commit recorded, so the next cut
+          # redoes both. A new PR has no such gap: no PR means a fresh cut.
+          #
+          # REST, not `gh pr edit`: that command also reads project fields an
+          # App token may not be allowed to see.
+          if [ "$ACTION" = "update" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+              -f "title=Release v$VERSION" -F "body=@$RUNNER_TEMP/body.md" >/dev/null
+            git push --force origin "release/v$VERSION"
+            url="$repo_url/pull/$PR_NUMBER"
+          else
+            git push --force origin "release/v$VERSION"
+            url=$(gh pr create --base main --head "release/v$VERSION" \
+              --title "Release v$VERSION" --body-file "$RUNNER_TEMP/body.md")
+          fi
+          echo "Release v$VERSION ready, cut from ${CUT_SHA:0:7}: $url" | tee -a "$GITHUB_STEP_SUMMARY"

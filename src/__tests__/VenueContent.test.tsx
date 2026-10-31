@@ -13,6 +13,7 @@ import { render, screen, within } from "@testing-library/react";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import VenueContent from "@/components/VenueContent";
+import { buildVenueSummaries } from "@/lib/venueSummary";
 import { venues } from "@/data/venues";
 import { OSM_COPYRIGHT_URL } from "@/lib/osmAttribution";
 import type { Venue } from "@/types/venue";
@@ -57,6 +58,28 @@ describe("VenueContent — locale", () => {
     expect(screen.getByText(t("detail.getDirections", "es"))).toBeDefined();
     expect(screen.getByText(t("detail.viewOnMap", "es"))).toBeDefined();
     expect(screen.getByRole("heading", { level: 1, name: FIXTURE_VENUE.name })).toBeDefined();
+  });
+});
+
+// #721: the summary paragraph is built on the server in both languages; the
+// page must show whichever language is current (the EN tree's toggle
+// switches in place, with no new server render).
+describe("VenueContent — server-built summary", () => {
+  const summary = buildVenueSummaries(FIXTURE_VENUE);
+
+  test("shows the English summary by default", () => {
+    render(<VenueContent venue={FIXTURE_VENUE} summary={summary} />);
+    expect(screen.getByText(summary.en)).toBeDefined();
+    expect(screen.queryByText(summary.es)).toBeNull();
+  });
+
+  test("shows the Spanish summary when the locale is es", () => {
+    render(
+      <LocaleProvider initialLocale="es">
+        <VenueContent venue={FIXTURE_VENUE} summary={summary} />
+      </LocaleProvider>,
+    );
+    expect(screen.getByText(summary.es)).toBeDefined();
   });
 });
 

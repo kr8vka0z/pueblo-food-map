@@ -6,8 +6,9 @@
  * export route handlers. See the route file's header for the concurrency design.
  */
 
-import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "../../scripts/refresh/diffEngine";
+import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "@/lib/venueFieldCompare";
 import type { Venue } from "@/types/venue";
+import { auditInsertIfExistsSql } from "@/lib/auditLog";
 
 // Every editable column except `status` (see file header for why status is
 // permanently excluded) and the workflow columns an edit never touches:
@@ -28,9 +29,10 @@ export const VENUE_UPDATE_SQL = `UPDATE venues SET
 // insert entirely when the venue UPDATE above didn't actually apply — see
 // this file's own header for why EXISTS-against-venues, not changes().
 // Trailing two bind params (id, the NEW updatedAt) are the guard.
-export const AUDIT_INSERT_SQL = `INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id)
-  SELECT ?, ?, ?, ?, ?, ?, ?, ?
-  WHERE EXISTS (SELECT 1 FROM venues WHERE id = ? AND updated_at = ?)`;
+export const AUDIT_INSERT_SQL = auditInsertIfExistsSql(
+  "?, ?, ?, ?, ?, ?, ?, ?",
+  "SELECT 1 FROM venues WHERE id = ? AND updated_at = ?",
+);
 
 // Blessing Boxes slice 1: an edit keeps the invariant "a blessing_boxes row
 // exists iff venues.category = 'blessing_box'". DELETE-then-INSERT (rather

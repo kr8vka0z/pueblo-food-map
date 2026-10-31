@@ -37,7 +37,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { categoryLabels } from "@/data/venues";
+import { categoryLabels } from "@/lib/categories";
 import { formatLastVerified } from "@/lib/adminVenues";
 import { describeIrregularSchedule, formatSlot } from "@/lib/hours";
 import { t } from "@/lib/i18n";
@@ -65,7 +65,6 @@ const cardClass =
 export const SOURCE_BADGE: Record<ProposalSourceValue, { label: string; className: string }> = {
   osm: { label: "OpenStreetMap", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
   plentiful: { label: "Plentiful", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
-  gtfs: { label: "GTFS", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
   link_health: { label: "Broken link", className: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]" },
   care_and_share: { label: "Care and Share", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
   website: { label: "Venue website", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
@@ -269,7 +268,14 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
         router.refresh();
         return;
       }
-      const data = (await res.json().catch(() => null)) as { message?: string } | null;
+      const data = (await res.json().catch(() => null)) as { message?: string; handled?: boolean } | null;
+      // handled: already approved, rejected, superseded or already on the
+      // map — not a failure, so drop the card like a success would.
+      if (data?.handled) {
+        setApproveState({ status: "idle" });
+        router.refresh();
+        return;
+      }
       setApproveState({
         status: "error",
         message: data?.message ?? "Something went wrong. This wasn't applied. Try again.",
@@ -291,7 +297,14 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
         router.refresh();
         return;
       }
-      const data = (await res.json().catch(() => null)) as { message?: string } | null;
+      const data = (await res.json().catch(() => null)) as { message?: string; handled?: boolean } | null;
+      // handled: already approved, rejected, superseded or already on the
+      // map — not a failure, so drop the card like a success would.
+      if (data?.handled) {
+        setRejectState({ status: "idle" });
+        router.refresh();
+        return;
+      }
       setRejectState({
         status: "error",
         message: data?.message ?? "Something went wrong. This wasn't rejected. Try again.",

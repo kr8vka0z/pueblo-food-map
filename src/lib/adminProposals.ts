@@ -16,7 +16,7 @@
  * catch with plain fixtures here; neither is cheap to catch by reading
  * production D1 after the fact.
  *
- * WHY this reuses diffEngine.ts's own currentFieldValue()/valuesEqual()
+ * WHY this reuses venueFieldCompare.ts's currentFieldValue()/valuesEqual()
  * rather than re-deriving field equality: the stale-apply guard (§6.10c,
  * docs/admin/cloudflare-native-admin-spec.md) exists specifically to
  * re-check a proposal's `before` snapshot against a fresh D1 read using the
@@ -28,17 +28,21 @@
  */
 
 import type { AdminVenueRow, AdminVenueSourceType, Venue } from "@/types/venue";
-import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "../../scripts/refresh/diffEngine";
+import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "@/lib/venueFieldCompare";
 import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
+import { localYmd } from "@/lib/activityLog";
 
 // ─── Row + parsed-diff shapes ───────────────────────────────────────────────
 
-/** Mirrors the `change_proposals` CHECK constraints (migrations/0001_init_admin_schema.sql; source widened by 0020). */
+/**
+ * Mirrors the `change_proposals` CHECK constraints (migrations/0001_init_admin_schema.sql;
+ * source widened by 0020), minus 'gtfs': the CHECK still allows it, but GTFS was
+ * dropped (#133) and nothing ever writes it.
+ */
 export type ProposalStatus = "pending" | "approved" | "rejected" | "superseded";
 export type ProposalSourceValue =
   | "osm"
   | "plentiful"
-  | "gtfs"
   | "link_health"
   | "care_and_share"
   | "website"
@@ -100,14 +104,15 @@ export function parseProposalRow(row: ChangeProposalRow): ParsedProposal {
 
 /**
  * Sources whose freshness-only pings are trusted enough to blanket-approve.
- * `gtfs` is deliberately excluded (diffEngine.ts never emits a
- * freshness-only `gtfs` proposal today, and this predicate names an
- * allowlist rather than everything-but-link_health so a future new source
- * doesn't silently gain bulk-approval by omission). `link_health` can never
+ * This predicate names an allowlist rather than everything-but-link_health
+ * so a future new source doesn't silently gain bulk-approval by omission.
+ * `link_health` can never
  * qualify regardless — it is a dead-link finding routed to the venue edit
  * screen, never approved directly (see applyApprovedProposal's own header).
+ * `website` (step 3): a page that loaded and changed nothing is the same
+ * "still listed" fetch, recorded without a click.
  */
-const DATE_ONLY_BULK_SOURCES: ReadonlySet<string> = new Set(["osm", "plentiful", "care_and_share"]);
+const DATE_ONLY_BULK_SOURCES: ReadonlySet<string> = new Set(["osm", "plentiful", "care_and_share", "website"]);
 
 /**
  * True for exactly the shape the first production pipeline run mostly
@@ -221,6 +226,31 @@ export interface StaleApplyResult {
   stale: boolean;
   /** Human-readable, shown to the reviewing admin when stale — absent when stale is false. */
   reason?: string;
+  /** Stale only because the venue already carries every change this proposal makes (a duplicate card). */
+  alreadyDone?: true;
+}
+
+/**
+ * Whether a card can count as a plain duplicate at all. Excluded: rename and
+ * unconfirmed-match cards (approving records an upstream id alias), needs_review
+ * cards (they carry review notes a person must read), and new_alias cards (the
+ * link was made this run; rejecting the card is what undoes it, migration 0024).
+ * Same exclusions as scripts/refresh/proposalSql.ts's auto-apply check.
+ */
+function isPlainDuplicateCandidate(diff: ProposedDiff): boolean {
+  const meta = diff.meta ?? {};
+  return !(meta.rename || meta.match || meta.needs_review || meta.new_alias);
+}
+
+/** Changed fields (minus the last_verified stamp) whose `after` value the venue already holds — true only when there is at least one, all match, and the card is a plain duplicate candidate. */
+function venueAlreadyHasAfter(currentRow: CurrentVenueRow, diff: ProposedDiff): boolean {
+  if (!isPlainDuplicateCandidate(diff)) return false;
+  const fields = diff.fields_changed.filter((f) => f !== "last_verified");
+  const after = (diff.after ?? {}) as unknown as CurrentVenueRow;
+  return (
+    fields.length > 0 &&
+    fields.every((f) => valuesEqual(currentFieldValue(after, f as keyof Venue), currentFieldValue(currentRow, f as keyof Venue)))
+  );
 }
 
 /**
@@ -268,11 +298,22 @@ export function checkStaleApply(
         return { stale: true, reason: "This venue no longer exists or was already removed from the map." };
       }
       const before = (diff.before ?? {}) as Partial<Venue>;
-      for (const field of diff.fields_changed) {
+      // #866: every card carries the last_verified stamp, so checking it
+      // would stale every older card once the venue is verified again. Only
+      // a date-only card, which asserts nothing else, still checks it.
+      const others = diff.fields_changed.filter((f) => f !== "last_verified");
+      for (const field of others.length > 0 ? others : diff.fields_changed) {
         const key = field as keyof Venue;
         const beforeValue = currentFieldValue(before as unknown as CurrentVenueRow, key);
         const nowValue = currentFieldValue(currentRow, key);
         if (!valuesEqual(beforeValue, nowValue)) {
+          // Two cards proposing the same change (the website reader never
+          // supersedes a hand-checked card — refresh-ingest.ts) leave the
+          // second one here once the first is approved: say so plainly
+          // rather than imply someone changed the venue.
+          if (venueAlreadyHasAfter(currentRow, diff)) {
+            return { stale: true, reason: "Already done — the map already has this change.", alreadyDone: true };
+          }
           return {
             stale: true,
             reason: `This venue's "${field}" changed since the proposal was generated.`,
@@ -338,7 +379,7 @@ export interface ApprovingIdentity {
  */
 export type ApplyApprovedProposalResult =
   | { ok: true; status: 200; targetVenueId: string; changeType: ProposalChangeType }
-  | { ok: false; status: number; error: string; message?: string };
+  | { ok: false; status: number; error: string; message?: string; handled?: true };
 
 // `WHERE id = ? AND status = 'pending'` closes the supersede-race window —
 // see applyApprovedProposal's own header, correctness requirement 1 in the
@@ -450,11 +491,20 @@ export async function applyApprovedProposal(
   if (staleCheck.stale) {
     const now = new Date().toISOString();
     await db.prepare(SUPERSEDE_PROPOSAL_SQL).bind(now, proposalRow.id).run();
-    return { ok: false, status: 409, error: "stale", message: staleCheck.reason };
+    return {
+      ok: false,
+      status: 409,
+      error: "stale",
+      message: staleCheck.reason,
+      ...(staleCheck.alreadyDone ? { handled: true as const } : {}),
+    };
   }
 
   const timestamp = new Date().toISOString();
-  const after = diff.after ?? {};
+  // #866: a human approve is the check, so last_verified is today's Denver
+  // date, never the card's older stamp (that could move it backward).
+  const approvedOn = localYmd(timestamp);
+  const after: Partial<Venue> = { ...diff.after, last_verified: approvedOn };
 
   // D1PreparedStatement isn't among cloudflare-env.d.ts's narrow runtime
   // imports (see that file's own header for why this project avoids a bare
@@ -467,10 +517,16 @@ export async function applyApprovedProposal(
 
   if (changeType === "remove") {
     const existing = currentRow!;
-    const afterRow: AdminVenueRow = { ...existing, status: "archived", updated_by: identity.email, updated_at: timestamp };
+    const afterRow: AdminVenueRow = {
+      ...existing,
+      status: "archived",
+      last_verified: approvedOn,
+      updated_by: identity.email,
+      updated_at: timestamp,
+    };
     venueStmt = db
-      .prepare("UPDATE venues SET status = 'archived', updated_by = ?, updated_at = ? WHERE id = ?")
-      .bind(identity.email, timestamp, proposalRow.target_venue_id);
+      .prepare("UPDATE venues SET status = 'archived', last_verified = ?, updated_by = ?, updated_at = ? WHERE id = ?")
+      .bind(afterRow.last_verified, identity.email, timestamp, proposalRow.target_venue_id);
     auditAction = "archive";
     beforeJson = JSON.stringify(existing);
     afterRowForAudit = afterRow;
@@ -674,8 +730,45 @@ export async function applyApprovedProposal(
       status: 409,
       error: "stale",
       message: "This proposal was already reviewed by the time this request completed.",
+      handled: true,
     };
   }
 
+  if (changeType === "update") {
+    try {
+      await supersedeAlreadyAppliedSiblings(db, proposalRow, timestamp);
+    } catch (err) {
+      // The approve itself already landed; a failed tidy-up only leaves a
+      // duplicate card that says "Already done" when clicked.
+      console.error("supersedeAlreadyAppliedSiblings failed", proposalRow.id, err);
+    }
+  }
+
   return { ok: true, status: 200, targetVenueId: proposalRow.target_venue_id, changeType };
+}
+
+/**
+ * After an update is approved, other pending update cards for the same venue
+ * whose every change is now already on the venue are duplicates (refresh-ingest
+ * lets a website card sit beside a hand-checked one proposing the same phone):
+ * mark them superseded so they leave the queue instead of erroring on Approve.
+ * Left alone: link_health findings, freshness-only cards, and anything
+ * isPlainDuplicateCandidate excludes.
+ */
+async function supersedeAlreadyAppliedSiblings(db: D1Database, approved: ChangeProposalRow, timestamp: string): Promise<void> {
+  const venue = await db.prepare("SELECT * FROM venues WHERE id = ?").bind(approved.target_venue_id).first<AdminVenueRow>();
+  if (!venue) return;
+  const { results } = await db
+    .prepare(
+      "SELECT * FROM change_proposals WHERE target_venue_id = ? AND id != ? AND status = 'pending' AND change_type = 'update' AND source != 'link_health'",
+    )
+    .bind(approved.target_venue_id, approved.id)
+    .all<ChangeProposalRow>();
+  for (const row of results) {
+    const parsed = parseProposalRow(row);
+    if (parsed.parseError) continue;
+    if (venueAlreadyHasAfter(venue as CurrentVenueLookup, parsed.diff)) {
+      await db.prepare(SUPERSEDE_PROPOSAL_SQL).bind(timestamp, row.id).run();
+    }
+  }
 }

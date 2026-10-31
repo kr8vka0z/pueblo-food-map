@@ -15,7 +15,7 @@
  * against firing twice under React StrictMode's dev-mode double-invoke of
  * effects — a local ref, not bundled into any returned/shared state object
  * (same rule this repo's react-hooks/refs lint rule enforces on
- * useBoxTurnstileWidget.ts's container ref).
+ * useTurnstile.ts's container ref).
  *
  * <noscript> fallback: a visitor with JS disabled gets none of the above —
  * the effect never runs, so the page would otherwise show "Stopping…"
@@ -120,7 +120,7 @@ export default function AlertsStopContent({ token }: { token: string }) {
                   onClick={handleUndo}
                   disabled={undoState === "undoing"}
                   className={
-                    "mt-6 min-h-[44px] px-4 text-sm font-medium text-[var(--color-sage-600)] underline " +
+                    "mt-6 relative before:absolute before:inset-x-0 before:-inset-y-0.5 min-h-[44px] px-4 text-sm font-medium text-[var(--color-sage-600)] underline " +
                     "underline-offset-2 hover:text-[var(--color-sage-700)] " +
                     "disabled:opacity-50 disabled:cursor-not-allowed"
                   }
@@ -153,7 +153,7 @@ export default function AlertsStopContent({ token }: { token: string }) {
             <form action={`/api/public/alerts/stop?t=${encodeURIComponent(token)}`} method="post" className="mt-6">
               <button
                 type="submit"
-                className="min-h-[44px] px-4 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] text-sm font-semibold"
+                className="min-h-12 px-4 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] text-sm font-semibold"
               >
                 {t("alerts.stop.noscriptButton", locale)}
               </button>

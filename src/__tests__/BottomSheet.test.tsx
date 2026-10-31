@@ -36,6 +36,7 @@ import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 import * as shareMod from "@/lib/share";
 import { track, EVENTS } from "@/lib/analytics";
+import { waitForBoxCard } from "@/lib/testing/waitForBoxCard.testutil";
 
 // #485 PR 2: mock the whole module so EVENTS keeps its real allowlist values.
 vi.mock("@/lib/analytics", async (importOriginal) => ({
@@ -457,8 +458,9 @@ function makeBox(overrides: Partial<PublicBlessingBox["box"]> = {}): PublicBless
 }
 
 describe("BottomSheet — blessing box card (map-first rework)", () => {
-  test("renders BoxCardBody content, with the SAME grab bar #666 gives ordinary venues (#667 supersedes 'box cards get no toggle')", () => {
+  test("renders BoxCardBody content, with the SAME grab bar #666 gives ordinary venues (#667 supersedes 'box cards get no toggle')", async () => {
     render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={() => {}} />);
+    await waitForBoxCard();
     // BoxCardBody's status badge is present — proves the box branch rendered.
     expect(screen.getByTestId("box-status-badge")).toBeDefined();
     // #667 supersedes #666's original "box cards get the bar only, no
@@ -469,6 +471,7 @@ describe("BottomSheet — blessing box card (map-first rework)", () => {
   test("tapping the grab bar expands the box card's below-the-fold section (#667)", async () => {
     const user = userEvent.setup();
     render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={() => {}} />);
+    await waitForBoxCard();
     const bar = screen.getByRole("button", { name: /show details/i });
     expect(bar.getAttribute("aria-expanded")).toBe("false");
     await user.click(bar);
@@ -478,15 +481,16 @@ describe("BottomSheet — blessing box card (map-first rework)", () => {
     expect(wrapper?.className).not.toContain("overflow-hidden");
   });
 
-  test("the box's below-the-fold wrapper (sponsor band, footer) sits inside the grab bar's aria-controls target", () => {
+  test("the box's below-the-fold wrapper (sponsor band, footer) sits inside the grab bar's aria-controls target", async () => {
     render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={() => {}} />);
+    await waitForBoxCard();
     const bar = screen.getByRole("button", { name: /show details/i });
     const wrapper = document.getElementById(bar.getAttribute("aria-controls")!);
     expect(wrapper?.textContent).toMatch(/needs a sponsor/i);
     expect(screen.getByRole("link", { name: "History" }).closest(`#${wrapper?.id}`)).not.toBeNull();
   });
 
-  test("hours-today badge and notes paragraph are skipped for a box", () => {
+  test("hours-today badge and notes paragraph are skipped for a box", async () => {
     render(
       <BottomSheet
         venue={makeBoxVenue({ notes: "Some note text that would otherwise show" })}
@@ -494,6 +498,7 @@ describe("BottomSheet — blessing box card (map-first rework)", () => {
         onClose={() => {}}
       />,
     );
+    await waitForBoxCard();
     expect(screen.queryByText("Some note text that would otherwise show")).toBeNull();
     expect(screen.queryByText(/Open now|Closed|hours unknown/i)).toBeNull();
   });
@@ -508,8 +513,9 @@ describe("BottomSheet — blessing box card (map-first rework)", () => {
   // filling'." Supersedes the 2026-09-18b "near the top" placement this
   // test used to assert — the History link now lives in the card's
   // footer, after the check-in panel, alongside the alert-signup link.
-  test("shows the History link in the footer, after the check-in panel, alongside 'Email me when it needs filling'", () => {
+  test("shows the History link in the footer, after the check-in panel, alongside 'Email me when it needs filling'", async () => {
     render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={() => {}} />);
+    await waitForBoxCard();
     const link = screen.getByRole("link", { name: "History" });
     expect(link.getAttribute("href")).toBe("/box/test-box-1/history");
     // "I used this box" is BoxCheckinPanel's first button — the History
@@ -526,6 +532,7 @@ describe("BottomSheet — blessing box card (map-first rework)", () => {
     const shareSpy = vi.spyOn(shareMod, "shareVenue").mockResolvedValue("copied");
     const user = userEvent.setup();
     render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={() => {}} />);
+    await waitForBoxCard();
     await user.click(screen.getByRole("button", { name: /share/i }));
     expect(shareSpy).toHaveBeenCalledWith(expect.objectContaining({ venueId: "test-box-1", isBox: true }));
     shareSpy.mockRestore();

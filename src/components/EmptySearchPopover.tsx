@@ -19,7 +19,7 @@
  */
 
 import { CATEGORY_OPTIONS } from "@/lib/searchVenues";
-import { categoryColors } from "@/data/venues";
+import { categoryColors } from "@/lib/categories";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 

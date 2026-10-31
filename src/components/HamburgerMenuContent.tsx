@@ -29,7 +29,7 @@
  */
 
 import Link from "next/link";
-import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Star, History, Compass, Heart } from "lucide-react";
+import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Lightbulb, Star, History, Compass, Heart } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import StyxCredit from "./StyxCredit";
@@ -40,7 +40,7 @@ import { localizedHref } from "@/lib/localizedHref";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { track, EVENTS } from "@/lib/analytics";
 import type { Venue } from "@/types/venue";
-import { categoryColors } from "@/data/venues";
+import { categoryColors } from "@/lib/categories";
 import { formatMiles } from "@/lib/distance";
 import type { ViewMode } from "@/lib/useMapUI";
 
@@ -48,6 +48,11 @@ export interface HamburgerMenuContentProps {
   locale?: Locale;
   onShowWelcome?: () => void;
   savedVenues?: Array<Venue & { distanceMiles?: number }>;
+  /**
+   * PageNav loads the saved list on first open (#721); while it does, say
+   * "Loading…" rather than flash "No saved places yet" at someone who has some.
+   */
+  savedLoading?: boolean;
   /** Called directly with the picked venue's id — no implicit close (see file header). */
   onSelectVenue?: (id: string) => void;
   /** Which view to render: the menu ("top") or the saved places ("saved"). */
@@ -72,6 +77,7 @@ export default function HamburgerMenuContent({
   locale: localeProp,
   onShowWelcome,
   savedVenues = [],
+  savedLoading = false,
   onSelectVenue,
   view,
   onClose,
@@ -130,7 +136,11 @@ export default function HamburgerMenuContent({
         {view === "saved" ? (
           // Plain list, not role="menu": these are buttons in a dialog-like
           // panel, and the empty state is prose, not a menu item.
-          savedVenues.length > 0 ? (
+          savedLoading ? (
+            <p role="status" className="px-5 py-10 text-center text-sm text-[var(--color-ink-500)]">
+              {t("box.cardLoading", locale)}
+            </p>
+          ) : savedVenues.length > 0 ? (
             <ul aria-label={t("menu.saved.heading", locale)} className="py-2">
               {savedVenues.map((v) => (
                 <li key={v.id}>
@@ -324,6 +334,17 @@ export default function HamburgerMenuContent({
                 href={localizedHref("/resources", tree)}
                 onClick={onClose}
                 icon={<HandHelping size={14} />}
+              />
+
+              {/* Roadmap (#846) — the public roadmap page is served by a
+                  separate Worker on the /roadmap* route, so this is a plain
+                  link, never client routing, and the same path in Spanish. */}
+              <HamburgerMenuItem
+                label={t("menu.roadmap", locale)}
+                href="/roadmap"
+                plain
+                onClick={onClose}
+                icon={<Lightbulb size={14} />}
               />
             </ul>
             {/* Language toggle (#109) — placed OUTSIDE role="menu" because LanguageToggle

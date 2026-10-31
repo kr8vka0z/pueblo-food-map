@@ -102,3 +102,16 @@ describe("SiteFooter — crawl links", () => {
     );
   });
 });
+
+// #846: /roadmap is served by a separate Worker on the /roadmap* route, so
+// the link must never be rewritten to /es/roadmap, which would 404.
+describe("SiteFooter — Roadmap link (#846)", () => {
+  test.each(["en", "es"] as const)("points at /roadmap on the %s tree", (locale) => {
+    render(
+      <LocaleProvider initialLocale={locale}>
+        <SiteFooter />
+      </LocaleProvider>,
+    );
+    expect(screen.getByRole("link", { name: t("footer.roadmap", locale) }).getAttribute("href")).toBe("/roadmap");
+  });
+});

@@ -70,60 +70,48 @@ function makeVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: nu
 // ─── DesktopVenueWindow guards ────────────────────────────────────────────────
 
 describe("DesktopVenueWindow — OSM notes guard", () => {
-  test("does NOT render notes containing 'OSM' in collapsed state", () => {
+  test("does NOT render notes containing 'OSM'", () => {
     const venue = makeVenue({
       notes: "Hours (OSM opening_hours): Mo-Su 08:00-17:00",
     });
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
       />
     );
     expect(screen.queryByText(/OSM opening_hours/i)).toBeNull();
   });
 
-  test("does NOT render notes containing 'osm' (case-insensitive) in expanded state", () => {
+  test("does NOT render notes containing 'osm' (case-insensitive)", () => {
     const venue = makeVenue({
       notes: "osm_tag_reference",
     });
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={true}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
       />
     );
     expect(screen.queryByText(/osm_tag_reference/i)).toBeNull();
   });
 
-  test("DOES render clean notes (no OSM) in collapsed state", () => {
+  test("DOES render clean notes (no OSM)", () => {
     const venue = makeVenue({ notes: "surcharge for using cards" });
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
       />
     );
     expect(screen.getByText("surcharge for using cards")).toBeDefined();
   });
 
-  test("DOES render clean notes (no OSM) in expanded state", () => {
+  test("DOES render clean notes (no OSM)", () => {
     const venue = makeVenue({ notes: "Identifies as Women owned" });
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={true}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
       />
     );
@@ -141,9 +129,6 @@ describe("DesktopVenueWindow — address placeholder guard", () => {
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={true}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
       />
     );
@@ -157,9 +142,6 @@ describe("DesktopVenueWindow — address placeholder guard", () => {
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={true}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
       />
     );

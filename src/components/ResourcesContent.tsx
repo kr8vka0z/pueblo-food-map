@@ -87,7 +87,7 @@ export const PROGRAMS: Array<{ key: string; actions: Action[] }> = [
 ];
 
 const ACTION_CLASS =
-  "inline-flex items-center gap-1.5 min-h-11 px-4 rounded-full text-sm font-semibold " +
+  "inline-flex items-center gap-1.5 min-h-12 px-4 rounded-full text-sm font-semibold " +
   "border border-[var(--color-sage-500)] text-[var(--color-sage-700)] bg-white " +
   "hover:bg-[var(--color-sage-100)] transition-colors " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +

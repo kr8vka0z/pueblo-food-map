@@ -201,6 +201,15 @@ const nextConfig: NextConfig = {
         destination: "/?venue=plentiful-blessing-box-216-w-routt-plentiful-1454",
         permanent: true,
       },
+      // Retired admin review pages (#675, #677; moved here from one-line
+      // redirect() pages in #724): their queues now live as filters on a
+      // tab, and old bookmarks must land on the same filter. Plain paths,
+      // checked under vinext with `npm run preview` (each answers 307 with
+      // the query string intact). /admin/flags stays a page: see its header.
+      // Not permanent, so a browser never caches them if the tabs move again.
+      { source: "/admin/submissions", destination: "/admin/places?show=review&from=public", permanent: false },
+      { source: "/admin/box-photos", destination: "/admin/boxes?show=review", permanent: false },
+      { source: "/admin/box-adopters", destination: "/admin/boxes?show=review", permanent: false },
     ];
   },
 };

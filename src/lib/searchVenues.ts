@@ -1,4 +1,5 @@
 import type { Venue, VenueCategory } from "@/types/venue";
+import { categoryLabels } from "@/lib/categories";
 
 /**
  * Category search index: English labels, Spanish labels, and Pueblo aliases.
@@ -53,18 +54,6 @@ const WIC_SEARCH_TERMS = ["wic"];
  * Name substring search still works below this threshold.
  */
 const MIN_ALIAS_QUERY_LENGTH = 3;
-
-/** Primary EN label per category for EmptySearchPopover CATEGORY_OPTIONS. */
-const CATEGORY_LABELS: Record<VenueCategory, string> = {
-  pantry: "Food pantry",
-  grocery: "Grocery store",
-  convenience: "Convenience store",
-  farm: "Farm",
-  garden: "Community garden",
-  edible_landscape: "Edible landscape",
-  meal_site: "Meal site",
-  blessing_box: "Blessing box",
-};
 
 function normalizeQuery(query: string): string {
   return query.trim().toLowerCase();
@@ -139,11 +128,12 @@ export function searchVenues(venues: Venue[], query: string): Venue[] {
 }
 
 /**
- * Ordered list of all categories with their search-index labels.
- * Used by EmptySearchPopover to render suggestion chips.
+ * Ordered list of all categories with their EN labels (src/lib/categories.ts,
+ * the one label source since #721). Used by EmptySearchPopover to render
+ * suggestion chips; the chip text itself comes from i18n `category.full.*`.
  */
 export const CATEGORY_OPTIONS: Array<{ key: VenueCategory; label: string }> =
-  Object.entries(CATEGORY_LABELS).map(([key, label]) => ({
+  Object.entries(categoryLabels).map(([key, label]) => ({
     key: key as VenueCategory,
     label,
   }));

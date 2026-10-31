@@ -1,20 +1,7 @@
 /**
- * DesktopVenueWindow tests — issue #64 persistent header chrome.
- *
- * Verifies:
- *   1. Header bar visible in collapsed state (shows "Show details" button + X-close).
- *   2. Header bar visible in expanded state (shows "Hide details" button + X-close).
- *   3. X-close button calls onClose in collapsed state.
- *   4. X-close button calls onClose in expanded state.
- *   5. "Show details" toggle calls onExpand in collapsed state.
- *   6. "Hide details" toggle calls onCollapse in expanded state.
- *   7. Venue title is rendered in the body in both states (same id, no jump).
- *   8. No "See full details →" link anywhere (removed from collapsed body).
- *   9. No standalone chevron-only collapse button (removed from expanded header).
- *  10. Keyboard: Enter activates the Show/Hide toggle.
- *  11. Keyboard: Enter activates the X-close button.
- *  12. ES locale: "Show details" → "Ver detalles", "Hide details" → "Ocultar detalles".
- *  13. aria-expanded on toggle button reflects expanded state.
+ * DesktopVenueWindow tests — header chrome (#64) and the always-full card
+ * (#732: the Show/Hide details toggle is gone; a computer always shows the
+ * full details).
  *
  * #682: DesktopVenueWindow no longer takes a mapboxMap prop or computes its
  * own position (edge-flip removed — it now renders inside DesktopSidePanel,
@@ -29,6 +16,7 @@ import DesktopSidePanel from "@/components/DesktopSidePanel";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 import { track, EVENTS } from "@/lib/analytics";
+import { waitForBoxCard } from "@/lib/testing/waitForBoxCard.testutil";
 
 // #485 PR 2: mock the whole module so EVENTS keeps its real allowlist values.
 vi.mock("@/lib/analytics", async (importOriginal) => ({
@@ -76,9 +64,6 @@ function makeVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: nu
 
 function renderWindow(
   overrides: Partial<{
-    expanded: boolean;
-    onExpand: () => void;
-    onCollapse: () => void;
     onClose: () => void;
     locale: "en" | "es";
     venue: Venue;
@@ -86,9 +71,6 @@ function renderWindow(
 ) {
   const props = {
     venue: makeVenue(),
-    expanded: false,
-    onExpand: vi.fn(),
-    onCollapse: vi.fn(),
     onClose: vi.fn(),
     locale: "en" as const,
     ...overrides,
@@ -96,87 +78,56 @@ function renderWindow(
   return render(<DesktopVenueWindow {...props} />);
 }
 
-// ─── Header visibility ────────────────────────────────────────────────────────
+// ─── Always the full card (#732) ──────────────────────────────────────────────
 
-describe("DesktopVenueWindow — persistent header (collapsed)", () => {
-  test("renders X-close button in collapsed state", () => {
-    renderWindow({ expanded: false });
-    const closeBtn = screen.getByRole("button", { name: /close/i });
-    expect(closeBtn).toBeDefined();
-  });
-
-  test("renders 'Show details' toggle in collapsed state", () => {
-    renderWindow({ expanded: false });
-    const toggle = screen.getByRole("button", { name: /show details/i });
-    expect(toggle).toBeDefined();
-  });
-
-  test("does NOT render 'Hide details' in collapsed state", () => {
-    renderWindow({ expanded: false });
-    expect(screen.queryByRole("button", { name: /hide details/i })).toBeNull();
-  });
-});
-
-describe("DesktopVenueWindow — persistent header (expanded)", () => {
-  test("renders X-close button in expanded state", () => {
-    renderWindow({ expanded: true });
-    const closeBtn = screen.getByRole("button", { name: /close/i });
-    expect(closeBtn).toBeDefined();
-  });
-
-  test("renders 'Hide details' toggle in expanded state", () => {
-    renderWindow({ expanded: true });
-    const toggle = screen.getByRole("button", { name: /hide details/i });
-    expect(toggle).toBeDefined();
-  });
-
-  test("does NOT render 'Show details' in expanded state", () => {
-    renderWindow({ expanded: true });
-    expect(screen.queryByRole("button", { name: /show details/i })).toBeNull();
+describe("DesktopVenueWindow — full details on open, no toggle (#732)", () => {
+  test("the summary and the full details render together, with no Show/Hide details control", () => {
+    renderWindow({
+      venue: makeVenue({
+        phone: "(719) 555-0164",
+        hours_weekly: { mon: ["09:00-17:00"] },
+        notes: "Bring a photo ID.",
+      }),
+    });
+    expect(screen.queryByRole("button", { name: /show details|hide details/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /walk/i })).toBeDefined();
+    expect(screen.getByText("123 Test St, Pueblo, CO")).toBeDefined();
+    expect(screen.getByRole("region", { name: "HOURS" })).toBeDefined();
+    expect(screen.getByRole("link", { name: /555-0164/ })).toBeDefined();
+    expect(screen.getByText("Bring a photo ID.")).toBeDefined();
   });
 });
 
-// ─── Button interactions ──────────────────────────────────────────────────────
+// ─── X-close ─────────────────────────────────────────────────────────────────
 
 describe("DesktopVenueWindow — X-close interaction", () => {
-  test("X-close calls onClose in collapsed state", async () => {
+  test("X-close calls onClose", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
-    renderWindow({ expanded: false, onClose });
+    renderWindow({ onClose });
     await user.click(screen.getByRole("button", { name: /close/i }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  test("X-close calls onClose in expanded state", async () => {
+  test("Enter activates X-close button", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
-    renderWindow({ expanded: true, onClose });
-    await user.click(screen.getByRole("button", { name: /close/i }));
+    renderWindow({ onClose });
+    const closeBtn = screen.getByRole("button", { name: /close/i });
+    closeBtn.focus();
+    await user.keyboard("{Enter}");
     expect(onClose).toHaveBeenCalledTimes(1);
   });
-});
 
-describe("DesktopVenueWindow — toggle interaction", () => {
-  test("'Show details' calls onExpand in collapsed state", async () => {
-    const onExpand = vi.fn();
-    const user = userEvent.setup();
-    renderWindow({ expanded: false, onExpand });
-    await user.click(screen.getByRole("button", { name: /show details/i }));
-    expect(onExpand).toHaveBeenCalledTimes(1);
-  });
-
-  test("'Hide details' calls onCollapse in expanded state", async () => {
-    const onCollapse = vi.fn();
-    const user = userEvent.setup();
-    renderWindow({ expanded: true, onCollapse });
-    await user.click(screen.getByRole("button", { name: /hide details/i }));
-    expect(onCollapse).toHaveBeenCalledTimes(1);
+  test("ES: X-close has aria-label 'Cerrar'", () => {
+    renderWindow({ locale: "es" });
+    expect(screen.getByRole("button", { name: "Cerrar" })).toBeDefined();
   });
 });
 
 describe("DesktopVenueWindow — phone link looks tappable (option A, 2026-09-23)", () => {
-  test("expanded phone number is an underlined, green tel: link", () => {
-    renderWindow({ expanded: true, venue: makeVenue({ phone: "(719) 555-0164" }) });
+  test("phone number is an underlined, green tel: link", () => {
+    renderWindow({ venue: makeVenue({ phone: "(719) 555-0164" }) });
     const link = screen.getByRole("link", { name: /555-0164/ });
     expect(link.getAttribute("href")).toBe("tel:(719) 555-0164");
     expect(link.className.split(/\s+/)).toEqual(
@@ -185,144 +136,14 @@ describe("DesktopVenueWindow — phone link looks tappable (option A, 2026-09-23
   });
 });
 
-// ─── Venue title in body (no position jump) ───────────────────────────────────
+// ─── Venue title (focus target + dialog name) ────────────────────────────────
 
 describe("DesktopVenueWindow — venue title in body", () => {
-  test("venue title appears in body (with id) in collapsed state", () => {
+  test("venue title carries the id DesktopSidePanel focuses", () => {
     const venue = makeVenue({ name: "My Test Food Pantry" });
-    renderWindow({ expanded: false, venue });
+    renderWindow({ venue });
     const heading = screen.getByRole("heading", { name: "My Test Food Pantry" });
     expect(heading.id).toBe(`venue-window-title-${venue.id}`);
-  });
-
-  test("venue title appears in body (with id) in expanded state", () => {
-    const venue = makeVenue({ name: "My Test Food Pantry" });
-    renderWindow({ expanded: true, venue });
-    const heading = screen.getByRole("heading", { name: "My Test Food Pantry" });
-    expect(heading.id).toBe(`venue-window-title-${venue.id}`);
-  });
-});
-
-// ─── Old chrome removed ───────────────────────────────────────────────────────
-
-describe("DesktopVenueWindow — old chrome removed", () => {
-  test("no 'See full details' link in collapsed state", () => {
-    renderWindow({ expanded: false });
-    expect(screen.queryByText(/see full details/i)).toBeNull();
-  });
-
-  test("no chevron-only button with aria-label 'Collapse to quick summary' in expanded state", () => {
-    renderWindow({ expanded: true });
-    expect(screen.queryByRole("button", { name: /collapse to quick summary/i })).toBeNull();
-  });
-});
-
-// ─── Keyboard accessibility ───────────────────────────────────────────────────
-
-describe("DesktopVenueWindow — keyboard activation", () => {
-  test("Enter activates 'Show details' toggle", async () => {
-    const onExpand = vi.fn();
-    const user = userEvent.setup();
-    renderWindow({ expanded: false, onExpand });
-    const toggle = screen.getByRole("button", { name: /show details/i });
-    toggle.focus();
-    await user.keyboard("{Enter}");
-    expect(onExpand).toHaveBeenCalledTimes(1);
-  });
-
-  test("Space activates 'Show details' toggle", async () => {
-    const onExpand = vi.fn();
-    const user = userEvent.setup();
-    renderWindow({ expanded: false, onExpand });
-    const toggle = screen.getByRole("button", { name: /show details/i });
-    toggle.focus();
-    await user.keyboard(" ");
-    expect(onExpand).toHaveBeenCalledTimes(1);
-  });
-
-  test("Enter activates X-close button", async () => {
-    const onClose = vi.fn();
-    const user = userEvent.setup();
-    renderWindow({ expanded: false, onClose });
-    const closeBtn = screen.getByRole("button", { name: /close/i });
-    closeBtn.focus();
-    await user.keyboard("{Enter}");
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-});
-
-// ─── aria-expanded on toggle ──────────────────────────────────────────────────
-
-describe("DesktopVenueWindow — aria-expanded on toggle", () => {
-  test("toggle has aria-expanded=false in collapsed state", () => {
-    renderWindow({ expanded: false });
-    const toggle = screen.getByRole("button", { name: /show details/i });
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
-  });
-
-  test("toggle has aria-expanded=true in expanded state", () => {
-    renderWindow({ expanded: true });
-    const toggle = screen.getByRole("button", { name: /hide details/i });
-    expect(toggle.getAttribute("aria-expanded")).toBe("true");
-  });
-});
-
-// ─── aria-controls on toggle ─────────────────────────────────────────────────
-
-describe("DesktopVenueWindow — toggle aria-controls", () => {
-  test("toggle aria-controls targets the body region id (collapsed)", () => {
-    const venue = makeVenue();
-    renderWindow({ expanded: false, venue });
-    const toggle = screen.getByRole("button", { name: /show details/i });
-    expect(toggle.getAttribute("aria-controls")).toBe(
-      `venue-popup-body-${venue.id}`,
-    );
-    expect(
-      document.getElementById(`venue-popup-body-${venue.id}`),
-    ).not.toBeNull();
-  });
-
-  test("toggle aria-controls targets the body region id (expanded)", () => {
-    const venue = makeVenue();
-    renderWindow({ expanded: true, venue });
-    const toggle = screen.getByRole("button", { name: /hide details/i });
-    expect(toggle.getAttribute("aria-controls")).toBe(
-      `venue-popup-body-${venue.id}`,
-    );
-    expect(
-      document.getElementById(`venue-popup-body-${venue.id}`),
-    ).not.toBeNull();
-  });
-});
-
-// ─── Tab order: X-close before toggle ────────────────────────────────────────
-
-describe("DesktopVenueWindow — tab order", () => {
-  test("X-close appears before toggle in DOM order (tab order)", () => {
-    renderWindow({ expanded: false });
-    const closeBtn = screen.getByRole("button", { name: /close/i });
-    const toggle = screen.getByRole("button", { name: /show details/i });
-    // compareDocumentPosition: DOCUMENT_POSITION_FOLLOWING = 4
-    expect(closeBtn.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-});
-
-// ─── i18n — ES locale ────────────────────────────────────────────────────────
-
-describe("DesktopVenueWindow — ES locale strings", () => {
-  test("ES: toggle reads 'Ver detalles' in collapsed state", () => {
-    renderWindow({ expanded: false, locale: "es" });
-    expect(screen.getByRole("button", { name: "Ver detalles" })).toBeDefined();
-  });
-
-  test("ES: toggle reads 'Ocultar detalles' in expanded state", () => {
-    renderWindow({ expanded: true, locale: "es" });
-    expect(screen.getByRole("button", { name: "Ocultar detalles" })).toBeDefined();
-  });
-
-  test("ES: X-close has aria-label 'Cerrar'", () => {
-    renderWindow({ expanded: false, locale: "es" });
-    expect(screen.getByRole("button", { name: "Cerrar" })).toBeDefined();
   });
 });
 
@@ -364,14 +185,11 @@ function makeBox(overrides: Partial<PublicBlessingBox["box"]> = {}): PublicBless
 }
 
 describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-09-18)", () => {
-  test("no expand/collapse toggle for a box — the header renders a History link instead, regardless of the (now-unused-for-boxes) expanded prop", () => {
+  test("no expand/collapse toggle for a box — the header renders a History link instead", () => {
     render(
       <DesktopVenueWindow
         venue={makeBoxVenue()}
         box={makeBox()}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,
@@ -387,49 +205,43 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
   // venueNameBlock's own heading — a box branch never renders that block,
   // so the dialog's accessible name dangled (pointed at no element) for
   // every box until BoxCardBody's new `nameId` prop was wired through.
-  test("the dialog's accessible name resolves to the box's own name (aria-labelledby no longer dangles)", () => {
+  test("the dialog's accessible name resolves to the box's own name (aria-labelledby no longer dangles)", async () => {
     render(
       <DesktopVenueWindow
         venue={makeBoxVenue()}
         box={makeBox()}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,
     );
+    await waitForBoxCard();
     expect(screen.getByRole("dialog", { name: "Test Blessing Box" })).toBeDefined();
   });
 
-  test("host note and status render unconditionally — no 'nothing shows up' gap (Kyle, 2026-09-18)", () => {
+  test("host note and status render unconditionally — no 'nothing shows up' gap (Kyle, 2026-09-18)", async () => {
     render(
       <DesktopVenueWindow
         venue={makeBoxVenue()}
         box={makeBox()}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,
     );
+    await waitForBoxCard();
     expect(screen.getByTestId("box-status-badge")).toBeDefined();
     expect(screen.getByText("Please knock if the gate is closed.")).toBeDefined();
   });
 
-  test("ordinary-venue-only sections (address, hours table, phone, Plentiful link, report) never render for a box", () => {
+  test("ordinary-venue-only sections (address, hours table, phone, Plentiful link, report) never render for a box", async () => {
     render(
       <DesktopVenueWindow
         venue={makeBoxVenue({ phone: "(719) 555-0199", address: "999 Should Not Show St" })}
         box={makeBox()}
-        expanded={true}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,
     );
+    await waitForBoxCard();
     expect(screen.queryByText("999 Should Not Show St")).toBeNull();
     expect(screen.queryByText("(719) 555-0199")).toBeNull();
     expect(screen.queryByRole("link", { name: /report/i })).toBeNull();
@@ -440,9 +252,6 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
       <DesktopVenueWindow
         venue={makeBoxVenue()}
         box={null}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,
@@ -450,21 +259,18 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
     expect(screen.queryByTestId("box-status-badge")).toBeNull();
   });
 
-  test("the header's History link navigates to /box/<id>/history for a box (replaces the Show/Hide toggle, same position/classes — VenuePopupHeader's own header)", () => {
+  test("the header's History link navigates to /box/<id>/history for a box (VenuePopupHeader's own header)", () => {
     render(
       <DesktopVenueWindow
         venue={makeBoxVenue()}
         box={makeBox()}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,
     );
     const link = screen.getByRole("link", { name: "History" });
     expect(link.getAttribute("href")).toBe("/box/test-box-1/history");
-    // Same order-1 (visually leftmost) slot the ordinary-venue toggle uses.
+    // order-1: visually leftmost, while X-close stays first in tab order.
     expect(link.className).toContain("order-1");
   });
 
@@ -482,53 +288,19 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
           <DesktopVenueWindow
             venue={venue}
             box={makeBox()}
-            expanded={true}
-            onExpand={vi.fn()}
-            onCollapse={vi.fn()}
             onClose={close}
             locale="en"
           />
         )}
       </DesktopSidePanel>,
     );
+    await waitForBoxCard();
     // "I filled it" expands an optional-note form with a textarea (BoxCheckinPanel).
     await user.click(screen.getByRole("button", { name: "I filled it" }));
     const textarea = await screen.findByRole("textbox");
     textarea.focus();
     await user.keyboard("{Escape}");
     expect(onClose).not.toHaveBeenCalled();
-  });
-
-  test("an in-progress check-in note survives toggling expanded (fix, PR review 2026-09-18 — collapsed/expanded used to be two separate BoxCardBody subtrees that remounted on toggle)", async () => {
-    const user = userEvent.setup();
-    const { rerender } = render(
-      <DesktopVenueWindow
-        venue={makeBoxVenue()}
-        box={makeBox()}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
-        onClose={vi.fn()}
-        locale="en"
-      />,
-    );
-    await user.click(screen.getByRole("button", { name: "I filled it" }));
-    const textarea = await screen.findByRole("textbox");
-    await user.type(textarea, "Left extra cans");
-
-    rerender(
-      <DesktopVenueWindow
-        venue={makeBoxVenue()}
-        box={makeBox()}
-        expanded={true}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
-        onClose={vi.fn()}
-        locale="en"
-      />,
-    );
-
-    expect(screen.getByRole("textbox")).toHaveValue("Left extra cans");
   });
 });
 
@@ -538,7 +310,7 @@ describe("DesktopVenueWindow — analytics", () => {
   test("clicking the phone number fires call_clicked", async () => {
     const user = userEvent.setup();
     const venue = makeVenue({ phone: "(719) 555-0164" });
-    renderWindow({ expanded: true, venue });
+    renderWindow({ venue });
     await user.click(screen.getByRole("link", { name: /555-0164/ }));
     expect(track).toHaveBeenCalledWith(EVENTS.CALL_CLICKED, { venueId: venue.id });
   });
@@ -546,7 +318,7 @@ describe("DesktopVenueWindow — analytics", () => {
   test("clicking the Plentiful website link fires website_clicked", async () => {
     const user = userEvent.setup();
     const venue = makeVenue({ source: "plentiful", url: "https://example.com/pantry" });
-    renderWindow({ expanded: true, venue });
+    renderWindow({ venue });
     await user.click(screen.getByRole("link", { name: /plentiful/i }));
     expect(track).toHaveBeenCalledWith(EVENTS.WEBSITE_CLICKED, { venueId: venue.id });
   });

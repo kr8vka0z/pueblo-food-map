@@ -1,8 +1,8 @@
 # Only three kinds of branch may open a PR into `main` (= production):
-#   release/*   the weekly release PR (release.yml)
+#   release/*   the release PR (release.yml)
 #   hotfix/*    an emergency patch for something broken on the live site
 #   publish-bot venue-data publishes from the admin Publish button (no version)
-# Everything else ships via `dev` and the next weekly release; a stray
+# Everything else ships via `dev` and the next release; a stray
 # dev -> main "promotion" would put unreleased, unversioned work on prod.
 #
 # The job name `main-source-guard` is deliberately stable: it is a required
@@ -39,5 +39,5 @@ jobs:
             esac
           fi
           echo "PRs into main must come from release/*, hotfix/*, or publish-bot (got: $HEAD_REF)." >&2
-          echo "Work merges to dev and ships in the next weekly release (see AGENTS.md 'Release schedule')." >&2
+          echo "Work merges to dev and ships in the next release (see AGENTS.md 'Release schedule')." >&2
           exit 1

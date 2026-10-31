@@ -34,6 +34,8 @@ interface HamburgerMenuItemProps {
    * Typically a small Lucide icon (size 14-16).
    */
   icon?: ReactNode;
+  /** Render a plain <a> (full page load) instead of next/link — for a path another Worker serves, like /roadmap (#846). */
+  plain?: boolean;
 }
 
 export default function HamburgerMenuItem({
@@ -41,6 +43,7 @@ export default function HamburgerMenuItem({
   href,
   onClick,
   icon,
+  plain = false,
 }: HamburgerMenuItemProps) {
   const itemClass =
     // min-h-12: #233's 48px floor (py-3 alone gave 44).
@@ -76,7 +79,11 @@ export default function HamburgerMenuItem({
   // for a future a11y pass.
   return (
     <li role="menuitem">
-      {href ? (
+      {href && plain ? (
+        <a href={href} onClick={onClick} className={itemClass}>
+          {children}
+        </a>
+      ) : href ? (
         <Link href={href} onClick={onClick} className={itemClass}>
           {children}
         </Link>

@@ -6,10 +6,9 @@
  * (header History link, no expand/collapse toggle, Share/Favorite actions)
  * is unaffected by this wiring addition.
  *
- * Covers only the wiring DesktopVenueWindow itself owns: forwarding
- * onWalkRoute/isWalkRouteActive/onClearWalkRoute/walkRouteInfo/
- * walkRouteSteps/showWalkLocationHint into BoxCardBody, and binding
- * onWalkRoute to the box (not the plain Venue) as its callback target.
+ * Covers only the wiring DesktopVenueWindow itself owns: forwarding the `walk`
+ * object into BoxCardBody, which calls `walk.onWalk` with the box (not the
+ * plain Venue) as its target.
  * BoxCardBody's own render logic (button vs link, the readout) is covered
  * by BoxCardBody.walk.test.tsx.
  */
@@ -20,6 +19,8 @@ import userEvent from "@testing-library/user-event";
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
+import { waitForBoxCard } from "@/lib/testing/waitForBoxCard.testutil";
+import { makeWalk } from "@/__tests__/helpers/walkTestHelpers";
 
 const mockTurnstile = {
   render: vi.fn((_container: HTMLElement, opts: { callback?: (t: string) => void }) => {
@@ -89,50 +90,42 @@ describe("DesktopVenueWindow — forwards walk props into BoxCardBody", () => {
       <DesktopVenueWindow
         venue={makeBoxVenue()}
         box={box}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
-        onWalkRoute={onWalkRoute}
+        walk={makeWalk({ onWalk: onWalkRoute })}
       />,
     );
+    await waitForBoxCard();
     await user.click(screen.getByText("123 Test St, Pueblo, CO"));
     expect(onWalkRoute).toHaveBeenCalledTimes(1);
     expect(onWalkRoute).toHaveBeenCalledWith(box);
   });
 
-  test("no onWalkRoute prop -> address stays a plain link (unchanged pre-restore behavior)", () => {
+  test("no onWalkRoute prop -> address stays a plain link (unchanged pre-restore behavior)", async () => {
     render(
       <DesktopVenueWindow
         venue={makeBoxVenue()}
         box={makeBox()}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,
     );
+    await waitForBoxCard();
     const trigger = screen.getByText("123 Test St, Pueblo, CO");
     expect(trigger.tagName).toBe("A");
   });
 
-  test("isWalkRouteActive + walkRouteInfo render the active-route readout inside the box card", () => {
+  test("isWalkRouteActive + walkRouteInfo render the active-route readout inside the box card", async () => {
     render(
       <DesktopVenueWindow
         venue={makeBoxVenue()}
         box={makeBox()}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
-        onWalkRoute={vi.fn()}
-        isWalkRouteActive
-        walkRouteInfo={{ distance: "0.4", duration: "8 min" }}
+        walk={makeWalk({ onWalk: vi.fn(), isActive: true, info: { distance: "0.4", duration: "8 min" } })}
       />,
     );
+    await waitForBoxCard();
     expect(screen.getByTestId("walking-route-info")).toBeDefined();
   });
 });

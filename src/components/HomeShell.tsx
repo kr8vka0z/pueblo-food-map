@@ -115,7 +115,11 @@ export default function HomeShell({ locale }: { locale: Locale }) {
             const treeHref = localizedHref(href, locale);
             return (
               <li key={treeHref}>
-                <Link href={treeHref} className={HOME_CRAWL_LINK_CLASS}>
+                {/* prefetch={false} (#721): these links are visually hidden
+                    but count as on screen, so each one prefetched its page's
+                    data in the background on every map visit (the /resources
+                    prefetch among them) for links almost nobody uses. */}
+                <Link href={treeHref} prefetch={false} className={HOME_CRAWL_LINK_CLASS}>
                   {label[locale]}
                 </Link>
               </li>
@@ -126,7 +130,19 @@ export default function HomeShell({ locale }: { locale: Locale }) {
       {/* Must sit right before HomePageClient: runs before the splash markup is
           parsed, so returning visitors never paint it (see splashGate.ts). */}
       <script dangerouslySetInnerHTML={{ __html: SPLASH_GATE_SCRIPT }} />
-      <HomePageClient />
+      {/* Labels resolved here, on the server, so the stand-in never pulls the
+          i18n dictionary into the blocking bundle (#730). */}
+      <HomePageClient
+        standInLabels={{
+          search: t("search.placeholder", locale),
+          filters: t("filters.button.label", locale),
+          nearMe: t("nav.nearMe", locale),
+          saved: t("nav.saved", locale),
+          boxes: t("nav.boxes", locale),
+          help: t("nav.resources", locale),
+          menu: t("nav.menu", locale),
+        }}
+      />
     </>
   );
 }

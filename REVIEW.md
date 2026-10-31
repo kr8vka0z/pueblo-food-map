@@ -1,28 +1,65 @@
 # REVIEW.md — how to review a change in this repo
 
-Read by the CI reviewer (`.github/workflows/claude-code-review.yml`) and the `reviewer`
-subagent. One page on purpose. Operational facts live in [AGENTS.md](AGENTS.md); design
-rationale in [ARCHITECTURE.md](ARCHITECTURE.md).
+Read by the Codex PR review (run by the server's `pr-review` script, posted as a PR comment) and
+by any human or agent reviewer. One page on purpose. Operational facts live in
+[AGENTS.md](AGENTS.md); design rationale in [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Judge against the PR description
+
+The reviewer sees only the PR description, the diff, the spec issue the PR links (`Spec: #<n>`),
+this file and AGENTS.md: no chat, no history. So the description has to carry the case on its own (template:
+`.github/pull_request_template.md`, sections Why / What changed / How it was tested / Risk /
+How to undo it / Watch for).
+
+- The diff should do what the description says, and nothing it doesn't explain. A file or change
+  the description never accounts for is a finding.
+- A description that is missing, empty, or doesn't match the diff is a Blocker.
+- Where a rule below needs proof the diff can't show (a test that failed before the fix,
+  `scripts/check-pages-serve.sh` after a `next`/`vinext`/`vite` bump, a migration applied to
+  staging), the proof is a sentence in "How it was tested". No sentence, no proof.
 
 ## Severity
 
-- **Blocker** — wrong behavior, data loss, a security hole, anything that breaks a
-  standing rule below, a test weakened to pass, a migration that could cascade-delete
-  a referenced table.
+- **Blocker** — must be fixed before merge: wrong behavior, data loss, a security hole, a broken
+  standing rule below, a test weakened to pass, a migration that could cascade-delete a referenced
+  table, a description missing or not matching the diff.
 - **Important** — works but fragile: new behavior with no test, an unhandled error path,
-  an accessibility regression, a diff that departs from the issue's plan without saying so.
+  an accessibility regression, a diff that goes beyond what the description says without
+  explaining it.
 - **Nit** — naming, style, small simplifications. At most 5 per review; drop the rest.
+
+## Security
+
+This repo is public: anything committed is published.
+
+- Secrets: none in code, config, tests, fixtures or logs. Only the URL-restricted Mapbox public
+  token (`pk.*`) ships in a client bundle, never the secret token (`sk.*`). The full-access Resend
+  key never goes in the Worker.
+- Logs: never log an IP, email or form content; `invocation_logs` stays `false`
+  (AGENTS.md "Scheduled jobs and observability").
+- Injection: JSON-LD only through `serializeJsonLd`; D1 queries use bound parameters.
+- Auth and permission checks: new admin code fetches D1 only through `getAdminDb()`; every non-GET
+  `/api/admin/*` route calls `requireAdminOrigin()`; `ADMIN_ALLOWLIST` fails toward "only Kyle".
+  The allowlist plugin's tests (`adminAuthAllowlistPlugin.test.ts`) are the security boundary:
+  weakening them is a Blocker.
+- Input: the server re-validates every admin field (`adminVenueValidation.ts`); public forms keep
+  Turnstile and the D1 rate limiters. Scraped HTML is untrusted, so `CLOUDFLARE_D1_TOKEN` never
+  goes to a deploy job.
+- Workflows: `pull_request_target` workflows never check out or run PR code.
+- New dependencies: each one says why in the description, and why nothing already installed covers it.
 
 ## Check every time
 
-1. Does the diff do what the PR/issue describes — no more, no less?
-2. Is there a test that would fail if this change were reverted? For a bug fix: did the
-   failing test exist before the fix?
-3. Did any existing test change? If yes, why — which requirement demanded it?
+1. Does the diff do what the description says — no more, no less?
+2. Is there a test that would fail if this change were reverted? For a bug fix: does the
+   description say the new test failed before the fix?
+3. Did any existing test change? If yes, does the description say which requirement made it change?
 4. Does this change make `AGENTS.md`, `README.md` or `ARCHITECTURE.md` wrong? Say which line.
 5. A new top-level binding, var, or secret in `wrangler.jsonc` → is its `env.staging` twin
    in the same change? Named environments inherit almost nothing here (see AGENTS.md,
    "Hosting").
+6. PR into `dev`: is the title a Conventional Commit? PR into `main`: is the head branch
+   `release/*`, `hotfix/*` or the publish bot? Anything else is a Blocker.
 
 ## Standing rules for this repo (owner decisions — a diff that breaks one is a Blocker)
 
@@ -41,9 +78,7 @@ rationale in [ARCHITECTURE.md](ARCHITECTURE.md).
   with `git diff --stat origin/dev origin/main` — never a commit count
   (`git rev-list --count`), which reads non-zero even when the branches are
   content-identical (squash-only merges rewrite SHAs).
-- **Mapbox: only the URL-restricted public token (`pk.*`) ships in a client bundle.**
-  Never the secret token (`sk.*`). The Mapbox attribution logo rendering at 65×20 is
-  expected and not a finding.
+- **Mapbox:** the Mapbox attribution logo rendering at 65×20 is expected and not a finding.
 - **Dependabot targets `dev`, never `main`.** The `dev` branch ruleset requires the same
   four checks as `main` (`Lint, typecheck, build`, Semgrep, TruffleHog, Dependency CVE
   Audit) — loosening or removing that ruleset silently turns Dependabot auto-merge into
@@ -55,6 +90,33 @@ rationale in [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Date-only freshness proposals auto-apply by design** (Kyle, 2026-09-15) — not a
   finding. `/venue/<id>` routing (including the box-vs-venue split) is settled — don't
   re-litigate it absent a new bug report.
+
+## Sensitive paths
+
+These files hold the admin sign-in gate and admin writes, the public forms that write to D1
+and email strangers (box alerts, sign-in codes), the rate limits and Turnstile, publishing
+to the live map, the cron, the security headers, and the refresh pipeline and server timer
+that write to the production database. The review's built-in defaults apply on top.
+
+```
+src/app/api/admin/**
+src/app/api/public/**
+src/lib/admin*.ts
+src/lib/email*.ts
+src/lib/boxAlerts.ts
+src/lib/alertTokens.ts
+src/lib/checkinRateLimit.ts
+src/lib/turnstile.ts
+src/lib/boxTurnstile.ts
+src/lib/publishVenues.ts
+src/lib/scheduledTasks.ts
+custom-worker.ts
+next.config.ts
+scripts/refresh/**
+scripts/refresh-ingest.ts
+scripts/release/**
+ops/systemd/**
+```
 
 ## Skip
 

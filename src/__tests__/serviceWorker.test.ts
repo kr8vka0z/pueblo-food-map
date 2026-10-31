@@ -185,3 +185,87 @@ describe("sw.js activate (#130)", () => {
     expect(respondWith).not.toHaveBeenCalled();
   });
 });
+
+// #721: install used to precache all six shell pages (both languages) and
+// their chunks for every visitor; now only the open page's tree.
+describe("sw.js install precaches one language tree (#721)", () => {
+  async function install(clientUrls: string[]) {
+    const env = loadSw();
+    const put = vi.fn(async () => {});
+    env.caches.open = vi.fn(async () => ({ put, add: vi.fn(async () => {}) }));
+    env.context.fetch = vi.fn(async () => ({
+      ok: true,
+      type: "basic",
+      redirected: false,
+      clone: () => ({ text: async () => "<html></html>" }),
+    }));
+    Object.assign(env.self.clients, {
+      matchAll: vi.fn(async () => clientUrls.map((url) => ({ url }))),
+    });
+    let done: Promise<unknown> = Promise.resolve();
+    env.listeners.install({ waitUntil: (p: Promise<unknown>) => (done = p) });
+    await done;
+    return (env.context.fetch as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]).sort();
+  }
+
+  test("an English page precaches only the English shells", async () => {
+    expect(await install([`${ORIGIN}/about`])).toEqual(["/", "/resources", "/venues"]);
+  });
+
+  test("a Spanish page precaches only the Spanish shells", async () => {
+    expect(await install([`${ORIGIN}/es/venues`])).toEqual(["/es", "/es/resources", "/es/venues"]);
+  });
+
+  test("no known window falls back to English", async () => {
+    expect(await install([])).toEqual(["/", "/resources", "/venues"]);
+  });
+
+  // Review round 1 blocker: the installed app launches at start_url `/`, so a
+  // worker installed from /es (only the /es shells cached) must still answer
+  // an offline `/` launch, and the mirror case for /es.
+  async function installThenOpenOffline(installFrom: string, open: string) {
+    const env = loadSw();
+    const store = new Map<string, { body: string }>();
+    const cache = {
+      put: vi.fn(async (key: string, res: { body: string }) => void store.set(key, res)),
+      add: vi.fn(async () => {}),
+      match: vi.fn(async (key: string) => store.get(key)),
+    };
+    env.caches.open = vi.fn(async () => cache);
+    env.context.fetch = vi.fn(async (page: string) => ({
+      ok: true,
+      type: "basic",
+      redirected: false,
+      body: `shell ${page}`,
+      clone: () => ({ text: async () => "<html></html>" }),
+    }));
+    Object.assign(env.self.clients, { matchAll: vi.fn(async () => [{ url: `${ORIGIN}${installFrom}` }]) });
+    let installed: Promise<unknown> = Promise.resolve();
+    env.listeners.install({ waitUntil: (p: Promise<unknown>) => (installed = p) });
+    await installed;
+
+    env.context.fetch = vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    let served: Promise<{ body: string }> | undefined;
+    env.listeners.fetch({
+      request: { url: `${ORIGIN}${open}`, method: "GET", mode: "navigate" },
+      respondWith: (p: Promise<{ body: string }>) => (served = p),
+    });
+    return (await served!).body;
+  }
+
+  test("installed from /es, an offline launch of / gets the cached /es shell", async () => {
+    expect(await installThenOpenOffline("/es", "/")).toBe("shell /es");
+    expect(await installThenOpenOffline("/es/about", "/venues")).toBe("shell /es/venues");
+  });
+
+  test("installed from /, an offline open of /es gets the cached / shell", async () => {
+    expect(await installThenOpenOffline("/", "/es")).toBe("shell /");
+    expect(await installThenOpenOffline("/about", "/es/resources")).toBe("shell /resources");
+  });
+
+  test("the cache version moved on from v2, so installed workers drop the two-tree cache", () => {
+    expect(vm.runInContext("CACHE_VERSION", loadSw().context)).not.toBe("v2");
+  });
+});

@@ -34,6 +34,7 @@ const INTERNAL_DEVICE_STORAGE_KEY = "pfm_internal";
 type PostHogClient = {
   init: (key: string, config: Record<string, unknown>) => void;
   capture: (name: string, props?: Record<string, unknown>) => void;
+  stopSessionRecording: () => void;
 };
 
 // Set once initAnalytics() passes every gate and posthog-js has loaded.
@@ -41,6 +42,16 @@ type PostHogClient = {
 // caller that fires before/without init (or on a gated device) is a silent,
 // zero-cost no-op — never a network call to an uninitialized SDK.
 let client: PostHogClient | null = null;
+
+// Set the first time an event would be sent from an /admin page (#861).
+// Once set, nothing more is sent for the rest of this page load, public
+// pages included: the visitor who walked into /admin is almost always Kyle,
+// and markInternalDevice() at sign-in makes it permanent from the next load.
+let stoppedForAdmin = false;
+
+function isAdminPath(pathname: string): boolean {
+  return pathname === "/admin" || pathname.startsWith("/admin/");
+}
 
 /**
  * True if this browser is flagged as one of Kyle's own — set by the admin
@@ -155,6 +166,7 @@ export async function track(
  */
 export function _resetAnalyticsStateForTest(): void {
   client = null;
+  stoppedForAdmin = false;
 }
 
 export type InitAnalyticsOptions = {
@@ -167,12 +179,19 @@ export type InitAnalyticsOptions = {
 };
 
 /**
- * Session replay sample rate — 1.0 (every session) for now. Named so a
- * future dial-down doesn't require re-reading posthog-js docs to find the
- * right field again (Kyle, 2026-09-26: reversed the issue's original
- * "replay OFF" decision after seeing the #681 dashboard mockup).
+ * Session replay sample rate: 0.2 records one visit in five (#722). Recording
+ * every visit cost CPU and data on the audience's phones; one in five still
+ * gives the #681 dashboard plenty to watch. Kyle can change the number here.
  */
-export const SESSION_REPLAY_SAMPLE_RATE = 1.0;
+export const SESSION_REPLAY_SAMPLE_RATE = 0.2;
+
+/**
+ * Never recorded by replay (#722): the map container mapbox-gl marks with
+ * this class, which holds the canvas, every pin and the map popups. The
+ * recorder otherwise re-records ~130 pins on every pan frame. Replay shows a
+ * blank box of the same size; autocapture and the named events still fire.
+ */
+export const REPLAY_BLOCK_SELECTOR = ".mapboxgl-map";
 
 /**
  * Loads and initializes posthog-js, or does nothing at all (no import, no
@@ -201,7 +220,7 @@ export async function initAnalytics(options: InitAnalyticsOptions = {}): Promise
 
   const pathname =
     options.pathname ?? (typeof window !== "undefined" ? window.location.pathname : "");
-  if (pathname === "/admin" || pathname.startsWith("/admin/")) return;
+  if (isAdminPath(pathname)) return;
 
   if (isInternalDevice()) return;
 
@@ -218,6 +237,21 @@ export async function initAnalytics(options: InitAnalyticsOptions = {}): Promise
     // it off only skips that download; it changes nothing that is collected.
     disable_surveys: true,
     capture_pageview: "history_change",
+    // #861: the gates above only see the FIRST page. A visitor who then
+    // follows a link into /admin stays on the same page load, and
+    // history_change pageviews, autocapture and replay would keep running.
+    // Every one of those (replay's $snapshot batches included) goes through
+    // before_send, which reads the address at send time, so the move is
+    // caught before any React effect could run: drop the event, stop the
+    // recorder, and send nothing more from this page load.
+    before_send: (event: unknown) => {
+      if (stoppedForAdmin) return null;
+      if (!isAdminPath(window.location.pathname)) return event;
+      stoppedForAdmin = true;
+      client = null;
+      posthog.stopSessionRecording();
+      return null;
+    },
     // Session replay is ON (Kyle, 2026-09-26 — reverses the issue's original
     // "replay OFF" default; see #681, the admin dashboard mockup). Still
     // behind this same deferred initAnalytics() call, so it costs nothing
@@ -234,6 +268,7 @@ export async function initAnalytics(options: InitAnalyticsOptions = {}): Promise
       // number shown on the page), a different surface from input values.
       maskAllInputs: true,
       sampleRate: SESSION_REPLAY_SAMPLE_RATE,
+      blockSelector: REPLAY_BLOCK_SELECTOR,
     },
   });
   client = posthog;

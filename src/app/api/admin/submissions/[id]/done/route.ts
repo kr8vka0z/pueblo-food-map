@@ -51,6 +51,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { auditInsertIfExistsSql } from "@/lib/auditLog";
 
 interface PendingClosureRow {
   target_venue_id: string | null;
@@ -62,9 +63,10 @@ const DONE_SUBMISSION_SQL =
 // SELECT-form so the guard can skip the insert entirely when the UPDATE
 // above didn't actually apply — same shape as the venue edit/archive
 // routes' AUDIT_INSERT_SQL (src/lib/adminVenueEditSql.ts).
-const AUDIT_INSERT_SQL = `INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id)
-  SELECT ?, 'venue', ?, 'update', NULL, ?, ?, ?
-  WHERE EXISTS (SELECT 1 FROM public_submissions WHERE id = ? AND status = 'approved')`;
+const AUDIT_INSERT_SQL = auditInsertIfExistsSql(
+  "?, 'venue', ?, 'update', NULL, ?, ?, ?",
+  "SELECT 1 FROM public_submissions WHERE id = ? AND status = 'approved'",
+);
 
 export async function POST(
   req: NextRequest,

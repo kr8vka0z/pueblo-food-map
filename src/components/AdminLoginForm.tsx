@@ -41,13 +41,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/authClient";
 import { markInternalDevice } from "@/lib/analytics";
+import { EMAIL_RE } from "@/lib/email";
 
 type FormStatus = "idle" | "sending" | "sent" | "error";
 type CodeStatus = "idle" | "verifying" | "error";
 type PasskeySignInStatus = "idle" | "authenticating" | "error";
 type PasskeyRegisterStatus = "idle" | "registering" | "error";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CODE_LENGTH = 6;
 /** Seconds "Resend code" stays disabled after each send (#684). */
 export const RESEND_COOLDOWN_SECONDS = 30;
@@ -78,12 +78,12 @@ const inputBase =
 const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
 const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
 const primaryButtonClass =
-  "w-full h-11 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
+  "w-full h-12 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
   "text-base font-semibold transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
   "focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed";
 const secondaryButtonClass =
-  "w-full h-11 inline-flex items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
+  "w-full h-12 inline-flex items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
   "text-sm font-medium text-[var(--color-sage-600)] bg-transparent " +
   "transition-colors duration-150 hover:bg-[var(--color-sage-50)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
@@ -350,7 +350,7 @@ export default function AdminLoginForm() {
               type="button"
               onClick={handleResend}
               disabled={resendIn > 0}
-              className="min-h-11 text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60"
+              className="min-h-12 text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60"
             >
               {resendIn > 0 ? `Resend code (${resendIn}s)` : "Resend code"}
             </button>
@@ -364,7 +364,7 @@ export default function AdminLoginForm() {
                 setCodeStatus("idle");
                 setResendIn(0);
               }}
-              className="min-h-11 text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+              className="min-h-12 text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
             >
               Use a different email
             </button>

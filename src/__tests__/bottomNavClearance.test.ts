@@ -99,6 +99,7 @@ describe("#530 — small-viewport anchoring for bottom-pinned chrome", () => {
 
   test.each([
     ["src/components/BottomNav.tsx"],
+    ["src/components/bottomNavShared.tsx"], // #730: the nav's classes live here now
     ["src/components/BottomSheet.tsx"],
   ])("%s pins bottom-anchored chrome with no bare vh unit", (relPath) => {
     const src = readSrc(relPath);
@@ -106,7 +107,8 @@ describe("#530 — small-viewport anchoring for bottom-pinned chrome", () => {
   });
 
   test("BottomNav.tsx uses no dvh unit at all", () => {
-    const src = readSrc("src/components/BottomNav.tsx");
+    // #730: bottomNavShared.tsx holds the nav's classes now.
+    const src = readSrc("src/components/BottomNav.tsx") + readSrc("src/components/bottomNavShared.tsx");
     expect(
       src,
       "BottomNav.tsx must not size/position against a bare dvh unit — it has no snap-point " +
@@ -140,6 +142,7 @@ describe("#530 — small-viewport anchoring for bottom-pinned chrome", () => {
 describe("#530 review round 2 — position lives in CSS, not a React inline style", () => {
   test.each([
     ["src/components/BottomNav.tsx"],
+    ["src/components/bottomNavShared.tsx"], // #730: the nav's classes live here now
     ["src/components/BottomSheet.tsx"],
   ])("%s sets no inline top/bottom/left/right position style", (relPath) => {
     const src = readSrc(relPath);

@@ -27,8 +27,8 @@
  *   samesite: Lax
  */
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import type { Locale } from "@/lib/i18n";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { hasSpanish, loadSpanish, type Locale } from "@/lib/i18n";
 
 // ─── Cookie helpers ───────────────────────────────────────────────────────────
 
@@ -110,22 +110,40 @@ export function LocaleProvider({
   // that only ever changes via a full page load (crossing root layouts),
   // never a client-side re-render, so it's derived once and never updated.
   const tree = initialLocale ?? "en";
+  // Counts language choices (#723). Switching to Spanish can wait on a
+  // download; a choice made meanwhile bumps this, so the stale switch is
+  // dropped instead of landing late and overriding it.
+  const choice = useRef(0);
 
   // Sync client cookie on mount when no explicit initialLocale prop is provided (#289)
   useEffect(() => {
     if (!initialLocale) {
       const saved = readLocaleCookie();
       if (saved) {
-        queueMicrotask(() => {
-          setLocaleState((prev) => (prev !== saved ? saved : prev));
-        });
+        // Spanish strings load first, so the switch never shows a fallback (#723).
+        const mine = choice.current;
+        const ready = saved === "es" ? loadSpanish() : Promise.resolve();
+        ready.then(
+          () => {
+            if (choice.current === mine) setLocaleState((prev) => (prev !== saved ? saved : prev));
+          },
+          () => undefined, // Couldn't load (offline): stay in English.
+        );
       }
     }
   }, [initialLocale]);
 
   const setLocale = useCallback((next: Locale) => {
-    setLocaleState(next);
-    writeLocaleCookie(next);
+    const mine = ++choice.current;
+    const apply = () => {
+      if (choice.current !== mine) return; // a newer choice was made meanwhile
+      setLocaleState(next);
+      writeLocaleCookie(next);
+    };
+    // English-tree visitors don't have the Spanish strings until they ask
+    // (#723): switch once they've loaded, and stay in English if they can't.
+    if (next === "en" || hasSpanish()) apply();
+    else loadSpanish().then(apply, () => undefined);
   }, []);
 
   // Keep <html lang> in sync with the active locale for screen-reader pronunciation.
@@ -147,7 +165,7 @@ export function LocaleProvider({
  *
  * @example
  *   const { locale, setLocale } = useLocale();
- *   <button onClick={() => setLocale("es")}>{t("topbar.locale.es", locale)}</button>
+ *   <button onClick={() => setLocale("es")}>{t("menu.language", locale)}</button>
  */
 export function useLocale(): LocaleContextValue {
   return useContext(LocaleContext);

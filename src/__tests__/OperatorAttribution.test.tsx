@@ -3,14 +3,13 @@
  *
  * Verifies:
  *   1. DesktopVenueWindow renders "Operated by Pueblo Food Project" (with link)
- *      when venue.operator is set — in both quick and expanded views.
+ *      when venue.operator is set.
  *   2. DesktopVenueWindow renders nothing operator-related when venue.operator
  *      is undefined (pantry, grocery, etc.)
  *   3. BottomSheet quick-summary and full-detail both render the operator line.
  *   4. BottomSheet omits the line when venue.operator is undefined.
- *   5. All 10 pfpVenues (pfp-venues.ts) have operator: "Pueblo Food Project".
- *   6. No non-PFP venue in the combined venues list has an operator field.
- *   7. i18n: ES locale shows "Operado por Pueblo Food Project".
+ *   5. No non-PFP venue in the combined venues list has an operator field.
+ *   6. i18n: ES locale shows "Operado por Pueblo Food Project".
  *
  * Mock strategy:
  *   DesktopVenueWindow requires a mapboxMap instance to compute position.
@@ -48,7 +47,6 @@ beforeAll(() => {
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
 import BottomSheet from "@/components/BottomSheet";
 import { venues } from "@/data/venues";
-import { pfpVenues } from "@/data/pfp-venues";
 import type { Venue } from "@/types/venue";
 
 // ─── Shared fixtures ──────────────────────────────────────────────────────────
@@ -68,17 +66,14 @@ function makeVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: nu
 }
 
 /** Minimal mapboxgl.Map stub for DesktopVenueWindow position logic. */
-// ─── DesktopVenueWindow — quick view ─────────────────────────────────────────
+// ─── DesktopVenueWindow ─────────────────────────────────────────────────
 
-describe("DesktopVenueWindow — operator attribution (quick view)", () => {
+describe("DesktopVenueWindow — operator attribution", () => {
   test("shows operator line when venue.operator is set", () => {
     const venue = makeVenue({ operator: "Pueblo Food Project" });
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,
@@ -92,9 +87,6 @@ describe("DesktopVenueWindow — operator attribution (quick view)", () => {
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,
@@ -113,9 +105,6 @@ describe("DesktopVenueWindow — operator attribution (quick view)", () => {
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,
@@ -129,9 +118,6 @@ describe("DesktopVenueWindow — operator attribution (quick view)", () => {
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="es"
       />,
@@ -139,41 +125,6 @@ describe("DesktopVenueWindow — operator attribution (quick view)", () => {
     expect(screen.getByText(/Operado por/)).toBeDefined();
     // Org name stays as-is (proper noun)
     expect(screen.getByText("Pueblo Food Project")).toBeDefined();
-  });
-});
-
-// ─── DesktopVenueWindow — expanded view ──────────────────────────────────────
-
-describe("DesktopVenueWindow — operator attribution (expanded view)", () => {
-  test("shows operator line in expanded view", () => {
-    const venue = makeVenue({ operator: "Pueblo Food Project" });
-    render(
-      <DesktopVenueWindow
-        venue={venue}
-        expanded={true}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
-        onClose={vi.fn()}
-        locale="en"
-      />,
-    );
-    expect(screen.getByText(/Operated by/)).toBeDefined();
-    expect(screen.getByText("Pueblo Food Project")).toBeDefined();
-  });
-
-  test("omits operator line in expanded view when undefined (grocery)", () => {
-    const venue = makeVenue({ category: "grocery", operator: undefined });
-    render(
-      <DesktopVenueWindow
-        venue={venue}
-        expanded={true}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
-        onClose={vi.fn()}
-        locale="en"
-      />,
-    );
-    expect(screen.queryByText(/Operated by/)).toBeNull();
   });
 });
 
@@ -243,28 +194,6 @@ describe("BottomSheet — operator attribution (full snap)", () => {
 // ─── Data integrity ───────────────────────────────────────────────────────────
 
 describe("venues data — operator field integrity", () => {
-  test("all 10 pfpVenues have operator: 'Pueblo Food Project'", () => {
-    expect(pfpVenues).toHaveLength(10);
-    const withOperator = pfpVenues.filter((v) => v.operator === "Pueblo Food Project");
-    expect(withOperator).toHaveLength(10);
-  });
-
-  test("all 6 garden venues have operator set", () => {
-    const gardens = pfpVenues.filter((v) => v.category === "garden");
-    expect(gardens).toHaveLength(6);
-    gardens.forEach((v) => {
-      expect(v.operator).toBe("Pueblo Food Project");
-    });
-  });
-
-  test("all 4 edible_landscape venues have operator set", () => {
-    const landscapes = pfpVenues.filter((v) => v.category === "edible_landscape");
-    expect(landscapes).toHaveLength(4);
-    landscapes.forEach((v) => {
-      expect(v.operator).toBe("Pueblo Food Project");
-    });
-  });
-
   test("no pantry venue in combined venues list has an operator field", () => {
     const pantries = venues.filter((v) => v.category === "pantry");
     expect(pantries.length).toBeGreaterThan(0);

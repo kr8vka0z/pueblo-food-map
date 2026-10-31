@@ -2,8 +2,8 @@
  * Sends the admin sign-in CODE email via Resend (#684). Replaces the old
  * magic-link email: a link always opened a second tab (mail apps open links
  * in a new tab), so the admin now types a 6-digit code into the tab they're
- * already on. Same Resend sending-key convention as every other email on
- * this site (`RESEND_API_KEY`, `api.resend.com/emails`).
+ * already on. Sent through the shared sendResendEmail (emailSend.ts), like
+ * every other email on this site.
  *
  * Only ever called for an allowlisted email and `type === "sign-in"`:
  * adminAuthAllowlistPlugin.ts short-circuits every other
@@ -15,16 +15,14 @@
  * No link of any kind — nothing to click.
  */
 
+import { sendResendEmail } from "@/lib/emailSend";
+
 const FROM_ADDRESS = "Pueblo Food Map Admin <noreply@pueblofoodmap.com>";
 
 /** Minutes the code stays valid — must match emailOTP's `expiresIn` in auth-options.ts. */
 export const SIGN_IN_CODE_MINUTES = 10;
 
 export async function sendAdminSignInCodeEmail(data: { email: string; otp: string }): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    throw new Error("RESEND_API_KEY not configured");
-  }
   // Defensive: the plugin only ever generates digits, but this string lands
   // in HTML — never interpolate anything else.
   const code = data.otp.replace(/\D/g, "");
@@ -59,23 +57,5 @@ export async function sendAdminSignInCodeEmail(data: { email: string; otp: strin
     </div>
   `;
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      from: FROM_ADDRESS,
-      to: [data.email],
-      subject: `Your sign-in code: ${code}`,
-      text,
-      html,
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(unreadable)");
-    throw new Error(`Resend API error ${res.status}: ${body}`);
-  }
+  await sendResendEmail({ from: FROM_ADDRESS, to: data.email, subject: `Your sign-in code: ${code}`, text, html });
 }

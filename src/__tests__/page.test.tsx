@@ -127,13 +127,14 @@ afterEach(() => {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Render the page, flush queueMicrotask state update, and settle Suspense. */
+/** Render the page, let the mocked dynamic() imports resolve, and settle Suspense. */
 async function renderPage() {
   let result!: ReturnType<typeof render>;
   await act(async () => {
     result = render(<HomePage />);
     // Flush multiple microtask ticks to settle:
-    // 1. queueMicrotask in page.tsx that sets splashShown
+    // 1. (splashShown is set in HomePageClient's useLayoutEffect, which runs
+    //    inside render() itself, so it needs no tick)
     // 2. React.lazy Promise resolution for dynamic components
     // 3. React re-render after Suspense resolution
     await new Promise<void>((resolve) => setTimeout(resolve, 0));

@@ -7,7 +7,8 @@
  * is natively keyboard-focusable (Tab) and activatable (Enter / Space).
  *
  * Visual design:
- *   - Default: Lucide MapPin filled with category color, white stroke, drop shadow.
+ *   - Default: Lucide MapPin filled with category color, white stroke, and a
+ *     shadow drawn in the SVG (PinShadow.tsx), never a CSS filter (#722).
  *   - Selected: same pin + 4px sage ring rendered as an outer SVG circle.
  *   - Hover: slight scale-up (CSS transform) for interactive affordance.
  *
@@ -21,8 +22,9 @@ import { memo, useRef, type KeyboardEvent } from "react";
 import { Marker } from "react-map-gl/mapbox";
 import { MapPin } from "lucide-react";
 import type { Venue } from "@/types/venue";
+import PinShadow, { PIN_PATH } from "@/components/PinShadow";
 // Plain hex map (no DOM/CSSOM lookup), so the pin renders anywhere.
-import { categoryColors } from "@/data/venues";
+import { categoryColors } from "@/lib/categories";
 import { formatMiles } from "@/lib/distance";
 import { t, type Locale } from "@/lib/i18n";
 
@@ -102,7 +104,17 @@ function VenueMarker({
 
   // ─── Pin SVG ──────────────────────────────────────────────────────────────
   // When selected, wrap the MapPin in a larger SVG that adds the sage ring.
-  // When not selected, render the MapPin directly.
+  // When not selected, a 24-unit SVG holds the shadow and the MapPin. Both
+  // let the shadow spill past their box (overflow: visible), as the old CSS
+  // drop-shadow did.
+
+  // Lucide draws in a 24-unit box; pxPerUnit sizes the shadow in screen px.
+  const pxPerUnit = pinSize / 24;
+  const pinShadow = (
+    <PinShadow px={pxPerUnit} baseStroke={1.5}>
+      <path d={PIN_PATH} />
+    </PinShadow>
+  );
 
   const pinElement = selected ? (
     <svg
@@ -111,8 +123,12 @@ function VenueMarker({
       viewBox={`0 0 ${totalSize} ${totalSize}`}
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
-      style={{ display: "block" }}
+      style={{ display: "block", overflow: "visible" }}
     >
+      <PinShadow px={1} baseStroke={4}>
+        <circle cx={totalSize / 2} cy={totalSize / 2} r={totalSize / 2 - 2} fill="none" />
+      </PinShadow>
+      <g transform={`translate(${RING_PAD} ${RING_PAD}) scale(${pxPerUnit})`}>{pinShadow}</g>
       {/* Sage ring sits behind the pin */}
       <circle
         cx={totalSize / 2}
@@ -134,14 +150,17 @@ function VenueMarker({
       </foreignObject>
     </svg>
   ) : (
-    <MapPin
-      size={pinSize}
-      fill={color}
-      color="#FFFFFF"
-      strokeWidth={1.5}
+    <svg
+      width={pinSize}
+      height={pinSize}
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
-      style={{ display: "block" }}
-    />
+      style={{ display: "block", overflow: "visible" }}
+    >
+      {pinShadow}
+      <MapPin size={24} fill={color} color="#FFFFFF" strokeWidth={1.5} aria-hidden="true" />
+    </svg>
   );
 
   return (
@@ -192,7 +211,6 @@ function VenueMarker({
           ref={pinWrapperRef}
           style={{
             display: "block",
-            filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.25))",
             transform: "scale(1)",
             transition: "transform 0.1s ease",
             width: `${totalSize}px`,

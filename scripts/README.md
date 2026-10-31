@@ -5,7 +5,7 @@ reads, what it writes, why it exists) — this file is the map between them:
 run order, what's automated vs. by-hand, and the shared dependency pin.
 Deeper operational detail lives in [`AGENTS.md`](../AGENTS.md): the
 "Automated venue-refresh pipeline" section (guardrails, chunked writes) and
-the "Secrets" table (credentials). Local runs are below;
+the secrets table in [`docs/agents/secrets.md`](../docs/agents/secrets.md) (credentials). Local runs are below;
 the product-level story (why the pipeline exists, what it fixed) is in
 [`README.md`](../README.md)'s "Data sources" section. Read those, not this
 file, for the *why* — this file is only the *what runs when*.
@@ -23,6 +23,7 @@ the named script UNMODIFIED:
 | 1b | `fetch-osm-grocery.py` | Overpass API (live HTTP) | `data/raw/pueblo-grocery.json` |
 | 1c | `ingest-osm-grocery.py` | `data/raw/pueblo-grocery.json` + `public/data/pueblo-county-boundary.geojson` | `src/data/grocery-osm.ts` |
 | 1d | `refresh/careAndShare.ts` (inside `refresh-ingest.ts`) | Care and Share's Find Food map API (`api.accessfood.org`, live HTTP, one request every 3.5 s) | nothing on disk in the repo; a contact-free cache in a temp dir per run |
+| — | `refresh/website.ts` | Not in this workflow: the server's weekly timer runs it (see "Venue website reader" below) | — |
 | 2 | `refresh-ingest.ts` itself | current D1 `venues` rows + the freshly-regenerated files above | `change_proposals` rows (one exception: a pure "date-only" proposal auto-applies to `venues.last_verified`) |
 
 Step 2's diff/guardrail/link-health logic isn't inline in `refresh-ingest.ts`
@@ -51,6 +52,23 @@ change):
 ```
 npx tsx scripts/refresh-ingest.ts --db-mode local --only care_and_share --dry-run
 ```
+
+## Venue website reader — weekly on the server, not in CI
+
+`refresh/website.ts` (+ `refresh/websiteIo.ts`) runs only as
+`refresh-ingest.ts --only website`, from the server's systemd timer
+(`ops/systemd/README.md`), because it needs Gemini through the Antigravity
+CLI (`agy`) logged in on that machine. It reads venue websites and the Pueblo
+Food Project gardens page (live HTTP, public addresses only, one site every
+4 s; no browser, so a JavaScript-only page is unreadable) and writes `website` proposals. Needs migration `0025` on the
+target database. Watch it without writing (real pages, real Gemini):
+
+```
+npx tsx scripts/refresh-ingest.ts --db-mode local --only website --dry-run
+```
+
+`PFM_GEMINI_MODEL` overrides the model (default `gemini-3.8-flash-medium`: Argon's quota is small and shared with other work);
+`AGY_BIN` the CLI path.
 
 `--db-mode <local|staging|remote>` picks the DATABASE, not just a flag —
 `remote` is production, only ever run by the real workflow. Full rationale
@@ -84,7 +102,6 @@ automated diff:
 
 | Script | Purpose | When to re-run |
 |---|---|---|
-| `geocode-pfp.py` | Geocodes the 10 hand-curated Pueblo Food Project venues against Nominatim | Only if a PFP address changes — last run 2026-05-14 |
 | `geocode-osm-missing.py` | Reverse-geocodes OSM venues missing an address (Nominatim, falling back to Mapbox, then raw coordinates) | After an OSM ingest leaves new venues with no address |
 
 ## Release and security automation
@@ -94,6 +111,7 @@ schedule"). Each has a `.test.mjs` beside it except `section.sh`.
 
 | Script | Purpose | Run by |
 |---|---|---|
+| `release/decide.mjs` | Decides what a cut does: nothing, a new PR, update the open PR, or stop with a reason | `release.yml` |
 | `release/prepare.mjs` | Picks the next version, bumps it, and lists the PRs merged since the last release | `release.yml` |
 | `release/section.sh` | Extracts one version's CHANGELOG section (the GitHub Release notes; proves the section parses) | `release.yml`, `deploy-prod.yml` |
 | `release/check-push-target.sh` | Refuses to push unless `origin` still points at this repo | `release.yml`, and `security/audit-fix.sh` (so `security-fix.yml`) |
@@ -110,7 +128,6 @@ unfamiliar reader doesn't mistake them for part of the flow above:
 
 | Script | Purpose |
 |---|---|
-| `seed-admin-db.ts` | Local only: generates SQL that loads the real venue source records into a fresh local D1 (`npm run seed:admin`). Never apply it with `--remote`; remote databases change only through `wrangler d1 migrations apply` |
 | `seed-blessing-boxes.ts` | Dev-only: generates throwaway fake blessing-box SQL for staging/dev |
 | `load-real-blessing-boxes.ts` | Generates ready-to-apply SQL for Kyle's real blessing-box address list |
 | `seed-dev.sql` | Fake venue rows for the staging admin D1 database's UI states |

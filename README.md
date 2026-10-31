@@ -67,9 +67,9 @@ src/
   data/            Static venue data (committed TypeScript modules)
     venues.ts        Public venue list — single import for all components
     published-venues.ts  Snapshot of D1 venues, written by admin Publish (do not edit by hand)
-    grocery-osm.ts, pantries-plentiful.ts, pfp-venues.ts
-                     Scraper/hand-curated source arrays — not read by the public
-                     map since the #237 D1 cutover (seed script, tests, refresh diff)
+    grocery-osm.ts, pantries-plentiful.ts
+                     Scraper source arrays — not read by the public map since
+                     the #237 D1 cutover (tests, refresh diff)
     pueblo-bbox.ts   Pueblo County geographic constants
   lib/             Shared utilities (i18n, hours, favorites, distance, etc.)
   types/
@@ -103,11 +103,9 @@ scripts/           Data pipeline, seed, and lint scripts (never imported by the 
   the steps (lint, design checks, typecheck, tests, build, a check that
   prerendered pages serve, Lighthouse) are in
   [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
-- **AI review:** a Claude reviewer
-  ([`claude-code-review.yml`](.github/workflows/claude-code-review.yml))
-  reviews every human-authored pull request into `dev` against [REVIEW.md](REVIEW.md), and
-  CodeRabbit reviews human-authored pull requests targeting `dev` or `main`
-  using the low-noise settings in [`.coderabbit.yaml`](.coderabbit.yaml).
+- **AI review:** a Codex review, run by the `pr-review` script on Kyle's
+  server and posted as a PR comment, reviews pull requests against their
+  description and [REVIEW.md](REVIEW.md) (an agent's merge waits for a clean one).
 - **Deploys:** GitHub Actions
   ([`deploy-prod.yml`](.github/workflows/deploy-prod.yml) /
   [`deploy-dev.yml`](.github/workflows/deploy-dev.yml)), not Cloudflare
@@ -152,9 +150,9 @@ CI enforces this automatically (blocking gate).
 | Grocery / convenience / farms | OpenStreetMap Overpass API | Automated (see below) |
 | SNAP / WIC flags | USDA FNS + CDPHE public data (matched into D1 by migration `0014`, #597) | Admin-editable in D1 directly |
 
-PFP garden coordinates geocoded against Nominatim (OpenStreetMap) on
-2026-05-14 via `scripts/geocode-pfp.py` — audit trail in
-`data/raw/pfp-geocodes.json`.
+PFP garden coordinates were geocoded against Nominatim (OpenStreetMap) on
+2026-05-14 by a one-time script, since removed; the audit trail is in
+`data/raw/pfp-geocodes.json`. They live in D1 and are edited in the admin.
 
 **Re-running the scrapers by hand does NOT update the live map.** Since the
 #237 admin cutover, the public map's data comes from Cloudflare D1 via an
@@ -181,7 +179,7 @@ retired standalone `/admin/flags` queue by #674) before it reaches the
 public map. See
 `scripts/refresh-ingest.ts`'s own file header for the full mechanism, and
 AGENTS.md's "Automated venue-refresh pipeline" section for the guardrails,
-AGENTS.md's "Secrets" table for credentials, and `scripts/README.md` for
+`docs/agents/secrets.md` for credentials, and `scripts/README.md` for
 local runs.
 
 ---

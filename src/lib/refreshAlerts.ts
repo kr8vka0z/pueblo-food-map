@@ -35,11 +35,10 @@
  * ever becomes one: a dedicated `refresh_runs` completion table written by
  * scripts/refresh-ingest.ts at the end of a successful run.
  *
- * WHY no `@/` alias imports here (in fact, no imports at all): this file
- * is reached from custom-worker.ts, which wrangler's own bundler (not
- * Next's webpack) compiles when it builds the top-level `main` entry —
- * tsconfig `paths` aliases aren't resolved there. Same constraint
- * src/lib/emailRetention.ts documents.
+ * Imports by relative path: under OpenNext this file was compiled by
+ * wrangler's own bundler, which didn't resolve tsconfig `@/` aliases. Under
+ * vinext, vite builds custom-worker.ts and resolves them (emailSend.ts,
+ * imported below, uses them), so this is now house style, not a constraint.
  *
  * WHY `resendApiKey` is passed in rather than read from
  * `process.env.RESEND_API_KEY` (the convention every OTHER Resend send in
@@ -55,6 +54,8 @@
  * existing `env.HC_PING_URL` read already established for this exact
  * handler.
  */
+
+import { sendResendEmail } from "./emailSend";
 
 export const PENDING_AGE_ALERT_DAYS = 14;
 export const STALENESS_ALERT_DAYS = 40;
@@ -96,21 +97,22 @@ export async function checkPendingAge(db: D1Database, now: Date = new Date()): P
 
 // ─── Per-source staleness (#234) ────────────────────────────────────────────
 
-const REFRESH_ALERT_SOURCES = ["plentiful", "osm", "care_and_share"] as const;
+const REFRESH_ALERT_SOURCES = ["plentiful", "osm", "care_and_share", "website"] as const;
 /**
  * Sources that alert even when they have NEVER written a row. care_and_share
  * (Venue Data Rebuild step 2) is left out on purpose: it starts writing only
  * once its reader reaches production, and a never-run alert would email
  * every day until then. A first run that fails is already loud (the refresh
  * job exits non-zero when a source aborts); once it has run once, the normal
- * 40-day rule applies to it like the others.
+ * 40-day rule applies to it like the others. `website` (step 3, the server's
+ * weekly timer, ops/systemd/) is the same: every page it reads writes a row.
  */
 const NEVER_RUN_ALERT_SOURCES: ReadonlySet<string> = new Set(["plentiful", "osm"]);
 export type RefreshAlertSource = (typeof REFRESH_ALERT_SOURCES)[number];
 
 /** Hardcoded IN-list, not a bound placeholder loop — REFRESH_ALERT_SOURCES is a fixed, small, compile-time set (ponytail: one string beats a dynamic placeholder builder for two known values). */
 export const SOURCE_STALENESS_SQL =
-  "SELECT source, MAX(created_at) AS last FROM change_proposals WHERE source IN ('plentiful','osm','care_and_share') GROUP BY source";
+  "SELECT source, MAX(created_at) AS last FROM change_proposals WHERE source IN ('plentiful','osm','care_and_share','website') GROUP BY source";
 
 export interface SourceStalenessCheck {
   source: RefreshAlertSource;
@@ -137,29 +139,13 @@ export async function checkSourceStaleness(db: D1Database, now: Date = new Date(
 }
 
 // ─── Email ──────────────────────────────────────────────────────────────────
-// Plain internal text mail to the same admin-notice address every other
-// internal (non-public-facing) send in this app already uses — see
-// src/lib/boxAdopters.ts's sendAdopterConfirmedAdminEmail, the closest
-// existing precedent for "one-off inline fetch, plain text, admin-only."
-// Not routed through src/lib/emailSend.ts's sendResendEmail: that helper
-// reads no secret itself (the caller passes one in already, same as here)
-// but every existing caller of IT runs inside a request and is free to
-// import `@/lib/*` — this file, reached from custom-worker.ts, is not
-// (see file header).
+// Plain internal text mail to the admin-notice address, through the shared
+// sender with the binding's key passed in (see this file's header).
 
-const RESEND_FROM = "Pueblo Food Map <noreply@pueblofoodmap.com>";
 const ALERT_TO = "issues@pueblofoodmap.com";
 
-async function sendAlertEmail(resendApiKey: string, subject: string, lines: string[]): Promise<void> {
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${resendApiKey}` },
-    body: JSON.stringify({ from: RESEND_FROM, to: [ALERT_TO], subject, text: lines.join("\n") }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(unreadable)");
-    throw new Error(`Resend API error ${res.status}: ${body}`);
-  }
+function sendAlertEmail(resendApiKey: string, subject: string, lines: string[]): Promise<void> {
+  return sendResendEmail({ to: ALERT_TO, subject, text: lines.join("\n") }, resendApiKey);
 }
 
 // ─── Orchestrator ───────────────────────────────────────────────────────────

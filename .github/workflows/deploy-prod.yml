@@ -308,6 +308,29 @@ jobs:
           gh release create "v$version" --target "$GITHUB_SHA" \
             --title "v$version" --notes-file "$RUNNER_TEMP/notes.md"
 
+      # prepare.mjs starts the next release's notes at the newest cut/* tag, so
+      # that tag must mean "this dev commit went live". Writing it here, after a
+      # good deploy, keeps a cut that never merged inside the next notes. The
+      # release lands as a squash, so the dev commit comes from the merged PR:
+      # the merge base of its head and dev is the commit it was cut from.
+      # Hotfixes and publish-bot get no cut tag: they don't come from dev.
+      # POST, then PATCH: a re-run finds the tag already there.
+      - name: Record the dev commit that went live
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          pr=$(gh api "repos/$REPO/commits/$GITHUB_SHA/pulls" --jq \
+            '[.[] | select(.base.ref == "main" and .merged_at != null and (.head.ref | startswith("release/")))][0] // empty | "\(.head.ref) \(.head.sha)"')
+          if [ -z "$pr" ]; then echo "Not a release merge; no cut tag."; exit 0; fi
+          read -r ref head <<<"$pr"
+          cut=$(gh api "repos/$REPO/compare/dev...$head" --jq .merge_base_commit.sha)
+          tag="cut/${ref#release/}"
+          gh api -X POST "repos/$REPO/git/refs" -f "ref=refs/tags/$tag" -f "sha=$cut" >/dev/null \
+            || gh api -X PATCH "repos/$REPO/git/refs/tags/$tag" -f "sha=$cut" -F force=true >/dev/null
+          echo "$tag -> $cut"
+
   # main -> dev sync, after ANY push to main (release, hotfix, publish-bot).
   # Release/hotfix PRs reach main as SQUASH commits (main's ruleset requires
   # linear history), so main's history and dev's diverge; without a real merge

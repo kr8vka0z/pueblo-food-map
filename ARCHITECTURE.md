@@ -948,7 +948,7 @@ off Vercel in May 2026 (#42/#53; the reason isn't recorded) and from OpenNext
 Push to `main` → `deploy-prod.yml` deploys the top-level `wrangler.jsonc`
 Worker (`pueblo-food-map`, pueblofoodmap.com); push to `dev` →
 `deploy-dev.yml` deploys the staging Worker at dev.pueblofoodmap.com. `main`
-only receives the weekly release PR, `hotfix/*` and `publish-bot` (below). Only
+only receives the release PR, `hotfix/*` and `publish-bot` (below). Only
 `deploy-prod.yml` has a `workflow_dispatch` recovery trigger.
 
 **CI is the gate.** `ci.yml` runs `lint → design:lint → design:drift →
@@ -968,10 +968,13 @@ in "Dependency CVE Audit"; typecheck and build always run. The diff check, not
 the branch name, is the safety property — see `ci.yml`'s "Detect data-only
 publish-bot PR" step comment.
 
-**Weekly release flow (replaced ad-hoc `dev` → `main` promotions).** Work
-merges to `dev` all week (`pr-title.yml` requires Conventional Commit PR
-titles). `release.yml` (cron Sun 02:00 UTC = Saturday evening Mountain, or
-`workflow_dispatch`) runs `scripts/release/prepare.mjs` (dry run: next version
+**Release flow (replaced ad-hoc `dev` → `main` promotions).** Work
+merges to `dev` (`pr-title.yml` requires Conventional Commit PR titles).
+`release.yml` (`workflow_dispatch` only, when Kyle says "cut the release") first
+runs `scripts/release/decide.mjs`: identical files on `dev` and `main` end the
+run green with no PR, an open release PR is updated in place or left alone, and
+a stuck sync PR stops the run red. It then runs
+`scripts/release/prepare.mjs` (dry run: next version
 from the merged-PR titles — `feat` → minor, else patch, major only via a forced
 version — plus the PR list), has Claude write the plain-language CHANGELOG.md
 section (the run fails unless that is the only file changed, and unless
@@ -989,8 +992,8 @@ COMMIT, unless `dev` already contains `main`. Squash releases leave `main` and
 code and venue data to staging, and keeps the next release PR conflict-free.
 `main-source-guard` (`main-source-guard.yml`) rejects PRs into `main` unless
 from `release/*`, `hotfix/*` or `publish-bot`. Since a squash means the `v*`
-tag doesn't carry dev's old commits, the cut also pushes a lightweight
-`cut/vX.Y.Z` tag on the dev commit it was cut from; the next release's PR list
+tag doesn't carry dev's old commits, the `release` job also writes a lightweight
+`cut/vX.Y.Z` tag on the dev commit that went live; the next release's PR list
 starts at the newest reachable `cut/*` tag (falling back to the newest `v*` tag
 for the first run and for hotfixes). Operating rules and the hotfix lane:
 AGENTS.md "Release schedule".
@@ -1004,7 +1007,7 @@ why Publish uses the `GITHUB_PUBLISH_TOKEN` PAT. Auto-merge only waits for CI
 because the `dev` ruleset requires the same checks as `main` (delete that
 ruleset and auto-merge silently becomes merge-on-open). A consequence: a
 dependency bump, security bumps included, waits on `dev` until the next
-weekly release. Any new workflow that pushes to `main` must avoid `GITHUB_TOKEN`. Incident history:
+release. Any new workflow that pushes to `main` must avoid `GITHUB_TOKEN`. Incident history:
 atlas-kb "PFM ARCHITECTURE History — 2026-09-24 Trim".
 
 **Security fixes.** Dependabot *security* updates always target `main` (they

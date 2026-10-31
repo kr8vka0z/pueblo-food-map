@@ -39,8 +39,8 @@ performance).
    because the title becomes the commit message the release notes are built
    from. CI runs lint, typecheck, tests, and build on every PR and must pass
    before merge. `dev` deploys to staging (`dev.pueblofoodmap.com`). Merged
-   work ships to production in the maintainers' weekly release (cut Saturday
-   night, merged Sunday) — there is no mid-week promotion.
+   work ships to production in the maintainers' next release (cut and merged
+   when they choose, usually Sunday) — there is no mid-week promotion.
 
 A maintainer runs an AI code review (Codex) on each pull request and posts
 it as a comment, judged against the PR description and

@@ -243,31 +243,9 @@ jobs:
           EOF
           } > "$RUNNER_TEMP/body.md"
 
-          # Force: this branch is rebuilt from dev on every cut, either over a
-          # closed PR's leftover branch or to update the open PR in place. The
-          # push reruns the PR's checks.
-          #
-          # WHY the update writes the body BEFORE the push: decide.mjs reads the
-          # recorded cut from the branch. If the push came first and the body
-          # write failed, the next cut would see the commit already recorded and
-          # change nothing, leaving old notes and checks on new code. This way
-          # round a failure leaves the old commit recorded, so the next cut
-          # redoes both. A new PR has no such gap: no PR means a fresh cut.
-          #
-          # If the push then fails, the old body goes back, so the PR never
-          # describes a commit it doesn't hold.
-          #
-          # REST, not `gh pr edit`: that command also reads project fields an
-          # App token may not be allowed to see.
+          # Force: a closed PR's leftover branch may still be there.
           if [ "$ACTION" = "update" ]; then
-            pr_api="repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"
-            gh api "$pr_api" --jq .body > "$RUNNER_TEMP/old-body.md"
-            gh api -X PATCH "$pr_api" -f "title=Release v$VERSION" -F "body=@$RUNNER_TEMP/body.md" >/dev/null
-            if ! git push --force origin "release/v$VERSION"; then
-              gh api -X PATCH "$pr_api" -F "body=@$RUNNER_TEMP/old-body.md" >/dev/null
-              echo "::error::Release NOT updated: the push failed, so the PR keeps its old commit and description. Cut again."
-              exit 1
-            fi
+            bash scripts/release/update-release-pr.sh "$GITHUB_REPOSITORY" "$PR_NUMBER" "$VERSION" "$RUNNER_TEMP/body.md"
             url="$repo_url/pull/$PR_NUMBER"
           else
             git push --force origin "release/v$VERSION"

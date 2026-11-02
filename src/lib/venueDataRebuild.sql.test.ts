@@ -16,6 +16,7 @@ import { buildProposalWriteStatements } from "../../scripts/refresh/proposalSql"
 import { PIN_INSERT_SQL } from "@/lib/adminVenueEditSql";
 import { applyApprovedProposal, type ChangeProposalRow } from "@/lib/adminProposals";
 import { sqliteD1 } from "@/lib/sqliteD1.testutil";
+import { localYmd } from "@/lib/activityLog";
 
 const MIGRATIONS_DIR = join(process.cwd(), "migrations");
 const ALL = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql")).sort();
@@ -193,7 +194,7 @@ describe("0022 step-0 website fixes", () => {
     const venue = (id: string) => db.prepare("SELECT * FROM venues WHERE id = ?").get(id) as Record<string, unknown>;
     expect(venue(TARGETS[0]).status).toBe("archived");
     expect(venue(TARGETS[2]).status).toBe("archived");
-    expect(venue(TARGETS[1])).toMatchObject({ category: "meal_site", last_verified: "2026-10-25" });
+    expect(venue(TARGETS[1])).toMatchObject({ category: "meal_site", last_verified: localYmd(new Date()) }); // #866: approval date
     expect(JSON.parse(venue(TARGETS[1]).hours_weekly as string).fri).toEqual(["4:30 PM - 5:00 PM"]);
     expect(venue(TARGETS[4])).toMatchObject({ address: "623 E 4th St, Pueblo, CO 81001", notes: "Closed the 1st and 3rd Monday of each month." });
     expect(venue(TARGETS[7]).notes).toMatch(/Bring ID/);

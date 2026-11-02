@@ -429,12 +429,12 @@ body {
 .pfm-event-pin[data-selected="true"] .pfm-event-pin__body { transform: scale(1.12); }
 
 /* position:relative keeps the pin painted above the (absolutely positioned)
-   rings that precede it in the DOM. The shadow is on the SVG only, so the
-   animated rings are never re-filtered every frame. */
+   rings that precede it in the DOM. The shadow is drawn inside the SVG
+   (PinShadow.tsx, #722), never a CSS filter, so overflow must stay visible. */
 .pfm-event-pin__svg {
   position: relative;
   display: block;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+  overflow: visible;
 }
 
 .pfm-event-pin__shape {
@@ -526,6 +526,14 @@ body {
    carries data-splash-pending while unresolved, so a re-shown splash (#99)
    is unaffected. */
 html[data-splash-seen] [data-splash-pending] {
+  display: none;
+}
+
+/* The reverse for the map-screen stand-in (#730, MapScreenStandIn.tsx): while
+   the gate is unresolved it shows only for those same visitors, so a
+   first-time visitor sees the splash alone. Once resolved, React drops the
+   pending copy and shows the stand-in only until MapWrapper mounts. */
+html:not([data-splash-seen]) [data-map-standin-pending] {
   display: none;
 }
 

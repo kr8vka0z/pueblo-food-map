@@ -77,7 +77,7 @@ export function parseWalkSteps(
     // written turn list is the older, more-relied-on half of this feature.
     // Dropping the whole step would delete a readable instruction to protect
     // a camera hop — the stepper simply doesn't move the map for a step it
-    // has no coordinate for (handleStepChange guards on it). The live API
+    // has no coordinate for (useWalkingRoute's stepTo guards on it). The live API
     // supplies `location` on every step (measured 2026-09-20), so this only
     // ever fires on a malformed response.
     const raw = s.maneuver?.location;

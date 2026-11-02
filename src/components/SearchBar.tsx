@@ -70,9 +70,15 @@ function FilterIcon({ size = 16 }: { size?: number }) {
 }
 
 interface SearchBarProps {
-  /** Controlled value — owned by MapWrapper. */
-  value: string;
-  onChange: (next: string) => void;
+  /**
+   * Controlled value — owned by MapWrapper. Omit it (and onChange) for a
+   * plain uncontrolled input: MapScreenStandIn's (#730), typed into before
+   * any React handler exists, whose DOM value MapWrapper reads on takeover.
+   */
+  value?: string;
+  onChange?: (next: string) => void;
+  /** Starting text of an uncontrolled bar (no `value`). */
+  defaultValue?: string;
   /** Called when the user presses Enter to commit the current query. */
   onSubmit?: () => void;
   placeholder?: string;
@@ -108,11 +114,12 @@ interface SearchBarProps {
    * as the input's own `ariaLabel` prop — so this component stays
    * locale-agnostic. Absent for standalone use (e.g. a11y.test.tsx renders
    * SearchBar bare with no filters concept at all) — the magnifier shows
-   * either way now.
+   * either way now. No `onClick` → drawn only (inert, aria-hidden), for
+   * MapScreenStandIn (#730), whose filters control can't work yet.
    */
   filtersButton?: {
     count: number;
-    onClick: () => void;
+    onClick?: () => void;
     ariaLabel: string;
   };
 
@@ -130,6 +137,7 @@ interface SearchBarProps {
 export default function SearchBar({
   value,
   onChange,
+  defaultValue,
   onSubmit,
   placeholder = "Search places or categories",
   ariaLabel = "Search places or categories",
@@ -222,6 +230,8 @@ export default function SearchBar({
           <button
             type="button"
             onClick={filtersButton.onClick}
+            inert={!filtersButton.onClick || undefined}
+            aria-hidden={!filtersButton.onClick || undefined}
             aria-label={filtersButton.ariaLabel}
             // Guided tour target (#159) — the label changes with the count/locale.
             data-testid="filters-button"
@@ -270,7 +280,8 @@ export default function SearchBar({
         <input
           type="search"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          defaultValue={defaultValue}
+          onChange={onChange && ((e) => onChange(e.target.value))}
           onKeyDown={handleKey}
           onFocus={onFocus}
           onBlur={onBlur}

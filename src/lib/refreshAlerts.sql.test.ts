@@ -77,10 +77,9 @@ describe("SOURCE_STALENESS_SQL — real SQLite", () => {
     expect(rows.map((r) => r.source)).toEqual(["plentiful"]);
   });
 
-  test("link_health / gtfs rows never leak into this source-scoped result", () => {
+  test("link_health rows never leak into this source-scoped result", () => {
     const db = buildDb();
     insertProposal(db, { source: "link_health", createdAt: "2026-09-01T00:00:00.000Z" });
-    insertProposal(db, { source: "gtfs", createdAt: "2026-09-01T00:00:00.000Z", targetVenueId: "v2" });
 
     const rows = db.prepare(SOURCE_STALENESS_SQL).all() as Array<{ source: string }>;
 

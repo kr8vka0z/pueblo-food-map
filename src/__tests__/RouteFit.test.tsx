@@ -25,7 +25,7 @@
  *   - `fetch` dispatches on URL: the Mapbox Directions API (route JSON),
  *     `/api/public/blessing-boxes` (empty list — useBoxesList's fetch), and
  *     the county boundary geojson (empty features — Map.tsx's own fetch).
- *   - `NEXT_PUBLIC_MAPBOX_TOKEN` stubbed — fetchWalkingRoute bails silently
+ *   - `NEXT_PUBLIC_MAPBOX_TOKEN` stubbed — useWalkingRoute's fetchRoute bails silently
  *     without one.
  *
  * The desktop (`isMobile` false) case renders the real DesktopVenueWindow

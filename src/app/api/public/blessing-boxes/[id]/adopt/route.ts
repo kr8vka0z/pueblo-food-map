@@ -38,8 +38,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getCloudflareContext } from "@/lib/cloudflareContext";
-import { resolveBoxTurnstileKey, verifyBoxTurnstile } from "@/lib/boxTurnstile";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
@@ -49,7 +47,7 @@ import { insertAdopterApplication, sendAdopterConfirmEmail } from "@/lib/boxAdop
 import { checkAlertEmailFloodCaps } from "@/lib/boxAlerts";
 import { sanitizeDisplayName } from "@/lib/displayNameHygiene";
 import { resolveEmailLang } from "@/lib/i18n";
-import { requestIp } from "@/lib/publicRequest";
+import { parsePublicPost } from "@/lib/publicRequest";
 import { loadLiveBoxName } from "@/lib/blessingBoxes";
 
 export const dynamic = "force-dynamic";
@@ -77,40 +75,11 @@ export async function POST(
 ): Promise<NextResponse> {
   const { id: boxId } = await params;
 
-  const ct = req.headers.get("content-type") ?? "";
-  if (!ct.includes("application/json")) {
-    return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
-  }
-
-  let body: AdoptPayload;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
-  }
-
-  const ip = requestIp(req);
-  const turnstileKey = resolveBoxTurnstileKey(body.turnstileKey);
-  const rateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
-  if (!rateLimitSecret) {
-    throw new Error("CHECKIN_RATE_LIMIT_SECRET not configured");
-  }
-  const turnstileValid = await verifyBoxTurnstile(body.turnstileToken, turnstileKey, ip);
-  if (!turnstileValid) {
-    logFormFailure("adopt", "turnstile_failed");
-    return NextResponse.json({ ok: false, error: "turnstile_failed" }, { status: 400 });
-  }
-
-  if (body.website && body.website.trim() !== "") {
-    return NextResponse.json({ ok: true }); // bots think it worked
-  }
-
-  let db: D1Database;
-  try {
-    ({ env: { ADMIN_DB: db } } = getCloudflareContext());
-  } catch {
-    return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
-  }
+  // Content-Type, JSON, Turnstile (box key or its fallback), honeypot, D1 and
+  // the rate-limit secret — shared with the form routes (src/lib/publicRequest.ts).
+  const pre = await parsePublicPost<AdoptPayload>(req, "adopt", "box");
+  if (pre instanceof NextResponse) return pre;
+  const { body, db, rateLimitSecret } = pre;
 
   const clientToken = typeof body.clientToken === "string" ? body.clientToken.slice(0, 200) : null;
   if (clientToken) {

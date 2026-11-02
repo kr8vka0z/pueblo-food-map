@@ -40,11 +40,11 @@ const inputClass =
   "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-3 py-2 text-base md:text-sm " +
   "text-[var(--color-ink-900)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
 const buttonClass =
-  "inline-flex min-h-11 items-center rounded-[var(--radius-md)] border border-[var(--color-sage-500)] px-4 text-sm " +
+  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-sage-500)] px-4 text-sm " +
   "font-medium text-[var(--color-sage-600)] bg-transparent hover:bg-[var(--color-sage-50)] focus-visible:outline-none " +
   "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
 const dangerClass =
-  "inline-flex min-h-11 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] px-4 text-sm " +
+  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] px-4 text-sm " +
   "font-medium text-[var(--color-danger)] bg-transparent hover:bg-[var(--color-danger)] hover:text-[var(--color-bone-50)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2 " +
   "disabled:opacity-50 disabled:cursor-not-allowed";

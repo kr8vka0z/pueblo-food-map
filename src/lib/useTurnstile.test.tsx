@@ -1,5 +1,5 @@
 /**
- * useBoxTurnstileWidget tests (Blessing Boxes slice 6). A minimal harness
+ * useTurnstile tests (Blessing Boxes slice 6). A minimal harness
  * component exercises the hook exactly the way AdoptBoxForm/
  * BoxAlertSignupForm do (mount ref, read token/mode/error, call reset).
  */
@@ -7,14 +7,14 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { useRef } from "react";
 import { render, screen, fireEvent, act } from "@testing-library/react";
-import { useBoxTurnstileWidget } from "@/lib/useBoxTurnstileWidget";
+import { useTurnstile } from "@/lib/useTurnstile";
 
 function Harness() {
   // The container ref is created here (not by the hook) — see
-  // useBoxTurnstileWidget.ts's own header for why it's a parameter, not a
+  // useTurnstile.ts's own header for why it's a parameter, not a
   // return value.
   const containerRef = useRef<HTMLDivElement>(null);
-  const turnstile = useBoxTurnstileWidget(containerRef);
+  const turnstile = useTurnstile(containerRef, { box: true });
   return (
     <div>
       <div data-testid="token">{turnstile.token ?? "none"}</div>
@@ -36,7 +36,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("useBoxTurnstileWidget", () => {
+describe("useTurnstile", () => {
   test("mounts the box widget with the invisible-mode sitekey and captures its token", () => {
     const renderMock = vi.fn((_el: HTMLElement, opts: { callback?: (t: string) => void }) => {
       opts.callback?.("real-token");

@@ -40,7 +40,7 @@ import SiteFooter from "@/components/SiteFooter";
 const SECTION_HEADING = "mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]";
 const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
 const CRUMB_LINK =
-  "inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] " +
+  "relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] " +
   "transition-colors rounded " + FOCUS;
 
 export default function EventPage({

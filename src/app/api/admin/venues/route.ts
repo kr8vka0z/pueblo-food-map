@@ -56,10 +56,8 @@ import { boxEventsForCreate, BOX_EVENT_INSERT_SQL } from "@/lib/boxEvents";
 import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 import { venueSourceTypeFor } from "@/lib/adminProposals";
 
-// Deliberately mirrors scripts/seed-admin-db.ts's INSERT_COLUMNS list:
-// created_at/updated_at are omitted so the schema's own
-// DEFAULT (strftime(...)) fills them, matching that script's established
-// convention (migrations/0001_init_admin_schema.sql).
+// created_at/updated_at are deliberately omitted so the schema's own
+// DEFAULT (strftime(...)) fills them (migrations/0001_init_admin_schema.sql).
 const VENUES_INSERT_COLUMNS = [
   "id", "name", "category", "lat", "lng", "address", "hours_weekly", "hours_irregular",
   "accepts_snap", "accepts_wic", "phone", "email", "url", "notes", "operator",

@@ -21,8 +21,7 @@
  * the PUBLISHED map; nothing stops it from being live-readable on staging,
  * so the names themselves are the safety net.
  *
- * RUN — same human-reviewed convention as seed-admin-db.ts: this
- * only WRITES the two .sql files below (gitignored — derivable from this
+ * RUN — human-reviewed: this only WRITES the two .sql files below (gitignored — derivable from this
  * committed script); it never touches D1 itself.
  *   npx tsx scripts/seed-blessing-boxes.ts
  * Then apply the one you want:

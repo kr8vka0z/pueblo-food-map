@@ -40,7 +40,7 @@
 
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import BottomNav, { type MenuSection } from "./BottomNav";
@@ -49,7 +49,8 @@ import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { localizedHref } from "@/lib/localizedHref";
 import { useFavorites } from "@/lib/favorites";
-import { venues } from "@/data/venues";
+import { useBoxesList, toVenue } from "@/lib/useBoxesList";
+import type { Venue } from "@/types/venue";
 
 /**
  * Classes for a page's <main> so its end clears the fixed nav: bottom padding
@@ -74,17 +75,43 @@ export default function PageNav({ locale, backHref = "/" }: { locale: Locale; ba
   const [section, setSection] = useState<MenuSection | null>(null);
   const navRef = useRef<HTMLElement | null>(null);
 
+  // #721: the published venue list and the live box layer load only once
+  // Saved is first opened with something saved. Importing the list at the top
+  // of this file made every content page download all ~100 venues for a
+  // panel most visitors never open. Boxes are never in the published list, so
+  // they come from the same live endpoint the map uses — without that, saved
+  // boxes never showed here.
+  const favoriteIds = useFavorites();
+  const [savedOpened, setSavedOpened] = useState(false);
+  const wantSaved = savedOpened && favoriteIds.length > 0;
+  const [publishedVenues, setPublishedVenues] = useState<Venue[] | null>(null);
+  useEffect(() => {
+    if (!wantSaved || publishedVenues) return;
+    let cancelled = false;
+    import("@/data/venues")
+      .then((m) => !cancelled && setPublishedVenues(m.venues))
+      // A failed chunk load (offline) must not leave Saved stuck on "Loading".
+      .catch(() => !cancelled && setPublishedVenues([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [wantSaved, publishedVenues]);
+  const { boxes, loading: boxesLoading } = useBoxesList(wantSaved);
+  const savedLoading = wantSaved && (publishedVenues === null || boxesLoading);
+
   // Duplicates useMapFilters.ts's savedVenues derivation (distance sort) on
   // purpose, not by oversight — these pages have no map, so there's no user
   // location to sort by. Name order is the next-best stable ordering off the
   // map, so this stays its own small useMemo rather than sharing the hook.
-  const favoriteIds = useFavorites();
   const savedVenues = useMemo(() => {
     const ids = new Set(favoriteIds);
-    return venues.filter((v) => ids.has(v.id)).sort((a, b) => a.name.localeCompare(b.name));
-  }, [favoriteIds]);
+    return [...(publishedVenues ?? []), ...boxes.map(toVenue)]
+      .filter((v) => ids.has(v.id))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [favoriteIds, publishedVenues, boxes]);
 
   const handleSectionTap = useCallback((s: MenuSection) => {
+    if (s === "saved") setSavedOpened(true);
     setSection((current) => (current === s ? null : s));
   }, []);
   const handleClose = useCallback(() => setSection(null), []);
@@ -114,6 +141,7 @@ export default function PageNav({ locale, backHref = "/" }: { locale: Locale; ba
         onClose={handleClose}
         view={section ?? "top"}
         savedVenues={savedVenues}
+        savedLoading={savedLoading}
         onSelectVenue={(id) =>
           router.push(localizedHref(`/?venue=${encodeURIComponent(id)}`, tree))
         }

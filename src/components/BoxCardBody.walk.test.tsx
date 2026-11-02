@@ -23,6 +23,7 @@ import { LocaleProvider } from "@/lib/LocaleContext";
 import BoxCardBody from "@/components/BoxCardBody";
 import { googleMapsUrl } from "@/components/DirectionButtons";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
+import { makeWalk } from "@/__tests__/helpers/walkTestHelpers";
 
 const BASE_BOX: PublicBlessingBox = {
   id: "test-box-1",
@@ -52,7 +53,7 @@ describe("BoxCardBody — address doubles as the in-app Walk trigger when onWalk
     const onWalkRoute = vi.fn();
     render(
       <LocaleProvider initialLocale="en">
-        <BoxCardBody box={BASE_BOX} onWalkRoute={onWalkRoute} />
+        <BoxCardBody box={BASE_BOX} walk={makeWalk({ onWalk: onWalkRoute })} />
       </LocaleProvider>,
     );
     const trigger = screen.getByText("123 Test St, Pueblo, CO");
@@ -64,7 +65,7 @@ describe("BoxCardBody — address doubles as the in-app Walk trigger when onWalk
     const onWalkRoute = vi.fn();
     render(
       <LocaleProvider initialLocale="en">
-        <BoxCardBody box={BASE_BOX} onWalkRoute={onWalkRoute} />
+        <BoxCardBody box={BASE_BOX} walk={makeWalk({ onWalk: onWalkRoute })} />
       </LocaleProvider>,
     );
     await user.click(screen.getByText("123 Test St, Pueblo, CO"));
@@ -74,7 +75,7 @@ describe("BoxCardBody — address doubles as the in-app Walk trigger when onWalk
   test("accessible name contains the visible address text (WCAG 2.5.3 label-in-name)", () => {
     render(
       <LocaleProvider initialLocale="en">
-        <BoxCardBody box={BASE_BOX} onWalkRoute={vi.fn()} />
+        <BoxCardBody box={BASE_BOX} walk={makeWalk({ onWalk: vi.fn() })} />
       </LocaleProvider>,
     );
     const trigger = screen.getByText("123 Test St, Pueblo, CO");
@@ -85,7 +86,7 @@ describe("BoxCardBody — address doubles as the in-app Walk trigger when onWalk
   test("no active-route readout renders when isWalkRouteActive is false", () => {
     render(
       <LocaleProvider initialLocale="en">
-        <BoxCardBody box={BASE_BOX} onWalkRoute={vi.fn()} isWalkRouteActive={false} />
+        <BoxCardBody box={BASE_BOX} walk={makeWalk({ onWalk: vi.fn(), isActive: false })} />
       </LocaleProvider>,
     );
     expect(screen.queryByTestId("walking-route-info")).toBeNull();
@@ -102,11 +103,7 @@ describe("BoxCardBody — active-route readout (reused from DirectionButtons' Wa
       <LocaleProvider initialLocale="en">
         <BoxCardBody
           box={BASE_BOX}
-          onWalkRoute={vi.fn()}
-          isWalkRouteActive
-          onClearWalkRoute={onClearWalkRoute}
-          walkRouteInfo={{ distance: "0.4", duration: "8 min" }}
-          walkRouteSteps={[{ instruction: "Head north", distance: 200 }]}
+          walk={makeWalk({ onWalk: vi.fn(), isActive: true, onClear: onClearWalkRoute, info: { distance: "0.4", duration: "8 min" }, steps: [{ instruction: "Head north", distance: 200 }] })}
         />
       </LocaleProvider>,
     );
@@ -140,9 +137,7 @@ describe("BoxCardBody — active-route readout (reused from DirectionButtons' Wa
       <LocaleProvider initialLocale="en">
         <BoxCardBody
           box={BASE_BOX}
-          onWalkRoute={vi.fn()}
-          isWalkRouteActive
-          walkRouteInfo={{ distance: "0.4", duration: "8 min" }}
+          walk={makeWalk({ onWalk: vi.fn(), isActive: true, info: { distance: "0.4", duration: "8 min" } })}
         />
       </LocaleProvider>,
     );
@@ -154,7 +149,7 @@ describe("BoxCardBody — location hint (#207)", () => {
   test("renders the 'share your location' hint when showWalkLocationHint is true and no route is active", () => {
     render(
       <LocaleProvider initialLocale="en">
-        <BoxCardBody box={BASE_BOX} onWalkRoute={vi.fn()} showWalkLocationHint />
+        <BoxCardBody box={BASE_BOX} walk={makeWalk({ onWalk: vi.fn(), showLocationHint: true })} />
       </LocaleProvider>,
     );
     expect(screen.getByTestId("walk-location-hint")).toBeDefined();
@@ -163,7 +158,7 @@ describe("BoxCardBody — location hint (#207)", () => {
   test("the address button's aria-describedby points at the hint", () => {
     render(
       <LocaleProvider initialLocale="en">
-        <BoxCardBody box={BASE_BOX} onWalkRoute={vi.fn()} showWalkLocationHint />
+        <BoxCardBody box={BASE_BOX} walk={makeWalk({ onWalk: vi.fn(), showLocationHint: true })} />
       </LocaleProvider>,
     );
     const trigger = screen.getByText("123 Test St, Pueblo, CO");

@@ -272,8 +272,8 @@ export interface WalkStepperProps {
    *  — nothing filters these out (see `WalkStep.location`'s own WHY in
    *  Map.tsx: a turn with no usable coordinate is still worth reading, so it
    *  is kept and only its camera hop is skipped). Anything here that reaches
-   *  for a coordinate must guard first, the way MapWrapper's
-   *  `handleStepChange` does. */
+   *  for a coordinate must guard first, the way
+   *  `useWalkingRoute`'s `stepTo` does. */
   steps: WalkStep[];
   activeIndex: number;
   onStepChange: (index: number) => void;

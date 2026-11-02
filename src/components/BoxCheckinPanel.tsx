@@ -11,9 +11,9 @@
  * 'filled'/'problem' expand a small optional-note form first (this slice's
  * own scope: "optional short note on filled and problem").
  *
- * Turnstile mount/reset mirrors ReportForm.tsx's own widget lifecycle
- * (mount once the CF script loads; the sitekey/container pattern is
- * identical) with one addition: a Turnstile token is single-use, so this
+ * The Turnstile widget lifecycle (mount, fallback swap, reset) is the shared
+ * useTurnstile hook (src/lib/useTurnstile.ts, box mode). A token is
+ * single-use, so this
  * panel resets the widget after EVERY submit attempt, not only a failed
  * one — a user can tap more than once in the same page view (e.g. "took"
  * now, "empty" later), and the second tap would otherwise silently fail
@@ -48,10 +48,9 @@
  * error-callback swaps the invisible widget for a SECOND widget rendered
  * into the same container, using the ordinary MANAGED key every other public
  * form already uses (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`, default visible
- * "Verify you are human" checkbox — no `appearance` override). `turnstileMode`
- * ("box" | "fallback", mirrored into `turnstileModeRef` so the widget
- * callbacks registered once at mount always read the current value, same
- * reason `submitCheckin`'s own closure trick exists below) tracks which key
+ * "Verify you are human" checkbox — no `appearance` override). The hook's `mode`
+ * ("box" | "fallback", also readable as `currentMode()` off a ref so a
+ * closure never sends a stale value) tracks which key
  * is live; it flips at most once and never flips back — once a visitor has
  * been asked for the visible checkbox, there's no reason to re-attempt the
  * invisible one. A tap queued when the box widget fails is NOT failed — it
@@ -151,7 +150,7 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { getCheckinClientToken } from "@/lib/checkinClientToken";
 import { shrinkImageToJpeg, UnsupportedImageError } from "@/lib/imageResize";
 import ReportPhotoButton from "@/components/ReportPhotoButton";
-import type { BoxTurnstileMode } from "@/lib/useBoxTurnstileWidget";
+import { useTurnstile } from "@/lib/useTurnstile";
 import { NEED_KEYS, type BoxStatus, type CheckinKind, type NeedKey } from "@/lib/blessingBoxes";
 
 const { BOX_CHECKIN_NOTE } = FIELD_LIMITS;
@@ -304,107 +303,16 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
     if (needsAsk) needsHeadingRef.current?.focus();
   }, [needsAsk]);
 
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const [turnstileError, setTurnstileError] = useState(false);
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
-  const turnstileWidgetId = useRef<string | null>(null);
-
-  // Which Turnstile key produced (or is expected to produce) the current
-  // token — see this file's own header, "Fallback to a visible checkbox".
-  // Mirrored into a ref because the box widget's error-callback is
-  // registered once at mount and must read the CURRENT mode synchronously
-  // (a second error-callback firing before a re-render would otherwise see
-  // a stale "box" and try to switch again).
-  const [turnstileMode, setTurnstileModeState] = useState<BoxTurnstileMode>("box");
-  const turnstileModeRef = useRef<BoxTurnstileMode>("box");
-  function setTurnstileMode(mode: "box" | "fallback") {
-    turnstileModeRef.current = mode;
-    setTurnstileModeState(mode);
-  }
+  // Box key with the managed fallback (this file's header, "Fallback to a
+  // visible checkbox"); the widget lifecycle itself lives in useTurnstile.ts.
+  const turnstile = useTurnstile(turnstileContainerRef, { box: true, rebuildDeadWidget: false });
+  const turnstileToken = turnstile.token;
 
   // A tap that lands before Turnstile's invisible check resolves queues here
   // instead of being dropped or blocking the panel — see this file's own
   // header. Cleared the instant the queued submit actually fires.
   const [pendingSubmit, setPendingSubmit] = useState<PendingSubmit | null>(null);
-
-  function mountTurnstile() {
-    if (!turnstileContainerRef.current || !window.turnstile) return;
-    if (turnstileWidgetId.current) return; // already mounted
-
-    turnstileWidgetId.current = window.turnstile.render(turnstileContainerRef.current, {
-      // Dedicated invisible-mode key, check-ins only — never the managed
-      // NEXT_PUBLIC_TURNSTILE_SITE_KEY the other three forms use (that key
-      // is reserved for the FALLBACK widget below). See this file's own
-      // header for why (Kyle, 2026-09-18: the managed checkbox still
-      // appeared on his phone even under "interaction-only").
-      sitekey: process.env.NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY ?? "",
-      callback: (token) => {
-        setTurnstileToken(token);
-        setTurnstileError(false);
-      },
-      "error-callback": () => {
-        // The invisible check doubts this visitor and there's no widget on
-        // screen for them to satisfy — swap in a visible checkbox instead
-        // of a dead-end error. Any queued tap stays queued; see this file's
-        // own header, "Fallback to a visible checkbox".
-        switchToFallback();
-      },
-      "expired-callback": () => {
-        setTurnstileToken(null);
-      },
-    });
-  }
-
-  /**
-   * Removes the (invisible) box widget and mounts the managed-key fallback
-   * widget into the same container — a visible "Verify you are human"
-   * checkbox, default appearance. Idempotent (a second call while already
-   * in fallback mode is a no-op) and never flips back to box mode: once a
-   * visitor's been asked for the visible checkbox, the invisible one has
-   * nothing left to prove. Returns false only when the swap genuinely
-   * couldn't happen (`window.turnstile` never loaded) — the one case the
-   * caller (the pending-submit timeout) still needs to fail the queued tap
-   * outright rather than wait on a widget that will never render.
-   */
-  function switchToFallback(): boolean {
-    if (turnstileModeRef.current === "fallback") return true;
-    if (!turnstileContainerRef.current || !window.turnstile) return false;
-
-    setTurnstileMode("fallback");
-    setTurnstileToken(null);
-    setTurnstileError(false);
-
-    if (turnstileWidgetId.current) {
-      window.turnstile.remove(turnstileWidgetId.current);
-      turnstileWidgetId.current = null;
-    }
-    turnstileWidgetId.current = window.turnstile.render(turnstileContainerRef.current, {
-      sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "",
-      callback: (token) => {
-        setTurnstileToken(token);
-        setTurnstileError(false);
-      },
-      "error-callback": () => {
-        setTurnstileToken(null);
-        setTurnstileError(true);
-      },
-      "expired-callback": () => {
-        setTurnstileToken(null);
-      },
-    });
-    return true;
-  }
-
-  useEffect(() => {
-    if (window.turnstile) mountTurnstile();
-    return () => {
-      if (window.turnstile && turnstileWidgetId.current) {
-        window.turnstile.remove(turnstileWidgetId.current);
-        turnstileWidgetId.current = null;
-      }
-    };
-  }, []);
-
   // Fires a queued tap the moment a token becomes available (first mount,
   // or after `expired-callback` clears a stale one and Turnstile hands back
   // a fresh one). setPendingSubmit is deferred to a microtask — same
@@ -456,21 +364,21 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
   }
 
   // Failure mode 1: Turnstile's error-callback fires while a tap is queued.
-  // mountTurnstile's callbacks are registered once at mount, so reading
+  // useTurnstile's widget callbacks are registered once at mount, so reading
   // pendingSubmit directly inside error-callback would close over a stale
   // (always-null) value — same reason the token-arrival effect above exists
   // instead of firing submitCheckin straight from Turnstile's own callback.
   useEffect(() => {
-    if (!turnstileError || !pendingSubmit) return;
+    if (!turnstile.error || !pendingSubmit) return;
     const queued = pendingSubmit;
     queueMicrotask(() => failQueuedSubmit(queued));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- failQueuedSubmit closes over stable setState setters + the notePhoto hook instance; re-running per turnstileError/pendingSubmit change (not per render) is what this effect wants.
-  }, [turnstileError, pendingSubmit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- failQueuedSubmit closes over stable setState setters + the notePhoto hook instance; re-running per turnstile.error/pendingSubmit change (not per render) is what this effect wants.
+  }, [turnstile.error, pendingSubmit]);
 
   // Failure mode 2: the box widget never loads or never calls back at all
   // (content blocker, offline, slow network) — nothing above ever fires
   // without this. Only runs in BOX mode; suspended entirely once
-  // turnstileMode is "fallback" (dep below), since a visible checkbox
+  // turnstile.mode is "fallback" (dep below), since a visible checkbox
   // waiting on a real human tap has no natural time bound — see this
   // file's own header. On firing, tries switchToFallback() FIRST (the
   // "no callback at all" case is exactly the case a real visitor most needs
@@ -478,14 +386,14 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
   // that swap itself couldn't happen (window.turnstile never loaded — the
   // one case a fallback widget can't be mounted either).
   useEffect(() => {
-    if (!pendingSubmit || turnstileMode === "fallback") return;
+    if (!pendingSubmit || turnstile.mode === "fallback") return;
     const queued = pendingSubmit;
     const timer = setTimeout(() => {
-      if (!switchToFallback()) failQueuedSubmit(queued);
+      if (!turnstile.switchToFallback()) failQueuedSubmit(queued);
     }, PENDING_SUBMIT_TIMEOUT_MS);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- switchToFallback/failQueuedSubmit only touch refs and stable setState setters (see switchToFallback's own header), so a fresh closure per render behaves identically; re-running this effect per pendingSubmit/turnstileMode change (not per render) is what it wants.
-  }, [pendingSubmit, turnstileMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- switchToFallback/failQueuedSubmit only touch refs and stable setState setters (see useTurnstile.ts), so a fresh closure per render behaves identically; re-running this effect per pendingSubmit/turnstileMode change (not per render) is what it wants.
+  }, [pendingSubmit, turnstile.mode]);
 
   async function submitCheckin(kind: CheckinKind, noteValue: string, photoBlob: Blob | null) {
     setSubmitState("submitting");
@@ -502,12 +410,12 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
           turnstileToken: turnstileToken ?? "",
           // Which key produced this token — the route picks its
           // verification secret off this field (TURNSTILE_SECRET_KEY for
-          // "fallback", TURNSTILE_BOX_SECRET_KEY otherwise). Read off the
-          // ref, not the `turnstileMode` state closed over by this render,
+          // "fallback", TURNSTILE_BOX_SECRET_KEY otherwise). Read via
+          // currentMode() (a ref), not the `mode` state closed over by this render,
           // so a mode flip that happens between queueing and firing (the
           // exact case this whole fallback feature exists for) is never
           // sent stale.
-          turnstileKey: turnstileModeRef.current,
+          turnstileKey: turnstile.currentMode(),
           clientToken: getCheckinClientToken() ?? undefined,
         }),
       });
@@ -526,20 +434,10 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
       // so it's still reset for the next possible tap (and, in BOX mode,
       // this kicks off Turnstile's own re-execution, default `execution:
       // "render"`, which is exactly what an attached photo below is
-      // waiting on) — but `reset()` is a call into third-party widget code
-      // outside this try, and if IT throws, the outer catch below must not
-      // be allowed to reclassify a real success as "error". Own try/catch,
-      // after the outcome is already decided.
-      try {
-        if (window.turnstile && turnstileWidgetId.current) {
-          window.turnstile.reset(turnstileWidgetId.current);
-        }
-      } catch {
-        // Nothing to recover — the checkin itself already succeeded or
-        // failed above; a stale/broken widget only affects the NEXT tap
-        // (which re-queues normally, same as if no token ever arrived).
-      }
-      setTurnstileToken(null);
+      // waiting on). useTurnstile's reset() never throws, so a broken
+      // widget can't let the outer catch below reclassify a real success
+      // as "error".
+      turnstile.reset();
 
       if (data.ok) {
         setSubmitState("success");
@@ -587,23 +485,14 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
       if (checkinId !== null) form.set("checkinId", String(checkinId));
       form.set("website", honeypot);
       form.set("turnstileToken", turnstileToken ?? "");
-      form.set("turnstileKey", turnstileModeRef.current);
+      form.set("turnstileKey", turnstile.currentMode());
       const clientToken = getCheckinClientToken();
       if (clientToken) form.set("clientToken", clientToken);
 
       const res = await fetch(`/api/public/blessing-boxes/${boxId}/photos`, { method: "POST", body: form });
 
-      // Reviewer fix pass (2026-09-19) — see submitCheckin's own comment on
-      // this same pattern: reset() is third-party widget code and must not
-      // be able to reclassify a real outcome as an error via the outer catch.
-      try {
-        if (window.turnstile && turnstileWidgetId.current) {
-          window.turnstile.reset(turnstileWidgetId.current);
-        }
-      } catch {
-        // Nothing to recover — see submitCheckin's own comment.
-      }
-      setTurnstileToken(null);
+      // Single-use token: reset for the next tap (see submitCheckin).
+      turnstile.reset();
 
       const data = (await res.json()) as { ok: boolean };
       if (data.ok) {
@@ -633,22 +522,13 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
           note: noteValue || undefined,
           website: honeypot,
           turnstileToken: turnstileToken ?? "",
-          turnstileKey: turnstileModeRef.current,
+          turnstileKey: turnstile.currentMode(),
           clientToken: getCheckinClientToken() ?? undefined,
         }),
       });
 
-      // Reviewer fix pass (2026-09-19) — see submitCheckin's own comment on
-      // this same pattern: reset() is third-party widget code and must not
-      // be able to reclassify a real outcome as an error via the outer catch.
-      try {
-        if (window.turnstile && turnstileWidgetId.current) {
-          window.turnstile.reset(turnstileWidgetId.current);
-        }
-      } catch {
-        // Nothing to recover — see submitCheckin's own comment.
-      }
-      setTurnstileToken(null);
+      // Single-use token: reset for the next tap (see submitCheckin).
+      turnstile.reset();
 
       const data = (await res.json()) as { ok: boolean };
       setNeedsSubmitState(data.ok ? "success" : "error");
@@ -746,7 +626,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
   }
 
   const buttonBase =
-    "min-h-[44px] px-3 py-2 rounded-[var(--radius-md)] text-sm font-medium text-center " +
+    "min-h-12 px-3 py-2 rounded-[var(--radius-md)] text-sm font-medium text-center " +
     "transition-colors duration-150 border border-[var(--color-bone-300)] text-[var(--color-ink-700)] bg-white " +
     "hover:bg-[var(--color-bone-100)] focus-visible:outline-none focus-visible:ring-2 " +
     "focus-visible:ring-[var(--color-sage-500)] disabled:opacity-60 disabled:cursor-not-allowed";
@@ -769,7 +649,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
       <Script
         src="https://challenges.cloudflare.com/turnstile/v0/api.js"
         strategy="afterInteractive"
-        onLoad={mountTurnstile}
+        onLoad={turnstile.mount}
       />
       {/* Card redesign (2026-09-19): display-font question heading, matching the mockup — was a small uppercase label. */}
       <h2
@@ -802,7 +682,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
           {t("box.checkin.error.rateLimitBox", locale)}
         </p>
       )}
-      {turnstileError && (
+      {turnstile.error && (
         <p role="alert" className="text-xs text-[var(--color-danger)]">
           {t("form.turnstile.error", locale)}
         </p>
@@ -891,7 +771,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
           across every render, regardless of `needsAsk` toggling `!needsAsk &&`
           above and below between `false` and an element) is what keeps it
           from being remounted. */}
-      {turnstileMode === "fallback" && !turnstileToken && !turnstileError && (
+      {turnstile.mode === "fallback" && !turnstileToken && !turnstile.error && (
         <p className="text-xs text-[var(--color-ink-700)]">{t("box.checkin.turnstileFallbackPrompt", locale)}</p>
       )}
       <div ref={turnstileContainerRef} data-testid="turnstile-widget" />
@@ -906,7 +786,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
             disabled={busy}
             aria-disabled={busy}
             onClick={() => handleTap("problem")}
-            className="inline-flex min-h-[44px] items-center text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:opacity-60"
+            className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] items-center text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:opacity-60"
           >
             {busyKind === "problem" ? t("box.checkin.submitting", locale) : t("box.checkin.problem", locale)}
           </button>
@@ -940,7 +820,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
                   disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
                   onClick={() => toggleNeed(key)}
                   className={
-                    "min-h-[44px] rounded-full border px-3.5 text-sm font-medium transition-colors duration-150 " +
+                    "min-h-12 rounded-full border px-3.5 text-sm font-medium transition-colors duration-150 " +
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
                     "disabled:opacity-60 disabled:cursor-not-allowed " +
                     (selected
@@ -978,7 +858,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
               disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
               aria-disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
               className={
-                "min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
+                "min-h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
                 "text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed " +
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
               }
@@ -990,7 +870,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
             <button
               type="button"
               onClick={handleNeedsSkip}
-              className="min-h-[44px] px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+              className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
             >
               {t("box.needs.skip", locale)}
             </button>
@@ -1047,7 +927,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
               disabled={busy}
               aria-disabled={busy}
               className={
-                "min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
+                "min-h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
                 "text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed " +
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
               }
@@ -1060,7 +940,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
                 setOpenKind(null);
                 notePhoto.clear();
               }}
-              className="min-h-[44px] px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+              className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
             >
               {t("box.checkin.cancel", locale)}
             </button>
@@ -1083,7 +963,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
               disabled={!standalonePhoto.blob || busy || photoSubmitState === "submitting"}
               aria-disabled={!standalonePhoto.blob || busy || photoSubmitState === "submitting"}
               className={
-                "min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
+                "min-h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
                 "text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed " +
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
               }
@@ -1097,7 +977,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
                 standalonePhoto.clear();
                 setPhotoSubmitState("idle");
               }}
-              className="min-h-[44px] px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+              className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
             >
               {t("box.checkin.cancel", locale)}
             </button>

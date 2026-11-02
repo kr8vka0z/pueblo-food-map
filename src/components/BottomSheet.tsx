@@ -52,7 +52,7 @@
  *
  * Route strip (#509, walk-route standard for every venue card): starting a
  * walking route (a box's address tap, or an ordinary place's Walk button —
- * both call the SAME `onWalkRoute`) shrinks this sheet to a short `RouteStrip`
+ * both call the SAME `walk.onWalk`) shrinks this sheet to a short `RouteStrip`
  * instead of leaving the full card covering the map. This is the one place
  * v2's retired snap-point model comes back — but scoped ONLY to while a
  * route is active, and only ever between two points (full card / strip), not
@@ -80,34 +80,50 @@
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Drawer } from "vaul";
-import { X, MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
+import { X } from "lucide-react";
 import type { Venue } from "@/types/venue";
-import { categoryColors } from "@/data/venues";
-import { formatMiles } from "@/lib/distance";
-import { computeVenueOpenStatus, nextIrregularOccurrence, formatIrregularOccurrence } from "@/lib/hours";
-import { getDisplayNotes } from "@/lib/venueNotes";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
-import { safeUrl } from "@/lib/safeUrl";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { isNativeDialogOpen } from "@/lib/dialogGuard";
-import { track, EVENTS } from "@/lib/analytics";
 import { claimEscape, useOverlayStackId } from "@/lib/overlayRegistry";
-import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
-import HoursList from "@/components/HoursList";
-import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
-import BoxCardBody from "@/components/BoxCardBody";
+import VenueCardBody, { displayAddress } from "@/components/VenueCardBody";
+import type { Walk } from "@/lib/useWalkingRoute";
 import RouteStrip, { ROUTE_STRIP_HEIGHT_PX } from "@/components/RouteStrip";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 import type { PublicEventDetail } from "@/lib/events";
 import { eventText } from "@/lib/eventCard";
-import EventHereLine, { type EventHere } from "@/components/EventHereLine";
+import type { EventHere } from "@/components/EventHereLine";
 
 // The special-event card (#759) loads only when an event is opened, so a
 // visitor who never taps an event pin downloads none of it.
 const EventCardBody = dynamic(() => import("@/components/EventCardBody"), { ssr: false });
+
+/** "Loading…" line shown while the box record or the box card's code is on its way. */
+function BoxCardLoading({ locale: localeProp }: { locale?: Locale }) {
+  // The dynamic() fallback below gets no props, so it reads the context locale
+  // (the same value MapWrapper passes down as BottomSheet's `locale`).
+  const { locale: ctxLocale } = useLocale();
+  const locale = localeProp ?? ctxLocale;
+  return (
+    <div className="px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <p className="text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
+    </div>
+  );
+}
+
+// #721: the box card (check-in, adopt, photo resize, Turnstile) loads only
+// when a box is opened, so a visitor who never taps a box downloads none of
+// it. Module-level on purpose: a dynamic() made inside render would be a new
+// component each render and remount the card, wiping a half-typed check-in.
+// No `ssr: false`: this sheet only ever renders inside the client-only
+// MapWrapper, and ssr:false would show "Loading…" for a frame on EVERY box
+// open (it waits for a mount effect), not just the first.
+const BoxCardBody = dynamic(() => import("@/components/BoxCardBody"), {
+  loading: () => <BoxCardLoading />,
+});
 
 // #549: the map-peek gap deliberately left visible above the drawer at rest
 // (100px, matches the non-route maxHeight below). Named so the height calc
@@ -170,26 +186,8 @@ interface BottomSheetProps {
   inert?: boolean;
   /** Override locale for testing. If omitted, reads from LocaleContext. */
   locale?: Locale;
-  /** Called when the user taps the Walk direction button. MapWrapper fetches the route. */
-  onWalkRoute?: (venue: Venue) => void;
-  /** True when a walking route for this venue is currently drawn on the map. */
-  isWalkRouteActive?: boolean;
-  /** Called when the user taps Walk while a route is active (clears it). */
-  onClearWalkRoute?: () => void;
-  /** Walking route distance + duration for the in-card readout (threaded from MapWrapper). */
-  walkRouteInfo?: RouteInfo | null;
-  /** Turn-by-turn steps from Mapbox (pre-localized). Shown as a collapsible list in DirectionButtons. */
-  walkRouteSteps?: WalkStep[] | null;
-  /**
-   * True when this venue's Walk tap requested geolocation and it was denied
-   * or is unavailable (#207). Tells DirectionButtons to show the localized
-   * "share your location" hint instead of silently doing nothing.
-   */
-  showWalkLocationHint?: boolean;
-  /** Which turn the step-through stepper is showing (#555) — owned by MapWrapper so the map's camera focus agrees with every stepper instance. */
-  activeStepIndex?: number;
-  /** Moves the stepper to a different turn (#555) — Back/Next or an "All turns" row tap, in either the RouteStrip sheet or the full card's own readout. */
-  onStepChange?: (index: number) => void;
+  /** Walking directions for this card (useWalkingRoute's walkFor). Absent: no Walk route (Walk does nothing, a box address stays a plain link). */
+  walk?: Walk;
 }
 
 // ─── BottomSheet ─────────────────────────────────────────────────────────────
@@ -207,17 +205,11 @@ export default function BottomSheet({
   forceExpanded,
   inert,
   locale: localeProp,
-  onWalkRoute,
-  isWalkRouteActive = false,
-  onClearWalkRoute,
-  walkRouteInfo,
-  walkRouteSteps,
-  showWalkLocationHint = false,
-  activeStepIndex = 0,
-  onStepChange = () => {},
+  walk,
 }: BottomSheetProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
+  const isWalkRouteActive = walk?.isActive ?? false;
   const [expanded, setExpanded] = useState(false);
 
   // ── Grab bar toggle + swipe (#666) ──────────────────────────────────────
@@ -369,9 +361,6 @@ export default function BottomSheet({
   // here for that reason; `claimEscape` is called directly instead.
   const overlayId = useOverlayStackId(open);
   const isBox = venue?.category === "blessing_box";
-  const status = venue ? computeVenueOpenStatus(venue) : null;
-  const nextOccurrence = venue?.hours_irregular ? nextIrregularOccurrence(venue.hours_irregular) : null;
-  const displayNotes = venue ? getDisplayNotes(venue) : undefined;
   const showStrip = isWalkRouteActive && !cardRevealed;
   // #666/#667: the grab bar needs SOMETHING to expand into. An ordinary
   // venue always has a detail section; a box only once its record has
@@ -656,17 +645,12 @@ export default function BottomSheet({
               (like Drawer.Title above) so every branch — box, ordinary venue,
               route-strip-only, no venue yet — has SOME description, never a
               dangling reference.
-              Same OSM placeholder guard as the visible address line below
-              (line ~666) and DesktopVenueWindow.tsx's own copy of it — a
-              screen reader must never hear the literal "Address not in
+              Same OSM placeholder guard as the visible address line
+              (VenueCardBody's displayAddress) — a screen reader must never hear the literal "Address not in
               OpenStreetMap" string either. */}
           <Drawer.Description className="sr-only">
             {venue
-              ? `${t(`category.full.${venue.category}`, locale)}, ${
-                  venue.address === "Address not in OpenStreetMap"
-                    ? `${venue.lat}, ${venue.lng}`
-                    : venue.address
-                }`
+              ? `${t(`category.full.${venue.category}`, locale)}, ${displayAddress(venue)}`
               : event
               ? event.address
               : t("detail.venueDetailsPanel", locale)}
@@ -713,19 +697,19 @@ export default function BottomSheet({
               position as the ordinary header row's own trio. */}
           {venue && showStrip && (
             // #509: strip replaces the full card entirely while a route is
-            // active and not revealed — same trigger (onWalkRoute) and
-            // onClearWalkRoute callback contract every card branch below
+            // active and not revealed — same `walk` object (onWalk /
+            // onClear) contract every card branch below
             // already wires, so RouteStrip needs no knowledge of box vs
             // ordinary venue.
             <RouteStrip
               venueName={venue.name}
-              routeInfo={walkRouteInfo ?? null}
+              routeInfo={walk?.info ?? null}
               locale={locale}
               onShowCard={() => setCardRevealed(true)}
-              onClearRoute={onClearWalkRoute}
-              walkSteps={walkRouteSteps}
-              activeStepIndex={activeStepIndex}
-              onStepChange={onStepChange}
+              onClearRoute={walk?.onClear}
+              walkSteps={walk?.steps}
+              activeStepIndex={walk?.activeStepIndex}
+              onStepChange={walk?.onStepChange}
             />
           )}
 
@@ -795,14 +779,7 @@ export default function BottomSheet({
                     expanded={expanded}
                     onRequestExpand={() => setExpandedState(true)}
                     detailSectionId={DETAIL_SECTION_ID}
-                    onWalkRoute={onWalkRoute ? () => onWalkRoute(box) : undefined}
-                    isWalkRouteActive={isWalkRouteActive}
-                    onClearWalkRoute={onClearWalkRoute}
-                    walkRouteInfo={isWalkRouteActive ? walkRouteInfo : null}
-                    walkRouteSteps={isWalkRouteActive ? walkRouteSteps : null}
-                    showWalkLocationHint={showWalkLocationHint}
-                    activeStepIndex={activeStepIndex}
-                    onStepChange={onStepChange}
+                    walk={walk}
                     actions={
                       <>
                         <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} isBox />
@@ -826,293 +803,20 @@ export default function BottomSheet({
                     }
                   />
                 ) : (
-                  <div className="px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                    <p className="text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
-                  </div>
+                  <BoxCardLoading locale={locale} />
                 )
               ) : (
-              <div className="flex flex-col px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3">
-                {/* Header row: title + close */}
-                {/* gap-4: Share/Save (-m-1) and × (-ml-1) each give back 4px
-                    of it, leaving 8px between their 48px hit areas (#233). */}
-                <div className="flex items-start gap-4">
-                  <h2
-                    className="flex-1 text-xl font-normal text-[var(--color-ink-900)] leading-tight"
-                    style={{ fontFamily: "var(--font-display)" }}
-                  >
-                    {venue.name}
-                  </h2>
-                  <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} isBox={isBox} />
-                  <FavoriteButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} />
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    aria-label={t("detail.close", locale)}
-                    className={
-                      // 32px -> 48px hit area (#233; 44 before, mobile review
-                      // #11): box grows via width/height, negative margins
-                      // cancel the growth vertically and on the right (the
-                      // icon stays 12px in from the content edge, as before).
-                      // Only -ml-1 on the left, so the row's gap-4 still
-                      // leaves 8px to Save's hit area.
-                      "flex items-center justify-center w-12 h-12 " +
-                      "-mt-2 -mb-2 -ml-1 -mr-3 rounded-md " +
-                      "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
-                      PRESS_FEEDBACK + " " +
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-                    }
-                  >
-                    <X size={18} aria-hidden />
-                  </button>
-                </div>
-
-                {eventHere && <EventHereLine {...eventHere} />}
-
-                {/* Operator attribution */}
-                {venue.operator && (
-                  <p className="text-xs text-[var(--color-ink-500)] -mt-1">
-                    {t("operator.operated_by", locale)}{" "}
-                    <a
-                      href="https://pueblofoodproject.org/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
-                    >
-                      {venue.operator}
-                    </a>
-                  </p>
-                )}
-
-                {/* Category badge + SNAP/WIC pills */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium text-[var(--color-bone-50)]"
-                    style={{ backgroundColor: categoryColors[venue.category] }}
-                  >
-                    <span className="w-2 h-2 rounded-full bg-white/40 shrink-0" aria-hidden />
-                    {t(`category.full.${venue.category}`, locale)}
-                  </span>
-                  {venue.accepts_snap && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-                      {t("badge.snap", locale)}
-                    </span>
-                  )}
-                  {venue.accepts_wic && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-                      {t("badge.wic", locale)}
-                    </span>
-                  )}
-                </div>
-
-                {/* Distance + hours today */}
-                <div className="flex items-center gap-4 text-sm text-[var(--color-ink-500)]">
-                  {venue.distanceMiles !== undefined && (
-                    <span className="flex items-center gap-1.5">
-                      <MapPin size={14} aria-hidden className="text-[var(--color-ink-400)]" />
-                      {formatMiles(venue.distanceMiles)} {t("distance.fromYou", locale)}
-                    </span>
-                  )}
-                  {/* Hours badges don't apply to a blessing box (it has no
-                      hours_weekly) — BoxCardBody's own status badge covers
-                      the equivalent "is it usable right now" read. */}
-                  {!isBox && status && status.state !== "no_hours" && (
-                    <span className="flex items-center gap-1.5">
-                      <Clock size={14} aria-hidden className="text-[var(--color-ink-400)]" />
-                      {status.state === "open"
-                        ? `${t("badge.openNow", locale)} · ${t("badge.closesAt", locale, { time: status.time })}`
-                        : status.state === "opens_at"
-                        ? t("badge.opensAt", locale, { time: status.time })
-                        : t("badge.closedToday", locale)}
-                    </span>
-                  )}
-                  {/* Board review finding #1: a "no_hours" venue now survives the
-                      "Open now" filter instead of vanishing — this label is what
-                      tells the user why there's no open/closed read, using a
-                      different icon (not Clock) + explicit text so it's never
-                      mistaken for "open" by shape alone, not just color. */}
-                  {!isBox && status && status.state === "no_hours" && (
-                    <span className="flex items-center gap-1.5 text-[var(--color-ink-700)] font-medium">
-                      <CircleHelp size={14} aria-hidden className="text-[var(--color-ink-700)]" />
-                      {t("badge.hoursUnknown", locale)}
-                    </span>
-                  )}
-                </div>
-                {/* #400: monthly-schedule next-occurrence — see VenueCard's own comment. */}
-                {!isBox && nextOccurrence && (
-                  <p className="text-sm text-[var(--color-ink-500)]">
-                    {t("hours.irregular.next", locale, { when: formatIrregularOccurrence(nextOccurrence, locale) })}
-                  </p>
-                )}
-
-                {/* Notes (2 lines max) — suppressed for OSM artifacts and
-                    Plentiful's auto-generated boilerplate (src/lib/venueNotes.ts).
-                    Also suppressed for a box — its host note renders inside
-                    BoxCardBody instead, alongside the rest of the box-specific
-                    content. */}
-                {!isBox && displayNotes && (
-                  <p className="text-sm text-[var(--color-ink-700)] leading-relaxed line-clamp-2">
-                    {displayNotes}
-                  </p>
-                )}
-
-                {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive.
-                    routeInfo threads distance+duration down for the in-card readout.
-                    walkSteps provides the collapsible turn-by-turn list.
-                    Ordinary venues only as of the card redesign (2026-09-19)
-                    — a box's own Walk trigger is the address text
-                    BoxCardBody renders (walk restore pass, same day; see
-                    that component's own header), not this three-button row,
-                    so this branch is guaranteed non-box already. */}
-                <DirectionButtons
+                <VenueCardBody
                   venue={venue}
-                  onWalk={onWalkRoute ?? (() => {})}
+                  variant="sheet"
                   locale={locale}
-                  isRouteActive={isWalkRouteActive}
-                  onClearRoute={onClearWalkRoute}
-                  routeInfo={isWalkRouteActive ? walkRouteInfo : null}
-                  walkSteps={isWalkRouteActive ? walkRouteSteps : null}
-                  showLocationHint={showWalkLocationHint}
-                  activeStepIndex={activeStepIndex}
-                  onStepChange={onStepChange}
+                  walk={walk}
+                  eventHere={eventHere}
+                  onClose={onClose}
+                  expanded={expanded}
+                  onRequestExpand={() => setExpandedState(true)}
+                  detailSectionId={DETAIL_SECTION_ID}
                 />
-
-                {/* Detail section (#666) — ALWAYS mounted now (the old
-                    `{expanded && (...)}` guard is gone), so it exists to be
-                    peeked at. Collapsed: clipped to a short fixed height with
-                    a bottom fade and its own tap-to-expand (the
-                    accessibility section's "tapping the cut-off preview also
-                    expands"). Expanded: full height, no clip, scrolls with
-                    the outer body as before. `data-vaul-no-drag` is
-                    deliberately NOT set here — unlike the grab bar, letting a
-                    drag started in the collapsed preview fall through to
-                    vaul's own dismiss keeps "swipe down on the normal card
-                    closes it" exactly as it was pre-#666 (see this file's
-                    header on why the swipe-to-collapse gesture is scoped to
-                    the bar instead of fought for here). */}
-                <div
-                  id={DETAIL_SECTION_ID}
-                  onClick={!expanded ? () => setExpandedState(true) : undefined}
-                  className={
-                    "relative flex flex-col gap-4 pt-1 " +
-                    (expanded ? "" : "max-h-16 overflow-hidden cursor-pointer")
-                  }
-                >
-                  {/* `inert` while collapsed (#683 review): the clip hides the
-                      phone/website/report controls visually but not from Tab
-                      or a screen reader. Inert takes them out of both, and
-                      acts like `pointer-events: none`, so a tap on the preview
-                      still lands on the wrapper's own expand handler above.
-                      `contents` keeps the children as the wrapper's flex items. */}
-                  <div className="contents" inert={!expanded}>
-                  {/* Address — guard: never render "Address not in OpenStreetMap" placeholder */}
-                  <div className="flex gap-2.5">
-                    <MapPin size={16} className="text-[var(--color-ink-400)] shrink-0 mt-0.5" aria-hidden />
-                    <div>
-                      <p className="text-sm text-[var(--color-ink-700)]">
-                        {venue.address === "Address not in OpenStreetMap"
-                          ? `${venue.lat}, ${venue.lng}`
-                          : venue.address}
-                      </p>
-                      {venue.distanceMiles !== undefined && (
-                        <p className="text-sm text-[var(--color-ink-400)] font-mono mt-0.5">
-                          {formatMiles(venue.distanceMiles)} {t("distance.fromYou", locale)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* SNAP/WIC detail badges */}
-                  {(venue.accepts_snap || venue.accepts_wic) && (
-                    <div className="flex flex-wrap gap-2">
-                      {venue.accepts_snap && (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-                          {t("detail.acceptsSnap", locale)}
-                        </span>
-                      )}
-                      {venue.accepts_wic && (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-                          {t("detail.acceptsWic", locale)}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Full weekly + monthly hours (#400) — today highlighted + aria-current */}
-                  {(venue.hours_weekly || venue.hours_irregular) && (
-                    <section aria-label={t("detail.hours", locale)}>
-                      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
-                        {t("detail.hours", locale)}
-                      </h3>
-                      <HoursList
-                        hours_weekly={venue.hours_weekly}
-                        hours_irregular={venue.hours_irregular}
-                        compact={false}
-                      />
-                    </section>
-                  )}
-
-                  {/* Phone / Contact */}
-                  {venue.phone && (
-                    <section aria-label={t("detail.contact", locale)}>
-                      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
-                        {t("detail.contact", locale)}
-                      </h3>
-                      <a
-                        href={`tel:${venue.phone}`}
-                        onClick={() => void track(EVENTS.CALL_CLICKED, { venueId: venue.id })}
-                        // before:* — 2px overlay up/down takes the 44px link to 48 (#233).
-                        className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
-                      >
-                        <Phone size={15} className="text-[var(--color-sage-600)]" aria-hidden />
-                        {venue.phone}
-                      </a>
-                    </section>
-                  )}
-
-                  {/* See full details on Plentiful (#128) — Plentiful-sourced venues only */}
-                  {/* safeUrl: venue.url comes from OSM (anyone can edit); reject non-http(s) */}
-                  {venue.source.toLowerCase().includes("plentiful") && safeUrl(venue.url) && (
-                    <a
-                      href={safeUrl(venue.url)!}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => void track(EVENTS.WEBSITE_CLICKED, { venueId: venue.id })}
-                      className={
-                        // min-h-12: one line of text + py-3 is 46px on
-                        // wide phones; #233's floor is 48 (#659).
-                        "flex items-center justify-between gap-2 w-full min-h-12 px-4 py-3 " +
-                        // #534: --color-sage-300 undefined in
-                        // globals.css @theme — sage-500 is DESIGN.md's
-                        // own documented border for this exact chip
-                        // shape (TooltipChip: "bone-50 bg, 1px sage-500
-                        // border"), 3.8:1 against the sage-50 fill below.
-                        "rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
-                        "bg-[var(--color-sage-50)] text-sm font-medium text-[var(--color-sage-700)] " +
-                        "hover:bg-[var(--color-sage-100)] transition-colors " +
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-                      }
-                    >
-                      <span>{t("detail.plentifulLink", locale)}</span>
-                      <ExternalLink size={15} className="shrink-0" aria-hidden />
-                    </a>
-                  )}
-
-                  {/* Report venue */}
-                  <ReportVenueButton venueId={venue.id} locale={locale} />
-                  </div>
-
-                  {/* Cut-off preview fade (#666) — matches the card
-                      background (`bone-50`) so the clipped content visibly
-                      continues below, telling a visitor there's more without
-                      a "Show details" label. */}
-                  {!expanded && (
-                    <div
-                      aria-hidden
-                      className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-b from-transparent to-[var(--color-bone-50)]"
-                    />
-                  )}
-                </div>
-              </div>
               )}
             </div>
           )}

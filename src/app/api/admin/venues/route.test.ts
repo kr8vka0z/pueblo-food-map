@@ -190,8 +190,7 @@ describe("POST /api/admin/venues", () => {
     expect(venueStmt.args).toContain("manual");
     expect(venueStmt.args).toContain(ADMIN_EMAIL);
     // created_at/updated_at are deliberately absent from the column list —
-    // D1's own DEFAULT (strftime(...)) fills them (matches
-    // scripts/seed-admin-db.ts's established convention).
+    // D1's own DEFAULT (strftime(...)) fills them.
     expect(venueStmt.sql).not.toContain("created_at");
     expect(venueStmt.sql).not.toContain("updated_at");
 

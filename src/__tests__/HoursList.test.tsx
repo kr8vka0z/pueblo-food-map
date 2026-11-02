@@ -64,9 +64,6 @@ describe("DesktopVenueWindow hours list — today row highlight", () => {
     const { container, unmount } = render(
       <DesktopVenueWindow
         venue={makeVenue()}
-        expanded={true}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
       />,
     );

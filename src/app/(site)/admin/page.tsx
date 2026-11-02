@@ -372,7 +372,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 key={p}
                 href={`/admin?period=${p}`}
                 aria-current={p === period ? "page" : undefined}
-                className={`min-h-11 rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium transition-colors duration-150 ${
+                className={`min-h-12 rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium transition-colors duration-150 ${
                   p === period
                     ? "bg-[var(--color-sage-600)] text-[var(--color-bone-50)]"
                     : "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)]"

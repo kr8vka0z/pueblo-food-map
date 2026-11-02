@@ -57,7 +57,7 @@ export async function POST(
 
   if (result.meta.changes === 0) {
     return NextResponse.json(
-      { ok: false, error: "stale", message: "This proposal is no longer current — it was already reviewed or superseded." },
+      { ok: false, error: "stale", handled: true, message: "This proposal is no longer current — it was already reviewed or superseded." },
       { status: 404 },
     );
   }

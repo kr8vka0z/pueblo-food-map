@@ -8,6 +8,7 @@
 
 import { NextResponse } from "next/server";
 import { bustEdgeCache } from "@/lib/edgeCache";
+import { auditInsertIfExistsSql } from "@/lib/auditLog";
 
 /** The public feed's path — every events write purges this edge-cache entry. */
 export const PUBLIC_EVENTS_PATH = "/api/public/events";
@@ -21,9 +22,10 @@ export const PUBLIC_EVENTS_PATH = "/api/public/events";
  * (migrations/0001), so a cancel is recorded as 'update' with the new
  * status in after_json.
  */
-export const EVENT_AUDIT_INSERT_SQL = `INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id)
-  SELECT ?, 'event', ?, ?, ?, ?, ?, ?
-  WHERE EXISTS (SELECT 1 FROM events WHERE id = ? AND updated_at = ?)`;
+export const EVENT_AUDIT_INSERT_SQL = auditInsertIfExistsSql(
+  "?, 'event', ?, ?, ?, ?, ?, ?",
+  "SELECT 1 FROM events WHERE id = ? AND updated_at = ?",
+);
 
 export function eventConflictResponse(): NextResponse {
   return NextResponse.json(

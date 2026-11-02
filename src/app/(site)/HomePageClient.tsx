@@ -70,7 +70,7 @@
  * unaffected — MapWrapper first mounts with `splashShown` already `false`.
  */
 
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { readSplashGate, markSplashSeen, resolveVenueId, shouldSkipSplash, type SplashViewport } from '@/lib/splashGate';
 // WHY a static import (mobile LCP): the splash's purpose line IS the LCP
@@ -84,6 +84,15 @@ import { readSplashGate, markSplashSeen, resolveVenueId, shouldSkipSplash, type 
 // visitors who skip the splash. MapWrapper stays dynamic: it is the heavy part.
 import SplashScreen from '@/components/SplashScreen';
 import type { LocationFailure } from '@/lib/useGeolocation';
+import MapScreenStandIn, { type StandInLabels } from '@/components/MapScreenStandIn';
+
+// What MapWrapper's `loading` placeholder shows (#730): the map-screen stand-in
+// for a visitor with no splash, nothing behind a splash. A context because
+// next/dynamic's `loading` takes no props of ours.
+const MapLoadingContext = createContext<ReactNode>(null);
+function MapLoading() {
+  return useContext(MapLoadingContext);
+}
 
 // WHY dynamic + ssr:false: MapWrapper pulls in vaul, Radix UI, geolocation
 // hooks, and all venue UI. None of it is needed during SSR (it only mounts
@@ -91,10 +100,15 @@ import type { LocationFailure } from '@/lib/useGeolocation';
 // the blocking JS window — the primary TBT lever for #202.
 const MapWrapper = dynamic(() => import('@/components/MapWrapper'), {
   ssr: false,
-  loading: () => null,
+  loading: MapLoading,
 });
 
-export default function HomePageClient() {
+/**
+ * `standInLabels` (#730), from the server shell (HomeShell), turns on the
+ * map-screen stand-in: in the server HTML for returning visitors (CSS-gated),
+ * then until MapWrapper mounts. Omitted → no stand-in (tests rendering this alone).
+ */
+export default function HomePageClient({ standInLabels }: { standInLabels?: StandInLabels }) {
   // null = not yet determined (localStorage/URL are unknown server-side). The
   // server and first client render both show the splash as `pending` and no
   // map; the layout effect then resolves the true value without a hydration
@@ -215,7 +229,11 @@ export default function HomePageClient() {
   }, []);
 
   return (
-    <>
+    <MapLoadingContext value={splashShown === false && standInLabels ? <MapScreenStandIn labels={standInLabels} /> : null}>
+      {/* Unresolved gate: the stand-in is in the server HTML, hidden by
+          globals.css unless SPLASH_GATE_SCRIPT marked this visitor as
+          skipping the splash. Once resolved, MapLoading above takes over. */}
+      {splashShown === null && standInLabels && <MapScreenStandIn labels={standInLabels} pending />}
       {/* Map mounts only once the gate resolves (never while null): useDeferredMapLoad
           treats a hold true→false edge as an immediate load trigger, so mounting
           it earlier would change when mapbox-gl loads for returning visitors. */}
@@ -254,6 +272,6 @@ export default function HomePageClient() {
           onTour={startTourFromSplash}
         />
       )}
-    </>
+    </MapLoadingContext>
   );
 }

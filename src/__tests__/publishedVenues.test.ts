@@ -13,7 +13,6 @@ import { describe, test, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { venues, categoryLabels, categoryColors } from "@/data/venues";
-import { pfpVenues } from "@/data/pfp-venues";
 import { publishedVenues, publishedAt } from "@/data/published-venues";
 import { serializePublishedVenuesFile } from "@/lib/publishVenues";
 import { groceryOsmVenues } from "@/data/grocery-osm";
@@ -60,8 +59,7 @@ describe("venues data-layer invariants", () => {
     );
   });
 
-  test("seed arrays total 106 records: 10 pfp + 60 osm + 36 plentiful", () => {
-    expect(pfpVenues).toHaveLength(10);
+  test("scraper seed arrays: 60 osm + 36 plentiful", () => {
     expect(groceryOsmVenues).toHaveLength(60);
     expect(plentifulPantries).toHaveLength(36);
   });

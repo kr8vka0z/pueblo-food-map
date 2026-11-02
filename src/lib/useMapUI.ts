@@ -3,8 +3,8 @@
 /**
  * useMapUI — UI and selection state for MapWrapper.
  *
- * Owns: selected venue, view mode, WebGL availability, desktop window
- * expanded state, bottom-sheet snap state, and the Mapbox map instance.
+ * Owns: selected venue, view mode, WebGL availability, and the Mapbox map
+ * instance.
  *
  * WHY separate from useMapFilters: UI/selection state doesn't participate
  * in the filter pipeline — separating the two halves makes MapWrapper's
@@ -82,9 +82,6 @@ export function useMapUI(initialEventId: string | null = null) {
     if (!mapUnavailable) setViewMode("map");
   }, [mapUnavailable]);
 
-  // ── Desktop window expanded state (PR 5) ───────────────────────────────────
-  const [windowExpanded, setWindowExpanded] = useState(false);
-
   // ── Map instance — passed up from Map via onMapReady ───────────────────────
   // Typed as mapboxgl.Map; MapWrapper uses it for flyTo/fitBounds calls.
   const [mapboxMap, setMapboxMap] = useState<mapboxgl.Map | null>(null);
@@ -101,8 +98,6 @@ export function useMapUI(initialEventId: string | null = null) {
     mapUnavailableReason,
     handleMapError,
     showVenueOnMap,
-    windowExpanded,
-    setWindowExpanded,
     mapboxMap,
     setMapboxMap,
   };

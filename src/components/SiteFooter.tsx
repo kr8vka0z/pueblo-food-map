@@ -99,6 +99,11 @@ export default function SiteFooter() {
         >
           {t("footer.suggest", locale)}
         </Link>
+        {/* Roadmap (#846): served by a separate Worker, so a plain <a> (no
+            client routing) and the same /roadmap path in both languages. */}
+        <a href="/roadmap" className={LINK_CLASS}>
+          {t("footer.roadmap", locale)}
+        </a>
         {/* ODbL attribution (#133 4.5) — this footer covers /venues, /about
             and every other SiteFooter page that lists venue data without
             Mapbox's own AttributionControl. Same 48px row as the links above

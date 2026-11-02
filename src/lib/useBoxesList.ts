@@ -6,7 +6,8 @@
  * plain Venue shape. Consumers: MapWrapper.tsx (the open box card needs the
  * full PublicBlessingBox — status, lastFilledAt, mostNeeded, recentCheckins,
  * host note — and the pin/filter pipeline gets `boxes.map(toVenue)` from the
- * same single fetch) and BoxesActivityContent.tsx (its box filter dropdown).
+ * same single fetch), BoxesActivityContent.tsx (its box filter dropdown) and
+ * PageNav.tsx (saved boxes in the Saved list off the map, #721).
  *
  * WHY a client fetch rather than baking boxes into venues.ts's build-time
  * snapshot: boxes are live, not published (Build Plan architecture call #1)
@@ -45,11 +46,17 @@ export interface UseBoxesListResult {
   loading: boolean;
 }
 
-export function useBoxesList(): UseBoxesListResult {
+/**
+ * `enabled` (default true) holds the fetch back until a caller actually needs
+ * boxes — PageNav (#721) passes false until its Saved list first opens, so a
+ * content page that never shows Saved never asks for the box layer.
+ */
+export function useBoxesList(enabled = true): UseBoxesListResult {
   const [boxes, setBoxes] = useState<PublicBlessingBox[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
 
     fetch("/api/public/blessing-boxes")
@@ -71,7 +78,7 @@ export function useBoxesList(): UseBoxesListResult {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enabled]);
 
   return { boxes, loading };
 }

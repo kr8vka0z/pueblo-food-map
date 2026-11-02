@@ -21,6 +21,7 @@ import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import BottomSheet from "@/components/BottomSheet";
 import type { Venue } from "@/types/venue";
+import { makeWalk } from "@/__tests__/helpers/walkTestHelpers";
 
 // ─── Mock vaul, capturing the props BottomSheet passes to Drawer.Root ────────
 // so tests can assert on the contract and simulate vaul calling back into
@@ -116,10 +117,7 @@ describe("BottomSheet — route active, mounts straight to the strip", () => {
       <BottomSheet
         venue={makeVenue()}
         onClose={() => {}}
-        onWalkRoute={vi.fn()}
-        isWalkRouteActive
-        walkRouteInfo={{ distance: "0.4", duration: "8 min" }}
-        onClearWalkRoute={vi.fn()}
+        walk={makeWalk({ onWalk: vi.fn(), isActive: true, info: { distance: "0.4", duration: "8 min" }, onClear: vi.fn() })}
       />,
     );
     expect(rootPropsHolder.dismissible).toBe(false);
@@ -141,10 +139,7 @@ describe("BottomSheet — route active, mounts straight to the strip", () => {
       <BottomSheet
         venue={makeVenue()}
         onClose={() => {}}
-        onWalkRoute={vi.fn()}
-        isWalkRouteActive
-        walkRouteInfo={{ distance: "0.4", duration: "8 min" }}
-        onClearWalkRoute={vi.fn()}
+        walk={makeWalk({ onWalk: vi.fn(), isActive: true, info: { distance: "0.4", duration: "8 min" }, onClear: vi.fn() })}
       />,
     );
     await user.click(screen.getByTestId("route-strip-show-card"));
@@ -160,10 +155,7 @@ describe("BottomSheet — route active, mounts straight to the strip", () => {
       <BottomSheet
         venue={makeVenue()}
         onClose={onClose}
-        onWalkRoute={vi.fn()}
-        isWalkRouteActive
-        walkRouteInfo={{ distance: "0.4", duration: "8 min" }}
-        onClearWalkRoute={vi.fn()}
+        walk={makeWalk({ onWalk: vi.fn(), isActive: true, info: { distance: "0.4", duration: "8 min" }, onClear: vi.fn() })}
       />,
     );
     await user.click(screen.getByTestId("route-strip-show-card"));
@@ -186,10 +178,7 @@ describe("BottomSheet — route active, mounts straight to the strip", () => {
       <BottomSheet
         venue={makeVenue()}
         onClose={() => {}}
-        onWalkRoute={vi.fn()}
-        isWalkRouteActive
-        walkRouteInfo={{ distance: "0.4", duration: "8 min" }}
-        onClearWalkRoute={onClearWalkRoute}
+        walk={makeWalk({ onWalk: vi.fn(), isActive: true, info: { distance: "0.4", duration: "8 min" }, onClear: onClearWalkRoute })}
       />,
     );
     await user.click(screen.getByTestId("route-strip-clear"));
@@ -203,10 +192,7 @@ describe("BottomSheet — route active, mounts straight to the strip", () => {
       <BottomSheet
         venue={makeVenue()}
         onClose={onClose}
-        onWalkRoute={vi.fn()}
-        isWalkRouteActive
-        walkRouteInfo={{ distance: "0.4", duration: "8 min" }}
-        onClearWalkRoute={vi.fn()}
+        walk={makeWalk({ onWalk: vi.fn(), isActive: true, info: { distance: "0.4", duration: "8 min" }, onClear: vi.fn() })}
       />,
     );
     await user.click(screen.getByTestId("route-strip-show-card"));
@@ -225,10 +211,7 @@ describe("BottomSheet — route active, mounts straight to the strip", () => {
       <BottomSheet
         venue={makeVenue()}
         onClose={onClose}
-        onWalkRoute={vi.fn()}
-        isWalkRouteActive
-        walkRouteInfo={{ distance: "0.4", duration: "8 min" }}
-        onClearWalkRoute={vi.fn()}
+        walk={makeWalk({ onWalk: vi.fn(), isActive: true, info: { distance: "0.4", duration: "8 min" }, onClear: vi.fn() })}
       />,
     );
     await user.click(screen.getByTestId("route-strip-show-card"));

@@ -216,7 +216,7 @@ describe("buildWalkingRouteUrl — URL params (#134 enhancement)", () => {
 
 // ─── parseWalkSteps — step parsing edge cases (FIX 3) ────────────────────────
 //
-// parseWalkSteps is extracted from the handleWalkRoute async callback so the
+// parseWalkSteps is extracted from the walking-route fetch (useWalkingRoute's fetchRoute) so the
 // parse logic can be unit-tested without mounting MapWrapper (WebGL required).
 // Tests cover the highest-risk paths: malformed API responses that would
 // previously throw → be caught → silently discard the entire route.
@@ -331,12 +331,12 @@ describe("parseWalkSteps — step parsing edge cases (FIX 3)", () => {
 
 // ─── Race guard — monotonic seq logic (#208 hardening) ───────────────────────
 //
-// handleWalkRoute in MapWrapper.tsx uses a monotonic sequence counter
-// (walkReqSeq ref) instead of keying on venue.id. This describe block
+// useWalkingRoute's fetchRoute uses a monotonic sequence counter
+// (reqSeq ref) instead of keying on venue.id. This describe block
 // exercises the guard semantics as a pure behavioral simulation — no
 // MapWrapper mount needed (WebGL unavailable in jsdom).
 //
-// The simulation recreates the closure pattern from handleWalkRoute:
+// The simulation recreates the closure pattern from fetchRoute:
 //   seq = ++counter.current     // mint token at fetch start
 //   await fetch(...)            // yield — other taps may increment counter
 //   if (counter.current !== seq) return;  // bail if superseded
@@ -346,7 +346,7 @@ describe("parseWalkSteps — step parsing edge cases (FIX 3)", () => {
 //   Gap 1: same-venue double-tap (old venue.id guard would let both through).
 //   Gap 2: A→B switch while A's fetch pending (seq guard + render-gate).
 //
-// NOTE: The render-gate (walkingRouteVenueId === selectedVenueId ? route : null)
+// NOTE: The render-gate (routeVenueId === selectedVenueId ? route : null)
 // is a JSX prop expression; it cannot be directly exercised without mounting
 // MapWrapper (WebGL). It is covered by the behavioral description in the final
 // two tests, which verify that the seq guard drops superseded responses before
@@ -354,8 +354,8 @@ describe("parseWalkSteps — step parsing edge cases (FIX 3)", () => {
 
 describe("Race guard — monotonic seq counter (#208 hardening)", () => {
   /**
-   * Minimal simulation of the walkReqSeq guard pattern.
-   * Returns a factory that mimics the async closure in handleWalkRoute.
+   * Minimal simulation of the reqSeq guard pattern.
+   * Returns a factory that mimics the async closure in fetchRoute.
    */
   function makeGuardedFetch(counter: { current: number }) {
     return async function fetchAndCommit(
@@ -443,7 +443,7 @@ describe("Race guard — monotonic seq counter (#208 hardening)", () => {
   });
 
   test("seq NOT bumped in selection-change path: new fetch for new venue proceeds", async () => {
-    // WHY: the selectedVenueId-change effect does NOT bump walkReqSeq (by design).
+    // WHY: the selectedVenueId-change effect does NOT bump reqSeq (by design).
     // This test verifies that a fetch started for a new venue (after a selection
     // switch) is NOT prematurely discarded by the guard.
     const counter = { current: 0 };

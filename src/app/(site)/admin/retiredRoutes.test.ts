@@ -1,23 +1,22 @@
 /**
  * Retired admin routes — redirect regression tests. Each of these pages used
- * to render its own review queue; the queue was folded into a tab, and the
- * page became a one-line Server Component `redirect()` so old links still
- * land on the right filter:
+ * to render its own review queue; the queue was folded into a tab, and old
+ * links must still land on the right filter:
  *   /admin/flags         (#674, Data refresh tab → Places)
  *   /admin/submissions   (#675, public Review queue → Places)
  *   /admin/box-photos    (#677, Photo review → Blessing Boxes)
  *   /admin/box-adopters  (#677, Sponsor requests → Blessing Boxes)
- * /admin/flags also still serves the links in refresh-alert emails sent
- * before the alert link moved to /admin/places?show=review; those emails
- * still sit in inboxes. See each page.tsx's own header for why it is a
- * redirect and not a 404.
+ * /admin/flags is a one-line Server Component `redirect()` page (it still
+ * serves the links in refresh-alert emails; see its header). The other three
+ * are plain-path `redirects()` entries in next.config.ts (#724).
  *
  * next/navigation's real `redirect()` throws internally to unwind to Next's
- * router; it is mocked to throw too, so each case asserts the redirect fired
- * with the right target without a real Next router.
+ * router; it is mocked to throw too, so the page case asserts the redirect
+ * fired with the right target without a real Next router.
  */
 
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+import nextConfig from "../../../../next.config";
 
 const mockRedirect = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -28,19 +27,21 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("retired admin routes redirect to their new home", () => {
-  beforeEach(() => {
-    mockRedirect.mockClear();
+  test("/admin/flags calls redirect('/admin/places?show=review')", async () => {
+    const { default: Page } = await import("@/app/(site)/admin/flags/page");
+    expect(() => Page()).toThrow("REDIRECT_CALLED");
+    expect(mockRedirect).toHaveBeenCalledTimes(1);
+    expect(mockRedirect).toHaveBeenCalledWith("/admin/places?show=review");
   });
 
   test.each([
-    { route: "/admin/flags", load: () => import("@/app/(site)/admin/flags/page"), target: "/admin/places?show=review" },
-    { route: "/admin/submissions", load: () => import("@/app/(site)/admin/submissions/page"), target: "/admin/places?show=review&from=public" },
-    { route: "/admin/box-photos", load: () => import("@/app/(site)/admin/box-photos/page"), target: "/admin/boxes?show=review" },
-    { route: "/admin/box-adopters", load: () => import("@/app/(site)/admin/box-adopters/page"), target: "/admin/boxes?show=review" },
-  ])("$route calls redirect('$target')", async ({ load, target }) => {
-    const { default: Page } = await load();
-    expect(() => Page()).toThrow("REDIRECT_CALLED");
-    expect(mockRedirect).toHaveBeenCalledTimes(1);
-    expect(mockRedirect).toHaveBeenCalledWith(target);
+    { source: "/admin/submissions", destination: "/admin/places?show=review&from=public" },
+    { source: "/admin/box-photos", destination: "/admin/boxes?show=review" },
+    { source: "/admin/box-adopters", destination: "/admin/boxes?show=review" },
+  ])("$source redirects to $destination", async ({ source, destination }) => {
+    const rules = (await nextConfig.redirects?.()) ?? [];
+    expect(rules.filter((r) => r.source === source)).toEqual([
+      { source, destination, permanent: false },
+    ]);
   });
 });

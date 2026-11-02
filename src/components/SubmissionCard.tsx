@@ -39,7 +39,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { categoryLabels } from "@/data/venues";
+import { categoryLabels } from "@/lib/categories";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import type { VenueCategory } from "@/types/venue";
 import type { ClosurePayload, NewVenuePayload, ReviewSubmission } from "@/lib/publicSubmissions";

@@ -402,6 +402,21 @@ export function buildVenueSummary(
 }
 
 /**
+ * The on-page summary paragraph in BOTH languages, joined, for the venue
+ * pages to hand to VenueContent (#721). Built on the server so the venue
+ * page's browser code carries no summary or schema helpers (venueSchema.ts
+ * imports the whole venue list); both languages because the
+ * EN tree's language toggle switches the page in place without a request.
+ * includeAddress: false — see VenueContent's summary paragraph.
+ */
+export function buildVenueSummaries(venue: Venue): Record<Locale, string> {
+  return {
+    en: buildVenueSummary(venue, "en", { includeAddress: false }).join(" "),
+    es: buildVenueSummary(venue, "es", { includeAddress: false }).join(" "),
+  };
+}
+
+/**
  * The meta description / JSON-LD description budget: whole sentences only,
  * accumulated while the running total stays ≤ maxLen (issue #704: "cut at a
  * sentence boundary" — never mid-sentence). A sentence that doesn't fit is

@@ -133,6 +133,13 @@
         "redact_query_string": true,
         "logs": { "invocation_logs": false }
       },
+      // #773: deploy-dev.yml's smoke check needs an origin outside the zone,
+      // the way prod's uses pueblo-food-map.kyle-boyd.workers.dev. Bot Fight
+      // Mode (Free plan, no WAF skip) answers 403 to GitHub runners at
+      // dev.pueblofoodmap.com. With `routes` set, wrangler defaults this to
+      // false and turns workers.dev (and preview URLs) off on every deploy.
+      // The extra host is noindexed by custom-worker.ts (indexingHost.ts).
+      "workers_dev": true,
       "routes": [
         // Admin serves at /admin on this same apex host — gated by Better
         // Auth alone (email code + passkey; Cloudflare Access has been fully

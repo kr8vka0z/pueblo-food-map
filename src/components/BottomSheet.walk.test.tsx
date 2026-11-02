@@ -6,10 +6,9 @@
  * badge, hours/notes suppression, History link, Share isBox) is unaffected
  * by this wiring addition.
  *
- * Covers only the wiring BottomSheet itself owns: forwarding onWalkRoute/
- * isWalkRouteActive/onClearWalkRoute/walkRouteInfo/walkRouteSteps/
- * showWalkLocationHint into BoxCardBody, and binding onWalkRoute to the box
- * (not the plain Venue) as its callback target. BoxCardBody's own render
+ * Covers only the wiring BottomSheet itself owns: forwarding the `walk`
+ * object into BoxCardBody, which calls `walk.onWalk` with the box (not the
+ * plain Venue) as its target. BoxCardBody's own render
  * logic (button vs link, the readout) is covered by BoxCardBody.walk.test.tsx.
  */
 
@@ -19,6 +18,8 @@ import userEvent from "@testing-library/user-event";
 import BottomSheet from "@/components/BottomSheet";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
+import { waitForBoxCard } from "@/lib/testing/waitForBoxCard.testutil";
+import { makeWalk } from "@/__tests__/helpers/walkTestHelpers";
 
 const mockTurnstile = {
   render: vi.fn((_container: HTMLElement, opts: { callback?: (t: string) => void }) => {
@@ -105,15 +106,17 @@ describe("BottomSheet — forwards walk props into BoxCardBody", () => {
     const onWalkRoute = vi.fn();
     const box = makeBox();
     render(
-      <BottomSheet venue={makeBoxVenue()} box={box} onClose={() => {}} onWalkRoute={onWalkRoute} />,
+      <BottomSheet venue={makeBoxVenue()} box={box} onClose={() => {}} walk={makeWalk({ onWalk: onWalkRoute })} />,
     );
+    await waitForBoxCard();
     await user.click(screen.getByText("123 Test St, Pueblo, CO"));
     expect(onWalkRoute).toHaveBeenCalledTimes(1);
     expect(onWalkRoute).toHaveBeenCalledWith(box);
   });
 
-  test("no onWalkRoute prop -> address stays a plain link (unchanged pre-restore behavior)", () => {
+  test("no onWalkRoute prop -> address stays a plain link (unchanged pre-restore behavior)", async () => {
     render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={() => {}} />);
+    await waitForBoxCard();
     const trigger = screen.getByText("123 Test St, Pueblo, CO");
     expect(trigger.tagName).toBe("A");
   });
@@ -131,9 +134,7 @@ describe("BottomSheet — forwards walk props into BoxCardBody", () => {
         venue={makeBoxVenue()}
         box={makeBox()}
         onClose={() => {}}
-        onWalkRoute={vi.fn()}
-        isWalkRouteActive
-        walkRouteInfo={{ distance: "0.4", duration: "8 min" }}
+        walk={makeWalk({ onWalk: vi.fn(), isActive: true, info: { distance: "0.4", duration: "8 min" } })}
       />,
     );
     expect(screen.getByTestId("route-strip")).toBeDefined();
@@ -149,12 +150,11 @@ describe("BottomSheet — forwards walk props into BoxCardBody", () => {
         venue={makeBoxVenue()}
         box={makeBox()}
         onClose={() => {}}
-        onWalkRoute={vi.fn()}
-        isWalkRouteActive
-        walkRouteInfo={{ distance: "0.4", duration: "8 min" }}
+        walk={makeWalk({ onWalk: vi.fn(), isActive: true, info: { distance: "0.4", duration: "8 min" } })}
       />,
     );
     await user.click(screen.getByTestId("route-strip-show-card"));
+    await waitForBoxCard();
     expect(screen.queryByTestId("route-strip")).toBeNull();
     expect(screen.getByTestId("walking-route-info")).toBeDefined();
   });

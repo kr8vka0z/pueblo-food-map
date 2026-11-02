@@ -72,8 +72,8 @@ export default function Wordmark({ size = 'xl', className = '', onClick, locale:
           ...(selfPositioned ? ['absolute top-4 left-4'] : []),
           // Visual — pill bg matching other map controls
           'bg-white/90 backdrop-blur-sm rounded-xl shadow-sm',
-          // Mobile: min 44×44px tap target
-          'min-h-[44px] min-w-[44px] px-3 py-2',
+          // 48×48 tap floor (DESIGN.md)
+          'min-h-12 min-w-12 px-3 py-2',
           // Typography size for map context (sole font-size declaration on this element)
           'text-sm md:text-base',
           // Interactive states

@@ -175,7 +175,7 @@ export function reviewItemKey(item: ReviewItem): string {
 // `status` is intentionally absent from both the column list and the bound
 // values below — the schema's own DEFAULT 'pending' applies (matches this
 // app's established convention of letting D1 DEFAULTs fill columns the
-// route never sets, e.g. venues.created_at in scripts/seed-admin-db.ts).
+// route never sets, e.g. venues.created_at).
 const INSERT_SQL =
   "INSERT INTO public_submissions (kind, payload, target_venue_id, submitter_email) VALUES (?, ?, ?, ?)";
 

@@ -49,11 +49,14 @@ export interface LatLng {
  * existing garden/edible_landscape rows today), so no category-specific
  * branch was needed anywhere in this file. Defaults to [] so every existing
  * caller/test keeps working unchanged.
+ *
+ * `initialQuery` (#730): text typed into the map-screen stand-in before
+ * MapWrapper loaded, so the first render already searches on it.
  */
-export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
+export function useMapFilters(origin: LatLng, extraVenues: Venue[] = [], initialQuery = "") {
   const combinedVenues = useMemo(() => [...allVenues, ...extraVenues], [extraVenues]);
   // ── Filter state ────────────────────────────────────────────────────────────
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [selectedCategories, setSelectedCategories] =
     useState<Set<VenueCategory> | null>(null);
   const [filterOpenNow, setFilterOpenNow] = useState(false);

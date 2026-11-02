@@ -118,13 +118,13 @@ export default function LocationHelpCard({
         "px-4 pt-4 pb-3.5 elevation-2"
       }
     >
-      {/* Close X — top-right, 44×44 hit area */}
+      {/* Close X — top-right, 48×48 hit area (same centre as the old 44 at 2px in) */}
       <button
         type="button"
         onClick={onDismiss}
         aria-label={t("detail.close", locale)}
         className={
-          "absolute top-[2px] right-[2px] w-11 h-11 " +
+          "absolute top-0 right-0 w-12 h-12 " +
           "flex items-center justify-center rounded-full " +
           "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-200)] " +
           "transition-colors duration-150 " +

@@ -1,0 +1,5 @@
+# Deploy smoke tests
+
+Moved verbatim from AGENTS.md, section Hosting and deploys.
+
+`deploy-prod.yml` smoke-tests `/`, `/venues`, one `/venue/<id>`, `/es`, `/es/venues`, one `/es/venue/<id>`, the four SEO hubs (`/food-pantries`, `/snap-wic-stores`, `/community-gardens`, `/blessing-boxes`) and their `/es` twins, `/sitemap.xml`, `/robots.txt` and `/llms.txt` (200), the `/es` pages for `<html lang="es">` in the response body, an unmatched URL and an unknown `/event/<id>` and `/es/event/<id>` (all 404, so a missing `events` table can never surface as a 500), and the noindex header policy after each deploy. `deploy-dev.yml` smoke-tests staging the same way (`/`, `/venues`, one `/venue/<id>`, `/es`, `/es/venues`, one `/es/venue/<id>`, `/report/<id>`, `/sitemap.xml` at 200; unmatched page, venue and event URLs at 404; `<html lang="es">`), so a broken staging deploy turns its run red. Both smoke tests call the Worker's workers.dev origin (staging: https://pueblo-food-map-staging.kyle-boyd.workers.dev, kept on by `env.staging` `workers_dev: true`), never the zone host: Bot Fight Mode answers 403 to GitHub runners there (Free plan, no WAF skip, #773).

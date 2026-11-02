@@ -28,6 +28,7 @@ import userEvent from "@testing-library/user-event";
 import BottomSheet from "@/components/BottomSheet";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
+import { waitForBoxCard } from "@/lib/testing/waitForBoxCard.testutil";
 
 // jsdom shims required by vaul (same as src/__tests__/OperatorAttribution.test.tsx,
 // the repo's existing precedent for exercising a REAL vaul Drawer): vaul's
@@ -114,6 +115,7 @@ describe("BottomSheet (real vaul) — Escape closes only the open PhotoViewer, n
     const onClose = vi.fn();
     const user = userEvent.setup();
     render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={onClose} locale="en" />);
+    await waitForBoxCard();
 
     await user.click(screen.getByRole("button", { name: "View photo full size" }));
     const photoDialog = screen.getByRole("dialog", { name: /photo of test blessing box/i }) as HTMLDialogElement;
@@ -129,6 +131,7 @@ describe("BottomSheet (real vaul) — Escape closes only the open PhotoViewer, n
     const onClose = vi.fn();
     const user = userEvent.setup();
     render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={onClose} locale="en" />);
+    await waitForBoxCard();
     screen.getByRole("button", { name: "View photo full size" }).focus();
     await user.keyboard("{Escape}");
     await waitFor(() => expect(onClose).toHaveBeenCalled());

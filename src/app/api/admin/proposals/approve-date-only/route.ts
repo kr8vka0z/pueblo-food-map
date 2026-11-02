@@ -34,8 +34,8 @@
  * client's claim.** status must be 'pending', change_type must be 'update',
  * fields_changed must be EXACTLY `["last_verified"]`, and source must be
  * 'osm' or 'plentiful' — `link_health` (routed to the venue edit screen
- * instead — see applyApprovedProposal's own header) and 'gtfs' can never
- * qualify, and neither can an 'add'/'remove' proposal, which is why
+ * instead — see applyApprovedProposal's own header) can never qualify,
+ * and neither can an 'add'/'remove' proposal, which is why
  * isDateOnlyUpdateProposal's own change_type check exists at all even
  * though the pipeline never emits a freshness-only add/remove today. Every
  * approved id still goes through applyApprovedProposal() — the SAME engine

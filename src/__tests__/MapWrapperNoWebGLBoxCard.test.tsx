@@ -31,15 +31,22 @@ vi.mock("next/navigation", () => ({
 // Mock WebGL as unavailable — same convention as MapWrapperFallback.test.tsx.
 vi.mock("@/lib/webgl", () => ({ isWebGLAvailable: () => false }));
 
-vi.mock("next/dynamic", () => ({
-  default: () => {
-    function DummyDynamic() {
-      return null;
-    }
-    DummyDynamic.displayName = "DummyDynamic";
-    return DummyDynamic;
-  },
-}));
+// #721: BottomSheet now loads BoxCardBody through dynamic() too, and the box
+// card is the thing under test here, so that one loader gets the real
+// component (imported up front); every other dynamic() still renders nothing.
+vi.mock("next/dynamic", async () => {
+  const { default: BoxCardBody } = await import("@/components/BoxCardBody");
+  return {
+    default: (loader: () => unknown) => {
+      if (String(loader).includes("BoxCardBody")) return BoxCardBody;
+      function DummyDynamic() {
+        return null;
+      }
+      DummyDynamic.displayName = "DummyDynamic";
+      return DummyDynamic;
+    },
+  };
+});
 
 // Desktop-only component — unused on the mobile layout this file tests, but
 // still imported by MapWrapper.tsx, so mock it the same way every other

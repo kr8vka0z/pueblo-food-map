@@ -1,12 +1,14 @@
 /**
- * emailSend.ts — shared Resend HTTP + single-language-email-composition
- * helpers for the adopt-a-box and email-alert flows (Blessing Boxes slice 6).
+ * emailSend.ts — the one Resend sender (sendResendEmail / sendResendBatch)
+ * every email in this app goes through, plus the single-language
+ * composition helpers for the adopt-a-box and email-alert flows (Blessing
+ * Boxes slice 6).
  *
- * WHY this exists: the report/suggest/feedback forms each send a one-off
- * inline `fetch()` of TEXT-ONLY mail to a single internal admin address; the
- * Blessing Box admin notices (problem report, new/flagged photo, confirmed
- * adoption) send the same kind of mail through sendAdminNotice below. This
- * slice is the first to (a) send HTML mail to real site
+ * WHY this exists: the report/suggest/feedback forms, the refresh alerts
+ * and the admin sign-in code send TEXT-ONLY (or fixed-HTML) mail to one
+ * address; the Blessing Box admin notices (problem report, new/flagged
+ * photo, confirmed adoption) send the same kind of mail through
+ * sendAdminNotice below. Slice 6 was the first to (a) send HTML mail to real site
  * visitors, (b) need the identical composition (in the recipient's OWN
  * language — see composeEmail's own header) across six different email
  * kinds (adopt confirm, adoption-approved, giver confirm, host welcome, and
@@ -73,10 +75,12 @@ function htmlParagraph(line: string): string {
 }
 
 export interface OutboundEmail {
+  /** Defaults to "Pueblo Food Map <noreply@pueblofoodmap.com>"; the admin sign-in code uses its own "… Admin" name. */
+  from?: string;
   to: string;
   subject: string;
   text: string;
-  /** Omitted only by sendAdminNotice: the internal admin notices are text-only, so the user free text in them (problem note, applicant name/note) never goes into HTML. Every email to a member of the public sets it, via composeEmail. JSON.stringify drops an undefined value, so no `html` key is sent at all. */
+  /** Omitted by every internal, text-only email (sendAdminNotice, the feedback/report/suggest form mails, the refresh alerts), so the visitor free text in them never goes into HTML. Every email to a member of the public sets it, via composeEmail. JSON.stringify drops an undefined value, so no `html` key is sent at all. */
   html?: string;
   /** RFC 8058 one-click unsubscribe headers — see unsubscribeHeaders() below. Every email this slice sends to a real subscriber carries these; the internal admin notices (sendAdminNotice) do not. */
   headers?: Record<string, string>;
@@ -116,16 +120,22 @@ export function unsubscribeHeaders(stopApiUrl: string): Record<string, string> {
   };
 }
 
-/** Sends one email. Throws on a non-OK Resend response or a missing key — callers decide whether that's fatal (adopt/giver confirm, where the email IS the point of the request) or best-effort (welcome mail, admin notices). */
-export async function sendResendEmail(email: OutboundEmail): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
+/**
+ * Sends one email — every single email this app sends goes through here.
+ * Throws on a non-OK Resend response or a missing key — callers decide
+ * whether that's fatal (adopt/giver confirm, where the email IS the point of
+ * the request) or best-effort (welcome mail, admin notices). `apiKey` is
+ * passed only from scheduled() code (refreshAlerts.ts), which reads the
+ * Cloudflare env binding rather than process.env.
+ */
+export async function sendResendEmail(email: OutboundEmail, apiKey = process.env.RESEND_API_KEY): Promise<void> {
   if (!apiKey) throw new Error("RESEND_API_KEY not configured");
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      from: FROM,
+      from: email.from ?? FROM,
       to: [email.to],
       subject: email.subject,
       text: email.text,

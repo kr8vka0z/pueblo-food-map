@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * prepare.mjs — weekly release prep: pick the next version, bump it, and write
+ * prepare.mjs — release prep: pick the next version, bump it, and write
  * the merged-PR list the changelog writer (Claude in release.yml, or a human)
  * turns into the CHANGELOG.md section.
  *
@@ -9,9 +9,10 @@
  * Exit codes: 0 ok, 3 nothing to release (no new PRs since the last release).
  *
  * Which PRs count as "since the last release": releases reach `main` as SQUASH
- * commits, so the `v*` tag does not bring dev's old commits with it. The
- * release workflow therefore tags the dev commit it cut from as `cut/vX.Y.Z`;
- * the PR list starts at the newest `cut/*` tag reachable from --ref. With none
+ * commits, so the `v*` tag does not bring dev's old commits with it. After a
+ * good deploy, deploy-prod.yml therefore tags the dev commit that went live as
+ * `cut/vX.Y.Z`, so a cut that never merged stays in the next list. The
+ * PR list starts at the newest `cut/*` tag reachable from --ref. With none
  * (the very first run, or a hotfix branch, which comes from main and never
  * has cut tags) it falls back to the newest `v*` tag, which is an ancestor of
  * dev/hotfix once main has been synced into dev. The newest `v*` tag also

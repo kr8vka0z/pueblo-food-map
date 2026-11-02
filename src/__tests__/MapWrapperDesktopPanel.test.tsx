@@ -356,7 +356,7 @@ describe("MapWrapper desktop side panel — Saved/Menu views (#682 8b)", () => {
   });
 
   // PR #688 review, Important item 1: closeDesktopPanel used to clear
-  // selectedVenueId/windowExpanded unconditionally, including the "← Saved"
+  // selectedVenueId unconditionally, including the "← Saved"
   // branch — deselecting the pin (and dropping any walking route) just from
   // navigating back to the list. Proxy for "is this venue still selected":
   // VenueMarker renders a sage (#4A8466) ring <circle> around the pin ONLY

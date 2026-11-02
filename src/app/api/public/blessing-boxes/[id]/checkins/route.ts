@@ -83,7 +83,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
-import { resolveBoxTurnstileKey, verifyBoxTurnstile } from "@/lib/boxTurnstile";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { computeNeedsToken } from "@/lib/boxNeedsToken";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
@@ -99,7 +98,7 @@ import {
 } from "@/lib/blessingBoxes";
 import { notifyBoxAlerts } from "@/lib/boxAlerts";
 import { resolveEmailOrigin } from "@/lib/alertOrigin";
-import { requestIp } from "@/lib/publicRequest";
+import { parsePublicPost } from "@/lib/publicRequest";
 import { sendAdminNotice } from "@/lib/emailSend";
 
 export const dynamic = "force-dynamic";
@@ -163,58 +162,11 @@ export async function POST(
 ): Promise<NextResponse> {
   const { id: boxId } = await params;
 
-  const ct = req.headers.get("content-type") ?? "";
-  if (!ct.includes("application/json")) {
-    return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
-  }
-
-  let body: CheckinPayload;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
-  }
-
-  // IP is used ONLY for Turnstile's optional remoteip validation — never
-  // stored, never used as a rate-limit key (see checkinRateLimit.ts header).
-  const ip = requestIp(req);
-
-  // Which secret to verify against depends on which widget produced the
-  // token (2026-09-18 follow-up — the client can now fall back to the
-  // shared managed-mode widget when its own invisible check doubts a
-  // visitor; see BoxCheckinPanel.tsx's own header, "Fallback to a visible
-  // checkbox"). "fallback" -> the ordinary managed-mode secret every other
-  // public form already verifies against (TURNSTILE_SECRET_KEY — already
-  // set on both the dev and prod Workers, no new secret needed for this).
-  // Anything else, including missing/mistyped -> the dedicated invisible-mode
-  // secret this route has always used (TURNSTILE_BOX_SECRET_KEY) — the
-  // ORIGINAL flow stays the strict default, never silently upgraded.
-  const turnstileKey = resolveBoxTurnstileKey(body.turnstileKey);
-  // Dedicated secret for rate-limit key derivation — deliberately NOT
-  // whichever Turnstile secret verifyBoxTurnstile() picks (2026-09-17
-  // review correction; see checkinRateLimit.ts's header for why sharing the
-  // two would let a Turnstile-only rotation silently reset every open
-  // rate-limit bucket).
-  const checkinRateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
-  if (!checkinRateLimitSecret) {
-    throw new Error("CHECKIN_RATE_LIMIT_SECRET not configured");
-  }
-  const turnstileValid = await verifyBoxTurnstile(body.turnstileToken, turnstileKey, ip);
-  if (!turnstileValid) {
-    logFormFailure("checkin", "turnstile_failed");
-    return NextResponse.json({ ok: false, error: "turnstile_failed" }, { status: 400 });
-  }
-
-  if (body.website && body.website.trim() !== "") {
-    return NextResponse.json({ ok: true }); // bots think it worked
-  }
-
-  let db: D1Database;
-  try {
-    ({ env: { ADMIN_DB: db } } = getCloudflareContext());
-  } catch {
-    return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
-  }
+  // Content-Type, JSON, Turnstile (box key or its fallback), honeypot, D1 and
+  // the rate-limit secret — shared with the form routes (src/lib/publicRequest.ts).
+  const pre = await parsePublicPost<CheckinPayload>(req, "checkin", "box");
+  if (pre instanceof NextResponse) return pre;
+  const { body, db, rateLimitSecret: checkinRateLimitSecret } = pre;
 
   // Visitor cap FIRST, box cap second (2026-09-17 review correction — this
   // used to run box-then-visitor). See this file's header "WHY the visitor

@@ -800,12 +800,19 @@ function diffLocation(loc: CasLocation, rows: CasSchedule[], current: CurrentVen
       const irregular = canonicalIrregular(conv.hours_irregular);
       const curWeekly = canonicalWeekly(current.hours_weekly);
       const curIrregular = canonicalIrregular(current.hours_irregular);
-      if (weekly !== curWeekly) {
-        before.hours_weekly = curWeekly;
+      // Only a kind of schedule the listing actually has: a weekly-only
+      // listing says nothing about our monthly special (and vice versa), and
+      // proposing the other as "" stored invalid JSON that blocked Publish.
+      // `before` is the value AS STORED, because approve's stale check
+      // compares it to the row as-is; a canonical "13:00-15:00" against a
+      // stored "1:00 PM - 3:00 PM" read as stale (409). Both found in review
+      // of PR #845.
+      if (weekly && weekly !== curWeekly) {
+        before.hours_weekly = current.hours_weekly;
         after.hours_weekly = weekly;
       }
-      if (irregular !== curIrregular) {
-        before.hours_irregular = curIrregular;
+      if (irregular && irregular !== curIrregular) {
+        before.hours_irregular = current.hours_irregular;
         after.hours_irregular = irregular;
       }
     }

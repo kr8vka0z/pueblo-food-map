@@ -175,13 +175,13 @@ describe("Wordmark — map-reset button mode (onClick provided)", () => {
     expect(button?.style.zIndex).toBe("1000");
   });
 
-  test("button meets min-h-[44px] requirement (Tailwind class present)", () => {
+  test("button meets the 48px tap floor (Tailwind class present)", () => {
     const onClick = vi.fn();
     const { container } = render(<Wordmark onClick={onClick} />);
     const button = container.querySelector("button");
     // Verify the Tailwind min-height class is applied (CSS is not computed in jsdom,
     // but we verify the class is present so the browser will enforce the constraint)
-    expect(button?.className).toContain("min-h-[44px]");
+    expect(button?.className).toContain("min-h-12");
   });
 });
 

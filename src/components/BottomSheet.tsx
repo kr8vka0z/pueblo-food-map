@@ -77,7 +77,7 @@
  * simpler than vaul's snap-point internals to get provably right.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Drawer } from "vaul";
 import { X } from "lucide-react";
@@ -87,6 +87,8 @@ import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { isNativeDialogOpen } from "@/lib/dialogGuard";
 import { claimEscape, useOverlayStackId } from "@/lib/overlayRegistry";
+import { HEIGHT_ANIMATION_EASE, HEIGHT_ANIMATION_MS, useHeightTransition } from "@/lib/useHeightTransition";
+import { prefersReducedMotion } from "@/lib/useMediaQuery";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import VenueCardBody, { displayAddress } from "@/components/VenueCardBody";
@@ -293,6 +295,21 @@ export default function BottomSheet({
   //   those and `onClose()` still runs as before.
   const dismissDragActive = useRef(false);
   const drawerContentRef = useRef<HTMLDivElement>(null);
+  // #882 preview feedback: the content-hugging sheet used to snap to its new
+  // height in one frame on every expand/collapse. Animate old -> new height
+  // instead (useHeightTransition.ts has the mechanism). Never while a walk
+  // route is active: that branch is a fixed height with vaul snap points.
+  // followInner: the event card animates its own changing parts; the sheet
+  // animates to where they end up, in step with them.
+  const sheetHeightRef = useHeightTransition(expanded, { enabled: !isWalkRouteActive, followInner: true });
+  // One stable ref for Drawer.Content: the object ref onRelease reads, plus the height animation's.
+  const setDrawerContent = useCallback(
+    (node: HTMLDivElement | null) => {
+      drawerContentRef.current = node;
+      sheetHeightRef(node);
+    },
+    [sheetHeightRef],
+  );
   // Swipe-up-on-the-card recognizer's own start point + "was this gesture
   // eligible" flag — null'd out at pointerdown if it started on a button,
   // link, or anything a11y-labelled as one (Kyle's ask: "outside buttons/
@@ -413,8 +430,25 @@ export default function BottomSheet({
         if (!open && dismissDragActive.current && expanded && !isWalkRouteActive) {
           const el = drawerContentRef.current;
           if (el) {
-            el.style.transition = "";
-            el.style.transform = "";
+            // #882: clearing the transform in one frame jumped the dragged
+            // sheet back up by the drag distance at the same moment the
+            // collapse started — half of the stutter Kyle saw. Glide it back
+            // over the same time and curve as the height animation instead,
+            // so the top edge moves smoothly from where the finger left it.
+            if (prefersReducedMotion()) {
+              el.style.transition = "";
+              el.style.transform = "";
+            } else {
+              el.style.transition = `transform ${HEIGHT_ANIMATION_MS}ms ${HEIGHT_ANIMATION_EASE}`;
+              el.style.transform = "translate3d(0, 0, 0)";
+              window.setTimeout(() => {
+                // Only if nothing (a new vaul drag) has taken the node over since.
+                if (el.style.transform === "translate3d(0, 0, 0)" || el.style.transform === "translate3d(0px, 0px, 0px)") {
+                  el.style.transition = "";
+                  el.style.transform = "";
+                }
+              }, HEIGHT_ANIMATION_MS + 50);
+            }
           }
         }
         dismissDragActive.current = false;
@@ -478,7 +512,7 @@ export default function BottomSheet({
           // passing a ref here doesn't replace vaul's, it runs alongside
           // it), giving `onRelease` above a real DOM node to clear the
           // leftover drag transform from when we veto a dismiss.
-          ref={drawerContentRef}
+          ref={setDrawerContent}
           // Composed the same way — vaul calls `rest.onPointerDown/Up` FIRST,
           // then its own drag logic (confirmed in source), so these always
           // fire regardless of whether vaul itself decides to drag. This is

@@ -323,7 +323,11 @@ describe("BottomSheet — swipe down while expanded collapses instead of closing
     expect(bar.getAttribute("aria-expanded")).toBe("false");
   });
 
-  test("vaul's onRelease(event, false) after a vetoed dismiss clears the leftover drag transform", () => {
+  // #882 preview feedback: the leftover transform now glides back to 0 over the
+  // height animation's 280ms (clearing it in one frame jumped the sheet), and is
+  // cleared once that is done.
+  test("vaul's onRelease(event, false) after a vetoed dismiss returns the sheet from the leftover drag transform, then clears it", () => {
+    vi.useFakeTimers();
     render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
     const bar = screen.getByRole("button", { name: /show details/i });
     fireEvent.click(bar);
@@ -343,7 +347,12 @@ describe("BottomSheet — swipe down while expanded collapses instead of closing
       onRelease({}, false);
     });
 
+    expect(content.style.transform).not.toContain("240px");
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
     expect(content.style.transform).toBe("");
+    vi.useRealTimers();
   });
 
   test("Escape (no prior onDrag) still closes normally even while expanded — #527/#604 unchanged", () => {

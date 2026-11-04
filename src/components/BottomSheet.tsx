@@ -42,8 +42,11 @@
  *      `claimEscape` marks the Event object itself as spoken for, so a
  *      later listener is rejected regardless of what the stack looks like
  *      by then. See overlayRegistry.ts's own header on `claimEscape`.
- *   2. Tap on scrim (vaul handles by default)
- *   3. Explicit close X button
+ *   2. Swipe down from the collapsed card (#882; vaul on a fast pull, our
+ *      `onRelease` on a slow one). There is no scrim (`modal={false}`), and a
+ *      tap on the map behind the sheet does not close it.
+ *   3. The close button: since #882 hidden on the phone until it gets keyboard
+ *      focus (HIDDEN_UNTIL_FOCUS), so keyboard and screen-reader users keep it
  *
  * Route strip (#509, walk-route standard for every venue card): starting a
  * walking route (a box's address tap, or an ordinary place's Walk button —
@@ -80,6 +83,7 @@ import type { Venue } from "@/types/venue";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { HIDDEN_UNTIL_FOCUS } from "@/lib/interactionStyles";
 import { isNativeDialogOpen } from "@/lib/dialogGuard";
 import { claimEscape, useOverlayStackId } from "@/lib/overlayRegistry";
 import { measureWithInnerAnimationsFinished } from "@/lib/useHeightTransition";
@@ -893,9 +897,9 @@ export default function BottomSheet({
                           onClick={onClose}
                           aria-label={t("detail.close", locale)}
                           className={
-                            // Same 48px box/margins as the venue header's × below (#233).
-                            "flex items-center justify-center w-12 h-12 " +
-                            "-mt-2 -mb-2 -ml-1 -mr-3 rounded-md " +
+                            // #882: hidden on the phone (the sheet closes by swiping
+                            // down), shown on keyboard focus; same as the venue header's.
+                            HIDDEN_UNTIL_FOCUS + " flex items-center justify-center w-12 h-12 rounded-md " +
                             "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
                             PRESS_FEEDBACK + " " +
                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"

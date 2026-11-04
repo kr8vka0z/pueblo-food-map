@@ -81,7 +81,7 @@ import { eventAction, eventBadge, eventText, eventWhen, localizeEvent } from "@/
 import { downloadEventCalendar } from "@/lib/eventCalendar";
 import EventFlyer from "@/components/EventFlyer";
 import type { PublicEventDetail } from "@/lib/events";
-import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { HIDDEN_UNTIL_FOCUS, PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { eventShareUrl, shareLink } from "@/lib/share";
 import { useMinuteClock } from "@/lib/useMinuteClock";
 import { useHeightTransition } from "@/lib/useHeightTransition";
@@ -267,7 +267,10 @@ export default function EventCardBody({
         onClick={onClose}
         aria-label={t("events.card.closeAria", locale)}
         className={
-          "-mr-3 -mt-2 flex h-12 w-12 shrink-0 items-center justify-center rounded-md " +
+          // #882: on the phone sheet it is hidden until keyboard focus (the sheet
+          // closes by swiping down); the desktop panel keeps the visible ×.
+          (isSheet ? HIDDEN_UNTIL_FOCUS + " " : "-mr-3 -mt-2 ") +
+          "flex h-12 w-12 shrink-0 items-center justify-center rounded-md " +
           "text-[var(--color-ink-500)] transition-colors hover:bg-[var(--color-bone-100)] touch-manipulation " +
           PRESS_FEEDBACK +
           " focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"

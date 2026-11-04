@@ -25,7 +25,7 @@ import { getDisplayNotes } from "@/lib/venueNotes";
 import { PLACEHOLDER_ADDRESS } from "@/lib/venueSummary";
 import { t, type Locale } from "@/lib/i18n";
 import { safeUrl } from "@/lib/safeUrl";
-import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { HIDDEN_UNTIL_FOCUS, PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { track, EVENTS } from "@/lib/analytics";
 import type { Walk } from "@/lib/useWalkingRoute";
 import ReportVenueButton from "@/components/ReportVenueButton";
@@ -167,9 +167,10 @@ export default function VenueCardBody({
 
   return (
     <div className={sheet ? "flex flex-col px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3" : "flex flex-col p-4 gap-3"}>
-      {/* Name row: title, Share, Save (+ close on a phone). gap-4: Share/Save
-          (-m-1) and × (-ml-1) each give back 4px of it, leaving 8px between
-          their 48px hit areas (#233). */}
+      {/* Name row: title, Share, Save (+ a close button on a phone that is
+          hidden until keyboard focus, #882, so it takes no room). gap-4:
+          Share/Save (-m-1) each give back 4px of it, leaving 8px between their
+          48px hit areas (#233). */}
       <div className="flex items-start gap-4">
         <h2
           id={nameId}
@@ -189,8 +190,8 @@ export default function VenueCardBody({
             onClick={onClose}
             aria-label={t("detail.close", locale)}
             className={
-              "flex items-center justify-center w-12 h-12 " +
-              "-mt-2 -mb-2 -ml-1 -mr-3 rounded-md " +
+              // #882: hidden on the phone (the sheet closes by swiping down), shown on keyboard focus.
+              HIDDEN_UNTIL_FOCUS + " flex items-center justify-center w-12 h-12 rounded-md " +
               "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
               PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"

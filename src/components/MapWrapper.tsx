@@ -1097,6 +1097,19 @@ export default function MapWrapper({
   // Ended/cancelled events never reach `events`, so they get no pin.
   const { event: selectedEvent } = useEventDetail(selectedEventId, events, eventsLoaded);
 
+  // The phone sheet's React key (#882 preview feedback). It used to be the
+  // selected id or "empty", so closing flipped it to "empty" and remounted the
+  // sheet mid-close: vaul's slide-off never played. Now it changes only when a
+  // card OPENS (from nothing, or switching to a different item), which still
+  // gives every opened card a fresh sheet (that is what the key is for), and
+  // never when the selection goes back to null, so the closing sheet stays
+  // mounted and BottomSheet can hold its last card while vaul animates it away.
+  const sheetItemId = selectedVenueId ?? selectedEvent?.id ?? null;
+  const [sheetSlot, setSheetSlot] = useState({ item: sheetItemId, n: 0 });
+  if (sheetItemId !== sheetSlot.item) {
+    setSheetSlot({ item: sheetItemId, n: sheetItemId !== null ? sheetSlot.n + 1 : sheetSlot.n });
+  }
+
   // "See places open now" on an ended/cancelled card: the existing Open-now filter.
   const handleSeeOpenNow = useCallback(() => {
     setFilterOpenNow(true);
@@ -2016,7 +2029,7 @@ export default function MapWrapper({
           regardless of whether a venue is currently selected. */}
       {isMobile && (viewMode === "map" || mapUnavailable) && (
         <BottomSheet
-          key={selectedVenueId ?? selectedEvent?.id ?? "empty"}
+          key={`sheet-${sheetSlot.n}`}
           venue={selectedVenue}
           event={selectedVenue ? null : selectedEvent}
           userLocation={userLocation}

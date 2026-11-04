@@ -26,9 +26,10 @@
  * so on the phone it opens below the first view and nothing above it moves.
  *
  * About: clamped to 3 lines so the action button stays in the phone's first
- * view at 360px. "Read more" shows only when the text is actually cut; on the
- * sheet it expands the sheet (same action as the grab bar, and an expanded
- * sheet shows About in full), on desktop it just unclamps. The About section
+ * view at 360px. "Read more" shows only when the text is actually cut, and is
+ * the ONLY thing that unclamps it: expanding the sheet (swipe, grab bar) keeps
+ * it at 3 lines (#882 preview feedback). On a collapsed sheet "Read more" also
+ * expands the sheet; collapsing clamps it again. The About section
  * and the peek wrapper animate their height (useHeightTransition) and the
  * sheet animates to where they end up, so expand/collapse glides.
  *
@@ -104,6 +105,8 @@ export interface EventCardBodyProps {
   onRequestExpand?: () => void;
   /** "sheet" only — id of the below-the-fold wrapper, for the grab bar's aria-controls. */
   detailSectionId?: string;
+  /** "sheet" only — the sheet is sliding closed with this card still showing; return focus now. */
+  closing?: boolean;
   className?: string;
 }
 
@@ -137,6 +140,7 @@ export default function EventCardBody({
   expanded = true,
   onRequestExpand,
   detailSectionId,
+  closing = false,
   className = "",
 }: EventCardBodyProps) {
   const now = useMinuteClock();
@@ -166,22 +170,32 @@ export default function EventCardBody({
         ? focused
         : document.querySelector<HTMLElement>('.pfm-event-pin[aria-pressed="true"]');
   }, [isSheet]);
+  // `closing`: the sheet keeps this card on screen while it slides away
+  // (#882), so focus goes back when the close STARTS, not when it unmounts.
   useEffect(() => {
-    if (!isSheet) return;
+    if (!isSheet || closing) return;
     document.getElementById(headingId)?.focus({ preventScroll: true });
     return () => {
       const el = returnFocusRef.current;
       if (el?.isConnected) queueMicrotask(() => el.focus({ preventScroll: true }));
     };
-  }, [isSheet, headingId]);
+  }, [isSheet, headingId, closing]);
 
   // ── About clamp ───────────────────────────────────────────────────────────
-  // Sheet: clamped while collapsed (expanding shows it in full). Panel: until
-  // "Read more". "Read more" only appears when the clamp actually cuts text.
+  // Clamped until "Read more" (sheet and panel alike). "Read more" only
+  // appears when the clamp actually cuts text.
   // ponytail: measured once per text/clamp change, not on resize — the card's
   // width is fixed per device; a rotated phone keeps the first answer.
+  // Only "Read more" opens it, on the sheet too (#882 preview feedback: a
+  // swipe up to see the rest of the card must not also unclamp About).
+  // Collapsing the sheet clamps it again, so the next swipe up shows it clamped.
   const [aboutOpen, setAboutOpen] = useState(false);
-  const aboutClamped = isSheet ? !expanded : !aboutOpen;
+  const [prevExpanded, setPrevExpanded] = useState(expanded);
+  if (expanded !== prevExpanded) {
+    setPrevExpanded(expanded);
+    if (isSheet && !expanded) setAboutOpen(false);
+  }
+  const aboutClamped = !aboutOpen;
   const aboutRef = useRef<HTMLParagraphElement | null>(null);
   // Whether the text runs past 3 lines, measured only while clamped and kept
   // while open, so "Read more" appears/disappears in the SAME render as the
@@ -333,7 +347,10 @@ export default function EventCardBody({
       {aboutCut && (
         <button
           type="button"
-          onClick={isSheet ? onRequestExpand : () => setAboutOpen(true)}
+          onClick={() => {
+            setAboutOpen(true);
+            if (isSheet && !expanded) onRequestExpand?.();
+          }}
           className={
             // The ::before strip takes the tap target to 48px without adding height to the first view.
             "relative mt-1 py-1 text-sm font-semibold text-[var(--color-sage-600)] underline underline-offset-2 " +

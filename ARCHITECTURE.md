@@ -1403,9 +1403,10 @@ event** (see "Event page" below).
   and Add to calendar, and the orange Get directions button last. On a phone
   the first, always-visible view is badge, name, When, About and the action
   button; the rest is the clipped "peek" section under the grab bar, as on the
-  box card. "Read more" expands the sheet there (`onRequestExpand`, the grab
-  bar's action) and just unclamps on desktop; it shows only when the clamp
-  actually cuts the text. On a phone the flyer opens at the top of the peek
+  box card. Only "Read more" unclamps About, on the sheet as on desktop
+  (expanding by swipe or grab bar keeps 3 lines); on a collapsed sheet it also
+  expands it (`onRequestExpand`, the grab bar's action), and collapsing clamps
+  it again. It shows only when the clamp actually cuts the text. On a phone the flyer opens at the top of the peek
   section (only once expanded), not above the badge, so expanding never
   shifts the badge and name.
 - **Smooth expand/collapse** (#882 preview feedback: the sheet snapped to its
@@ -1426,6 +1427,18 @@ event** (see "Event page" below).
   callback mis-measured (the first toggle snapped). A swipe-down that
   collapses the expanded card now glides vaul's leftover drag transform back
   over the same 280ms instead of clearing it in one frame.
+- **Animated close** (#882 preview feedback: the card "disappeared super
+  fast"). Closing clears the selection, and `MapWrapper` used to key the
+  sheet on the selected id or `"empty"`, so a close remounted it and vaul's
+  slide-off never ran. The key is now `sheet-<n>`, bumped only when a card
+  opens (from nothing, or a different item), so switching pins still gets a
+  fresh sheet and a close keeps the same one. `BottomSheet` derives `open`
+  from its props but renders the last non-null venue / event / box /
+  event-here line, held until vaul's `onAnimationEnd(false)`, then dropped;
+  while closing the content is `inert`. Swipe-down, × and Escape all close
+  through vaul's own slide (0.5s, its ease). The sheet is `modal={false}`,
+  so there is no scrim to fade. While a walk route is active nothing
+  changed: clearing the route flips `Drawer.Root`'s route/card key as before.
 - **Action button** (#882, replaced the "More information" link).
   `eventAction()` (`src/lib/eventCard.ts`, pure) turns `link_url` +
   `link_label(_custom/_es)` into the href (only if `safeUrl()` accepts it; no

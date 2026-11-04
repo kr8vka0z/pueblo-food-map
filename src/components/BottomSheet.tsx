@@ -133,6 +133,8 @@ const BoxCardBody = dynamic(() => import("@/components/BoxCardBody"), {
 // ROUTE_STRIP_HEIGHT_PX + this) can't drift apart — see the `style` prop
 // below for the full derivation.
 const MAP_PEEK_PX = 100;
+// vaul's close slide is 0.5s (its TRANSITIONS.DURATION); the held card is dropped a little after.
+const SHEET_CLOSE_MS = 600;
 // vaul's px snapPoints can't use calc() — a literal string, computed once.
 // #549: this is ROUTE_STRIP_HEIGHT_PX + MAP_PEEK_PX, not ROUTE_STRIP_HEIGHT_PX
 // alone — see the `style` prop below for why the map peek has to be added
@@ -195,12 +197,12 @@ interface BottomSheetProps {
 // ─── BottomSheet ─────────────────────────────────────────────────────────────
 
 export default function BottomSheet({
-  venue,
-  event = null,
+  venue: venueProp,
+  event: eventProp = null,
   userLocation = null,
   onSeeOpenNow = () => {},
-  eventHere = null,
-  box,
+  eventHere: eventHereProp = null,
+  box: boxProp,
   onCheckinSuccess,
   onClose,
   onExpandedChange,
@@ -213,6 +215,41 @@ export default function BottomSheet({
   const locale = localeProp ?? ctxLocale;
   const isWalkRouteActive = walk?.isActive ?? false;
   const [expanded, setExpanded] = useState(false);
+
+  // ── Hold the last card while vaul animates closed (#882 preview feedback) ──
+  // Closing clears the selection, so venue/event arrive null the moment a
+  // close starts. Rendering that null emptied the card in one frame (and the
+  // parent used to remount the sheet), so the swipe-down/×/Escape close had
+  // nothing to slide away and "disappeared super fast". `open` follows the
+  // props; what the card SHOWS is the last non-null selection, held until
+  // vaul's onAnimationEnd(false) says the slide-off has finished, then
+  // dropped so nothing closed stays in the tree.
+  const open = venueProp !== null || eventProp !== null;
+  const [held, setHeld] = useState({ venue: venueProp, event: eventProp, box: boxProp, eventHere: eventHereProp });
+  if (
+    open &&
+    (held.venue !== venueProp || held.event !== eventProp || held.box !== boxProp || held.eventHere !== eventHereProp)
+  ) {
+    // React's "adjust state while rendering" pattern: tracks the live selection, never lags it.
+    setHeld({ venue: venueProp, event: eventProp, box: boxProp, eventHere: eventHereProp });
+  }
+  const shown = open ? { venue: venueProp, event: eventProp, box: boxProp, eventHere: eventHereProp } : held;
+  const venue = shown.venue;
+  const event = shown.event ?? null;
+  const box = shown.box;
+  const eventHere = shown.eventHere ?? null;
+  function handleAnimationEnd(isOpen: boolean) {
+    if (!isOpen) setHeld({ venue: null, event: null, box: undefined, eventHere: null });
+  }
+  // vaul only reports onAnimationEnd for closes IT starts (a swipe, Escape);
+  // a close from the parent (the × button, the tour) changes the `open` prop
+  // and never reaches it. So also drop the held card once vaul's 0.5s slide
+  // is surely over.
+  useEffect(() => {
+    if (open) return;
+    const timer = setTimeout(() => setHeld({ venue: null, event: null, box: undefined, eventHere: null }), SHEET_CLOSE_MS);
+    return () => clearTimeout(timer);
+  }, [open]);
 
   // ── Grab bar toggle + swipe (#666) ──────────────────────────────────────
   // One function, one state — the bar's tap, the preview's tap, and both
@@ -369,7 +406,6 @@ export default function BottomSheet({
     setCardRevealed(!isWalkRouteActive);
   }
 
-  const open = venue !== null || event !== null;
   // #527: registers this sheet into the shared overlay-escape stack (see
   // overlayRegistry.ts's own header) so `onEscapeKeyDown` below can tell
   // whether a higher overlay (Filters, the Menu) is open on top of it.
@@ -408,6 +444,7 @@ export default function BottomSheet({
       key={isWalkRouteActive ? "route" : "card"}
       open={open}
       onOpenChange={handleOpenChange}
+      onAnimationEnd={handleAnimationEnd}
       // Marks "vaul just engaged a real drag" for `handleOpenChange` above —
       // see this file's header comment for why `onDrag` (not `onRelease`)
       // is the right signal: it only fires once vaul's own `shouldDrag`
@@ -506,7 +543,8 @@ export default function BottomSheet({
       <Drawer.Portal>
         <Drawer.Content
           key={venue?.id ?? event?.id ?? "empty"}
-          inert={inert || undefined}
+          // Closing (`!open`): the held card is still sliding away; nothing on it may take focus or be read.
+          inert={inert || !open || undefined}
           // Composed with vaul's OWN internal `drawerRef` (vaul's `Content`
           // does `useComposedRefs(ref, drawerRef)` — confirmed in source, so
           // passing a ref here doesn't replace vaul's, it runs alongside
@@ -762,6 +800,7 @@ export default function BottomSheet({
                 expanded={expanded}
                 onRequestExpand={() => setExpandedState(true)}
                 detailSectionId={DETAIL_SECTION_ID}
+                closing={!open}
                 className="pb-[max(1rem,env(safe-area-inset-bottom))]"
               />
             </div>

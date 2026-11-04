@@ -1426,8 +1426,18 @@ event** (see "Event page" below).
   down sprang back, found on the iOS simulator). `sheetSnapPoints`
   (`src/lib/sheetSnap.ts`) turns the measurements into px snap points
   (adding `innerHeight − sheet height`, the #549 offset), fully open being
-  the content's own height or `1` when it is taller than the sheet; a
-  ResizeObserver re-measures (never while a finger is down).
+  the content's own height or `1` when it is taller than the sheet. The
+  content height is the persistent `[data-sheet-content]` wrapper's (not the
+  `flex-1` scroller's, which always fills the sheet), and a ResizeObserver on
+  that wrapper re-measures, so a lazily loaded card body arriving later still
+  counts (never while a finger is down). When the measurement leaves one
+  resting height (a short screen, or a first view taller than the sheet), the
+  card is laid out as expanded: nothing `inert`, the content scrolls, and the
+  grab bar is made invisible but keeps its space (removing it moved the
+  content, which flipped the measurement back: a render loop). Clamped text
+  in the sheet (About, a place's notes) is `pointer-events: none`: on iOS
+  Safari a flick that starts on text whose overflow is clipped never scrolls
+  the sheet's content (found on the simulator).
   Scrolling: the scroller is `overflow-y: hidden` + `touch-action: none`
   until fully open, so a drag below that always moves the sheet; fully open,
   vaul's own `shouldDrag` lets a drag up scroll and a drag down move the
@@ -1544,7 +1554,10 @@ One image per event, shown at the top of the card.
   `min(55vh, 28rem)`), `loading="lazy"`, `decoding="async"`, alt = the admin's
   text in the page language, else their English text, else the event name; a
   failed image renders nothing. It is only inside the card, so it never loads
-  with the map. On the phone sheet it renders only when the sheet is expanded.
+  with the map. On the phone sheet it renders at the top of the below-the-fold
+  section, collapsed or expanded (#882: the sheet slides rather than changing
+  its content), so it starts loading when the card opens, mostly off screen
+  until the sheet is pulled up.
 - **Admin form.** `EventFlyerField.tsx`, edit mode only (a new event has no id
   yet); each action saves by itself and hands the new `updated_at` up to the form.
   "Suggest Spanish" does not cover the alt text.

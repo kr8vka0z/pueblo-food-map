@@ -277,9 +277,11 @@ export default function VenueCardBody({
 
       {/* Notes — suppressed for OSM artifacts and Plentiful's auto-generated
           boilerplate (src/lib/venueNotes.ts). Two lines on a phone; in full
-          on a computer, which has the room. */}
+          on a computer, which has the room. pointer-events-none with the clamp:
+          on iOS Safari a flick that starts on clipped overflowing text never
+          scrolls the sheet (see EventCardBody's About). */}
       {displayNotes && (
-        <p className={`text-sm text-[var(--color-ink-700)] leading-relaxed${sheet ? " line-clamp-2" : ""}`}>
+        <p className={`text-sm text-[var(--color-ink-700)] leading-relaxed${sheet ? " line-clamp-2 pointer-events-none" : ""}`}>
           {displayNotes}
         </p>
       )}

@@ -31,17 +31,20 @@ export interface SheetSnaps {
   full: SnapPoint;
   /** What vaul gets: [collapsed, full], or just [full] when there is nothing to expand into. */
   points: SnapPoint[];
+  /** False before the sheet has a laid-out height (the first frame, jsdom): `points` is then a placeholder. */
+  measured: boolean;
 }
 
 const px = (n: number): SnapPoint => `${Math.round(n)}px`;
 
 export function sheetSnapPoints({ innerHeight, drawerHeight, firstView, content }: SheetMeasure): SheetSnaps {
+  const measured = drawerHeight > 0;
   const base = innerHeight - drawerHeight;
   const fullVisible = Math.min(content, drawerHeight);
   const full: SnapPoint = content >= drawerHeight - 0.5 ? 1 : px(fullVisible + base);
   const collapsedVisible = firstView === null ? fullVisible : Math.min(firstView, fullVisible);
   // Less than ~a finger's nudge between the two: one resting height, nothing to expand.
-  if (fullVisible - collapsedVisible < 24) return { collapsed: full, full, points: [full] };
+  if (fullVisible - collapsedVisible < 24) return { collapsed: full, full, points: [full], measured };
   const collapsed = px(collapsedVisible + base);
-  return { collapsed, full, points: [collapsed, full] };
+  return { collapsed, full, points: [collapsed, full], measured };
 }

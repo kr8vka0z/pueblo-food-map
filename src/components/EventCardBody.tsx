@@ -333,7 +333,13 @@ export default function EventCardBody({
       <p
         ref={aboutRef}
         className={
-          "whitespace-pre-line text-sm leading-relaxed text-[var(--color-ink-700)]" + (aboutClamped ? " line-clamp-3" : "")
+          // pointer-events-none while clamped: on iOS Safari a flick that starts
+          // on a box whose overflowing text is clipped never scrolls the sheet's
+          // content (iOS simulator: a flick down on the clamped About stayed
+          // put, the same flick on the text a line below scrolled). The touch
+          // then lands on the section instead, which scrolls normally.
+          "whitespace-pre-line text-sm leading-relaxed text-[var(--color-ink-700)]" +
+          (aboutClamped ? " line-clamp-3 pointer-events-none" : "")
         }
       >
         {text.description}

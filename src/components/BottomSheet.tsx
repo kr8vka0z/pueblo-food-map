@@ -309,6 +309,7 @@ export default function BottomSheet({
       content: 0,
     }),
   );
+  const [snapMeasured, setSnapMeasured] = useState(false);
   const pointerDownY = useRef<number | null>(null);
   const lastDragDy = useRef(0);
   const releaseTransform = useRef("");
@@ -326,7 +327,8 @@ export default function BottomSheet({
   const measureSnap = useCallback(() => {
     const el = drawerContentRef.current;
     const scroller = el?.querySelector<HTMLElement>("[data-sheet-scroller]");
-    if (!el || !scroller) return;
+    const content = scroller?.querySelector<HTMLElement>("[data-sheet-content]");
+    if (!el || !scroller || !content) return;
     if (pointerDownY.current !== null) {
       // Re-snapping under the finger would fight it; measure on release.
       measurePending.current = true;
@@ -348,9 +350,17 @@ export default function BottomSheet({
       innerHeight: window.innerHeight,
       drawerHeight: el.offsetHeight,
       firstView: collapsedFirstView.current,
-      content: scroller.getBoundingClientRect().top - top + scroller.scrollHeight,
+      // The card's own bottom, not the scroller's: the `flex-1` scroller fills
+      // the fixed-height sheet, so its scrollHeight is never below the sheet's
+      // and every short card measured as full height (PR #884 review).
+      content: content.getBoundingClientRect().bottom - top + scroller.scrollTop,
     });
+    // Same points: keep the same object, so vaul isn't handed a new
+    // `snapPoints` array (which makes it re-snap). `measured` only ever turns
+    // true, and is tracked on its own for the same reason: replacing the snap
+    // object for it alone broke scrolling back up on the iOS simulator.
     setSnap((prev) => (prev.points.join() === next.points.join() ? prev : next));
+    if (next.measured) setSnapMeasured(true);
   }, []);
   const resizeObserver = useRef<ResizeObserver | null>(null);
   // Callback ref: vaul's portal mounts this node after BottomSheet commits;
@@ -393,10 +403,13 @@ export default function BottomSheet({
     [measureSnap],
   );
   useEffect(() => () => resizeObserver.current?.disconnect(), []);
-  // The card body swaps under the same sheet (a lazy card finishing its load,
-  // About opening, the flyer): watch whatever the scroller holds now.
+  // Watch the persistent `[data-sheet-content]` wrapper: it is ours and always
+  // there, so a lazily loaded card body that arrives later (with no render of
+  // this component) still resizes something observed and re-measures (PR #884
+  // review: observing the scroller's first child missed a late chunk). Re-run
+  // each render because the wrapper changes with the branch (event / place).
   useEffect(() => {
-    const content = drawerContentRef.current?.querySelector("[data-sheet-scroller]")?.firstElementChild;
+    const content = drawerContentRef.current?.querySelector("[data-sheet-content]");
     if (content) resizeObserver.current?.observe(content);
     measureSnap();
   });
@@ -446,7 +459,13 @@ export default function BottomSheet({
   // The content scrolls only once the sheet is fully open (or has only one
   // height, or is the route card), so a drag below that always moves the sheet.
   // `overscroll-contain` (#553) is kept either way; see the scroller's note below.
-  const scrollerScrolls = expanded || isWalkRouteActive || snap.points.length === 1;
+  // One measured snap point (a short screen, or a first view taller than the
+  // sheet): the sheet is always fully open, so every card body is laid out as
+  // expanded (nothing `inert`, content scrolls) and the grab bar, which would
+  // toggle nothing, is hidden. Unmeasured (jsdom, the first frame) doesn't count.
+  const singleSnap = snapMeasured && snap.points.length === 1;
+  const cardExpanded = expanded || singleSnap;
+  const scrollerScrolls = cardExpanded || isWalkRouteActive;
   // `touch-none` below fully open: an overflow-hidden box is still a scroll
   // container, so the browser would claim a vertical touch as a pan and
   // cancel the pointer events vaul drags with (seen with CDP touch: the
@@ -790,9 +809,14 @@ export default function BottomSheet({
               people there's more, so a real handle no longer lies about what
               it does. */}
           {showGrabBar && (
-            <div className="flex shrink-0 justify-center pt-2 pb-1">
+            // One resting height: the bar toggles nothing, so it is hidden but
+            // keeps its space. Removing it moved the content up, which changed
+            // the measurement back to two heights, which brought the bar back:
+            // a render loop ("Maximum update depth", iOS simulator).
+            <div className={"flex shrink-0 justify-center pt-2 pb-1" + (singleSnap ? " invisible" : "")} aria-hidden={singleSnap || undefined}>
               <button
                 type="button"
+                disabled={singleSnap}
                 aria-expanded={expanded}
                 aria-controls={DETAIL_SECTION_ID}
                 aria-label={t(expanded ? "detail.hideDetails" : "detail.showDetails", locale)}
@@ -834,20 +858,23 @@ export default function BottomSheet({
             // Special-event card (#759). Same scroller as the place card
             // below, so the swipe/overscroll behavior (#553) is identical.
             <div data-sheet-scroller="" className={scrollerClass}>
-              <EventCardBody
-                event={event}
-                locale={locale}
-                userLocation={userLocation}
-                headingId={`event-card-title-${event.id}`}
-                onClose={onClose}
-                onSeeOpenNow={onSeeOpenNow}
-                layout="sheet"
-                expanded={expanded}
-                onRequestExpand={requestExpand}
-                detailSectionId={DETAIL_SECTION_ID}
-                closing={!open}
-                className="pb-[max(1rem,env(safe-area-inset-bottom))]"
-              />
+              {/* data-sheet-content: see "Maps-style sheet" — the persistent, measured wrapper. */}
+              <div data-sheet-content="">
+                <EventCardBody
+                  event={event}
+                  locale={locale}
+                  userLocation={userLocation}
+                  headingId={`event-card-title-${event.id}`}
+                  onClose={onClose}
+                  onSeeOpenNow={onSeeOpenNow}
+                  layout="sheet"
+                  expanded={cardExpanded}
+                  onRequestExpand={requestExpand}
+                  detailSectionId={DETAIL_SECTION_ID}
+                  closing={!open}
+                  className="pb-[max(1rem,env(safe-area-inset-bottom))]"
+                />
+              </div>
             </div>
           )}
 
@@ -870,6 +897,7 @@ export default function BottomSheet({
             // toolbar held a constant screen position in every frame of that
             // clip, so no resize appears to have fired.
             <div data-sheet-scroller="" className={scrollerClass}>
+              <div data-sheet-content="">
               {isBox ? (
                 box ? (
                   // Card-redesign (2026-09-19): BoxCardBody now owns the
@@ -894,7 +922,7 @@ export default function BottomSheet({
                     // to-expand affordance (#666 accessibility section:
                     // "tapping the cut-off preview also expands").
                     layout="sheet"
-                    expanded={expanded}
+                    expanded={cardExpanded}
                     onRequestExpand={requestExpand}
                     detailSectionId={DETAIL_SECTION_ID}
                     walk={walk}
@@ -931,11 +959,12 @@ export default function BottomSheet({
                   walk={walk}
                   eventHere={eventHere}
                   onClose={onClose}
-                  expanded={expanded}
+                  expanded={cardExpanded}
                   onRequestExpand={requestExpand}
                   detailSectionId={DETAIL_SECTION_ID}
                 />
               )}
+              </div>
             </div>
           )}
         </Drawer.Content>

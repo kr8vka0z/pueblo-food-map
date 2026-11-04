@@ -1275,6 +1275,17 @@ event** (see "Event page" below).
   event keeps its own coordinates), `link_url`, `flyer_key` (slice 4, see
   "Event flyer"), `status` draft / published / cancelled / archived and
   created / updated / published stamps. Nothing is deleted.
+- **Venue name and button wording (#882, `migrations/0026_event_venue_and_button.sql`,
+  ADD COLUMN only).** `venue_name` is the event's own copy of the place name
+  (the form fills it from the linked place when empty), shown in bold above the
+  address. `link_label` is what the card's action button says for `link_url`:
+  `website | signup | tickets | rsvp | volunteer | donate | custom`, NULL =
+  website (so events saved earlier read "Visit website"); checked by
+  `adminEventValidation.ts`, not a CHECK constraint, so a new wording needs no
+  table rebuild. `link_label_custom` / `_es` hold the admin's own words (25
+  characters, `FIELD_LIMITS.EVENT_LINK_LABEL`), English required, and are kept
+  only with `custom`. The public reads select all four, so 0026 must reach a
+  database before this code (until then the feed fails soft to empty).
 - **Pueblo time.** Admins type America/Denver wall-clock time; the **server**
   converts to UTC (`src/lib/eventTime.ts`, `Intl` only, DST-correct: a
   time inside the spring-forward gap is rejected, the repeated fall-back hour
@@ -1307,7 +1318,8 @@ event** (see "Event page" below).
 - **Suggest Spanish** (`POST /api/admin/events/translate`,
   `src/lib/eventTranslate.ts`). The owner does not write Spanish, so the form's
   "Suggest Spanish" button sends the English values and fills **only the
-  Spanish boxes that are empty**. The route gates like the other event routes
+  Spanish boxes that are empty** (including the Custom button words, sent only
+  when "Custom" is chosen, #882). The route gates like the other event routes
   (`authorizeAdminWrite`), checks the same `FIELD_LIMITS` caps, asks Workers
   AI through the `AI` binding (declared in `wrangler.jsonc` for production and
   `env.staging`; no key, secret or npm dependency), and returns
@@ -1382,13 +1394,27 @@ event** (see "Event page" below).
   kind: a shared link seeds the selection before `isMobile` settles, and a
   handler-set view would miss it. Opening a place, Saved or Menu clears the
   event and vice versa; closing clears `?event=`.
-- **Order** (owner-approved mockup): the flyer (#760, `EventFlyer.tsx`; absent
-  when the event has none), status badge, name, "Hosted by", When, Where (+ distance when the visitor's real
-  position is known), About, a highlighted "What to bring" box, the orange Get
-  directions button, Share and Add to calendar, then the optional link. On a
-  phone the first, always-visible view is badge, name, When and Get directions,
-  so there Get directions sits above Where/About; the rest is the clipped
-  "peek" section under the grab bar, as on the box card.
+- **Order** (owner-approved redesign #882, mockups in
+  `docs/mockups/Event Card Redesign - Mockups.html`): the flyer (#760,
+  `EventFlyer.tsx`; absent when the event has none), status badge, name,
+  "Hosted by", When, About (clamped to 3 lines with "Read more"), the green
+  action button, Where (venue name in bold, address, + distance when the
+  visitor's real position is known), a highlighted "What to bring" box, Share
+  and Add to calendar, and the orange Get directions button last. On a phone
+  the first, always-visible view is badge, name, When, About and the action
+  button; the rest is the clipped "peek" section under the grab bar, as on the
+  box card. "Read more" expands the sheet there (`onRequestExpand`, the grab
+  bar's action) and just unclamps on desktop; it shows only when the clamp
+  actually cuts the text.
+- **Action button** (#882, replaced the "More information" link).
+  `eventAction()` (`src/lib/eventCard.ts`, pure) turns `link_url` +
+  `link_label(_custom/_es)` into the href (only if `safeUrl()` accepts it; no
+  link, no button), the label (built-in wording with its own Spanish, or the
+  admin's Custom words with Spanish falling back to English), an icon key and
+  the site name (the URL host without `www.`). The card, the event page (its
+  plain link keeps its layout, only the wording changes) and the calendar file
+  (`Sign up: <url>`) all read it, and the page and calendar also show the venue
+  name.
 - **Badge and the clock.** `eventBadge()` (`src/lib/eventCard.ts`, pure) turns
   `(event, nowMs)` into the stage and the countdown ("Starts in 2 days / 2
   hours / 20 min", "Happening now, ends in 40 min"; more than 7 days out reads
@@ -1429,8 +1455,8 @@ event** (see "Event page" below).
   (pin window) whose `venue_id` is the selected place and passes one
   `{label, onOpen}` line ("Event here Saturday", `EventHereLine.tsx`) to
   `BottomSheet` / `DesktopVenueWindow`. Blessing-box cards do not show it.
-- **Text.** All event text is rendered as plain React text. The optional link
-  renders only if `safeUrl()` accepts it (http/https), with
+- **Text.** All event text is rendered as plain React text. The action button
+  renders only if `safeUrl()` accepts the link (http/https), with
   `rel="noopener noreferrer"`. Spanish is used on a Spanish page when that
   column is non-blank, otherwise English (`eventText()`).
 

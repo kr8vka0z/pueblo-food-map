@@ -1420,7 +1420,10 @@ event** (see "Event page" below).
   restoring the release position first so the slide starts there). The card
   content is the same at every height: the detail sections keep their full
   height (no clip, no fade; `inert` while collapsed), and the collapsed snap
-  is "top of `#bottomsheet-detail` + its `data-peek-px`". `sheetSnapPoints`
+  is "top of `#bottomsheet-detail` + its `data-peek-px`", read only while
+  collapsed (expanded, "Read more" can make the first view taller than it
+  will be once collapsed; reading it then left one snap point, so a flick
+  down sprang back, found on the iOS simulator). `sheetSnapPoints`
   (`src/lib/sheetSnap.ts`) turns the measurements into px snap points
   (adding `innerHeight − sheet height`, the #549 offset), fully open being
   the content's own height or `1` when it is taller than the sheet; a

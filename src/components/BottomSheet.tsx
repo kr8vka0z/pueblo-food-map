@@ -75,7 +75,7 @@
  * simpler than vaul's snap-point internals to get provably right.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Drawer } from "vaul";
 import { X } from "lucide-react";
@@ -317,6 +317,13 @@ export default function BottomSheet({
   // doesn't. Set for one tick after a real drag so that click can't toggle.
   const justDragged = useRef(false);
   const measurePending = useRef(false);
+  const expandedRef = useRef(expanded);
+  // Layout effect: up to date before the measuring effects below run.
+  useLayoutEffect(() => {
+    expandedRef.current = expanded;
+  });
+  // undefined = not measured yet; null = the card has no detail section.
+  const collapsedFirstView = useRef<number | null | undefined>(undefined);
   const measureSnap = useCallback(() => {
     const el = drawerContentRef.current;
     const scroller = el?.querySelector<HTMLElement>("[data-sheet-scroller]");
@@ -331,12 +338,20 @@ export default function BottomSheet({
     const next = measureWithInnerAnimationsFinished(el, () => {
       const top = el.getBoundingClientRect().top;
       const detail = scroller.querySelector<HTMLElement>(`#${DETAIL_SECTION_ID}`);
+      // The collapsed height is read only while collapsed. Expanded, the
+      // first view can be taller than it will be once collapsed (About opened
+      // with "Read more" re-clamps on collapse), and reading it then made the
+      // collapsed height reach the fully-open one: one snap point, so a flick
+      // down sprang back instead of collapsing (iOS simulator, #882).
+      if (!expandedRef.current || collapsedFirstView.current === undefined) {
+        collapsedFirstView.current = detail
+          ? detail.getBoundingClientRect().top - top + scroller.scrollTop + Number(detail.dataset.peekPx ?? 64)
+          : null;
+      }
       return sheetSnapPoints({
         innerHeight: window.innerHeight,
         drawerHeight: el.offsetHeight,
-        firstView: detail
-          ? detail.getBoundingClientRect().top - top + scroller.scrollTop + Number(detail.dataset.peekPx ?? 64)
-          : null,
+        firstView: collapsedFirstView.current,
         content: scroller.getBoundingClientRect().top - top + scroller.scrollHeight,
       });
     });

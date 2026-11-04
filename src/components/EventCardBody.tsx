@@ -13,25 +13,24 @@
  * bold above the address), a highlighted "What to bring" box, Share + Add to
  * calendar, and the large orange Get directions button LAST. The flyer (#760)
  * is EventFlyer: absent when the event has none or it fails to load, and the
- * card is complete without it. On the phone it shows only once the sheet is
- * expanded, at the top of the below-the-fold section (see "Phone"), which also
- * keeps the image from loading until the visitor asks for the whole card.
+ * card is complete without it. On the phone it sits at the top of the
+ * below-the-fold section (see "Phone").
  *
  * Phone: the sheet's first, always-visible view is the badge, name, When,
- * About (3 lines) and the action button, so in `layout="sheet"` the flyer /
- * Where / What to bring / Share / Calendar / Get directions sit in the clipped
- * "peek" wrapper under it (same grab-bar mechanics as the box card,
- * #666/#667). The flyer is the one phone/desktop order difference: above the
- * badge it pushed the badge and name down mid-swipe (#882 preview feedback),
- * so on the phone it opens below the first view and nothing above it moves.
+ * About (3 lines) and the action button; in `layout="sheet"` the flyer /
+ * Where / What to bring / Share / Calendar / Get directions follow in the
+ * below-the-fold section, which keeps its full height and sits under the
+ * screen edge while collapsed (the sheet slides on vaul snap points, #882;
+ * same grab-bar mechanics as the box card, #666/#667). The flyer is the one
+ * phone/desktop order difference: above the badge it pushed the badge and
+ * name down mid-swipe (#882 preview feedback).
  *
  * About: clamped to 3 lines so the action button stays in the phone's first
  * view at 360px. "Read more" shows only when the text is actually cut, and is
  * the ONLY thing that unclamps it: expanding the sheet (swipe, grab bar) keeps
  * it at 3 lines (#882 preview feedback). On a collapsed sheet "Read more" also
- * expands the sheet; collapsing clamps it again. The About section
- * and the peek wrapper animate their height (useHeightTransition) and the
- * sheet animates to where they end up, so expand/collapse glides.
+ * expands the sheet; collapsing clamps it again. The About section animates
+ * its height (useHeightTransition) and the sheet re-snaps to where it ends up.
  *
  * Action button (#882, replaces the old "More information" link): full-width
  * sage-600 fill, white label, the site name under it in sage-100 (5.25:1 on
@@ -208,12 +207,11 @@ export default function EventCardBody({
   }, [aboutClamped, text.description]);
   const aboutCut = aboutClamped && aboutOverflows;
 
-  // #882 preview feedback: the About section and the below-the-fold section
-  // grow and shrink smoothly instead of in one frame (useHeightTransition.ts).
-  // Declared after the measurement above so it reads the clamped size first.
-  // The sheet around them hugs them and so follows frame by frame.
+  // #882 preview feedback: About grows smoothly on "Read more" instead of in
+  // one frame (useHeightTransition.ts). Declared after the measurement above
+  // so it reads the clamped size first. On the phone the sheet picks its new
+  // fully-open height from where this animation ends.
   const aboutSectionRef = useHeightTransition(aboutClamped);
-  const detailRef = useHeightTransition(expanded, { enabled: isSheet });
 
   // ── Share ─────────────────────────────────────────────────────────────────
   const [copied, setCopied] = useState(false);
@@ -476,32 +474,28 @@ export default function EventCardBody({
           {actionButton}
           {openNowButton}
         </div>
-        {/* Below the fold: clipped to a faded peek until expanded. `inert`
-            while clipped so Tab and screen readers can't reach hidden buttons;
-            a tap still falls through to the wrapper's expand handler. */}
+        {/* Below the fold. Since #882 the sheet slides (vaul snap points), so
+            this keeps its full height (no clip, no fade) and collapsed just
+            means it sits below the screen edge with `data-peek-px` showing.
+            `inert` while collapsed so Tab and screen readers can't reach the
+            half-shown buttons; a tap still falls through to the expand handler. */}
         <div
-          ref={detailRef}
           id={detailSectionId}
+          data-peek-px="96"
           onClick={!expanded ? onRequestExpand : undefined}
-          className={"relative px-5 pt-3 " + (expanded ? "" : "max-h-24 cursor-pointer overflow-hidden")}
+          className={"relative px-5 pt-3 " + (expanded ? "" : "cursor-pointer")}
         >
           <div className="flex flex-col gap-4" inert={!expanded}>
-            {/* Phone: the flyer opens at the top of this section, once expanded (#882 preview
-                feedback). Above the badge it pushed the badge and name down mid-swipe; here it
-                grows inside the animated section and nothing above the fold moves. Rendered
-                only when expanded, so the image still doesn't load until asked for. */}
-            {expanded && flyer}
+            {/* Phone: the flyer sits at the top of this section, not above the
+                badge (#882 preview feedback: there it pushed the badge and
+                name down mid-swipe). Always rendered, so nothing appears
+                mid-motion; its box reserves the image's aspect ratio. */}
+            {flyer}
             {whereBlock}
             {bringBlock}
             {secondaryButtons}
             {directionsButton}
           </div>
-          {!expanded && (
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-b from-transparent to-[var(--color-bone-50)]"
-            />
-          )}
         </div>
       </div>
     );

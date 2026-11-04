@@ -539,18 +539,19 @@ export default function BoxCardBody({
         </div>
 
         {/* Below the fold (#667 items 9-13): the photo (or the sponsor band)
-            peeks above a bottom-edge fade when collapsed. BottomSheet owns
-            `expanded`/`onRequestExpand`; no status pill overlay here — it
-            already rendered inline above. */}
+            peeks at the screen edge when collapsed — since #882 the sheet
+            slides (vaul snap points) and this keeps its full height, no clip
+            or fade; `data-peek-px` is how much the collapsed sheet shows.
+            BottomSheet owns `expanded`/`onRequestExpand`; no status pill
+            overlay here — it already rendered inline above. */}
         <div
           id={detailSectionId}
+          data-peek-px="96"
           onClick={!expanded ? onRequestExpand : undefined}
-          className={
-            "relative flex flex-col gap-3 " + (expanded ? "" : "max-h-24 overflow-hidden cursor-pointer")
-          }
+          className={"relative flex flex-col gap-3 " + (expanded ? "" : "cursor-pointer")}
         >
-          {/* `inert` while collapsed (#683 review): clipped controls must not
-              be reachable by Tab or a screen reader, and a tap still falls
+          {/* `inert` while collapsed (#683 review): half-shown controls must
+              not be reachable by Tab or a screen reader, and a tap still falls
               through to the wrapper's expand handler. */}
           <div className="contents" inert={!expanded}>
             {photo()}
@@ -559,13 +560,6 @@ export default function BoxCardBody({
               {footerBlock}
             </div>
           </div>
-
-          {!expanded && (
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-b from-transparent to-[var(--color-bone-50)]"
-            />
-          )}
         </div>
       </div>
     );

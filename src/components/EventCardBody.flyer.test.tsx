@@ -73,14 +73,10 @@ describe("event card flyer", () => {
   });
 
   // #882 preview feedback: above the badge, the flyer pushed the badge and name
-  // down mid-swipe, so on the phone it now opens below the first view.
-  test("on the phone sheet the flyer is absent while collapsed and joins below the badge when expanded", () => {
-    const collapsed = renderCard(FLYER, { layout: "sheet", expanded: false });
-    expect(screen.queryByTestId("event-flyer")).toBeNull();
-    expect(screen.getByTestId("event-badge")).toBeInTheDocument();
-    collapsed.unmount();
-
-    renderCard(FLYER, { layout: "sheet", expanded: true });
+  // down mid-swipe, so on the phone it sits below the first view; and since the
+  // sheet now slides instead of changing its content, it is there collapsed too.
+  test.each([false, true])("on the phone sheet (expanded=%s) the flyer sits below the badge", (expanded) => {
+    renderCard(FLYER, { layout: "sheet", expanded });
     const flyer = screen.getByTestId("event-flyer");
     const badge = screen.getByTestId("event-badge");
     expect(badge.compareDocumentPosition(flyer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

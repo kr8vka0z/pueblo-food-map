@@ -1,25 +1,22 @@
 /**
  * useHeightTransition.ts — animates an element's height from what it was to
  * what it becomes whenever `trigger` changes, then hands the height back to
- * CSS (#882 preview feedback: the phone sheet snapped to its new height in one
- * frame on every expand/collapse, which read as a stutter).
+ * CSS (#882 preview feedback). Used by the event card's About section ("Read
+ * more"); the phone sheet itself moves on vaul snap points (BottomSheet.tsx)
+ * and reads the final layout through measureWithInnerAnimationsFinished.
  *
- * WHY measure-and-animate instead of a CSS transition: the sheet and the card
- * sections hug their content (auto / max-height), and CSS cannot transition to
- * or from `auto`. So the layout effect reads the height before the change (the
- * last size the ResizeObserver saw, or the live animated height when a toggle
- * lands mid-animation) and after it (the new natural layout), and plays a Web
- * Animations API keyframe between the two. WAAPI, not `style.transition`,
- * because vaul writes `style.transition` / `style.transform` on the sheet
- * during drags; an inline height transition would fight it. With fill "none"
- * the animation leaves no inline height behind, so the element hugs its
- * content again the moment it ends.
+ * WHY measure-and-animate instead of a CSS transition: the section hugs its
+ * content, and CSS cannot transition to or from `auto`. So the layout effect
+ * reads the height before the change (the last size the ResizeObserver saw,
+ * or the live animated height when a toggle lands mid-animation) and after it
+ * (the new natural layout), and plays a Web Animations API keyframe between
+ * the two. With fill "none" the animation leaves no inline height behind, so
+ * the element hugs its content again the moment it ends.
  *
- * WHY a callback ref (returned) rather than a ref object: the sheet's node is
- * mounted by vaul's portal in a render of its own, after the hook's component
- * has committed. A ref object would only be noticed on the component's next
- * render, which is the first toggle itself, so that toggle had no "before"
- * height and snapped (seen in the browser on the first expand of a card).
+ * WHY a callback ref (returned) rather than a ref object: a node mounted in a
+ * render of its own (inside a portal) is only noticed by a ref object on the
+ * component's next render, which can be the first toggle itself, so that
+ * toggle had no "before" height and snapped (seen in the browser).
  *
  * Instant (no animation) under prefers-reduced-motion, when `enabled` is
  * false, where the browser has no `Element.animate` (jsdom), and when the
@@ -38,17 +35,6 @@ export const HEIGHT_ANIMATION_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 export interface HeightTransitionOptions {
   /** false = always instant (e.g. the sheet while a walk route is active). */
   enabled?: boolean;
-  /**
-   * true = elements inside may run their own height animations for the same
-   * change (the event card's About and below-the-fold sections). React runs
-   * their layout effects first, so by the time this element measures its
-   * "after" height they sit at their start heights. Their animations are
-   * jumped to the end for that one measurement and put back, so this element
-   * animates to its real final height in step with them. Needed because the
-   * sheet is capped at a max-height: hugging alone made it hit the cap in one
-   * frame while the content inside was still growing.
-   */
-  followInner?: boolean;
 }
 
 interface HeightState {
@@ -94,27 +80,31 @@ function innerAnimations(el: HTMLElement): Animation[] {
 }
 
 /**
- * `el`'s height once the inner animations have finished. Seeking an animation
- * to its end (fill "none") removes its effect, so layout is the final one;
- * seeking straight back within the same task means no frame ever shows it,
- * and the finish notification is dropped because the animation is running
- * again by the time it would fire (Web Animations "update the finished state").
+ * Runs `measure` with every height animation inside `el` seeked to its end
+ * and put back, so a measurement taken mid-animation reads the final layout.
+ * The phone sheet uses it to pick its fully-open height once, when About
+ * starts growing, rather than chasing it frame by frame. Seeking to the end
+ * (fill "none") removes the effect; seeking straight back within the same
+ * task means no frame ever shows it, and the finish notification is dropped
+ * because the animation is running again by the time it would fire (Web
+ * Animations "update the finished state").
  */
-function heightAfter(el: HTMLElement, inner: Animation[]): number {
-  if (inner.length === 0) return heightOf(el);
-  const times = inner.map((a) => a.currentTime);
-  for (const a of inner) a.currentTime = HEIGHT_ANIMATION_MS;
-  const h = heightOf(el);
-  inner.forEach((a, i) => {
+export function measureWithInnerAnimationsFinished<T>(el: HTMLElement, measure: () => T): T {
+  const anims = innerAnimations(el);
+  if (anims.length === 0) return measure();
+  const times = anims.map((a) => a.currentTime);
+  for (const a of anims) a.currentTime = HEIGHT_ANIMATION_MS;
+  const result = measure();
+  anims.forEach((a, i) => {
     a.currentTime = times[i] ?? 0;
   });
-  return h;
+  return result;
 }
 
 /** Returns a stable callback ref for the element whose height should animate when `trigger` changes. */
 export function useHeightTransition(
   trigger: unknown,
-  { enabled = true, followInner = false }: HeightTransitionOptions = {},
+  { enabled = true }: HeightTransitionOptions = {},
 ): (el: HTMLElement | null) => void {
   const s = useRef<HeightState>({ el: null, ro: null, last: null, trigger, anim: null, overflow: "" });
 
@@ -147,7 +137,7 @@ export function useHeightTransition(
     // already holds the new layout, so the old height is the last one seen.
     const from = st.anim ? heightOf(el) : st.last;
     stop(st);
-    const to = heightAfter(el, followInner ? innerAnimations(el) : []);
+    const to = heightOf(el);
     st.last = to;
     if (from === null || !enabled || Math.abs(to - from) < 1) return;
     if (prefersReducedMotion() || typeof el.animate !== "function") return;
@@ -165,7 +155,7 @@ export function useHeightTransition(
     });
     st.anim = anim;
     anim.addEventListener("finish", () => {
-      // playState: belt and braces for heightAfter's seek-and-return above.
+      // playState: belt and braces for measureWithInnerAnimationsFinished's seek-and-return.
       if (st.anim !== anim || anim.playState !== "finished") return;
       st.anim = null;
       el.style.overflow = st.overflow;

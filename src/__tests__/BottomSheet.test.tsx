@@ -241,19 +241,6 @@ describe("BottomSheet — grab bar expand / collapse toggle (#666)", () => {
     expect(bar.getAttribute("aria-expanded")).toBe("true");
   });
 
-  test("swiping the bar up expands; swiping it down while expanded collapses", () => {
-    render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
-    const bar = screen.getByRole("button", { name: /show details/i });
-    // Swipe up (clientY decreases) past the 30px threshold.
-    fireEvent.pointerDown(bar, { clientY: 200 });
-    fireEvent.pointerUp(bar, { clientY: 150 });
-    expect(bar.getAttribute("aria-expanded")).toBe("true");
-    // Swipe down (clientY increases) past the threshold collapses it back.
-    fireEvent.pointerDown(bar, { clientY: 150 });
-    fireEvent.pointerUp(bar, { clientY: 200 });
-    expect(bar.getAttribute("aria-expanded")).toBe("false");
-  });
-
   test("a small movement under the swipe threshold does not toggle on its own", () => {
     render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
     const bar = screen.getByRole("button", { name: /show details/i });
@@ -263,96 +250,34 @@ describe("BottomSheet — grab bar expand / collapse toggle (#666)", () => {
   });
 });
 
-// ─── Whole-card swipe-up + swipe-down-collapse-vs-close (follow-up to #666) ──
-// Kyle's original ask was "swipe up on the card", not only the bar, and a
-// swipe down on the EXPANDED card should collapse before it closes. These
-// tests exercise the two different mechanisms BottomSheet.tsx uses (see its
-// own header comment on `dismissDragActive` for the full vaul-source
-// citation): swipe-up is our own recognizer on Drawer.Content; swipe-down-
-// while-expanded is vaul's own `onDrag`/`onRelease`/`onOpenChange` hooks,
-// captured here via `vaulRootProps` rather than reimplemented.
-describe("BottomSheet — swipe up anywhere on the collapsed card expands it", () => {
-  test("swiping up on the card body (not the bar) expands", () => {
+// ─── Drag (#882: Maps-style sheet on vaul snap points) ───────────────────────
+// vaul runs the drag itself now (mocked here), so the swipe recognizers and
+// the expanded-dismiss veto these describes used to test are gone. What is
+// still ours: a mouse drag that ends on the bar must not also toggle it, and a
+// slow pull down from the collapsed card closes on release.
+describe("BottomSheet — drag", () => {
+  test("a drag that ends on the grab bar does not also click-toggle it", () => {
     render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
     const bar = screen.getByRole("button", { name: /show details/i });
     const content = screen.getByTestId("vaul-content");
-    fireEvent.pointerDown(content, { clientY: 300 });
-    fireEvent.pointerUp(content, { clientY: 250 });
-    expect(bar.getAttribute("aria-expanded")).toBe("true");
-  });
-
-  test("swiping up starting on a button/link does not expand (Kyle's 'outside buttons/links')", () => {
-    render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
-    const bar = screen.getByRole("button", { name: /show details/i });
-    const closeButton = screen.getByRole("button", { name: "Close" });
-    fireEvent.pointerDown(closeButton, { clientY: 300 });
-    fireEvent.pointerUp(closeButton, { clientY: 250 });
+    fireEvent.pointerDown(content, { clientY: 400 });
+    fireEvent.pointerUp(content, { clientY: 300 });
+    fireEvent.click(bar);
     expect(bar.getAttribute("aria-expanded")).toBe("false");
   });
 
-  test("a pointercancel (native scroll taking over) clears the gesture — no expand on the eventual pointerup elsewhere", () => {
-    render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
-    const bar = screen.getByRole("button", { name: /show details/i });
-    const content = screen.getByTestId("vaul-content");
-    fireEvent.pointerDown(content, { clientY: 300 });
-    fireEvent.pointerCancel(content);
-    fireEvent.pointerUp(content, { clientY: 250 });
-    expect(bar.getAttribute("aria-expanded")).toBe("false");
-  });
-});
-
-describe("BottomSheet — swipe down while expanded collapses instead of closing", () => {
-  test("a vaul drag-dismiss while expanded collapses the card and does NOT call onClose", () => {
+  test.each([
+    ["a slow pull down from collapsed past the threshold closes", 160, 1],
+    ["a short one does not", 40, 0],
+  ])("%s", (_name, dy, closes) => {
     const onClose = vi.fn();
     render(<BottomSheet venue={makeVenue()} onClose={onClose} />);
-    const bar = screen.getByRole("button", { name: /show details/i });
-    fireEvent.click(bar); // expand
-    expect(bar.getAttribute("aria-expanded")).toBe("true");
-
-    // Simulate vaul engaging a real drag (its own onDrag prop), then
-    // deciding to dismiss (its own onOpenChange(false)) — exactly the two
-    // calls vaul's source makes, in that order, for a real drag-dismiss.
-    const onDrag = vaulRootProps.current.onDrag as (...args: unknown[]) => void;
-    const onOpenChange = vaulRootProps.current.onOpenChange as (open: boolean) => void;
-    act(() => {
-      onDrag();
-      onOpenChange(false);
-    });
-
-    expect(onClose).not.toHaveBeenCalled();
-    expect(bar.getAttribute("aria-expanded")).toBe("false");
-  });
-
-  // #882 preview feedback: the leftover transform now glides back to 0 over the
-  // height animation's 280ms (clearing it in one frame jumped the sheet), and is
-  // cleared once that is done.
-  test("vaul's onRelease(event, false) after a vetoed dismiss returns the sheet from the leftover drag transform, then clears it", () => {
-    vi.useFakeTimers();
-    render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
-    const bar = screen.getByRole("button", { name: /show details/i });
-    fireEvent.click(bar);
-
-    const content = screen.getByTestId("vaul-content") as HTMLDivElement;
-    // Simulate vaul's live drag having left an inline transform (exactly
-    // what vaul's own onDrag does to the DOM node during a real drag).
-    content.style.transition = "none";
-    content.style.transform = "translate3d(0, 240px, 0)";
-
-    const onDrag = vaulRootProps.current.onDrag as (...args: unknown[]) => void;
-    const onOpenChange = vaulRootProps.current.onOpenChange as (open: boolean) => void;
+    const content = screen.getByTestId("vaul-content");
     const onRelease = vaulRootProps.current.onRelease as (event: unknown, open: boolean) => void;
-    act(() => {
-      onDrag();
-      onOpenChange(false);
-      onRelease({}, false);
-    });
-
-    expect(content.style.transform).not.toContain("240px");
-    act(() => {
-      vi.advanceTimersByTime(1000);
-    });
-    expect(content.style.transform).toBe("");
-    vi.useRealTimers();
+    fireEvent.pointerDown(content, { clientY: 300 });
+    fireEvent.pointerUp(content, { clientY: 300 + dy });
+    act(() => onRelease({}, true));
+    expect(onClose).toHaveBeenCalledTimes(closes);
   });
 
   test("Escape (no prior onDrag) still closes normally even while expanded — #527/#604 unchanged", () => {
@@ -366,22 +291,6 @@ describe("BottomSheet — swipe down while expanded collapses instead of closing
     // to onOpenChange without ever touching vaul's onDrag prop.
     const onOpenChange = vaulRootProps.current.onOpenChange as (open: boolean) => void;
     act(() => {
-      onOpenChange(false);
-    });
-
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  test("a drag-dismiss while COLLAPSED still closes (only the second swipe-down, from expanded, is vetoed)", () => {
-    const onClose = vi.fn();
-    render(<BottomSheet venue={makeVenue()} onClose={onClose} />);
-    const bar = screen.getByRole("button", { name: /show details/i });
-    expect(bar.getAttribute("aria-expanded")).toBe("false");
-
-    const onDrag = vaulRootProps.current.onDrag as (...args: unknown[]) => void;
-    const onOpenChange = vaulRootProps.current.onOpenChange as (open: boolean) => void;
-    act(() => {
-      onDrag();
       onOpenChange(false);
     });
 

@@ -1406,27 +1406,39 @@ event** (see "Event page" below).
   box card. Only "Read more" unclamps About, on the sheet as on desktop
   (expanding by swipe or grab bar keeps 3 lines); on a collapsed sheet it also
   expands it (`onRequestExpand`, the grab bar's action), and collapsing clamps
-  it again. It shows only when the clamp actually cuts the text. On a phone the flyer opens at the top of the peek
-  section (only once expanded), not above the badge, so expanding never
-  shifts the badge and name.
-- **Smooth expand/collapse** (#882 preview feedback: the sheet snapped to its
-  new height in one frame while vaul settled its drag, which read as a
-  stutter). `useHeightTransition` (`src/lib/useHeightTransition.ts`) measures
-  an element's height before and after a change and plays a Web Animations
-  height keyframe between them (280ms ease-out, fill none, overflow clipped
-  only meanwhile; instant under reduced motion and where `Element.animate`
-  is missing, as in jsdom). WAAPI rather than `style.transition` because vaul
-  owns the sheet's inline `transition`/`transform`. `BottomSheet` uses it on
-  the sheet for every card (venue, box, event) except while a walk route is
-  active; the event card also uses it on its About section and its peek
-  section, and the sheet (`followInner`) measures its target with those inner
-  animations seeked to their end, so it reaches its max-height in step with
-  them instead of in one frame. It is a callback ref: vaul's portal mounts
-  the sheet node after `BottomSheet` commits, and Radix re-calls refs with
-  null then the same node on every commit, which a ref object or a naive
-  callback mis-measured (the first toggle snapped). A swipe-down that
-  collapses the expanded card now glides vaul's leftover drag transform back
-  over the same 280ms instead of clearing it in one frame.
+  it again. It shows only when the clamp actually cuts the text. About's
+  growth is animated (`useHeightTransition`, a Web Animations height
+  keyframe, 280ms, instant under reduced motion). On a phone the flyer sits
+  at the top of the below-the-fold section, not above the badge, so nothing
+  above the fold ever moves.
+- **Maps-style sheet** (#882 preview feedback: a swipe dragged the sheet,
+  bounced, then the rest of the card popped in). Every phone card (venue,
+  box, event) now rides vaul snap points: the sheet follows the finger
+  between collapsed and fully open and settles to the nearer one, velocity
+  counting, with vaul's 0.5s ease; a further pull down from collapsed closes
+  (vaul closes on a fast pull; `onRelease` adds the slow one past 100px,
+  restoring the release position first so the slide starts there). The card
+  content is the same at every height: the detail sections keep their full
+  height (no clip, no fade; `inert` while collapsed), and the collapsed snap
+  is "top of `#bottomsheet-detail` + its `data-peek-px`". `sheetSnapPoints`
+  (`src/lib/sheetSnap.ts`) turns the measurements into px snap points
+  (adding `innerHeight − sheet height`, the #549 offset), fully open being
+  the content's own height or `1` when it is taller than the sheet; a
+  ResizeObserver re-measures (never while a finger is down), reading past
+  About's running animation (`measureWithInnerAnimationsFinished`).
+  Scrolling: the scroller is `overflow-y: hidden` + `touch-action: none`
+  until fully open, so a drag below that always moves the sheet; fully open,
+  vaul's own `shouldDrag` lets a drag up scroll and a drag down move the
+  sheet only at `scrollTop 0`. A non-passive `touchmove` guard cancels the
+  browser's pull-down overscroll at `scrollTop 0` so it can't steal that drag
+  (vaul's own iOS guard is off because `modal`/`repositionInputs` are, #530).
+  `snapToSequentialPoint` keeps a pull from fully open at collapsed. The
+  sheet's height is now `100dvh − peek − safe area` for every card (the
+  route strip's #549 formula), so the #530 toolbar-resize residual
+  documented on `snapPoints` (a smooth re-snap, not a jump) applies to all
+  cards; the map page's document never scrolls, so Safari's toolbar changes
+  only on rotation. Not v2's retired model: v2 swapped content across three
+  snap points; this has two and never changes the content.
 - **Animated close** (#882 preview feedback: the card "disappeared super
   fast"). Closing clears the selection, and `MapWrapper` used to key the
   sheet on the selected id or `"empty"`, so a close remounted it and vaul's

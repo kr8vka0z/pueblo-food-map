@@ -297,28 +297,24 @@ export default function VenueCardBody({
         onStepChange={walk?.onStepChange}
       />
 
-      {/* Detail section. Phone (#666): always mounted, clipped to a short
-          peek with a bottom fade until expanded; tapping the peek expands it.
-          `data-vaul-no-drag` is deliberately NOT set, so a drag started on the
-          peek still reaches vaul's swipe-down-to-close. */}
+      {/* Detail section. Phone (#666): always mounted at full height. Since
+          #882 the sheet itself slides (vaul snap points), so collapsed means
+          this sits mostly below the screen edge with its top `data-peek-px`
+          showing; tapping that peek expands. No clip or fade any more: the
+          content must keep its real height for the sheet to measure. */}
       <div
         id={detailSectionId}
+        data-peek-px="64"
         onClick={open ? undefined : onRequestExpand}
-        className={"relative flex flex-col gap-4 pt-1 " + (open ? "" : "max-h-16 overflow-hidden cursor-pointer")}
+        className={"relative flex flex-col gap-4 pt-1 " + (open ? "" : "cursor-pointer")}
       >
-        {/* `inert` while clipped (#683 review): hides the clipped controls
-            from Tab and screen readers, and lets a tap fall through to the
-            wrapper's expand handler. `contents` keeps the children as the
-            wrapper's flex items. */}
+        {/* `inert` while collapsed (#683 review): hides the half-shown
+            controls from Tab and screen readers, and lets a tap fall through
+            to the wrapper's expand handler. `contents` keeps the children as
+            the wrapper's flex items. */}
         <div className="contents" inert={!open}>
           {details}
         </div>
-        {!open && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-b from-transparent to-[var(--color-bone-50)]"
-          />
-        )}
       </div>
     </div>
   );

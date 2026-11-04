@@ -366,8 +366,9 @@ export default function EventCardBody({
   ) : null;
 
   const ActionIcon = action ? ACTION_ICONS[action.kind] : null;
+  // Ended/cancelled: hidden like Share and Calendar (Kyle, 2026-11-03), so it never stacks on "See places open now".
   const actionButton =
-    action && ActionIcon ? (
+    active && action && ActionIcon ? (
       <a
         data-testid="event-action"
         href={action.href}

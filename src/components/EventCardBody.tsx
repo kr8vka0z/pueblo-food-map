@@ -14,19 +14,23 @@
  * calendar, and the large orange Get directions button LAST. The flyer (#760)
  * is EventFlyer: absent when the event has none or it fails to load, and the
  * card is complete without it. On the phone it shows only once the sheet is
- * expanded (see "Phone"), which also keeps the image from loading until the
- * visitor asks for the whole card.
+ * expanded, at the top of the below-the-fold section (see "Phone"), which also
+ * keeps the image from loading until the visitor asks for the whole card.
  *
  * Phone: the sheet's first, always-visible view is the badge, name, When,
- * About (3 lines) and the action button, so in `layout="sheet"` Where / What
- * to bring / Share / Calendar / Get directions sit in the clipped "peek"
- * wrapper under it (same grab-bar mechanics as the box card, #666/#667).
- * The phone and desktop orders are the same; only the fold differs.
+ * About (3 lines) and the action button, so in `layout="sheet"` the flyer /
+ * Where / What to bring / Share / Calendar / Get directions sit in the clipped
+ * "peek" wrapper under it (same grab-bar mechanics as the box card,
+ * #666/#667). The flyer is the one phone/desktop order difference: above the
+ * badge it pushed the badge and name down mid-swipe (#882 preview feedback),
+ * so on the phone it opens below the first view and nothing above it moves.
  *
  * About: clamped to 3 lines so the action button stays in the phone's first
  * view at 360px. "Read more" shows only when the text is actually cut; on the
  * sheet it expands the sheet (same action as the grab bar, and an expanded
- * sheet shows About in full), on desktop it just unclamps.
+ * sheet shows About in full), on desktop it just unclamps. The About section
+ * and the peek wrapper animate their height (useHeightTransition) and the
+ * sheet animates to where they end up, so expand/collapse glides.
  *
  * Action button (#882, replaces the old "More information" link): full-width
  * sage-600 fill, white label, the site name under it in sage-100 (5.25:1 on
@@ -80,6 +84,7 @@ import type { PublicEventDetail } from "@/lib/events";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { eventShareUrl, shareLink } from "@/lib/share";
 import { useMinuteClock } from "@/lib/useMinuteClock";
+import { useHeightTransition } from "@/lib/useHeightTransition";
 
 export interface EventCardBodyProps {
   event: PublicEventDetail;
@@ -178,11 +183,23 @@ export default function EventCardBody({
   const [aboutOpen, setAboutOpen] = useState(false);
   const aboutClamped = isSheet ? !expanded : !aboutOpen;
   const aboutRef = useRef<HTMLParagraphElement | null>(null);
-  const [aboutCut, setAboutCut] = useState(false);
+  // Whether the text runs past 3 lines, measured only while clamped and kept
+  // while open, so "Read more" appears/disappears in the SAME render as the
+  // clamp flips. A second render would change the section's height after the
+  // height animation below had already measured it, and end it with a jump.
+  const [aboutOverflows, setAboutOverflows] = useState(false);
   useLayoutEffect(() => {
     const el = aboutRef.current;
-    setAboutCut(aboutClamped && !!el && el.scrollHeight > el.clientHeight + 1);
+    if (aboutClamped && el) setAboutOverflows(el.scrollHeight > el.clientHeight + 1);
   }, [aboutClamped, text.description]);
+  const aboutCut = aboutClamped && aboutOverflows;
+
+  // #882 preview feedback: the About section and the below-the-fold section
+  // grow and shrink smoothly instead of in one frame (useHeightTransition.ts).
+  // Declared after the measurement above so it reads the clamped size first.
+  // The sheet around them hugs them and so follows frame by frame.
+  const aboutSectionRef = useHeightTransition(aboutClamped);
+  const detailRef = useHeightTransition(expanded, { enabled: isSheet });
 
   // ── Share ─────────────────────────────────────────────────────────────────
   const [copied, setCopied] = useState(false);
@@ -303,7 +320,7 @@ export default function EventCardBody({
   );
 
   const aboutBlock = text.description ? (
-    <section aria-labelledby={`${headingId}-about`}>
+    <section ref={aboutSectionRef} aria-labelledby={`${headingId}-about`}>
       <h3 id={`${headingId}-about`} className={SECTION_HEADING}>{t("events.card.about", locale)}</h3>
       <p
         ref={aboutRef}
@@ -432,10 +449,8 @@ export default function EventCardBody({
     return (
       <div className={`flex flex-col ${className}`}>
         {/* First view (always visible): badge, name, When, About (3 lines) and the action
-            button. The flyer joins above the badge only once expanded, so it can never
-            push those out of the collapsed sheet. */}
+            button. Nothing is inserted above the badge, so expanding never shifts it. */}
         <div className="flex flex-col gap-3 px-5 pt-2">
-          {expanded && flyer}
           {topRow}
           {heading}
           {statusNote}
@@ -448,11 +463,17 @@ export default function EventCardBody({
             while clipped so Tab and screen readers can't reach hidden buttons;
             a tap still falls through to the wrapper's expand handler. */}
         <div
+          ref={detailRef}
           id={detailSectionId}
           onClick={!expanded ? onRequestExpand : undefined}
           className={"relative px-5 pt-3 " + (expanded ? "" : "max-h-24 cursor-pointer overflow-hidden")}
         >
           <div className="flex flex-col gap-4" inert={!expanded}>
+            {/* Phone: the flyer opens at the top of this section, once expanded (#882 preview
+                feedback). Above the badge it pushed the badge and name down mid-swipe; here it
+                grows inside the animated section and nothing above the fold moves. Rendered
+                only when expanded, so the image still doesn't load until asked for. */}
+            {expanded && flyer}
             {whereBlock}
             {bringBlock}
             {secondaryButtons}

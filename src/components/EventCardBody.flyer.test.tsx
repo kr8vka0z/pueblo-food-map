@@ -72,7 +72,9 @@ describe("event card flyer", () => {
     expect(screen.queryByRole("img")).toBeNull();
   });
 
-  test("on the phone sheet the flyer is absent while collapsed and joins above the badge when expanded", () => {
+  // #882 preview feedback: above the badge, the flyer pushed the badge and name
+  // down mid-swipe, so on the phone it now opens below the first view.
+  test("on the phone sheet the flyer is absent while collapsed and joins below the badge when expanded", () => {
     const collapsed = renderCard(FLYER, { layout: "sheet", expanded: false });
     expect(screen.queryByTestId("event-flyer")).toBeNull();
     expect(screen.getByTestId("event-badge")).toBeInTheDocument();
@@ -81,6 +83,6 @@ describe("event card flyer", () => {
     renderCard(FLYER, { layout: "sheet", expanded: true });
     const flyer = screen.getByTestId("event-flyer");
     const badge = screen.getByTestId("event-badge");
-    expect(flyer.compareDocumentPosition(badge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(badge.compareDocumentPosition(flyer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

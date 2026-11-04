@@ -1405,7 +1405,27 @@ event** (see "Event page" below).
   button; the rest is the clipped "peek" section under the grab bar, as on the
   box card. "Read more" expands the sheet there (`onRequestExpand`, the grab
   bar's action) and just unclamps on desktop; it shows only when the clamp
-  actually cuts the text.
+  actually cuts the text. On a phone the flyer opens at the top of the peek
+  section (only once expanded), not above the badge, so expanding never
+  shifts the badge and name.
+- **Smooth expand/collapse** (#882 preview feedback: the sheet snapped to its
+  new height in one frame while vaul settled its drag, which read as a
+  stutter). `useHeightTransition` (`src/lib/useHeightTransition.ts`) measures
+  an element's height before and after a change and plays a Web Animations
+  height keyframe between them (280ms ease-out, fill none, overflow clipped
+  only meanwhile; instant under reduced motion and where `Element.animate`
+  is missing, as in jsdom). WAAPI rather than `style.transition` because vaul
+  owns the sheet's inline `transition`/`transform`. `BottomSheet` uses it on
+  the sheet for every card (venue, box, event) except while a walk route is
+  active; the event card also uses it on its About section and its peek
+  section, and the sheet (`followInner`) measures its target with those inner
+  animations seeked to their end, so it reaches its max-height in step with
+  them instead of in one frame. It is a callback ref: vaul's portal mounts
+  the sheet node after `BottomSheet` commits, and Radix re-calls refs with
+  null then the same node on every commit, which a ref object or a naive
+  callback mis-measured (the first toggle snapped). A swipe-down that
+  collapses the expanded card now glides vaul's leftover drag transform back
+  over the same 280ms instead of clearing it in one frame.
 - **Action button** (#882, replaced the "More information" link).
   `eventAction()` (`src/lib/eventCard.ts`, pure) turns `link_url` +
   `link_label(_custom/_es)` into the href (only if `safeUrl()` accepts it; no

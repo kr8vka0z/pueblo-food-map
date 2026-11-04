@@ -31,6 +31,8 @@ export const TRANSLATABLE_FIELDS = {
   description: FIELD_LIMITS.SUGGEST_NOTES,
   what_to_bring: FIELD_LIMITS.EVENT_SHORT_TEXT,
   cancel_note: FIELD_LIMITS.EVENT_SHORT_TEXT,
+  // The Custom action-button wording (#882); the form sends it only when "Custom" is chosen.
+  link_label_custom: FIELD_LIMITS.EVENT_LINK_LABEL,
 } as const;
 export type TranslatableField = keyof typeof TRANSLATABLE_FIELDS;
 const FIELD_KEYS = Object.keys(TRANSLATABLE_FIELDS) as TranslatableField[];

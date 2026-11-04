@@ -19,7 +19,13 @@
  * COPIED into the event, venue_id kept as provenance) or typed and geocoded
  * with the same GET /api/admin/geocode the venue form uses. Editing the typed
  * address drops the old coordinates, so stale coordinates can never ride along
- * with a new address.
+ * with a new address. "Venue name" (#882) is the event's own text; picking a
+ * place (or opening an event linked to one) fills it with the place's name
+ * only when the box is empty.
+ *
+ * Action button (#882): the link plus what the card's button says, one of the
+ * built-in wordings (Spanish built in) or Custom with English and Spanish
+ * boxes. Suggest Spanish includes the custom words only when Custom is chosen.
  *
  * Status actions: create = Save draft / Publish; edit = Save (+ Publish for a
  * draft, Cancel event for a published one — which reveals the required
@@ -41,7 +47,7 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import EventFlyerField from "@/components/EventFlyerField";
 import type { PublicFlyer } from "@/lib/events";
 import type { VenueChoice } from "@/lib/adminEventReads";
-import type { EventStatus } from "@/lib/adminEventValidation";
+import type { EventLinkLabel, EventStatus } from "@/lib/adminEventValidation";
 
 export interface EventFormValues {
   name: string;
@@ -61,7 +67,13 @@ export interface EventFormValues {
   address: string;
   lat: string;
   lng: string;
+  /** Shown in bold above the address on the card (#882). */
+  venueName: string;
   linkUrl: string;
+  /** One of EVENT_LINK_LABELS: what the card's action button says. */
+  linkLabel: string;
+  linkLabelCustom: string;
+  linkLabelCustomEs: string;
 }
 
 export interface EventFormProps {
@@ -90,8 +102,20 @@ interface GeocodeMatch {
 const EMPTY: EventFormValues = {
   name: "", nameEs: "", host: "", hostEs: "", description: "", descriptionEs: "",
   whatToBring: "", whatToBringEs: "", cancelNote: "", cancelNoteEs: "",
-  startsLocal: "", endsLocal: "", venueId: "", address: "", lat: "", lng: "", linkUrl: "",
+  startsLocal: "", endsLocal: "", venueId: "", address: "", lat: "", lng: "", venueName: "", linkUrl: "",
+  linkLabel: "website", linkLabelCustom: "", linkLabelCustomEs: "",
 };
+
+// The card button's wordings (#882), in the order the admin sees them. Keys are EVENT_LINK_LABELS.
+const LINK_LABEL_OPTIONS: [EventLinkLabel, string][] = [
+  ["website", "Visit website"],
+  ["signup", "Sign up"],
+  ["tickets", "Get tickets"],
+  ["rsvp", "RSVP"],
+  ["volunteer", "Volunteer"],
+  ["donate", "Donate"],
+  ["custom", "Custom (type your own)"],
+];
 
 // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
 const inputBase =
@@ -178,13 +202,19 @@ function validateClient(v: EventFormValues, cancelling: boolean): FieldErrors {
   if (!v.address.trim()) e.place = "Choose a place or enter an address.";
   else if (v.lat === "" || v.lng === "") e.place = "Find the location for this address, or choose a place from the list.";
   if (cancelling && !v.cancelNote.trim()) e.cancel_note = "Add a note explaining the cancellation.";
+  if (v.linkLabel === "custom" && !v.linkLabelCustom.trim()) e.link_label_custom = "Type what the button should say.";
   return e;
 }
 
 export default function EventForm({ venues, eventId, initialValues, status: initialStatus, expectedUpdatedAt, justSaved, initialFlyer }: EventFormProps) {
   const router = useRouter();
   const isEdit = eventId !== undefined;
-  const [values, setValues] = useState<EventFormValues>({ ...EMPTY, ...initialValues });
+  const [values, setValues] = useState<EventFormValues>(() => {
+    const start = { ...EMPTY, ...initialValues };
+    // An event linked to a mapped place but saved before #882 has no venue name: offer the place's.
+    if (!start.venueName.trim() && start.venueId) start.venueName = venues.find((x) => x.id === start.venueId)?.name ?? "";
+    return start;
+  });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<{ message: string; code: string | null } | null>(null);
@@ -206,7 +236,15 @@ export default function EventForm({ venues, eventId, initialValues, status: init
   const pickedVenue = venues.find((x) => x.id === values.venueId);
 
   function pickVenue(venue: VenueChoice) {
-    setValues((p) => ({ ...p, venueId: venue.id, address: venue.address, lat: String(venue.lat), lng: String(venue.lng) }));
+    setValues((p) => ({
+      ...p,
+      venueId: venue.id,
+      address: venue.address,
+      lat: String(venue.lat),
+      lng: String(venue.lng),
+      // Only fills an empty box: a name the admin typed is never overwritten.
+      venueName: p.venueName.trim() ? p.venueName : venue.name,
+    }));
     setErrors((p) => ({ ...p, place: undefined }));
     setVenueQuery("");
   }
@@ -259,7 +297,11 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       address: values.address,
       lat: values.lat === "" ? undefined : Number(values.lat),
       lng: values.lng === "" ? undefined : Number(values.lng),
+      venue_name: values.venueName,
       link_url: values.linkUrl,
+      link_label: values.linkLabel,
+      link_label_custom: values.linkLabelCustom,
+      link_label_custom_es: values.linkLabelCustomEs,
       ...(isEdit ? { expectedUpdatedAt: version } : {}),
     };
     try {
@@ -299,6 +341,9 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       ["description", "description", "descriptionEs"],
       ["what_to_bring", "whatToBring", "whatToBringEs"],
       ...(showCancelNote ? ([["cancel_note", "cancelNote", "cancelNoteEs"]] as [string, keyof EventFormValues, keyof EventFormValues][]) : []),
+      ...(values.linkLabel === "custom"
+        ? ([["link_label_custom", "linkLabelCustom", "linkLabelCustomEs"]] as [string, keyof EventFormValues, keyof EventFormValues][])
+        : []),
     ];
     if (!pairs.some(([, en]) => values[en].trim())) {
       setSuggest("none");
@@ -545,6 +590,17 @@ export default function EventForm({ venues, eventId, initialValues, status: init
             {errors.place}
           </p>
         )}
+        <div className="mt-4">
+          <TextField
+            id="event-venue-name"
+            label="Venue name"
+            hint="optional, shown in bold above the address"
+            value={values.venueName}
+            onChange={(v) => set("venueName", v)}
+            max={FIELD_LIMITS.SUGGEST_VENUE_NAME}
+            error={errors.venue_name}
+          />
+        </div>
       </fieldset>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -554,7 +610,39 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         <TextField id="event-bring-es" multiline lang="es" label="What to bring (Spanish)" value={values.whatToBringEs} onChange={(v) => set("whatToBringEs", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.what_to_bring_es} />
       </div>
 
-      <TextField id="event-link" type="url" label="Link" hint="optional, starts with https://" value={values.linkUrl} onChange={(v) => set("linkUrl", v)} max={FIELD_LIMITS.SUGGEST_CONTACT} error={errors.link_url} />
+      {/* The link becomes the card's green action button (#882); no link, no button. */}
+      <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4">
+        <legend className={`${labelClass} px-1`}>Action button</legend>
+        <div className="space-y-4">
+          <TextField id="event-link" type="url" label="Link" hint="optional, starts with https://" value={values.linkUrl} onChange={(v) => set("linkUrl", v)} max={FIELD_LIMITS.SUGGEST_CONTACT} error={errors.link_url} />
+          <div>
+            <label htmlFor="event-link-label" className={labelClass}>Button says</label>
+            <select
+              id="event-link-label"
+              value={values.linkLabel}
+              onChange={(e) => set("linkLabel", e.target.value)}
+              aria-invalid={errors.link_label ? "true" : undefined}
+              aria-describedby={errors.link_label ? "event-link-label-error" : undefined}
+              className={`${inputBase} ${inputBorder(!!errors.link_label)} min-h-12`}
+            >
+              {LINK_LABEL_OPTIONS.map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+            {errors.link_label && (
+              <p id="event-link-label-error" role="alert" className={errorClass}>
+                {errors.link_label}
+              </p>
+            )}
+          </div>
+          {values.linkLabel === "custom" && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <TextField id="event-link-label-custom" label="Button words (English)" required value={values.linkLabelCustom} onChange={(v) => set("linkLabelCustom", v)} max={FIELD_LIMITS.EVENT_LINK_LABEL} error={errors.link_label_custom} />
+              <TextField id="event-link-label-custom-es" label="Button words (Spanish)" lang="es" value={values.linkLabelCustomEs} onChange={(v) => set("linkLabelCustomEs", v)} max={FIELD_LIMITS.EVENT_LINK_LABEL} error={errors.link_label_custom_es} />
+            </div>
+          )}
+        </div>
+      </fieldset>
 
       {/* Saves on its own; hands the new `updated_at` up so the next Save doesn't 409 (#760). */}
       <EventFlyerField eventId={eventId} version={version} onVersion={setVersion} initialFlyer={initialFlyer} />

@@ -22,8 +22,9 @@ import type { EventRow } from "@/lib/events";
 
 const INSERT_EVENT_SQL = `INSERT INTO events (id, name, name_es, host, host_es, description, description_es,
     what_to_bring, what_to_bring_es, cancel_note, cancel_note_es, starts_at, ends_at, lat, lng, address,
-    venue_id, link_url, status, created_at, created_by, updated_at, updated_by, published_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    venue_id, venue_name, link_url, link_label, link_label_custom, link_label_custom_es,
+    status, created_at, created_by, updated_at, updated_by, published_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 export async function POST(req: NextRequest): Promise<Response> {
   let access: AdminDbAccess;
@@ -71,7 +72,11 @@ export async function POST(req: NextRequest): Promise<Response> {
     lng: fields.lng,
     address: fields.address,
     venue_id: fields.venueId,
+    venue_name: fields.venueName,
     link_url: fields.linkUrl,
+    link_label: fields.linkLabel,
+    link_label_custom: fields.linkLabelCustom,
+    link_label_custom_es: fields.linkLabelCustomEs,
     flyer_key: null,
     status,
     created_at: now,
@@ -86,7 +91,8 @@ export async function POST(req: NextRequest): Promise<Response> {
     .bind(
       row.id, row.name, row.name_es, row.host, row.host_es, row.description, row.description_es,
       row.what_to_bring, row.what_to_bring_es, row.cancel_note, row.cancel_note_es, row.starts_at, row.ends_at,
-      row.lat, row.lng, row.address, row.venue_id, row.link_url, row.status, row.created_at, row.created_by,
+      row.lat, row.lng, row.address, row.venue_id, row.venue_name, row.link_url, row.link_label,
+      row.link_label_custom, row.link_label_custom_es, row.status, row.created_at, row.created_by,
       row.updated_at, row.updated_by, row.published_at,
     );
   const insertAudit = db

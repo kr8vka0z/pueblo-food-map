@@ -14,7 +14,8 @@
  *
  * Error keys: name, host, ..., `starts_at`, `ends_at`, `place` (one message
  * covering "no place chosen / address never located / bad coordinates"),
- * `link_url`, `cancel_note`, and `_form` for body-level problems.
+ * `link_url`, `link_label`, `link_label_custom(_es)`, `venue_name`,
+ * `cancel_note`, and `_form` for body-level problems.
  */
 
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
@@ -22,6 +23,10 @@ import { puebloLocalToUtcIso } from "@/lib/eventTime";
 
 export const EVENT_STATUSES = ["draft", "published", "cancelled", "archived"] as const;
 export type EventStatus = (typeof EVENT_STATUSES)[number];
+
+/** What the card's action button can say (#882). Stored in events.link_label; NULL reads as "website". */
+export const EVENT_LINK_LABELS = ["website", "signup", "tickets", "rsvp", "volunteer", "donate", "custom"] as const;
+export type EventLinkLabel = (typeof EVENT_LINK_LABELS)[number];
 
 export interface ValidatedEventFields {
   name: string;
@@ -41,7 +46,12 @@ export interface ValidatedEventFields {
   lng: number;
   address: string;
   venueId: string | null;
+  venueName: string | null;
   linkUrl: string | null;
+  linkLabel: EventLinkLabel | null;
+  /** Only ever non-null when linkLabel is "custom". */
+  linkLabelCustom: string | null;
+  linkLabelCustomEs: string | null;
 }
 
 export type ValidateEventResult<A extends string> =
@@ -119,6 +129,23 @@ export function validateEventPayload<A extends string>(
   }
   const linkUrl = validateLinkUrl(b.link_url, errors);
 
+  // Button wording (#882). Blank = NULL = "Visit website". The custom words are
+  // kept only with "custom", so switching to a built-in wording can't leave
+  // stale text in the row (or the audit log) that nothing shows.
+  let linkLabel: EventLinkLabel | null = null;
+  if (b.link_label !== undefined && b.link_label !== null && b.link_label !== "") {
+    linkLabel = EVENT_LINK_LABELS.find((l) => l === b.link_label) ?? null;
+    if (linkLabel === null) errors.link_label = "Choose what the button says from the list.";
+  }
+  let linkLabelCustom: string | null = null;
+  let linkLabelCustomEs: string | null = null;
+  if (linkLabel === "custom") {
+    linkLabelCustom = optionalText(b.link_label_custom, "link_label_custom", FIELD_LIMITS.EVENT_LINK_LABEL, errors);
+    linkLabelCustomEs = optionalText(b.link_label_custom_es, "link_label_custom_es", FIELD_LIMITS.EVENT_LINK_LABEL, errors);
+    if (!linkLabelCustom && !errors.link_label_custom) errors.link_label_custom = "Type what the button should say.";
+  }
+  const venueName = optionalText(b.venue_name, "venue_name", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors);
+
   // Times: Pueblo wall clock in, UTC instants out; compare instants, never the typed text.
   const startsAt = typeof b.starts_at_local === "string" ? puebloLocalToUtcIso(b.starts_at_local) : null;
   if (!startsAt) errors.starts_at = "Enter a valid start date and time.";
@@ -162,7 +189,11 @@ export function validateEventPayload<A extends string>(
       lng: b.lng as number,
       address,
       venueId,
+      venueName,
       linkUrl,
+      linkLabel,
+      linkLabelCustom,
+      linkLabelCustomEs,
     },
   };
 }

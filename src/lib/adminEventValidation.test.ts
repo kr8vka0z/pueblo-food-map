@@ -121,3 +121,26 @@ describe("validateEventPayload", () => {
     expect(errorsOf([])._form).toBeTruthy();
   });
 });
+
+// #882: the action button's wording and the venue name.
+describe("button wording and venue name", () => {
+  test.each([
+    ["an unknown wording", { link_label: "buy-now" }, "link_label"],
+    ["Custom with no English text", { link_label: "custom", link_label_custom: "  ", link_label_custom_es: "Únete" }, "link_label_custom"],
+    ["Custom English over the cap", { link_label: "custom", link_label_custom: "x".repeat(FIELD_LIMITS.EVENT_LINK_LABEL + 1) }, "link_label_custom"],
+    ["Custom Spanish over the cap", { link_label: "custom", link_label_custom: "Join", link_label_custom_es: "x".repeat(FIELD_LIMITS.EVENT_LINK_LABEL + 1) }, "link_label_custom_es"],
+    ["a venue name over the cap", { venue_name: "x".repeat(FIELD_LIMITS.SUGGEST_VENUE_NAME + 1) }, "venue_name"],
+  ])("rejects %s", (_label, over, key) => {
+    expect(errorsOf(valid(over))[key]).toBeTruthy();
+  });
+
+  test("Custom keeps the admin's words; any other wording drops stale custom text", () => {
+    const custom = validateEventPayload(valid({ link_label: "custom", link_label_custom: " Join us ", link_label_custom_es: "" }), SAVE);
+    if (!custom.ok) throw new Error(JSON.stringify(custom.errors));
+    expect(custom.fields).toMatchObject({ linkLabel: "custom", linkLabelCustom: "Join us", linkLabelCustomEs: null });
+
+    const signup = validateEventPayload(valid({ link_label: "signup", link_label_custom: "Join us", link_label_custom_es: "Únete", venue_name: " Hall " }), SAVE);
+    if (!signup.ok) throw new Error(JSON.stringify(signup.errors));
+    expect(signup.fields).toMatchObject({ linkLabel: "signup", linkLabelCustom: null, linkLabelCustomEs: null, venueName: "Hall" });
+  });
+});

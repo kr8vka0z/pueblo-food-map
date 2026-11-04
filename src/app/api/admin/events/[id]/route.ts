@@ -31,7 +31,8 @@ import type { EventRow } from "@/lib/events";
 
 const UPDATE_EVENT_SQL = `UPDATE events SET name = ?, name_es = ?, host = ?, host_es = ?, description = ?, description_es = ?,
     what_to_bring = ?, what_to_bring_es = ?, cancel_note = ?, cancel_note_es = ?, starts_at = ?, ends_at = ?,
-    lat = ?, lng = ?, address = ?, venue_id = ?, link_url = ?, status = ?, published_at = ?, updated_by = ?, updated_at = ?
+    lat = ?, lng = ?, address = ?, venue_id = ?, venue_name = ?, link_url = ?, link_label = ?, link_label_custom = ?,
+    link_label_custom_es = ?, status = ?, published_at = ?, updated_by = ?, updated_at = ?
   WHERE id = ? AND updated_at = ?`;
 
 type EditAction = "save" | "publish" | "cancel";
@@ -122,7 +123,11 @@ export async function PATCH(
     lng: fields.lng,
     address: fields.address,
     venue_id: fields.venueId,
+    venue_name: fields.venueName,
     link_url: fields.linkUrl,
+    link_label: fields.linkLabel,
+    link_label_custom: fields.linkLabelCustom,
+    link_label_custom_es: fields.linkLabelCustomEs,
     status,
     published_at: existing.status !== "published" && status === "published" ? now : existing.published_at,
     updated_by: identity.email,
@@ -134,7 +139,8 @@ export async function PATCH(
     .bind(
       after.name, after.name_es, after.host, after.host_es, after.description, after.description_es,
       after.what_to_bring, after.what_to_bring_es, after.cancel_note, after.cancel_note_es, after.starts_at,
-      after.ends_at, after.lat, after.lng, after.address, after.venue_id, after.link_url, after.status,
+      after.ends_at, after.lat, after.lng, after.address, after.venue_id, after.venue_name, after.link_url,
+      after.link_label, after.link_label_custom, after.link_label_custom_es, after.status,
       after.published_at, after.updated_by, after.updated_at, id, expectedUpdatedAt,
     );
   const auditAction = existing.status === "draft" && status === "published" ? "publish" : "update";

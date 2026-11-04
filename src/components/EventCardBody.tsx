@@ -29,8 +29,8 @@
  * view at 360px. "Read more" shows only when the text is actually cut, and is
  * the ONLY thing that unclamps it: expanding the sheet (swipe, grab bar) keeps
  * it at 3 lines (#882 preview feedback). On a collapsed sheet "Read more" also
- * expands the sheet; collapsing clamps it again. The About section animates
- * its height (useHeightTransition) and the sheet re-snaps to where it ends up.
+ * expands the sheet; collapsing clamps it again. About unclamps at once and
+ * the sheet slides to its new fully-open height (BottomSheet re-measures).
  *
  * Action button (#882, replaces the old "More information" link): full-width
  * sage-600 fill, white label, the site name under it in sage-100 (5.25:1 on
@@ -84,7 +84,6 @@ import type { PublicEventDetail } from "@/lib/events";
 import { HIDDEN_UNTIL_FOCUS, PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { eventShareUrl, shareLink } from "@/lib/share";
 import { useMinuteClock } from "@/lib/useMinuteClock";
-import { useHeightTransition } from "@/lib/useHeightTransition";
 
 export interface EventCardBodyProps {
   event: PublicEventDetail;
@@ -206,12 +205,6 @@ export default function EventCardBody({
     if (aboutClamped && el) setAboutOverflows(el.scrollHeight > el.clientHeight + 1);
   }, [aboutClamped, text.description]);
   const aboutCut = aboutClamped && aboutOverflows;
-
-  // #882 preview feedback: About grows smoothly on "Read more" instead of in
-  // one frame (useHeightTransition.ts). Declared after the measurement above
-  // so it reads the clamped size first. On the phone the sheet picks its new
-  // fully-open height from where this animation ends.
-  const aboutSectionRef = useHeightTransition(aboutClamped);
 
   // ── Share ─────────────────────────────────────────────────────────────────
   const [copied, setCopied] = useState(false);
@@ -335,7 +328,7 @@ export default function EventCardBody({
   );
 
   const aboutBlock = text.description ? (
-    <section ref={aboutSectionRef} aria-labelledby={`${headingId}-about`}>
+    <section aria-labelledby={`${headingId}-about`}>
       <h3 id={`${headingId}-about`} className={SECTION_HEADING}>{t("events.card.about", locale)}</h3>
       <p
         ref={aboutRef}

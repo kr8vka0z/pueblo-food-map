@@ -86,7 +86,6 @@ import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { HIDDEN_UNTIL_FOCUS } from "@/lib/interactionStyles";
 import { isNativeDialogOpen } from "@/lib/dialogGuard";
 import { claimEscape, useOverlayStackId } from "@/lib/overlayRegistry";
-import { measureWithInnerAnimationsFinished } from "@/lib/useHeightTransition";
 import { sheetSnapPoints, type SheetSnaps } from "@/lib/sheetSnap";
 import { prefersReducedMotion } from "@/lib/useMediaQuery";
 import FavoriteButton from "@/components/FavoriteButton";
@@ -333,27 +332,23 @@ export default function BottomSheet({
       measurePending.current = true;
       return;
     }
-    // Read the layout as it will be once any height animation inside (About
-    // opening) ends, so the fully-open height is picked once, not chased.
-    const next = measureWithInnerAnimationsFinished(el, () => {
-      const top = el.getBoundingClientRect().top;
-      const detail = scroller.querySelector<HTMLElement>(`#${DETAIL_SECTION_ID}`);
-      // The collapsed height is read only while collapsed. Expanded, the
-      // first view can be taller than it will be once collapsed (About opened
-      // with "Read more" re-clamps on collapse), and reading it then made the
-      // collapsed height reach the fully-open one: one snap point, so a flick
-      // down sprang back instead of collapsing (iOS simulator, #882).
-      if (!expandedRef.current || collapsedFirstView.current === undefined) {
-        collapsedFirstView.current = detail
-          ? detail.getBoundingClientRect().top - top + scroller.scrollTop + Number(detail.dataset.peekPx ?? 64)
-          : null;
-      }
-      return sheetSnapPoints({
-        innerHeight: window.innerHeight,
-        drawerHeight: el.offsetHeight,
-        firstView: collapsedFirstView.current,
-        content: scroller.getBoundingClientRect().top - top + scroller.scrollHeight,
-      });
+    const top = el.getBoundingClientRect().top;
+    const detail = scroller.querySelector<HTMLElement>(`#${DETAIL_SECTION_ID}`);
+    // The collapsed height is read only while collapsed. Expanded, the first
+    // view can be taller than it will be once collapsed (About opened with
+    // "Read more" re-clamps on collapse), and reading it then made the
+    // collapsed height reach the fully-open one: one snap point, so a flick
+    // down sprang back instead of collapsing (iOS simulator, #882).
+    if (!expandedRef.current || collapsedFirstView.current === undefined) {
+      collapsedFirstView.current = detail
+        ? detail.getBoundingClientRect().top - top + scroller.scrollTop + Number(detail.dataset.peekPx ?? 64)
+        : null;
+    }
+    const next = sheetSnapPoints({
+      innerHeight: window.innerHeight,
+      drawerHeight: el.offsetHeight,
+      firstView: collapsedFirstView.current,
+      content: scroller.getBoundingClientRect().top - top + scroller.scrollHeight,
     });
     setSnap((prev) => (prev.points.join() === next.points.join() ? prev : next));
   }, []);

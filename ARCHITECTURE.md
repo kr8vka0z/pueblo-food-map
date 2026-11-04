@@ -1402,13 +1402,13 @@ event** (see "Event page" below).
   visitor's real position is known), a highlighted "What to bring" box, Share
   and Add to calendar, and the orange Get directions button last. On a phone
   the first, always-visible view is badge, name, When, About and the action
-  button; the rest is the clipped "peek" section under the grab bar, as on the
+  button; the rest is the "peek" section under the grab bar, as on the
   box card. Only "Read more" unclamps About, on the sheet as on desktop
   (expanding by swipe or grab bar keeps 3 lines); on a collapsed sheet it also
   expands it (`onRequestExpand`, the grab bar's action), and collapsing clamps
-  it again. It shows only when the clamp actually cuts the text. About's
-  growth is animated (`useHeightTransition`, a Web Animations height
-  keyframe, 280ms, instant under reduced motion). On a phone the flyer sits
+  it again. It shows only when the clamp actually cuts the text. About
+  unclamps at once; the sheet slides to its new fully-open height when it
+  re-measures (see "Maps-style sheet"). On a phone the flyer sits
   at the top of the below-the-fold section, not above the badge, so nothing
   above the fold ever moves.
 - **Maps-style sheet** (#882 preview feedback: a swipe dragged the sheet,
@@ -1427,8 +1427,7 @@ event** (see "Event page" below).
   (`src/lib/sheetSnap.ts`) turns the measurements into px snap points
   (adding `innerHeight − sheet height`, the #549 offset), fully open being
   the content's own height or `1` when it is taller than the sheet; a
-  ResizeObserver re-measures (never while a finger is down), reading past
-  About's running animation (`measureWithInnerAnimationsFinished`).
+  ResizeObserver re-measures (never while a finger is down).
   Scrolling: the scroller is `overflow-y: hidden` + `touch-action: none`
   until fully open, so a drag below that always moves the sheet; fully open,
   vaul's own `shouldDrag` lets a drag up scroll and a drag down move the

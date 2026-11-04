@@ -13,7 +13,9 @@
  * Visual language is the map card's (EventCardBody): same tokens, badge
  * colours, orange Get-directions button (DESIGN.md's owner-approved event
  * exception) and plain-text rule. All event text is a React text node, never
- * HTML; the optional link renders only if safeUrl() says http(s).
+ * HTML; the optional link renders only if safeUrl() says http(s) (via
+ * eventAction, which also gives it the card button's wording, #882). Where
+ * shows the venue name in bold above the address when there is one.
  *
  * An ended or cancelled event keeps its page but loses Get directions and Add
  * to calendar, the same as the card, and offers a way back to finding food.
@@ -21,7 +23,7 @@
 
 import { Navigation } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
-import { eventBadge, eventText, eventWhen, localizeEvent } from "@/lib/eventCard";
+import { eventAction, eventBadge, eventText, eventWhen, localizeEvent } from "@/lib/eventCard";
 import {
   buildEventBreadcrumbJsonLd,
   buildEventJsonLd,
@@ -32,7 +34,6 @@ import type { PublicEventDetail } from "@/lib/events";
 import { googleMapsUrl } from "@/lib/googleMapsUrl";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { localizedHref } from "@/lib/localizedHref";
-import { safeUrl } from "@/lib/safeUrl";
 import { serializeJsonLd } from "@/lib/venueSchema";
 import EventAddToCalendar from "@/components/EventAddToCalendar";
 import SiteFooter from "@/components/SiteFooter";
@@ -58,7 +59,8 @@ export default function EventPage({
   const phase = eventBadge(event, nowMs, locale).phase;
   const active = !cancelled && phase !== "ended";
   const when = eventWhen(event, locale);
-  const moreInfo = safeUrl(event.link_url);
+  // Same wording as the card's action button (#882); the page keeps its plain link layout.
+  const action = eventAction(event, locale);
   const otherLocale: Locale = locale === "es" ? "en" : "es";
   // The map link keeps its ?event= form: it is the one HomePageClient reads.
   const mapHref = localizedHref(`/?event=${encodeURIComponent(event.id)}`, locale);
@@ -179,6 +181,9 @@ export default function EventPage({
 
           <section aria-labelledby="event-where">
             <h2 id="event-where" className={SECTION_HEADING}>{t("events.card.where", locale)}</h2>
+            {event.venue_name?.trim() && (
+              <p className="text-sm font-semibold text-[var(--color-ink-900)]">{event.venue_name.trim()}</p>
+            )}
             <p className="text-sm text-[var(--color-ink-700)]">{event.address}</p>
           </section>
 
@@ -246,14 +251,14 @@ export default function EventPage({
                 {t("events.page.findFood", locale)}
               </a>
             )}
-            {moreInfo && (
+            {action && (
               <a
-                href={moreInfo}
+                href={action.href}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={"inline-flex min-h-12 items-center self-start text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)] " + FOCUS}
               >
-                {t("events.card.moreInfo", locale)}
+                {action.label}
               </a>
             )}
           </div>

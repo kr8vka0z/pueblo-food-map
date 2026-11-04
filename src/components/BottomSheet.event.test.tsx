@@ -4,8 +4,10 @@
  * because a mock can't prove anything about vaul's own Escape/focus wiring.
  * Covers: focus moves into the card on open and returns to the pin on close,
  * Escape and the close button both call onClose (which MapWrapper turns into
- * "deselect the pin and clear ?event="), and the collapsed first view already
- * has the badge, name and Get directions.
+ * "deselect the pin and clear ?event="), and the card mounts with its badge,
+ * name and Get directions. Which of them sit in the collapsed first view and
+ * which below the fold (#882 moved Get directions down) is asserted in
+ * EventCardBody.test.tsx.
  */
 
 import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
@@ -56,7 +58,7 @@ function Pin() {
 }
 
 describe("BottomSheet with an event", () => {
-  test("opens on the card: first view has badge, name and Get directions; focus lands in it", async () => {
+  test("opens on the card: badge, name and Get directions are there; focus lands in it", async () => {
     render(
       <>
         <Pin />

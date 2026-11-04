@@ -248,6 +248,37 @@ describe("text", () => {
   });
 });
 
+// #882: the action button and the new order.
+describe("action button and order", () => {
+  test("no link, no action button", () => {
+    vi.setSystemTime(START - HOUR);
+    renderCard(makeEvent({ link_url: null }));
+    expect(screen.queryByTestId("event-action")).toBeNull();
+  });
+
+  test.each(["panel", "sheet"] as const)("%s: Get directions is the last control on the card", (layout) => {
+    vi.setSystemTime(START - HOUR);
+    const { container } = renderCard(makeEvent({ link_url: "https://forms.gle/x", link_label: "signup" }), {
+      layout,
+      expanded: true,
+    });
+    const controls = container.querySelectorAll("a, button");
+    expect(controls[controls.length - 1]).toBe(directions());
+  });
+
+  test("phone sheet: the action button is in the first view and Get directions is below the fold", () => {
+    vi.setSystemTime(START - HOUR);
+    renderCard(makeEvent({ link_url: "https://forms.gle/x", link_label: "signup" }), {
+      layout: "sheet",
+      expanded: false,
+      detailSectionId: "detail",
+    });
+    const fold = document.getElementById("detail")!;
+    expect(fold.contains(screen.getByTestId("event-action"))).toBe(false);
+    expect(fold.contains(directions())).toBe(true);
+  });
+});
+
 describe("close", () => {
   test("the close button calls onClose", () => {
     vi.setSystemTime(START);

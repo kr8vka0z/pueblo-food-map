@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-05
+
+### Fixed
+
+- On laptops and tablets, the menu bar at the bottom of the map is now a compact bar in the middle instead of stretching across the whole screen. ([#888](https://github.com/kr8vka0z/pueblo-food-map/pull/888))
+
 ## [1.4.0] - 2026-11-01
 
 ### New

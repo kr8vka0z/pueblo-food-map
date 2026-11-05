@@ -57,6 +57,20 @@ export function flyerKey(eventId: string, ext: FlyerExt = "jpg"): string {
   return `${eventId}/${crypto.randomUUID()}.${ext}`;
 }
 
+/**
+ * Flyers the PUBLIC sends with "Share an event" (#883) wait here until an
+ * admin converts the submission. WHY a dot in the prefix: FLYER_EVENT_ID_RE
+ * refuses dots, so no public flyer URL can even name this folder; a pending
+ * flyer is unreachable by construction, not just because no event row
+ * matches. Convert copies the object to a fresh flyerKey(eventId).
+ */
+export const PENDING_FLYER_PREFIX = "pending.submissions/";
+export const PENDING_FLYER_KEY_RE = /^pending\.submissions\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jpg$/;
+
+export function pendingFlyerKey(): string {
+  return `${PENDING_FLYER_PREFIX}${crypto.randomUUID()}.jpg`;
+}
+
 /** The public URL path for a stored key, or null if the key is not in our shape. */
 export function flyerPublicPath(key: string): string | null {
   const [eventId, file, ...rest] = key.split("/");

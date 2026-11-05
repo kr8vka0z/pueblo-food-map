@@ -4,8 +4,13 @@
  * Same shape as /suggest/submit: parsePublicPost (Content-Type, Turnstile,
  * honeypot, D1) → checkFormRateLimit (5/hour per IP and 50/hour site-wide,
  * scope "event") → validateEventSubmission (the admin form's caps, link rule
- * and Pueblo-time conversion) → insert an event_submissions row → email the
- * suggestions inbox.
+ * and Pueblo-time conversion) → check the optional flyer → insert an
+ * event_submissions row → email the suggestions inbox.
+ *
+ * Flyer: the form uploads it first (POST /events/share/flyer) and sends the
+ * returned key as `flyer_key`. It must have the pending-key shape and exist
+ * in EVENT_FLYERS; its width and height are read here from the stored bytes
+ * (never client-reported) so the admin's convert can copy them as they are.
  *
  * WHY the D1 insert is required here (suggest's is best-effort): the row IS
  * the review queue. The admin's "Make it a draft event" copies from it, so an
@@ -27,6 +32,8 @@ import { parsePublicPost } from "@/lib/publicRequest";
 import { sendResendEmail } from "@/lib/emailSend";
 import { validateEventSubmission, type EventSubmissionPayload } from "@/lib/adminEventValidation";
 import { formatEventWhen } from "@/lib/eventTime";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
+import { inspectFlyer, PENDING_FLYER_KEY_RE, type InspectedFlyer } from "@/lib/eventFlyers";
 
 interface SubmitBody {
   website?: string;
@@ -77,6 +84,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "invalid", errors: v.errors }, { status: 422 });
   }
 
+  let flyer: { key: string; inspected: InspectedFlyer } | null = null;
+  if (body.flyer_key !== undefined && body.flyer_key !== null && body.flyer_key !== "") {
+    const key = body.flyer_key;
+    const object =
+      typeof key === "string" && PENDING_FLYER_KEY_RE.test(key)
+        ? await getCloudflareContext().env.EVENT_FLYERS.get(key)
+        : null;
+    const inspected = object ? inspectFlyer(await object.arrayBuffer()) : null;
+    if (!inspected) {
+      return NextResponse.json({ ok: false, error: "invalid", errors: { flyer: "Add the flyer again." } }, { status: 422 });
+    }
+    flyer = { key: key as string, inspected };
+  }
+
   const id = crypto.randomUUID();
   try {
     await db
@@ -84,7 +105,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         `INSERT INTO event_submissions (id, payload, submitter_name, submitter_email, flyer_key, flyer_width, flyer_height)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(id, JSON.stringify(v.payload), v.submitterName, v.submitterEmail, null, null, null)
+      .bind(
+        id, JSON.stringify(v.payload), v.submitterName, v.submitterEmail,
+        flyer?.key ?? null, flyer?.inspected.width ?? null, flyer?.inspected.height ?? null,
+      )
       .run();
   } catch (err) {
     logFormFailure("event", "db_write_failed", { message: err instanceof Error ? err.message : "unknown error" });
@@ -92,7 +116,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    await sendEventEmail(v.payload, v.submitterName, v.submitterEmail, false);
+    await sendEventEmail(v.payload, v.submitterName, v.submitterEmail, flyer !== null);
   } catch (err) {
     // Best-effort: the row is already in the admin list (see header).
     logFormFailure("event", "send_failed", { message: err instanceof Error ? err.message : "unknown error" });

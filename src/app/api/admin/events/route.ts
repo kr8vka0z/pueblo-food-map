@@ -11,20 +11,24 @@
  * event is live on the map within the feed's 60s cache, so the feed's edge
  * cache entry is purged after the write. Events never go through the venue
  * Publish snapshot.
+ *
+ * `submission_id` (#883): the form was opened from a public "Share an event"
+ * submission whose address couldn't be located automatically. Then only
+ * "save_draft" is accepted, the submission's flyer is copied onto the event,
+ * and the insert plus "mark the submission converted" go through the same
+ * atomic convertToDraft() as the convert route (409 if someone else
+ * already handled the submission).
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
-import { EVENT_AUDIT_INSERT_SQL, purgeEventsFeed } from "@/lib/adminEvents";
+import { EVENT_AUDIT_INSERT_SQL, EVENT_INSERT_COLUMNS, EVENT_INSERT_PLACEHOLDERS, eventInsertValues, purgeEventsFeed } from "@/lib/adminEvents";
 import { validateEventPayload } from "@/lib/adminEventValidation";
 import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import type { EventRow } from "@/lib/events";
+import { convertToDraft, loadPendingEventSubmission, submissionGoneResponse } from "@/lib/eventSubmissions";
 
-const INSERT_EVENT_SQL = `INSERT INTO events (id, name, name_es, host, host_es, description, description_es,
-    what_to_bring, what_to_bring_es, cancel_note, cancel_note_es, starts_at, ends_at, lat, lng, address,
-    venue_id, venue_name, link_url, link_label, link_label_custom, link_label_custom_es,
-    status, created_at, created_by, updated_at, updated_by, published_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+const INSERT_EVENT_SQL = `INSERT INTO events (${EVENT_INSERT_COLUMNS}) VALUES (${EVENT_INSERT_PLACEHOLDERS})`;
 
 export async function POST(req: NextRequest): Promise<Response> {
   let access: AdminDbAccess;
@@ -42,7 +46,10 @@ export async function POST(req: NextRequest): Promise<Response> {
     return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
   }
 
-  const validation = validateEventPayload(body, ["save_draft", "publish"] as const);
+  const raw = (body as { submission_id?: unknown } | null)?.submission_id;
+  const submissionId = typeof raw === "string" && raw ? raw : null;
+  // From a public submission: a draft only, never published on creation.
+  const validation = validateEventPayload(body, submissionId ? (["save_draft"] as const) : (["save_draft", "publish"] as const));
   if (!validation.ok) {
     return NextResponse.json({ ok: false, errors: validation.errors }, { status: 422 });
   }
@@ -86,15 +93,16 @@ export async function POST(req: NextRequest): Promise<Response> {
     published_at: publishedAt,
   };
 
+  if (submissionId) {
+    const sub = await loadPendingEventSubmission(db, submissionId);
+    const failed = sub ? await convertToDraft(db, identity, sub, row) : submissionGoneResponse();
+    if (failed) return failed;
+    return NextResponse.json({ ok: true, id, updated_at: now, status }, { status: 201 });
+  }
+
   const insertEvent = db
     .prepare(INSERT_EVENT_SQL)
-    .bind(
-      row.id, row.name, row.name_es, row.host, row.host_es, row.description, row.description_es,
-      row.what_to_bring, row.what_to_bring_es, row.cancel_note, row.cancel_note_es, row.starts_at, row.ends_at,
-      row.lat, row.lng, row.address, row.venue_id, row.venue_name, row.link_url, row.link_label,
-      row.link_label_custom, row.link_label_custom_es, row.status, row.created_at, row.created_by,
-      row.updated_at, row.updated_by, row.published_at,
-    );
+    .bind(...eventInsertValues(row));
   const insertAudit = db
     .prepare(EVENT_AUDIT_INSERT_SQL)
     .bind(identity.email, id, "create", null, JSON.stringify(row), now, identity.sessionId ?? null, id, now);

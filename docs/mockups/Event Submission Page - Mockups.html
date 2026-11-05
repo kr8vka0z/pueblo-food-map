@@ -1,0 +1,165 @@
+<!doctype html>
+<!--
+  Pueblo Food Map — public "Share an event" page, round 2 (2026-11-03).
+  Static mockup only; tokens from DESIGN.md. Round 2: friendlier intro
+  (Kyle: more inclusive, not just free/low-cost), plus a live preview of the
+  event card while the visitor types — side by side on a computer, a
+  "Preview" button that opens the real card sheet on a phone. The preview
+  reuses the event card designed in #882 (green action button, directions last).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Share an event — round 2</title>
+<style>
+  :root { --bone50:#FBFAF6; --bone200:#E8E3D6; --bone300:#D4CDB8; --ink400:#6A645A; --ink500:#5F5A52; --ink700:#2D2A26; --ink900:#1A1817; --sage50:#EAF0EC; --sage500:#4A8466; --sage600:#2C5F4F; --sage700:#1F4639; --orange:#F7943C; --navy:#190F3F; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:0; font-family:'Public Sans',system-ui,sans-serif; color:var(--ink700); }
+  @media (min-width:800px) { body { padding:16px; } }
+  h1 { font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:22px; margin:0 0 6px; color:var(--foreground, var(--ink900)); }
+  .lead { margin:0 0 20px; font-size:14px; color:var(--muted-foreground, var(--ink500)); line-height:1.5; max-width:760px; }
+  .h2 { font-size:16px; font-weight:700; margin:0 0 4px; color:var(--foreground, var(--ink900)); }
+  .why { font-size:13px; line-height:1.45; color:var(--muted-foreground, var(--ink500)); margin:0 0 12px; max-width:760px; }
+  .new { outline:3px solid var(--orange); outline-offset:3px; border-radius:6px; }
+
+  /* browser frame for the computer view */
+  .browser { max-width:1000px; border-radius:12px; overflow:hidden; box-shadow:0 2px 16px rgba(26,24,23,.14); background:var(--bone50); margin-bottom:36px; }
+  .bar { background:var(--bone200); padding:7px 12px; font-size:12px; color:var(--ink500); display:flex; gap:6px; align-items:center; }
+  .bar i { width:9px; height:9px; border-radius:99px; background:var(--bone300); display:inline-block; }
+  .bar span { margin-left:10px; background:#fff; border-radius:6px; padding:2px 10px; }
+  .split { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); }
+  .formside { padding:18px; border-right:1px solid var(--bone200); }
+  .prevside { padding:18px; background:#ECE8DF; }
+  .prevlbl { display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--ink500); margin-bottom:10px; }
+  .live { display:inline-flex; gap:5px; align-items:center; text-transform:none; letter-spacing:0; font-weight:600; color:var(--sage700); }
+  .live b { width:7px; height:7px; border-radius:99px; background:var(--sage500); display:inline-block; }
+
+  /* form bits */
+  .pt { font-family:'Fraunces',Georgia,serif; font-size:24px; color:var(--ink900); margin:0 0 4px; }
+  .ps { font-size:14px; color:var(--ink500); margin:0 0 14px; line-height:1.45; }
+  .sect { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--ink400); margin:14px 0 8px; padding-top:10px; border-top:1px solid var(--bone200); }
+  .sect.first { border-top:0; padding-top:0; margin-top:0; }
+  .f { margin-bottom:10px; }
+  .f label { display:block; font-size:13px; font-weight:600; color:var(--ink900); margin-bottom:3px; }
+  .f label i { font-style:normal; font-weight:400; color:var(--ink500); }
+  .inp { border:1px solid var(--bone300); border-radius:9px; padding:8px 11px; font-size:14px; background:#fff; color:var(--ink700); min-height:40px; display:flex; align-items:center; justify-content:space-between; }
+  .inp.ph { color:var(--ink400); }
+  .inp.focus { border:2px solid var(--sage500); }
+  .inp.area { min-height:60px; align-items:flex-start; }
+  .row { display:flex; gap:8px; } .row .f { flex:1; }
+  .more { font-size:12px; color:var(--ink500); text-align:center; padding:8px; border:1px dashed var(--bone300); border-radius:8px; }
+
+  /* the event card (same as #882) */
+  .card { background:var(--bone50); border-radius:12px; box-shadow:0 2px 12px rgba(26,24,23,.12); padding:14px 16px 16px; display:flex; flex-direction:column; gap:11px; }
+  .sheet { border-radius:18px 18px 0 0; }
+  .grab { width:40px; height:5px; border-radius:3px; background:var(--bone300); margin:0 auto; }
+  .badge { align-self:flex-start; border:2px solid var(--navy); border-radius:999px; padding:2px 10px; font-size:12px; font-weight:600; color:var(--navy); }
+  .name { font-family:'Fraunces',Georgia,serif; font-size:21px; line-height:1.15; color:var(--ink900); margin:0; }
+  .host { font-size:13px; color:var(--ink500); margin:3px 0 0; }
+  .lbl { font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--ink400); margin:0 0 2px; }
+  .day { font-size:15px; font-weight:600; color:var(--ink900); margin:0; }
+  .p { font-size:13.5px; line-height:1.45; margin:0; }
+  .empty { color:var(--ink400); font-style:italic; }
+  .cta { display:flex; align-items:center; gap:10px; min-height:52px; padding:8px 12px; border-radius:10px; background:var(--sage600); color:#fff; }
+  .cta .t { flex:1; line-height:1.2; } .cta .t b { display:block; font-size:15px; } .cta .t span { font-size:12px; color:#D1DDD3; }
+  .venue { font-size:14px; font-weight:700; color:var(--ink900); margin:0; }
+  .dirs { display:flex; align-items:center; justify-content:center; min-height:46px; border-radius:10px; background:var(--orange); color:var(--navy); font-weight:700; font-size:15px; }
+  .fade { opacity:.45; }
+  .disc { font-size:12px; color:var(--ink500); margin-top:10px; line-height:1.4; }
+
+  /* phone frames */
+  .phones { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:24px; align-items:start; }
+  .phone { max-width:330px; height:640px; background:var(--bone50); border-radius:22px; box-shadow:0 2px 14px rgba(26,24,23,.14); overflow:hidden; position:relative; }
+  .phone .scroll { padding:16px; }
+  .sticky { position:absolute; left:0; right:0; bottom:0; padding:10px 14px 14px; background:linear-gradient(to bottom, rgba(251,250,246,0), var(--bone50) 30%); display:flex; gap:8px; }
+  .sticky div { flex:1; display:flex; align-items:center; justify-content:center; gap:6px; min-height:48px; border-radius:10px; font-weight:700; font-size:15px; }
+  .pv { background:#fff; border:2px solid var(--sage600); color:var(--sage700); }
+  .send { background:var(--sage600); color:#fff; }
+  .dim { position:absolute; inset:0; background:rgba(26,24,23,.45); }
+  .phone .sheet { position:absolute; left:0; right:0; bottom:0; border-radius:20px 20px 0 0; box-shadow:0 -4px 20px rgba(0,0,0,.2); }
+  .back { display:flex; align-items:center; justify-content:center; min-height:44px; border-radius:10px; border:1px solid var(--bone300); font-weight:600; font-size:14px; background:#fff; }
+  .tag { align-self:center; font-size:11px; font-weight:700; background:var(--navy); color:#fff; padding:3px 10px; border-radius:99px; }
+</style>
+</head>
+<body>
+<h1>Share an event — round 2: live preview</h1>
+<p class="lead">New intro wording, and people see their event card fill in as they type. Fields they haven't filled yet show grey placeholder text in the card. Orange outlines mark what changed.</p>
+
+<p class="h2">On a computer: form on the left, card on the right</p>
+<p class="why">The preview sits beside the form and stays in view while they scroll. It's the real event card, so it will always match the map exactly.</p>
+<div class="browser">
+  <div class="bar"><i></i><i></i><i></i><span>pueblofoodmap.com/events/share</span></div>
+  <div class="split">
+    <div class="formside">
+      <p class="pt">Share an event</p>
+      <p class="ps new">Holding a food event you'd like on the map? Send us the details and we'll be in touch.</p>
+      <p class="sect first">The event</p>
+      <div class="f"><label>Event name</label><div class="inp">Thanksgiving Turkey Giveaway</div></div>
+      <div class="f"><label>Who's hosting it?</label><div class="inp">Pueblo Food Project</div></div>
+      <div class="row"><div class="f"><label>Date</label><div class="inp">Nov 22, 2026</div></div><div class="f"><label>Starts</label><div class="inp">10:00 AM</div></div><div class="f"><label>Ends</label><div class="inp">1:00 PM</div></div></div>
+      <div class="f"><label>What is it?</label><div class="inp area focus">Free turkeys and sides for families while supplies last. Drive-through line opens at 10|</div></div>
+      <div class="f"><label>What should people bring? <i>optional</i></label><div class="inp ph">e.g. bags, ID, a cooler</div></div>
+      <p class="sect">Where</p>
+      <div class="f"><label>Place name <i>optional</i></label><div class="inp ph">e.g. St. Mary's Church hall</div></div>
+      <div class="f"><label>Street address</label><div class="inp ph">Street, city</div></div>
+      <div class="more">… link, button wording, flyer, your name and email, Send …</div>
+    </div>
+    <div class="prevside new">
+      <div class="prevlbl">Preview <span class="live"><b></b>Updates as you type</span></div>
+      <div class="card">
+        <span class="badge">Starts in 19 days</span>
+        <div><p class="name">Thanksgiving Turkey Giveaway</p><p class="host">Hosted by Pueblo Food Project</p></div>
+        <div><p class="lbl">When</p><p class="day">Saturday, November 22</p><p class="p">10:00 AM – 1:00 PM</p></div>
+        <div><p class="lbl">About</p><p class="p">Free turkeys and sides for families while supplies last. Drive-through line opens at 10</p></div>
+        <div class="cta fade"><span class="t"><b>Visit website</b><span>Add a link to show this button</span></span></div>
+        <div><p class="lbl">Where</p><p class="p empty">Add an address</p></div>
+        <div class="dirs fade">Get directions</div>
+      </div>
+      <p class="disc">This is how it will look on the map once we approve it.</p>
+    </div>
+  </div>
+</div>
+
+<p class="h2">On a phone: a Preview button that opens the real card</p>
+<p class="why">There's no room side by side on a phone, so a Preview button sits next to Send at the bottom of the screen. It opens the card the same way it pops up on the map; "Back to editing" closes it.</p>
+<div class="phones">
+  <div>
+    <p class="why"><b>Filling in the form</b></p>
+    <div class="phone">
+      <div class="scroll">
+        <p class="pt">Share an event</p>
+        <p class="ps new">Holding a food event you'd like on the map? Send us the details and we'll be in touch.</p>
+        <p class="sect first">The event</p>
+        <div class="f"><label>Event name</label><div class="inp">Thanksgiving Turkey Giveaway</div></div>
+        <div class="f"><label>Who's hosting it?</label><div class="inp">Pueblo Food Project</div></div>
+        <div class="f"><label>Date</label><div class="inp">Sat, Nov 22, 2026</div></div>
+        <div class="row"><div class="f"><label>Starts</label><div class="inp">10:00 AM</div></div><div class="f"><label>Ends</label><div class="inp">1:00 PM</div></div></div>
+        <div class="f"><label>What is it?</label><div class="inp area">Free turkeys and sides for families…</div></div>
+      </div>
+      <div class="sticky new"><div class="pv">Preview</div><div class="send">Send for review</div></div>
+    </div>
+  </div>
+  <div>
+    <p class="why"><b>After tapping Preview</b></p>
+    <div class="phone">
+      <div class="scroll fade">
+        <p class="pt">Share an event</p>
+        <p class="ps">Holding a food event you'd like on the map? Send us the details and we'll be in touch.</p>
+      </div>
+      <div class="dim"></div>
+      <div class="card sheet">
+        <div class="grab"></div>
+        <span class="tag">Preview — not on the map yet</span>
+        <span class="badge">Starts in 19 days</span>
+        <div><p class="name">Thanksgiving Turkey Giveaway</p><p class="host">Hosted by Pueblo Food Project</p></div>
+        <div><p class="lbl">When</p><p class="day">Saturday, November 22</p><p class="p">10:00 AM – 1:00 PM</p></div>
+        <div><p class="lbl">About</p><p class="p">Free turkeys and sides for families while supplies last…</p></div>
+        <div class="cta fade"><span class="t"><b>Visit website</b><span>Add a link to show this button</span></span></div>
+        <div class="back new">Back to editing</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

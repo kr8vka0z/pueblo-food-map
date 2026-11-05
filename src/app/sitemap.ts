@@ -119,6 +119,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // WHY 0.7: a browse/discovery page (the crawlable counterpart to the
     // JS-only homepage map) — below /about's 0.8, above the utility forms.
     ...mirrored("/venues", "weekly", 0.7),
+    // #883: the public "Share an event" form (+ /es twin), same tier as /suggest.
+    ...mirrored("/events/share", "monthly", 0.6),
     {
       // WHY 0.5/"hourly": live content (Blessing Boxes slice 3), but a
       // secondary/watcher-audience page — below the browse/discovery pages

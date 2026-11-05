@@ -11,6 +11,32 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-05
+
+### Fixed
+
+- On laptops and tablets, the menu bar at the bottom of the map is now a compact bar in the middle instead of stretching across the whole screen. ([#888](https://github.com/kr8vka0z/pueblo-food-map/pull/888))
+
+## [1.4.0] - 2026-11-01
+
+### New
+
+- The menu and footer now have a Roadmap link (in Spanish, "Ideas y novedades"). ([#864](https://github.com/kr8vka0z/pueblo-food-map/pull/864))
+- The weekly data refresh now reads venue websites and sends suggested changes to the admin review queue. ([#845](https://github.com/kr8vka0z/pueblo-food-map/pull/845))
+
+### Improved
+
+- Returning visitors see the map screen's search bar and bottom bar right away instead of a blank page. ([#868](https://github.com/kr8vka0z/pueblo-food-map/pull/868))
+- Pages load faster on slow phones, and map pins pan more smoothly. ([#863](https://github.com/kr8vka0z/pueblo-food-map/pull/863), [#847](https://github.com/kr8vka0z/pueblo-food-map/pull/847))
+- The place card on desktop now always shows full details, and the last small buttons are bigger and easier to tap. ([#864](https://github.com/kr8vka0z/pueblo-food-map/pull/864))
+
+### Fixed
+
+- Admins can now approve older suggestion cards even after a venue's last-checked date has changed. ([#867](https://github.com/kr8vka0z/pueblo-food-map/pull/867))
+- Duplicate suggestion cards disappear once one of them is approved, so admins no longer see a false error. ([#851](https://github.com/kr8vka0z/pueblo-food-map/pull/851))
+- Saved blessing boxes now show up in the Saved list on every page. ([#847](https://github.com/kr8vka0z/pueblo-food-map/pull/847))
+- Visitors who move from a public page into the admin area are no longer tracked there. ([#863](https://github.com/kr8vka0z/pueblo-food-map/pull/863))
+
 ## [1.3.2] - 2026-10-27
 
 ### Fixed

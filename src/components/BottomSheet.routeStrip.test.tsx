@@ -103,10 +103,12 @@ function makeVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: nu
 }
 
 describe("BottomSheet — no route active (baseline, unchanged)", () => {
-  test("dismissible=true, no snapPoints", () => {
+  // #882: the card mode has its own snap points now (Maps-style sheet, measured
+  // from the card); what must hold is that they are never the route strip's.
+  test("dismissible=true, and not the route strip's snap points", () => {
     render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
     expect(rootPropsHolder.dismissible).toBe(true);
-    expect(rootPropsHolder.snapPoints).toBeUndefined();
+    expect(rootPropsHolder.snapPoints).not.toContain("212px");
     expect(screen.queryByTestId("route-strip")).toBeNull();
   });
 });

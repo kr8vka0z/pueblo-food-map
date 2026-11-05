@@ -285,10 +285,12 @@ describe("Venue card controls", () => {
     );
   });
 
-  test("BottomSheet header: 48px close, 16px flex gap so Share/Save/× hit areas sit 8px apart", () => {
+  // #882: the phone sheet's × is hidden until keyboard focus (Kyle: it closes by
+  // swiping down), so it no longer sits in the row; when it shows it is 48px.
+  test("BottomSheet header: 48px close when focused, 16px flex gap so Share/Save hit areas sit 8px apart", () => {
     render(<BottomSheet venue={makeVenue()} onClose={vi.fn()} />);
     const close = screen.getByRole("button", { name: "Close" });
-    expect(classes(close)).toEqual(expect.arrayContaining(["w-12", "h-12", "-ml-1", "-mr-3"]));
+    expect(classes(close)).toEqual(expect.arrayContaining(["w-12", "h-12", "focus-visible:h-12", "focus-visible:w-12"]));
     expect(classes(close.parentElement)).toContain("gap-4");
   });
 

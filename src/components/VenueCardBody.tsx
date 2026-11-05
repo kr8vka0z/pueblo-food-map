@@ -25,7 +25,7 @@ import { getDisplayNotes } from "@/lib/venueNotes";
 import { PLACEHOLDER_ADDRESS } from "@/lib/venueSummary";
 import { t, type Locale } from "@/lib/i18n";
 import { safeUrl } from "@/lib/safeUrl";
-import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { HIDDEN_UNTIL_FOCUS, PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { track, EVENTS } from "@/lib/analytics";
 import type { Walk } from "@/lib/useWalkingRoute";
 import ReportVenueButton from "@/components/ReportVenueButton";
@@ -167,9 +167,10 @@ export default function VenueCardBody({
 
   return (
     <div className={sheet ? "flex flex-col px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3" : "flex flex-col p-4 gap-3"}>
-      {/* Name row: title, Share, Save (+ close on a phone). gap-4: Share/Save
-          (-m-1) and × (-ml-1) each give back 4px of it, leaving 8px between
-          their 48px hit areas (#233). */}
+      {/* Name row: title, Share, Save (+ a close button on a phone that is
+          hidden until keyboard focus, #882, so it takes no room). gap-4:
+          Share/Save (-m-1) each give back 4px of it, leaving 8px between their
+          48px hit areas (#233). */}
       <div className="flex items-start gap-4">
         <h2
           id={nameId}
@@ -189,8 +190,8 @@ export default function VenueCardBody({
             onClick={onClose}
             aria-label={t("detail.close", locale)}
             className={
-              "flex items-center justify-center w-12 h-12 " +
-              "-mt-2 -mb-2 -ml-1 -mr-3 rounded-md " +
+              // #882: hidden on the phone (the sheet closes by swiping down), shown on keyboard focus.
+              HIDDEN_UNTIL_FOCUS + " flex items-center justify-center w-12 h-12 rounded-md " +
               "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
               PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
@@ -276,9 +277,11 @@ export default function VenueCardBody({
 
       {/* Notes — suppressed for OSM artifacts and Plentiful's auto-generated
           boilerplate (src/lib/venueNotes.ts). Two lines on a phone; in full
-          on a computer, which has the room. */}
+          on a computer, which has the room. pointer-events-none with the clamp:
+          on iOS Safari a flick that starts on clipped overflowing text never
+          scrolls the sheet (see EventCardBody's About). */}
       {displayNotes && (
-        <p className={`text-sm text-[var(--color-ink-700)] leading-relaxed${sheet ? " line-clamp-2" : ""}`}>
+        <p className={`text-sm text-[var(--color-ink-700)] leading-relaxed${sheet ? " line-clamp-2 pointer-events-none" : ""}`}>
           {displayNotes}
         </p>
       )}
@@ -297,28 +300,24 @@ export default function VenueCardBody({
         onStepChange={walk?.onStepChange}
       />
 
-      {/* Detail section. Phone (#666): always mounted, clipped to a short
-          peek with a bottom fade until expanded; tapping the peek expands it.
-          `data-vaul-no-drag` is deliberately NOT set, so a drag started on the
-          peek still reaches vaul's swipe-down-to-close. */}
+      {/* Detail section. Phone (#666): always mounted at full height. Since
+          #882 the sheet itself slides (vaul snap points), so collapsed means
+          this sits mostly below the screen edge with its top `data-peek-px`
+          showing; tapping that peek expands. No clip or fade any more: the
+          content must keep its real height for the sheet to measure. */}
       <div
         id={detailSectionId}
+        data-peek-px="64"
         onClick={open ? undefined : onRequestExpand}
-        className={"relative flex flex-col gap-4 pt-1 " + (open ? "" : "max-h-16 overflow-hidden cursor-pointer")}
+        className={"relative flex flex-col gap-4 pt-1 " + (open ? "" : "cursor-pointer")}
       >
-        {/* `inert` while clipped (#683 review): hides the clipped controls
-            from Tab and screen readers, and lets a tap fall through to the
-            wrapper's expand handler. `contents` keeps the children as the
-            wrapper's flex items. */}
+        {/* `inert` while collapsed (#683 review): hides the half-shown
+            controls from Tab and screen readers, and lets a tap fall through
+            to the wrapper's expand handler. `contents` keeps the children as
+            the wrapper's flex items. */}
         <div className="contents" inert={!open}>
           {details}
         </div>
-        {!open && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-b from-transparent to-[var(--color-bone-50)]"
-          />
-        )}
       </div>
     </div>
   );

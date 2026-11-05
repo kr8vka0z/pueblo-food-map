@@ -9,10 +9,9 @@
  */
 
 import { t, type Locale } from "@/lib/i18n";
-import { localizeEvent } from "@/lib/eventCard";
+import { eventAction, localizeEvent } from "@/lib/eventCard";
 import { buildIcs, downloadIcs } from "@/lib/eventIcs";
 import type { PublicEventDetail } from "@/lib/events";
-import { safeUrl } from "@/lib/safeUrl";
 import { eventShareUrl } from "@/lib/share";
 
 // ASCII-only so every OS accepts the download name; the real name is in the file.
@@ -23,17 +22,19 @@ export function icsFilename(name: string): string {
 
 export function downloadEventCalendar(event: PublicEventDetail, locale: Locale): void {
   const text = localizeEvent(event, locale);
-  const moreInfo = safeUrl(event.link_url);
+  // Same wording as the card's action button (#882), e.g. "Sign up: https://…".
+  const action = eventAction(event, locale);
   const parts = [text.description];
   if (text.whatToBring) parts.push(`${t("events.card.bring", locale)}: ${text.whatToBring}`);
-  if (moreInfo) parts.push(`${t("events.card.moreInfo", locale)}: ${moreInfo}`);
+  if (action) parts.push(`${action.label}: ${action.href}`);
+  const venueName = event.venue_name?.trim();
   downloadIcs(
     icsFilename(text.name),
     buildIcs({
       id: event.id,
       summary: text.name,
       description: parts.filter(Boolean).join("\n\n"),
-      location: event.address,
+      location: venueName ? `${venueName}, ${event.address}` : event.address,
       startsAt: event.starts_at,
       endsAt: event.ends_at,
       url: eventShareUrl(event.id, locale),

@@ -26,18 +26,13 @@ describe("#549 — route-active BottomSheet height matches vaul's window.innerHe
     expect(src).toMatch(/const MAP_PEEK_PX = 100;/);
   });
 
-  test("route-active height uses 100dvh, not var(--viewport-small)", () => {
-    const heightBranch = src.match(/isWalkRouteActive\s*\?\s*\{\s*height:\s*`([^`]+)`/);
-    expect(heightBranch, "expected a route-active height calc string").not.toBeNull();
-    expect(heightBranch![1]).toMatch(/100dvh/);
-    expect(heightBranch![1]).not.toMatch(/var\(--viewport-small\)/);
-  });
-
-  test("non-route maxHeight still uses var(--viewport-small), not dvh", () => {
-    const maxHeightBranch = src.match(/:\s*\{\s*maxHeight:\s*`([^`]+)`/);
-    expect(maxHeightBranch, "expected a non-route maxHeight calc string").not.toBeNull();
-    expect(maxHeightBranch![1]).toMatch(/var\(--viewport-small\)/);
-    expect(maxHeightBranch![1]).not.toMatch(/dvh/);
+  // #882: the card mode uses vaul snap points too (Maps-style sheet), so the
+  // one height now serves both modes; it must still be the 100dvh one.
+  test("the sheet height uses 100dvh, not var(--viewport-small)", () => {
+    const height = src.match(/style=\{\{\s*height:\s*`([^`]+)`/);
+    expect(height, "expected the sheet's height calc string").not.toBeNull();
+    expect(height![1]).toMatch(/100dvh/);
+    expect(height![1]).not.toMatch(/var\(--viewport-small\)/);
   });
 
   test("the strip snap point equals ROUTE_STRIP_HEIGHT_PX + MAP_PEEK_PX", () => {

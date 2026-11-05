@@ -1275,6 +1275,17 @@ event** (see "Event page" below).
   event keeps its own coordinates), `link_url`, `flyer_key` (slice 4, see
   "Event flyer"), `status` draft / published / cancelled / archived and
   created / updated / published stamps. Nothing is deleted.
+- **Venue name and button wording (#882, `migrations/0026_event_venue_and_button.sql`,
+  ADD COLUMN only).** `venue_name` is the event's own copy of the place name
+  (the form fills it from the linked place when empty), shown in bold above the
+  address. `link_label` is what the card's action button says for `link_url`:
+  `website | signup | tickets | rsvp | volunteer | donate | custom`, NULL =
+  website (so events saved earlier read "Visit website"); checked by
+  `adminEventValidation.ts`, not a CHECK constraint, so a new wording needs no
+  table rebuild. `link_label_custom` / `_es` hold the admin's own words (25
+  characters, `FIELD_LIMITS.EVENT_LINK_LABEL`), English required, and are kept
+  only with `custom`. The public reads select all four, so 0026 must reach a
+  database before this code (until then the feed fails soft to empty).
 - **Pueblo time.** Admins type America/Denver wall-clock time; the **server**
   converts to UTC (`src/lib/eventTime.ts`, `Intl` only, DST-correct: a
   time inside the spring-forward gap is rejected, the repeated fall-back hour
@@ -1307,7 +1318,8 @@ event** (see "Event page" below).
 - **Suggest Spanish** (`POST /api/admin/events/translate`,
   `src/lib/eventTranslate.ts`). The owner does not write Spanish, so the form's
   "Suggest Spanish" button sends the English values and fills **only the
-  Spanish boxes that are empty**. The route gates like the other event routes
+  Spanish boxes that are empty** (including the Custom button words, sent only
+  when "Custom" is chosen, #882). The route gates like the other event routes
   (`authorizeAdminWrite`), checks the same `FIELD_LIMITS` caps, asks Workers
   AI through the `AI` binding (declared in `wrangler.jsonc` for production and
   `env.staging`; no key, secret or npm dependency), and returns
@@ -1382,13 +1394,84 @@ event** (see "Event page" below).
   kind: a shared link seeds the selection before `isMobile` settles, and a
   handler-set view would miss it. Opening a place, Saved or Menu clears the
   event and vice versa; closing clears `?event=`.
-- **Order** (owner-approved mockup): the flyer (#760, `EventFlyer.tsx`; absent
-  when the event has none), status badge, name, "Hosted by", When, Where (+ distance when the visitor's real
-  position is known), About, a highlighted "What to bring" box, the orange Get
-  directions button, Share and Add to calendar, then the optional link. On a
-  phone the first, always-visible view is badge, name, When and Get directions,
-  so there Get directions sits above Where/About; the rest is the clipped
-  "peek" section under the grab bar, as on the box card.
+- **Order** (owner-approved redesign #882, mockups in
+  `docs/mockups/Event Card Redesign - Mockups.html`): the flyer (#760,
+  `EventFlyer.tsx`; absent when the event has none), status badge, name,
+  "Hosted by", When, About (clamped to 3 lines with "Read more"), the green
+  action button, Where (venue name in bold, address, + distance when the
+  visitor's real position is known), a highlighted "What to bring" box, Share
+  and Add to calendar, and the orange Get directions button last. On a phone
+  the first, always-visible view is badge, name, When, About and the action
+  button; the rest is the "peek" section under the grab bar, as on the
+  box card. Only "Read more" unclamps About, on the sheet as on desktop
+  (expanding by swipe or grab bar keeps 3 lines); on a collapsed sheet it also
+  expands it (`onRequestExpand`, the grab bar's action), and collapsing clamps
+  it again. It shows only when the clamp actually cuts the text. About
+  unclamps at once; the sheet slides to its new fully-open height when it
+  re-measures (see "Maps-style sheet"). On a phone the flyer sits
+  at the top of the below-the-fold section, not above the badge, so nothing
+  above the fold ever moves.
+- **Maps-style sheet** (#882 preview feedback: a swipe dragged the sheet,
+  bounced, then the rest of the card popped in). Every phone card (venue,
+  box, event) now rides vaul snap points: the sheet follows the finger
+  between collapsed and fully open and settles to the nearer one, velocity
+  counting, with vaul's 0.5s ease; a further pull down from collapsed closes
+  (vaul closes on a fast pull; `onRelease` adds the slow one past 100px,
+  restoring the release position first so the slide starts there). The card
+  content is the same at every height: the detail sections keep their full
+  height (no clip, no fade; `inert` while collapsed), and the collapsed snap
+  is "top of `#bottomsheet-detail` + its `data-peek-px`", read only while
+  collapsed (expanded, "Read more" can make the first view taller than it
+  will be once collapsed; reading it then left one snap point, so a flick
+  down sprang back, found on the iOS simulator). `sheetSnapPoints`
+  (`src/lib/sheetSnap.ts`) turns the measurements into px snap points
+  (adding `innerHeight − sheet height`, the #549 offset), fully open being
+  the content's own height or `1` when it is taller than the sheet. The
+  content height is the persistent `[data-sheet-content]` wrapper's (not the
+  `flex-1` scroller's, which always fills the sheet), and a ResizeObserver on
+  that wrapper re-measures, so a lazily loaded card body arriving later still
+  counts (never while a finger is down). When the measurement leaves one
+  resting height (a short screen, or a first view taller than the sheet), the
+  card is laid out as expanded: nothing `inert`, the content scrolls, and the
+  grab bar is made invisible but keeps its space (removing it moved the
+  content, which flipped the measurement back: a render loop). Clamped text
+  in the sheet (About, a place's notes) is `pointer-events: none`: on iOS
+  Safari a flick that starts on text whose overflow is clipped never scrolls
+  the sheet's content (found on the simulator).
+  Scrolling: the scroller is `overflow-y: hidden` + `touch-action: none`
+  until fully open, so a drag below that always moves the sheet; fully open,
+  vaul's own `shouldDrag` lets a drag up scroll and a drag down move the
+  sheet only at `scrollTop 0`. A non-passive `touchmove` guard cancels the
+  browser's pull-down overscroll at `scrollTop 0` so it can't steal that drag
+  (vaul's own iOS guard is off because `modal`/`repositionInputs` are, #530).
+  `snapToSequentialPoint` keeps a pull from fully open at collapsed. The
+  sheet's height is now `100dvh − peek − safe area` for every card (the
+  route strip's #549 formula), so the #530 toolbar-resize residual
+  documented on `snapPoints` (a smooth re-snap, not a jump) applies to all
+  cards; the map page's document never scrolls, so Safari's toolbar changes
+  only on rotation. Not v2's retired model: v2 swapped content across three
+  snap points; this has two and never changes the content.
+- **Animated close** (#882 preview feedback: the card "disappeared super
+  fast"). Closing clears the selection, and `MapWrapper` used to key the
+  sheet on the selected id or `"empty"`, so a close remounted it and vaul's
+  slide-off never ran. The key is now `sheet-<n>`, bumped only when a card
+  opens (from nothing, or a different item), so switching pins still gets a
+  fresh sheet and a close keeps the same one. `BottomSheet` derives `open`
+  from its props but renders the last non-null venue / event / box /
+  event-here line, held until vaul's `onAnimationEnd(false)`, then dropped;
+  while closing the content is `inert`. Swipe-down, × and Escape all close
+  through vaul's own slide (0.5s, its ease). The sheet is `modal={false}`,
+  so there is no scrim to fade. While a walk route is active nothing
+  changed: clearing the route flips `Drawer.Root`'s route/card key as before.
+- **Action button** (#882, replaced the "More information" link).
+  `eventAction()` (`src/lib/eventCard.ts`, pure) turns `link_url` +
+  `link_label(_custom/_es)` into the href (only if `safeUrl()` accepts it; no
+  link, no button), the label (built-in wording with its own Spanish, or the
+  admin's Custom words with Spanish falling back to English), an icon key and
+  the site name (the URL host without `www.`). The card, the event page (its
+  plain link keeps its layout, only the wording changes) and the calendar file
+  (`Sign up: <url>`) all read it, and the page and calendar also show the venue
+  name.
 - **Badge and the clock.** `eventBadge()` (`src/lib/eventCard.ts`, pure) turns
   `(event, nowMs)` into the stage and the countdown ("Starts in 2 days / 2
   hours / 20 min", "Happening now, ends in 40 min"; more than 7 days out reads
@@ -1429,8 +1512,8 @@ event** (see "Event page" below).
   (pin window) whose `venue_id` is the selected place and passes one
   `{label, onOpen}` line ("Event here Saturday", `EventHereLine.tsx`) to
   `BottomSheet` / `DesktopVenueWindow`. Blessing-box cards do not show it.
-- **Text.** All event text is rendered as plain React text. The optional link
-  renders only if `safeUrl()` accepts it (http/https), with
+- **Text.** All event text is rendered as plain React text. The action button
+  renders only if `safeUrl()` accepts the link (http/https), with
   `rel="noopener noreferrer"`. Spanish is used on a Spanish page when that
   column is non-blank, otherwise English (`eventText()`).
 
@@ -1471,7 +1554,10 @@ One image per event, shown at the top of the card.
   `min(55vh, 28rem)`), `loading="lazy"`, `decoding="async"`, alt = the admin's
   text in the page language, else their English text, else the event name; a
   failed image renders nothing. It is only inside the card, so it never loads
-  with the map. On the phone sheet it renders only when the sheet is expanded.
+  with the map. On the phone sheet it renders at the top of the below-the-fold
+  section, collapsed or expanded (#882: the sheet slides rather than changing
+  its content), so it starts loading when the card opens, mostly off screen
+  until the sheet is pulled up.
 - **Admin form.** `EventFlyerField.tsx`, edit mode only (a new event has no id
   yet); each action saves by itself and hands the new `updated_at` up to the form.
   "Suggest Spanish" does not cover the alt text.

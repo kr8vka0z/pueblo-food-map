@@ -11,6 +11,13 @@
  * event is live on the map within the feed's 60s cache, so the feed's edge
  * cache entry is purged after the write. Events never go through the venue
  * Publish snapshot.
+ *
+ * `submission_id` (#883): the form was opened from a public "Share an event"
+ * submission whose address couldn't be located automatically. Then only
+ * "save_draft" is accepted, the submission's flyer is copied onto the event,
+ * and the insert plus "mark the submission converted" go through the same
+ * atomic commitConversion() as the convert route (409 if someone else
+ * already handled the submission).
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -19,6 +26,8 @@ import { EVENT_AUDIT_INSERT_SQL, purgeEventsFeed } from "@/lib/adminEvents";
 import { validateEventPayload } from "@/lib/adminEventValidation";
 import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import type { EventRow } from "@/lib/events";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
+import { commitConversion, copyPendingFlyer, loadPendingEventSubmission, type CopiedFlyer } from "@/lib/eventSubmissions";
 
 const INSERT_EVENT_SQL = `INSERT INTO events (id, name, name_es, host, host_es, description, description_es,
     what_to_bring, what_to_bring_es, cancel_note, cancel_note_es, starts_at, ends_at, lat, lng, address,
@@ -42,7 +51,10 @@ export async function POST(req: NextRequest): Promise<Response> {
     return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
   }
 
-  const validation = validateEventPayload(body, ["save_draft", "publish"] as const);
+  const raw = (body as { submission_id?: unknown } | null)?.submission_id;
+  const submissionId = typeof raw === "string" && raw ? raw : null;
+  // From a public submission: a draft only, never published on creation.
+  const validation = validateEventPayload(body, submissionId ? (["save_draft"] as const) : (["save_draft", "publish"] as const));
   if (!validation.ok) {
     return NextResponse.json({ ok: false, errors: validation.errors }, { status: 422 });
   }
@@ -85,6 +97,31 @@ export async function POST(req: NextRequest): Promise<Response> {
     updated_by: identity.email,
     published_at: publishedAt,
   };
+
+  if (submissionId) {
+    const sub = await loadPendingEventSubmission(db, submissionId);
+    if (!sub) {
+      return NextResponse.json({ ok: false, error: "conflict", message: "Someone already handled this event. Go back to the Events tab." }, { status: 409 });
+    }
+    const { env } = await getCloudflareContext({ async: true });
+    let flyer: CopiedFlyer | null;
+    try {
+      flyer = await copyPendingFlyer(env.EVENT_FLYERS, sub, id);
+    } catch {
+      return NextResponse.json({ ok: false, error: "upload_failed", message: "The flyer could not be copied. Try again." }, { status: 502 });
+    }
+    const draft: EventRow = { ...row, flyer_key: flyer?.key ?? null, flyer_width: flyer?.width ?? null, flyer_height: flyer?.height ?? null };
+    let outcome: "converted" | "gone";
+    try {
+      outcome = await commitConversion(db, env.EVENT_FLYERS, identity, sub, draft);
+    } catch {
+      return NextResponse.json({ ok: false, error: "write_failed", message: "The event was not saved. Try again." }, { status: 500 });
+    }
+    if (outcome === "gone") {
+      return NextResponse.json({ ok: false, error: "conflict", message: "Someone already handled this event. Go back to the Events tab." }, { status: 409 });
+    }
+    return NextResponse.json({ ok: true, id, updated_at: now, status }, { status: 201 });
+  }
 
   const insertEvent = db
     .prepare(INSERT_EVENT_SQL)

@@ -34,6 +34,11 @@
  * against the admin's own previous save; a real 409 shows the server message
  * and a Reload button, leaving the admin's unsaved edits on screen.
  *
+ * From a public submission (#883, `submissionId`): the "Add event" form
+ * opened prefilled from a "Share an event" submission whose address couldn't
+ * be located automatically. It sends `submission_id`, offers Save draft only
+ * (the route refuses Publish then), and saving marks the submission converted.
+ *
  * Suggest Spanish: one button asks POST /api/admin/events/translate for a
  * machine draft of the Spanish boxes. It fills ONLY boxes that are empty (also
  * re-checked when the answer lands, in case the admin typed meanwhile), so
@@ -88,6 +93,8 @@ export interface EventFormProps {
   justSaved?: boolean;
   /** Edit mode: the event's current flyer, if any (#760). */
   initialFlyer?: PublicFlyer | null;
+  /** Create mode only: the public submission this draft comes from (#883). */
+  submissionId?: string;
 }
 
 // Keys match the server's error map (adminEventValidation.ts): snake_case field names, `place`, `starts_at`, `ends_at`, `_form`.
@@ -206,7 +213,7 @@ function validateClient(v: EventFormValues, cancelling: boolean): FieldErrors {
   return e;
 }
 
-export default function EventForm({ venues, eventId, initialValues, status: initialStatus, expectedUpdatedAt, justSaved, initialFlyer }: EventFormProps) {
+export default function EventForm({ venues, eventId, initialValues, status: initialStatus, expectedUpdatedAt, justSaved, initialFlyer, submissionId }: EventFormProps) {
   const router = useRouter();
   const isEdit = eventId !== undefined;
   const [values, setValues] = useState<EventFormValues>(() => {
@@ -303,6 +310,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       link_label_custom: values.linkLabelCustom,
       link_label_custom_es: values.linkLabelCustomEs,
       ...(isEdit ? { expectedUpdatedAt: version } : {}),
+      ...(!isEdit && submissionId ? { submission_id: submissionId } : {}),
     };
     try {
       const res = await fetch(isEdit ? `/api/admin/events/${eventId}` : "/api/admin/events", {
@@ -675,9 +683,11 @@ export default function EventForm({ venues, eventId, initialValues, status: init
             <button type="submit" disabled={busy} className={secondaryButtonClass}>
               {busy ? "Saving…" : "Save draft"}
             </button>
-            <button type="button" disabled={busy} onClick={() => void send("publish")} className={primaryButtonClass}>
-              Publish
-            </button>
+            {!submissionId && (
+              <button type="button" disabled={busy} onClick={() => void send("publish")} className={primaryButtonClass}>
+                Publish
+              </button>
+            )}
           </>
         )}
         {isEdit && (

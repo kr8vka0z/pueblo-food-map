@@ -14,14 +14,21 @@
  *
  * Error keys: name, host, ..., `starts_at`, `ends_at`, `place` (one message
  * covering "no place chosen / address never located / bad coordinates"),
- * `link_url`, `cancel_note`, and `_form` for body-level problems.
+ * `link_url`, `link_label`, `link_label_custom(_es)`, `venue_name`,
+ * `cancel_note`, and `_form` for body-level problems.
  */
 
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { puebloLocalToUtcIso } from "@/lib/eventTime";
+import { isValidEmail } from "@/lib/email";
+import { isOutsideCounty } from "@/lib/mapBounds";
 
 export const EVENT_STATUSES = ["draft", "published", "cancelled", "archived"] as const;
 export type EventStatus = (typeof EVENT_STATUSES)[number];
+
+/** What the card's action button can say (#882). Stored in events.link_label; NULL reads as "website". */
+export const EVENT_LINK_LABELS = ["website", "signup", "tickets", "rsvp", "volunteer", "donate", "custom"] as const;
+export type EventLinkLabel = (typeof EVENT_LINK_LABELS)[number];
 
 export interface ValidatedEventFields {
   name: string;
@@ -41,7 +48,12 @@ export interface ValidatedEventFields {
   lng: number;
   address: string;
   venueId: string | null;
+  venueName: string | null;
   linkUrl: string | null;
+  linkLabel: EventLinkLabel | null;
+  /** Only ever non-null when linkLabel is "custom". */
+  linkLabelCustom: string | null;
+  linkLabelCustomEs: string | null;
 }
 
 export type ValidateEventResult<A extends string> =
@@ -119,6 +131,23 @@ export function validateEventPayload<A extends string>(
   }
   const linkUrl = validateLinkUrl(b.link_url, errors);
 
+  // Button wording (#882). Blank = NULL = "Visit website". The custom words are
+  // kept only with "custom", so switching to a built-in wording can't leave
+  // stale text in the row (or the audit log) that nothing shows.
+  let linkLabel: EventLinkLabel | null = null;
+  if (b.link_label !== undefined && b.link_label !== null && b.link_label !== "") {
+    linkLabel = EVENT_LINK_LABELS.find((l) => l === b.link_label) ?? null;
+    if (linkLabel === null) errors.link_label = "Choose what the button says from the list.";
+  }
+  let linkLabelCustom: string | null = null;
+  let linkLabelCustomEs: string | null = null;
+  if (linkLabel === "custom") {
+    linkLabelCustom = optionalText(b.link_label_custom, "link_label_custom", FIELD_LIMITS.EVENT_LINK_LABEL, errors);
+    linkLabelCustomEs = optionalText(b.link_label_custom_es, "link_label_custom_es", FIELD_LIMITS.EVENT_LINK_LABEL, errors);
+    if (!linkLabelCustom && !errors.link_label_custom) errors.link_label_custom = "Type what the button should say.";
+  }
+  const venueName = optionalText(b.venue_name, "venue_name", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors);
+
   // Times: Pueblo wall clock in, UTC instants out; compare instants, never the typed text.
   const startsAt = typeof b.starts_at_local === "string" ? puebloLocalToUtcIso(b.starts_at_local) : null;
   if (!startsAt) errors.starts_at = "Enter a valid start date and time.";
@@ -162,7 +191,119 @@ export function validateEventPayload<A extends string>(
       lng: b.lng as number,
       address,
       venueId,
+      venueName,
       linkUrl,
+      linkLabel,
+      linkLabelCustom,
+      linkLabelCustomEs,
+    },
+  };
+}
+
+/** Button wordings the PUBLIC form offers (#883): the six built-ins, never Custom. */
+export const PUBLIC_EVENT_LINK_LABELS = EVENT_LINK_LABELS.filter((l): l is Exclude<EventLinkLabel, "custom"> => l !== "custom");
+export type PublicEventLinkLabel = (typeof PUBLIC_EVENT_LINK_LABELS)[number];
+
+/** What an event_submissions row's `payload` holds: admin-shaped fields, times already UTC. No personal data. */
+export interface EventSubmissionPayload {
+  name: string;
+  host: string;
+  description: string;
+  whatToBring: string | null;
+  startsAt: string;
+  endsAt: string;
+  venueName: string | null;
+  address: string;
+  linkUrl: string | null;
+  linkLabel: PublicEventLinkLabel;
+  /**
+   * The pin of the address the sender picked in the address check (#883 spec
+   * change), or null when there was none. Only kept when both are finite and
+   * inside Pueblo County's box; anything else is dropped, never an error, so
+   * a bad pin can't block a send. Rows saved before this field read as null.
+   */
+  lat: number | null;
+  lng: number | null;
+}
+
+/** A sender-supplied pin, kept only if it is two finite numbers inside Pueblo County's box. */
+export function puebloPin(lat: unknown, lng: unknown): { lat: number; lng: number } | null {
+  if (typeof lat !== "number" || typeof lng !== "number" || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return isOutsideCounty({ lat, lng }) ? null : { lat, lng };
+}
+
+export type ValidateSubmissionResult =
+  | { ok: true; payload: EventSubmissionPayload; submitterName: string; submitterEmail: string }
+  | { ok: false; errors: Record<string, string> };
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^\d{2}:\d{2}$/;
+
+/**
+ * The public "Share an event" form (#883, POST /events/share/submit). Same
+ * caps, link rule and Pueblo-time conversion as the admin form above, but its
+ * own required set: the public sends one date plus a start and end time (the
+ * same day; an overnight event is rare enough for the admin to fix in the
+ * draft), no coordinates (the admin's convert geocodes the address), no
+ * Spanish and no Custom button wording. Error keys are the body's own field
+ * names. The client's checks are only fast feedback; this is the boundary.
+ */
+export function validateEventSubmission(body: unknown): ValidateSubmissionResult {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return { ok: false, errors: { _form: "Invalid request body." } };
+  }
+  const b = body as Record<string, unknown>;
+  const errors: Record<string, string> = {};
+  const required = (key: string, max: number, message: string): string => {
+    const text = optionalText(b[key], key, max, errors);
+    if (!text && !errors[key]) errors[key] = message;
+    return text ?? "";
+  };
+
+  const name = required("name", FIELD_LIMITS.SUGGEST_VENUE_NAME, "Name is required.");
+  const host = required("host", FIELD_LIMITS.SUGGEST_VENUE_NAME, "Say who is hosting it.");
+  const description = required("description", FIELD_LIMITS.SUGGEST_NOTES, "Say what the event is.");
+  const whatToBring = optionalText(b.what_to_bring, "what_to_bring", FIELD_LIMITS.EVENT_SHORT_TEXT, errors);
+  const venueName = optionalText(b.venue_name, "venue_name", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors);
+  const address = required("address", FIELD_LIMITS.SUGGEST_ADDRESS, "Enter the street address.");
+  const linkUrl = validateLinkUrl(b.link_url, errors);
+  const linkLabel = PUBLIC_EVENT_LINK_LABELS.find((l) => l === (b.link_label ?? "website"));
+  if (!linkLabel) errors.link_label = "Choose what the button says from the list.";
+  const submitterName = required("submitter_name", FIELD_LIMITS.SUGGEST_VENUE_NAME, "Enter your name.");
+  const submitterEmail = typeof b.submitter_email === "string" ? b.submitter_email.trim() : "";
+  if (!submitterEmail) errors.submitter_email = "Enter your email.";
+  else if (submitterEmail.length > FIELD_LIMITS.EMAIL || !isValidEmail(submitterEmail)) errors.submitter_email = "Enter a valid email.";
+
+  const date = typeof b.date === "string" && DATE_RE.test(b.date) ? b.date : null;
+  const start = typeof b.start_time === "string" && TIME_RE.test(b.start_time) ? b.start_time : null;
+  const end = typeof b.end_time === "string" && TIME_RE.test(b.end_time) ? b.end_time : null;
+  const startsAt = date && start ? puebloLocalToUtcIso(`${date}T${start}`) : null;
+  const endsAt = date && end ? puebloLocalToUtcIso(`${date}T${end}`) : null;
+  if (!date) errors.date = "Enter a valid date.";
+  if (date && !startsAt) errors.start_time = "Enter a valid start time.";
+  if (date && !endsAt) errors.end_time = "Enter a valid end time.";
+  else if (startsAt && endsAt && Date.parse(endsAt) <= Date.parse(startsAt)) errors.end_time = "The end must be after the start.";
+
+  const pin = puebloPin(b.lat, b.lng);
+
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return {
+    ok: true,
+    submitterName,
+    submitterEmail,
+    payload: {
+      name,
+      host,
+      description,
+      whatToBring,
+      startsAt: startsAt as string,
+      endsAt: endsAt as string,
+      venueName,
+      address,
+      linkUrl,
+      linkLabel: linkLabel as PublicEventLinkLabel,
+      lat: pin?.lat ?? null,
+      lng: pin?.lng ?? null,
     },
   };
 }

@@ -191,11 +191,12 @@ describe("Add to calendar", () => {
 });
 
 describe("ended and cancelled events (shared link opened late)", () => {
-  test("ended: no Get directions, Share or Add to calendar; a way to see places open now", () => {
+  test("ended: no action button, Get directions, Share or Add to calendar; a way to see places open now", () => {
     vi.setSystemTime(START + 5 * HOUR);
-    const { onSeeOpenNow } = renderCard(makeEvent());
+    const { onSeeOpenNow } = renderCard(makeEvent({ link_url: "https://forms.gle/x" }));
 
     expect(screen.getByTestId("event-badge").dataset.phase).toBe("ended");
+    expect(screen.queryByTestId("event-action")).toBeNull();
     expect(directions()).toBeNull();
     expect(shareButton()).toBeNull();
     expect(calendarButton()).toBeNull();
@@ -206,10 +207,11 @@ describe("ended and cancelled events (shared link opened late)", () => {
 
   test("cancelled: shows the admin's note, and even a future start offers no actions", () => {
     vi.setSystemTime(START - 24 * HOUR);
-    renderCard(makeEvent({ status: "cancelled", cancel_note: "Cancelled for snow", cancel_note_es: null }));
+    renderCard(makeEvent({ status: "cancelled", cancel_note: "Cancelled for snow", cancel_note_es: null, link_url: "https://forms.gle/x" }));
 
     expect(screen.getByTestId("event-badge").dataset.phase).toBe("cancelled");
     expect(screen.getByText("Cancelled for snow")).toBeTruthy();
+    expect(screen.queryByTestId("event-action")).toBeNull();
     expect(directions()).toBeNull();
     expect(shareButton()).toBeNull();
     expect(calendarButton()).toBeNull();
@@ -245,6 +247,37 @@ describe("text", () => {
     const link = container.querySelector('a[href="https://example.org/info"]');
     expect(link).not.toBeNull();
     expect(link!.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+});
+
+// #882: the action button and the new order.
+describe("action button and order", () => {
+  test("no link, no action button", () => {
+    vi.setSystemTime(START - HOUR);
+    renderCard(makeEvent({ link_url: null }));
+    expect(screen.queryByTestId("event-action")).toBeNull();
+  });
+
+  test.each(["panel", "sheet"] as const)("%s: Get directions is the last control on the card", (layout) => {
+    vi.setSystemTime(START - HOUR);
+    const { container } = renderCard(makeEvent({ link_url: "https://forms.gle/x", link_label: "signup" }), {
+      layout,
+      expanded: true,
+    });
+    const controls = container.querySelectorAll("a, button");
+    expect(controls[controls.length - 1]).toBe(directions());
+  });
+
+  test("phone sheet: the action button is in the first view and Get directions is below the fold", () => {
+    vi.setSystemTime(START - HOUR);
+    renderCard(makeEvent({ link_url: "https://forms.gle/x", link_label: "signup" }), {
+      layout: "sheet",
+      expanded: false,
+      detailSectionId: "detail",
+    });
+    const fold = document.getElementById("detail")!;
+    expect(fold.contains(screen.getByTestId("event-action"))).toBe(false);
+    expect(fold.contains(directions())).toBe(true);
   });
 });
 

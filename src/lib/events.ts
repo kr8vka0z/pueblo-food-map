@@ -41,6 +41,11 @@ export interface EventRow {
   flyer_height?: number | null;
   flyer_alt?: string | null;
   flyer_alt_es?: string | null;
+  // Added by migration 0026 (#882). Optional for the same reason as the flyer columns.
+  venue_name?: string | null;
+  link_label?: string | null;
+  link_label_custom?: string | null;
+  link_label_custom_es?: string | null;
   status: EventStatus;
   created_at: string;
   created_by: string;
@@ -80,6 +85,15 @@ export interface PublicEvent {
   address: string;
   venue_id: string | null;
   link_url: string | null;
+  /**
+   * #882 (migration 0026). Optional so callers that build a PublicEvent by
+   * hand may omit them: no venue name reads as address only, and a missing
+   * link_label reads as "Visit website" (eventAction in eventCard.ts).
+   */
+  venue_name?: string | null;
+  link_label?: string | null;
+  link_label_custom?: string | null;
+  link_label_custom_es?: string | null;
   /** Null when the event has no flyer. Optional so callers that build a PublicEvent by hand may omit it. */
   flyer?: PublicFlyer | null;
 }
@@ -103,6 +117,7 @@ export interface PublicEventDetail extends PublicEvent {
 // withPublicFlyer before the row leaves this file, so the raw key never ships.
 export const PUBLIC_EVENTS_SQL = `SELECT id, name, name_es, host, host_es, description, description_es,
     what_to_bring, what_to_bring_es, starts_at, ends_at, lat, lng, address, venue_id, link_url,
+    venue_name, link_label, link_label_custom, link_label_custom_es,
     flyer_key, flyer_width, flyer_height, flyer_alt, flyer_alt_es
   FROM events
   WHERE status = 'published' AND ends_at > ?
@@ -157,6 +172,7 @@ export async function loadSitemapEvents(db: D1Database, now: Date = new Date()):
 // reveals that a draft exists.
 export const PUBLIC_EVENT_BY_ID_SQL = `SELECT id, name, name_es, host, host_es, description, description_es,
     what_to_bring, what_to_bring_es, starts_at, ends_at, lat, lng, address, venue_id, link_url,
+    venue_name, link_label, link_label_custom, link_label_custom_es,
     flyer_key, flyer_width, flyer_height, flyer_alt, flyer_alt_es,
     status, cancel_note, cancel_note_es
   FROM events

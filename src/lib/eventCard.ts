@@ -1,7 +1,8 @@
 /**
  * eventCard.ts — the pure logic behind the special-event card (#759, umbrella
  * #156): which stage an event is in, what the countdown badge says, the
- * English/Spanish text choice, and the Pueblo-time "when" lines.
+ * English/Spanish text choice, the Pueblo-time "when" lines, and the action
+ * button's wording (#882, eventAction).
  *
  * WHY pure and clock-as-argument: the card re-renders off the map's shared
  * once-a-minute tick (src/lib/useMinuteClock.ts), and the badge wording at
@@ -15,6 +16,42 @@ import { t, type Locale } from "@/lib/i18n";
 import { TIME_ZONE, puebloParts } from "@/lib/eventTime";
 import { EVENT_PIN_WINDOW_DAYS, clock } from "@/lib/eventPins";
 import type { PublicEvent, PublicEventDetail } from "@/lib/events";
+import { EVENT_LINK_LABELS, type EventLinkLabel } from "@/lib/adminEventValidation";
+import { safeUrl } from "@/lib/safeUrl";
+
+/** The event's action button (#882): where it goes, what it says, which icon, and the site name under the label. */
+export interface EventAction {
+  href: string;
+  label: string;
+  /** Picks the icon; "custom" and "website" share one. */
+  kind: EventLinkLabel;
+  /** The link's host without "www." (e.g. "facebook.com"). */
+  site: string;
+}
+
+/**
+ * The action button for an event, or null when there is no http(s) link
+ * (safeUrl). The card, the event page and the calendar file all read the
+ * wording from here so they can't disagree. A NULL or unknown stored wording,
+ * and a Custom with no English words, read as "Visit website": every event
+ * saved before #882 has a link but no wording.
+ */
+export function eventAction(
+  event: Pick<PublicEvent, "link_url" | "link_label" | "link_label_custom" | "link_label_custom_es">,
+  locale: Locale,
+): EventAction | null {
+  const href = safeUrl(event.link_url);
+  if (!href) return null;
+  let kind: EventLinkLabel = EVENT_LINK_LABELS.find((l) => l === event.link_label) ?? "website";
+  const custom = kind === "custom" ? eventText(event.link_label_custom, event.link_label_custom_es, locale) : "";
+  if (kind === "custom" && !custom) kind = "website";
+  return {
+    href,
+    label: custom || t(`events.card.action.${kind}`, locale),
+    kind,
+    site: new URL(href).hostname.replace(/^www\./, ""),
+  };
+}
 
 const MS_PER_MIN = 60_000;
 const MIN_PER_HOUR = 60;

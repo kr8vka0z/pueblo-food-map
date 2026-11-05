@@ -15,7 +15,7 @@ import { PUBLIC_EVENTS_SQL } from "@/lib/events";
 
 function buildDb(): Database.Database {
   const db = new Database(":memory:");
-  for (const f of ["0018_events.sql", "0019_event_flyer.sql"]) db.exec(readFileSync(join(process.cwd(), "migrations", f), "utf-8"));
+  for (const f of ["0018_events.sql", "0019_event_flyer.sql", "0026_event_venue_and_button.sql"]) db.exec(readFileSync(join(process.cwd(), "migrations", f), "utf-8"));
   return db;
 }
 

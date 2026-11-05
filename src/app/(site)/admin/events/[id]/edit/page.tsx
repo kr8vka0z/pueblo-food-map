@@ -42,7 +42,12 @@ function toFormValues(e: EventRow): Partial<EventFormValues> {
     address: e.address,
     lat: String(e.lat),
     lng: String(e.lng),
+    venueName: e.venue_name ?? "",
     linkUrl: e.link_url ?? "",
+    // NULL (every event saved before #882) is "Visit website", the form's default.
+    linkLabel: e.link_label || "website",
+    linkLabelCustom: e.link_label_custom ?? "",
+    linkLabelCustomEs: e.link_label_custom_es ?? "",
   };
 }
 

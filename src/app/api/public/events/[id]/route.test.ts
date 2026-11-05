@@ -26,7 +26,7 @@ const call = (id: string) =>
 
 function dbWithMigration(): Database.Database {
   const db = new Database(":memory:");
-  for (const f of ["0018_events.sql", "0019_event_flyer.sql"]) db.exec(readFileSync(join(process.cwd(), "migrations", f), "utf-8"));
+  for (const f of ["0018_events.sql", "0019_event_flyer.sql", "0026_event_venue_and_button.sql"]) db.exec(readFileSync(join(process.cwd(), "migrations", f), "utf-8"));
   return db;
 }
 

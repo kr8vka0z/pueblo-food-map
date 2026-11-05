@@ -100,7 +100,12 @@ export const NAV_CLASS =
   // right (not right-3): widens by --panel-right-inset while the
   // desktop panel is open, so the bar's own right edge stays clear of
   // it (see BottomNav's rightInset doc comment).
+  // max-w + mx-auto (#887): wider than a phone (tablets, laptops below
+  // 2xl) the pill stops at 460px and the auto margins centre it in the
+  // left/right span, so it stays centred left of the panel too. Phones
+  // under 484px never reach the cap and look unchanged.
   "fixed left-3 right-[calc(0.75rem+var(--panel-right-inset,0px))] z-[1003] " +
+  "max-w-[460px] mx-auto 2xl:max-w-none " +
   "transition-[right] duration-300 " +
   "h-16 px-1.5 " +
   "bg-[var(--color-bone-50)] border border-[var(--color-bone-300)] rounded-[var(--radius-full)] " +

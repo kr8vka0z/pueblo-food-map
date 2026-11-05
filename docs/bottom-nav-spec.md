@@ -330,6 +330,13 @@ decision lives, and it is an existing Tailwind breakpoint rather than a bespoke 
 > auto-zoom pads the map's bottom by the pill (24 + 52px) at `2xl`+, and the outside-county
 > alert sits 12px above it.
 
+> **Amended 2026-11-05 by Kyle (#887, no stretching):** below `2xl` the 64px pill is capped at
+> 460px wide and centred (`max-w-[460px] mx-auto` inside its `left/right: 12px` span), so
+> tablets and 1024–1535px laptops get a compact centred pill instead of one stretched edge to
+> edge. Phones under 484px never reach the cap and are unchanged. With the desktop panel open,
+> the span already ends at the panel, so the pill centres in the map area left of it. Height
+> and every clearance stay as they were.
+
 > **Amended 2026-09-16 by Kyle (nav on the Menu pages):** About, Suggest, Feedback, Browse
 > all venues and Food help programs carry the same bar/pill via `PageNav`, so Menu and Saved
 > open the drawer over the page instead of sending you back to the map. Near me returns to

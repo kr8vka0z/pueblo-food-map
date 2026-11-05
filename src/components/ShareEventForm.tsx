@@ -238,7 +238,12 @@ export default function ShareEventForm() {
     <div className="sticky bottom-[calc(var(--bottom-nav-clearance)+env(safe-area-inset-bottom))] z-10 -mx-4 flex gap-2 bg-[var(--color-bone-50)] px-4 py-3 md:static md:mx-0 md:p-0">
       <button
         type="button"
-        onClick={() => setSheetOpen(true)}
+        // Blur first: vaul hides the page from screen readers when the sheet opens, and Chrome refuses
+        // (console warning) while this button still holds focus behind it.
+        onClick={(e) => {
+          e.currentTarget.blur();
+          setSheetOpen(true);
+        }}
         className={
           "md:hidden inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-[var(--radius-md)] " +
           "border-2 border-[var(--color-sage-600)] bg-white text-base font-semibold text-[var(--color-sage-700)] " +

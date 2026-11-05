@@ -15,21 +15,10 @@
  * the returned key rides along with the submission. A local object URL shows
  * it in the preview.
  *
- * Live preview (ShareEventPreview): on a computer the card sits beside the
- * form and stays in view while scrolling; on a phone a Preview button beside
- * "Send for review" (pinned to the bottom of the screen while the form is in
- * view) opens the card in a sheet with "Back to editing". It disappears on
- * the thank-you screen.
- *
- * Address check (#883 spec change, 2026-11-05): leaving the address field
- * (and pressing Send, if that address wasn't checked yet) looks it up through
- * GET /events/share/geocode (the Census lookup, Pueblo County only). One
- * match replaces the typed address with the matched one and keeps its pin;
- * several show buttons to pick from (a fresh "several" at Send stops that
- * send so the sender can pick); none or a failed lookup shows a gentle note
- * and the sender can still send. The pin rides along as lat/lng, which the
- * server re-checks. Typing in the address drops the pin, so a pin can never
- * belong to a different address than the one sent.
+ * Address check (#883 spec change, 2026-11-05, GET /events/share/geocode):
+ * a fresh "several matches" at Send stops that send so the sender can pick;
+ * no match never blocks. Typing in the address drops the pin, so a pin can
+ * never belong to a different address than the one sent.
  *
  * WHY the link travels as `link_url`: `website` is PublicForm's honeypot key.
  */
@@ -43,6 +32,8 @@ import { useLocale } from "@/lib/LocaleContext";
 import { EMAIL_RE } from "@/lib/email";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { PUBLIC_EVENT_LINK_LABELS } from "@/lib/adminEventValidation";
+import type { GeocodeMatch } from "@/lib/censusGeocode";
+import { safeUrl } from "@/lib/safeUrl";
 import { shrinkFlyerToJpeg, UnsupportedImageError } from "@/lib/imageResize";
 import PublicForm, { Field, PrivacyNote, type FieldErrors } from "@/components/PublicForm";
 import ShareEventPreview from "@/components/ShareEventPreview";
@@ -92,23 +83,9 @@ const EMPTY: ShareEventValues = {
   venueName: "", address: "", linkUrl: "", linkLabel: "website",
 };
 
-interface AddressMatch {
-  lat: number;
-  lng: number;
-  matchedAddress: string;
-}
 type AddressCheck = "found" | "multiple" | "none" | "error";
 
 const SECTION = "pt-4 border-t border-[var(--color-bone-200)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]";
-
-function isHttpUrl(text: string): boolean {
-  try {
-    const u = new URL(text);
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
 export default function ShareEventForm() {
   const pathname = usePathname();
@@ -121,16 +98,16 @@ export default function ShareEventForm() {
   const [sent, setSent] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const set = <K extends keyof ShareEventValues>(key: K, value: string) => setValues((p) => ({ ...p, [key]: value }));
-  const [geo, setGeo] = useState<{ state: AddressCheck | "idle" | "loading"; options: AddressMatch[]; found?: string }>({
+  const [geo, setGeo] = useState<{ state: AddressCheck | "idle" | "loading"; options: GeocodeMatch[]; found?: string }>({
     state: "idle",
     options: [],
   });
   // The chosen match (address + pin). A ref because PublicForm calls body() right after beforeSubmit, before a re-render.
-  const pinRef = useRef<AddressMatch | null>(null);
+  const pinRef = useRef<GeocodeMatch | null>(null);
   // The address last looked up and its answer, so a blur then Send share one lookup.
   const checkRef = useRef<{ q: string; result: Promise<AddressCheck> } | null>(null);
 
-  function chooseMatch(m: AddressMatch) {
+  function chooseMatch(m: GeocodeMatch) {
     pinRef.current = m;
     checkRef.current = { q: m.matchedAddress, result: Promise.resolve("found") };
     set("address", m.matchedAddress);
@@ -151,7 +128,7 @@ export default function ShareEventForm() {
     const result = (async (): Promise<AddressCheck> => {
       try {
         const res = await fetch(`/events/share/geocode?q=${encodeURIComponent(q)}`);
-        const data = (await res.json()) as { ok: boolean; matches?: AddressMatch[] };
+        const data = (await res.json()) as { ok: boolean; matches?: GeocodeMatch[] };
         if (!data.ok || !data.matches) {
           setGeo({ state: "error", options: [] });
           return "error";
@@ -219,13 +196,14 @@ export default function ShareEventForm() {
     else if (v.start && v.end <= v.start) e.end = t("shareEvent.validation.endBeforeStart", locale);
     if (!v.description.trim()) e.description = t("shareEvent.validation.descriptionRequired", locale);
     if (!v.address.trim()) e.address = t("shareEvent.validation.addressRequired", locale);
-    if (v.linkUrl.trim() && !isHttpUrl(v.linkUrl.trim())) e.linkUrl = t("shareEvent.validation.linkInvalid", locale);
+    if (v.linkUrl.trim() && !safeUrl(v.linkUrl.trim())) e.linkUrl = t("shareEvent.validation.linkInvalid", locale);
     if (!submitterName.trim()) e.submitterName = t("shareEvent.validation.submitterNameRequired", locale);
     if (!submitterEmail.trim()) e.submitterEmail = t("shareEvent.validation.emailRequired", locale);
     else if (!EMAIL_RE.test(submitterEmail)) e.submitterEmail = t("shareEvent.validation.emailInvalid", locale);
     return e;
   }
 
+  // A named function, not an arrow: react/display-name flags an anonymous JSX-returning closure.
   const text = (key: keyof ShareEventValues, max: number, extra: Record<string, unknown> = {}) =>
     function Control(control: Parameters<Parameters<typeof Field>[0]["children"]>[0]) {
       return <input {...control} type="text" value={values[key]} onChange={(e) => set(key, e.target.value)} maxLength={max} {...extra} />;
@@ -266,15 +244,6 @@ export default function ShareEventForm() {
       validate={validate}
       onSuccess={() => setSent(true)}
       submitRow={submitRow}
-      successActions={
-        // A full page load on purpose: it gives the next event a fresh Turnstile token and an empty form.
-        <a
-          href={pathname}
-          className="mt-3 block text-sm font-semibold text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
-        >
-          {t("shareEvent.another", locale)}
-        </a>
-      }
       beforeSubmit={beforeSubmit}
       body={() => ({
         name: values.name.trim(),
@@ -504,7 +473,20 @@ export default function ShareEventForm() {
     </PublicForm>
   );
 
-  if (sent) return <div className="max-w-lg">{form}</div>;
+  if (sent) {
+    return (
+      <div className="max-w-lg text-center">
+        {form}
+        {/* A full page load on purpose: it gives the next event a fresh Turnstile token and an empty form. */}
+        <a
+          href={pathname}
+          className="inline-flex min-h-12 items-center text-sm font-semibold text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
+        >
+          {t("shareEvent.another", locale)}
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div className="md:grid md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] md:items-start md:gap-8">

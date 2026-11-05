@@ -55,23 +55,10 @@ function parseMatches(data: CensusGeocoderResponse): GeocodeMatch[] {
   return matches;
 }
 
-/** Up to MAX_MATCHES matches for `q`. Throws GeocodeError on a network failure, timeout, non-2xx or non-JSON answer. */
+/** Up to MAX_MATCHES matches for `q`. Throws on a network failure, timeout, non-2xx or non-JSON answer. */
 export async function geocodeAddress(q: string): Promise<GeocodeMatch[]> {
   const url = `${CENSUS_GEOCODER_URL}?address=${encodeURIComponent(q)}&benchmark=${CENSUS_BENCHMARK}&format=json`;
-  let data: CensusGeocoderResponse;
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-    if (!res.ok) throw new GeocodeError();
-    data = (await res.json()) as CensusGeocoderResponse;
-  } catch {
-    throw new GeocodeError();
-  }
-  return parseMatches(data);
-}
-
-export class GeocodeError extends Error {
-  constructor() {
-    super("Geocoder request failed.");
-    this.name = "GeocodeError";
-  }
+  const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  if (!res.ok) throw new Error("geocoder");
+  return parseMatches((await res.json()) as CensusGeocoderResponse);
 }

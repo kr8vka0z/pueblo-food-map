@@ -16,13 +16,6 @@
  *
  * Copy comes from i18n keys under the form's own prefix (`feedback.*`,
  * `report.*`, `suggest.*`, `shareEvent.*`), so each keeps its own wording.
- *
- * Four optional hooks exist for the "Share an event" form (#883) and change
- * nothing for the others: `onSuccess` (it hides its live preview),
- * `successActions` (its "Share another event" link), `submitRow` (wraps
- * the submit button, for its phone Preview button beside Send) and
- * `beforeSubmit` (its address check; returning false stops the send, and
- * `body()` runs after it, so it can read what the check found from a ref).
  */
 
 import { useRef, useState, type ReactNode } from "react";
@@ -140,7 +133,6 @@ export default function PublicForm<K extends string>({
   body,
   children,
   onSuccess,
-  successActions,
   submitRow = (submit) => submit,
   beforeSubmit,
 }: {
@@ -156,11 +148,9 @@ export default function PublicForm<K extends string>({
   body: () => Record<string, unknown>;
   children: (errors: FieldErrors<NoInfer<K>>, locale: Locale) => ReactNode;
   onSuccess?: () => void;
-  /** Rendered after "Back to map" on the success panel. */
-  successActions?: ReactNode;
   /** Wraps the submit button (default: the button alone). */
   submitRow?: (submit: ReactNode) => ReactNode;
-  /** Runs after client validation passes, before the POST; false = don't send. */
+  /** Runs after client validation passes, before the POST; false = don't send. body() runs after it, so it can read a ref the hook set. */
   beforeSubmit?: () => Promise<boolean>;
 }) {
   const { locale } = useLocale();
@@ -243,7 +233,6 @@ export default function PublicForm<K extends string>({
         >
           {t(`${form}.backToMap`, locale)}
         </Link>
-        {successActions}
       </div>
     );
   }

@@ -18,11 +18,8 @@
  * insert fails the submission so the sender can retry; the email is the
  * best-effort part (a Resend outage still leaves the row in the admin list).
  *
- * Nothing sent here is ever on the map: the row waits for an admin.
- *
- * PII: the sender's email is stored in its own column (never inside
- * payload), forwarded to the suggestions inbox, and never logged or echoed
- * back. IPs are used only for Turnstile and the HMAC'd rate-limit key.
+ * Nothing sent here is ever on the map: the row waits for an admin. PII
+ * rules for the sender's email: migrations/0027_event_submissions.sql.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -85,7 +82,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   let flyer: { key: string; inspected: InspectedFlyer } | null = null;
-  if (body.flyer_key !== undefined && body.flyer_key !== null && body.flyer_key !== "") {
+  if (body.flyer_key) {
     const key = body.flyer_key;
     const object =
       typeof key === "string" && PENDING_FLYER_KEY_RE.test(key)

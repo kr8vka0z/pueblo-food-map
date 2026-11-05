@@ -61,15 +61,7 @@ import { checkAndIncrement } from "@/lib/checkinRateLimit";
 export const MAX_PER_IP_PER_HOUR = 5;
 export const MAX_SITE_WIDE_PER_HOUR = 50;
 
-export type FormName = "report" | "suggest" | "feedback" | "event" | "event-geocode";
-
-/**
- * #883: the "Share an event" address check runs on every address the sender
- * types (not once per send), so it gets looser caps than the submit forms:
- * room for typo retries from one person, still a bounded share of the free
- * Census geocoder for the whole site.
- */
-export const EVENT_GEOCODE_CAPS = { perIp: 30, siteWide: 300 } as const;
+export type FormName = "report" | "suggest" | "feedback" | "event" | "event-geocode" | "event-flyer";
 
 /**
  * Returns true if this submission is under BOTH caps for `form`, atomically

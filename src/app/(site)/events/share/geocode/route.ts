@@ -7,7 +7,7 @@
  * filter of its own), so a same-named street in another state is never offered.
  *
  * Bounded by checkFormRateLimit's D1 counters under its own name
- * ("event-geocode", EVENT_GEOCODE_CAPS: looser than the submit forms, since it
+ * ("event-geocode", 30/hour per IP and 300 site-wide: looser than the submit forms, since it
  * runs on every address typed) and a length cap. No Turnstile: the form's one
  * token belongs to the submit. The address is never logged; the IP only
  * enters the HMAC'd rate-limit key. `no-store`: answers depend on the caller's
@@ -16,7 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
-import { checkFormRateLimit, EVENT_GEOCODE_CAPS } from "@/lib/formRateLimit";
+import { checkFormRateLimit } from "@/lib/formRateLimit";
 import { geocodeAddress } from "@/lib/censusGeocode";
 import { isOutsideCounty } from "@/lib/mapBounds";
 import { requestIp } from "@/lib/publicRequest";
@@ -49,7 +49,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   } catch {
     return answer(503, { ok: false, error: "unavailable" });
   }
-  if (!(await checkFormRateLimit(db, secret, "event-geocode", requestIp(req), EVENT_GEOCODE_CAPS))) {
+  // Runs on every address typed, not once per send: room for typo retries, still a bounded share of Census.
+  if (!(await checkFormRateLimit(db, secret, "event-geocode", requestIp(req), { perIp: 30, siteWide: 300 }))) {
     return answer(429, { ok: false, error: "rate_limit" });
   }
 

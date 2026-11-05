@@ -2,7 +2,7 @@
  * POST /api/admin/event-submissions/[id]/convert — "Make it a draft event"
  * (#883): turns a pending public submission into a DRAFT event (never
  * published) and marks the submission converted, atomically
- * (commitConversion in src/lib/eventSubmissions.ts). The flyer is copied
+ * (convertToDraft in src/lib/eventSubmissions.ts). The flyer is copied
  * onto the new event.
  *
  * Location: when the sender picked a checked address on the public form,
@@ -21,19 +21,11 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { geocodeAddress } from "@/lib/censusGeocode";
 import { puebloPin } from "@/lib/adminEventValidation";
-import {
-  commitConversion,
-  copyPendingFlyer,
-  draftFromPayload,
-  loadPendingEventSubmission,
-  parseSubmissionPayload,
-  type CopiedFlyer,
-} from "@/lib/eventSubmissions";
+import { convertToDraft, draftFromPayload, loadPendingEventSubmission, parseSubmissionPayload } from "@/lib/eventSubmissions";
 
 export const dynamic = "force-dynamic";
 
@@ -69,23 +61,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return fail(422, "needs_location", "We couldn't find this address on the map. Place it in the event form.", { openUrl });
   }
 
-  const { env } = await getCloudflareContext({ async: true });
-  const r2 = env.EVENT_FLYERS;
   const eventId = crypto.randomUUID();
-  let flyer: CopiedFlyer | null;
-  try {
-    flyer = await copyPendingFlyer(r2, sub, eventId);
-  } catch {
-    return fail(502, "upload_failed", "The flyer could not be copied. Try again.");
-  }
-
-  const row = draftFromPayload(eventId, payload, place, flyer, identity.email, new Date().toISOString());
-  let outcome: "converted" | "gone";
-  try {
-    outcome = await commitConversion(db, r2, identity, sub, row);
-  } catch {
-    return fail(500, "write_failed", "The draft was not created. Try again.");
-  }
-  if (outcome === "gone") return fail(409, "conflict", "Someone already handled this event. Reload to see it.");
+  const failed = await convertToDraft(db, identity, sub, draftFromPayload(eventId, payload, place, identity.email, new Date().toISOString()));
+  if (failed) return failed;
   return NextResponse.json({ ok: true, id: eventId, editUrl: `/admin/events/${eventId}/edit?saved=1` });
 }

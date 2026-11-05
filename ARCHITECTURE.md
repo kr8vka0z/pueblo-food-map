@@ -1697,7 +1697,7 @@ it a draft and publishes it.
   public twin of `/api/admin/geocode`: the same Census lookup
   (`src/lib/censusGeocode.ts`), matches outside `PUEBLO_COUNTY_BBOX` dropped,
   its own `checkFormRateLimit` name `event-geocode` with looser caps
-  (`EVENT_GEOCODE_CAPS`, 30/hour per IP, 300 site-wide), address never logged.
+  (30/hour per IP, 300 site-wide), address never logged.
   One match replaces the typed address and keeps its pin; several are buttons
   to pick from (a fresh "several" at Send stops that send); none or a failed
   lookup is a gentle note and the send still goes. The pin is sent as

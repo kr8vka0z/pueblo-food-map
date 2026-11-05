@@ -11,7 +11,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import Database from "better-sqlite3";
 import { sqliteD1 } from "@/lib/sqliteD1.testutil";
-import { EVENT_GEOCODE_CAPS } from "@/lib/formRateLimit";
+
+const PER_IP = 30; // the route's per-IP cap
 
 const mockGetCloudflareContext = vi.fn();
 vi.mock("@/lib/cloudflareContext", () => ({
@@ -43,11 +44,11 @@ const lookup = () =>
   GET(new NextRequest("https://pueblofoodmap.com/events/share/geocode?q=1%20Main%20St", { headers: { "cf-connecting-ip": "203.0.113.9" } }));
 
 test("one IP over the hourly cap gets 429, and that lookup never reaches the geocoder", async () => {
-  for (let i = 0; i < EVENT_GEOCODE_CAPS.perIp; i++) expect((await lookup()).status).toBe(200);
+  for (let i = 0; i < PER_IP; i++) expect((await lookup()).status).toBe(200);
   const res = await lookup();
   expect(res.status).toBe(429);
   expect(await res.json()).toMatchObject({ error: "rate_limit" });
-  expect(census).toHaveBeenCalledTimes(EVENT_GEOCODE_CAPS.perIp);
+  expect(census).toHaveBeenCalledTimes(PER_IP);
 });
 
 test("Census capitals come back as a readable address", async () => {

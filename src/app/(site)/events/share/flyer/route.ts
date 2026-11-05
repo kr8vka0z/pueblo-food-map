@@ -4,12 +4,7 @@
  * Returns `{ ok: true, key, width, height }`; the form sends the key with
  * the submission.
  *
- * Same byte rules as the admin flyer upload (src/lib/eventFlyers.ts): only a
- * real JPEG (the browser re-encodes PNG/WebP/JPEG first, imageResize.ts),
- * metadata stripped here, at most MAX_FLYER_BYTES and 4096px a side; the
- * storage key is made here, never taken from the client. The object goes
- * under PENDING_FLYER_PREFIX, which no public URL can name, so nothing
- * uploaded here is reachable by anyone until an admin converts the event.
+ * Byte rules and the private pending prefix: src/lib/eventFlyers.ts.
  *
  * WHY no Turnstile here: the form has one Turnstile token and siteverify
  * accepts it once; the submit route spends it. This route is bounded instead
@@ -17,24 +12,20 @@
  * and site-wide, separate scopes from the submit's so a re-picked flyer
  * doesn't eat the sender's submit budget).
  * ponytail: a flyer uploaded and never submitted stays in the bucket
- * (at most MAX_FLYER_SITE_PER_HOUR x 200 KB an hour). Upgrade path: an R2
+ * (at most 100 x 200 KB an hour). Upgrade path: an R2
  * lifecycle rule expiring `pending.submissions/` after 30 days, or the
  * scheduled job deleting pending keys no event_submissions row names.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
-import { checkAndIncrement } from "@/lib/checkinRateLimit";
+import { checkFormRateLimit } from "@/lib/formRateLimit";
 import { inspectFlyer, MAX_FLYER_BYTES, pendingFlyerKey } from "@/lib/eventFlyers";
 import { logFormFailure } from "@/lib/logger";
 import { requestIp } from "@/lib/publicRequest";
 
 export const dynamic = "force-dynamic";
 
-/** A few re-picks per sender per hour. */
-const MAX_FLYER_PER_IP_PER_HOUR = 10;
-/** Twice the submit route's site-wide cap: room for re-picks, still a bounded bucket. */
-const MAX_FLYER_SITE_PER_HOUR = 100;
 /** Room for the multipart framing on top of the file. */
 const MAX_REQUEST_BYTES = MAX_FLYER_BYTES + 16 * 1024;
 
@@ -66,11 +57,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return fail(503, "unavailable");
   }
 
-  const ip = requestIp(req);
-  const underCap =
-    (await checkAndIncrement(db, secret, { scope: "event-flyer", id: ip }, MAX_FLYER_PER_IP_PER_HOUR)) &&
-    (await checkAndIncrement(db, secret, { scope: "event-flyer-site", id: "all" }, MAX_FLYER_SITE_PER_HOUR));
-  if (!underCap) return fail(429, "rate_limit");
+  // A few re-picks per sender; site-wide twice the submit's cap, still a bounded bucket.
+  if (!(await checkFormRateLimit(db, secret, "event-flyer", requestIp(req), { perIp: 10, siteWide: 100 }))) {
+    return fail(429, "rate_limit");
+  }
 
   const file = form.get("flyer");
   if (!(file instanceof Blob) || file.size === 0) return fail(422, "unsupported_image");

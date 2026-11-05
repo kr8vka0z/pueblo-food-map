@@ -258,17 +258,7 @@ export default function EventCardBody({
         ? "border-[var(--color-event-outline)] bg-[var(--color-bone-50)] text-[var(--color-event-outline)]"
         : "border-[var(--color-bone-300)] bg-[var(--color-bone-200)] text-[var(--color-ink-700)]";
 
-  const topRow = preview ? (
-    timeless ? null : (
-      <p
-        data-testid="event-badge"
-        data-phase={badge.phase}
-        className={`inline-flex items-center gap-2 self-start rounded-full border-2 px-3 py-1 text-sm font-semibold ${badgeClass}`}
-      >
-        {badge.text}
-      </p>
-    )
-  ) : (
+  const topRow = preview && timeless ? null : (
     <div className="flex items-start justify-between gap-3">
       <p
         data-testid="event-badge"
@@ -280,22 +270,24 @@ export default function EventCardBody({
         )}
         {cancelled ? t("events.card.cancelled", locale) : badge.text}
       </p>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label={t("events.card.closeAria", locale)}
-        className={
-          // #882: on the phone sheet it is hidden until keyboard focus (the sheet
-          // closes by swiping down); the desktop panel keeps the visible ×.
-          (isSheet ? HIDDEN_UNTIL_FOCUS + " " : "-mr-3 -mt-2 ") +
-          "flex h-12 w-12 shrink-0 items-center justify-center rounded-md " +
-          "text-[var(--color-ink-500)] transition-colors hover:bg-[var(--color-bone-100)] touch-manipulation " +
-          PRESS_FEEDBACK +
-          " focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-        }
-      >
-        <X size={18} aria-hidden />
-      </button>
+      {!preview && (
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t("events.card.closeAria", locale)}
+          className={
+            // #882: on the phone sheet it is hidden until keyboard focus (the sheet
+            // closes by swiping down); the desktop panel keeps the visible ×.
+            (isSheet ? HIDDEN_UNTIL_FOCUS + " " : "-mr-3 -mt-2 ") +
+            "flex h-12 w-12 shrink-0 items-center justify-center rounded-md " +
+            "text-[var(--color-ink-500)] transition-colors hover:bg-[var(--color-bone-100)] touch-manipulation " +
+            PRESS_FEEDBACK +
+            " focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+          }
+        >
+          <X size={18} aria-hidden />
+        </button>
+      )}
     </div>
   );
 
@@ -405,7 +397,8 @@ export default function EventCardBody({
   const ActionIcon = action ? ACTION_ICONS[action.kind] : null;
   // Ended/cancelled: hidden like Share and Calendar (Kyle, 2026-11-03), so it never stacks on "See places open now".
   // Preview with no link yet: the button's look, faded, with what to add instead of the site name.
-  const PreviewIcon = ACTION_ICONS[EVENT_LINK_LABELS.find((l) => l === event.link_label) ?? "website"];
+  const previewKind = EVENT_LINK_LABELS.find((l) => l === event.link_label && l !== "custom") ?? "website";
+  const PreviewIcon = ACTION_ICONS[previewKind];
   const actionButton =
     preview && active && !action ? (
       <div
@@ -416,7 +409,7 @@ export default function EventCardBody({
         <PreviewIcon size={22} className="shrink-0" />
         <span className="min-w-0 flex-1 leading-tight">
           <span className="block text-base font-bold">
-            {t(`events.card.action.${event.link_label && event.link_label !== "custom" ? event.link_label : "website"}`, locale)}
+            {t(`events.card.action.${previewKind}`, locale)}
           </span>
           <span className="block truncate text-xs text-[var(--color-sage-100)]">{t("events.card.preview.link", locale)}</span>
         </span>

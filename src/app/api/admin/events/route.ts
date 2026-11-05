@@ -16,24 +16,19 @@
  * submission whose address couldn't be located automatically. Then only
  * "save_draft" is accepted, the submission's flyer is copied onto the event,
  * and the insert plus "mark the submission converted" go through the same
- * atomic commitConversion() as the convert route (409 if someone else
+ * atomic convertToDraft() as the convert route (409 if someone else
  * already handled the submission).
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
-import { EVENT_AUDIT_INSERT_SQL, purgeEventsFeed } from "@/lib/adminEvents";
+import { EVENT_AUDIT_INSERT_SQL, EVENT_INSERT_COLUMNS, EVENT_INSERT_PLACEHOLDERS, eventInsertValues, purgeEventsFeed } from "@/lib/adminEvents";
 import { validateEventPayload } from "@/lib/adminEventValidation";
 import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import type { EventRow } from "@/lib/events";
-import { getCloudflareContext } from "@/lib/cloudflareContext";
-import { commitConversion, copyPendingFlyer, loadPendingEventSubmission, type CopiedFlyer } from "@/lib/eventSubmissions";
+import { convertToDraft, loadPendingEventSubmission, submissionGoneResponse } from "@/lib/eventSubmissions";
 
-const INSERT_EVENT_SQL = `INSERT INTO events (id, name, name_es, host, host_es, description, description_es,
-    what_to_bring, what_to_bring_es, cancel_note, cancel_note_es, starts_at, ends_at, lat, lng, address,
-    venue_id, venue_name, link_url, link_label, link_label_custom, link_label_custom_es,
-    status, created_at, created_by, updated_at, updated_by, published_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+const INSERT_EVENT_SQL = `INSERT INTO events (${EVENT_INSERT_COLUMNS}) VALUES (${EVENT_INSERT_PLACEHOLDERS})`;
 
 export async function POST(req: NextRequest): Promise<Response> {
   let access: AdminDbAccess;
@@ -100,38 +95,14 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   if (submissionId) {
     const sub = await loadPendingEventSubmission(db, submissionId);
-    if (!sub) {
-      return NextResponse.json({ ok: false, error: "conflict", message: "Someone already handled this event. Go back to the Events tab." }, { status: 409 });
-    }
-    const { env } = await getCloudflareContext({ async: true });
-    let flyer: CopiedFlyer | null;
-    try {
-      flyer = await copyPendingFlyer(env.EVENT_FLYERS, sub, id);
-    } catch {
-      return NextResponse.json({ ok: false, error: "upload_failed", message: "The flyer could not be copied. Try again." }, { status: 502 });
-    }
-    const draft: EventRow = { ...row, flyer_key: flyer?.key ?? null, flyer_width: flyer?.width ?? null, flyer_height: flyer?.height ?? null };
-    let outcome: "converted" | "gone";
-    try {
-      outcome = await commitConversion(db, env.EVENT_FLYERS, identity, sub, draft);
-    } catch {
-      return NextResponse.json({ ok: false, error: "write_failed", message: "The event was not saved. Try again." }, { status: 500 });
-    }
-    if (outcome === "gone") {
-      return NextResponse.json({ ok: false, error: "conflict", message: "Someone already handled this event. Go back to the Events tab." }, { status: 409 });
-    }
+    const failed = sub ? await convertToDraft(db, identity, sub, row) : submissionGoneResponse();
+    if (failed) return failed;
     return NextResponse.json({ ok: true, id, updated_at: now, status }, { status: 201 });
   }
 
   const insertEvent = db
     .prepare(INSERT_EVENT_SQL)
-    .bind(
-      row.id, row.name, row.name_es, row.host, row.host_es, row.description, row.description_es,
-      row.what_to_bring, row.what_to_bring_es, row.cancel_note, row.cancel_note_es, row.starts_at, row.ends_at,
-      row.lat, row.lng, row.address, row.venue_id, row.venue_name, row.link_url, row.link_label,
-      row.link_label_custom, row.link_label_custom_es, row.status, row.created_at, row.created_by,
-      row.updated_at, row.updated_by, row.published_at,
-    );
+    .bind(...eventInsertValues(row));
   const insertAudit = db
     .prepare(EVENT_AUDIT_INSERT_SQL)
     .bind(identity.email, id, "create", null, JSON.stringify(row), now, identity.sessionId ?? null, id, now);

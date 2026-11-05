@@ -495,6 +495,7 @@ const enClient: Record<string, string> = {
   "shareEvent.flyer.remove": "Remove flyer",
   "shareEvent.flyer.errorType": "That file isn't a picture we can use. Try a JPEG or PNG.",
   "shareEvent.flyer.errorUpload": "The flyer couldn't be added. Try again.",
+  "shareEvent.flyer.errorReused": "Please add the flyer again, then send.",
   "shareEvent.submitterName.label": "Your name",
   "shareEvent.submitterEmail.label": "Your email",
   "shareEvent.submitterEmail.placeholder": "email@example.com",

@@ -431,6 +431,7 @@ const es: Record<string, string> = {
   "shareEvent.flyer.remove": "Quitar volante", // [CHECK]
   "shareEvent.flyer.errorType": "No podemos usar ese archivo. Prueba con un JPEG o PNG.", // [CHECK]
   "shareEvent.flyer.errorUpload": "No se pudo agregar el volante. Intenta de nuevo.", // [CHECK]
+  "shareEvent.flyer.errorReused": "Por favor agrega el volante otra vez y envía.", // [CHECK]
   "shareEvent.submitterName.label": "Tu nombre", // [CHECK]
   "shareEvent.submitterEmail.label": "Tu correo electrónico", // [CHECK]
   "shareEvent.submitterEmail.placeholder": "correo@ejemplo.com", // [CHECK]

@@ -135,6 +135,7 @@ export default function PublicForm<K extends string>({
   onSuccess,
   submitRow = (submit) => submit,
   beforeSubmit,
+  onFailure,
 }: {
   form: FormName;
   /** POST target, e.g. "/feedback/submit". */
@@ -152,6 +153,8 @@ export default function PublicForm<K extends string>({
   submitRow?: (submit: ReactNode) => ReactNode;
   /** Runs after client validation passes, before the POST; false = don't send. body() runs after it, so it can read a ref the hook set. */
   beforeSubmit?: () => Promise<boolean>;
+  /** Told the server's error code before the generic error banner shows. */
+  onFailure?: (error: string | undefined) => void;
 }) {
   const { locale } = useLocale();
   const [honeypot, setHoneypot] = useState("");
@@ -202,6 +205,7 @@ export default function PublicForm<K extends string>({
         turnstile.fail(); // shows the inline message, resets the widget so the visitor can retry
         setStatus("idle");
       } else {
+        onFailure?.(data.error);
         setStatus("error");
       }
     } catch {

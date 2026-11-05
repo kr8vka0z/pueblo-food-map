@@ -191,7 +191,17 @@ export const SESSION_REPLAY_SAMPLE_RATE = 0.2;
  * recorder otherwise re-records ~130 pins on every pan frame. Replay shows a
  * blank box of the same size; autocapture and the named events still fire.
  */
-export const REPLAY_BLOCK_SELECTOR = ".mapboxgl-map";
+export const REPLAY_BLOCK_SELECTOR = ".mapboxgl-map, .ph-no-capture";
+
+/**
+ * Class for page text that is someone's unsent personal input shown back as
+ * ordinary text, which maskAllInputs does not cover (#883: the "Share an
+ * event" live preview card, address-check results and the phone preview
+ * sheet). posthog-js skips it in autocapture and its recorder blocks it by
+ * default; it is also in REPLAY_BLOCK_SELECTOR so that holds even if a
+ * posthog-js release changes its own default.
+ */
+export const NO_CAPTURE_CLASS = "ph-no-capture";
 
 /**
  * Loads and initializes posthog-js, or does nothing at all (no import, no

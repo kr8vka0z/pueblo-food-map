@@ -34,6 +34,7 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { PUBLIC_EVENT_LINK_LABELS } from "@/lib/adminEventValidation";
 import type { GeocodeMatch } from "@/lib/censusGeocode";
 import { safeUrl } from "@/lib/safeUrl";
+import { NO_CAPTURE_CLASS } from "@/lib/analytics";
 import { shrinkFlyerToJpeg, UnsupportedImageError } from "@/lib/imageResize";
 import PublicForm, { Field, PrivacyNote, type FieldErrors } from "@/components/PublicForm";
 import ShareEventPreview from "@/components/ShareEventPreview";
@@ -83,7 +84,8 @@ const EMPTY: ShareEventValues = {
   venueName: "", address: "", linkUrl: "", linkLabel: "website",
 };
 
-type AddressCheck = "found" | "multiple" | "none" | "error";
+// "stale": the address changed while the lookup ran; its answer was thrown away.
+type AddressCheck = "found" | "multiple" | "none" | "error" | "stale";
 
 const SECTION = "pt-4 border-t border-[var(--color-bone-200)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]";
 
@@ -94,7 +96,10 @@ export default function ShareEventForm() {
   const [submitterName, setSubmitterName] = useState("");
   const [submitterEmail, setSubmitterEmail] = useState("");
   const [flyer, setFlyer] = useState<ShareEventFlyer | null>(null);
-  const [flyerState, setFlyerState] = useState<"idle" | "uploading" | "errorType" | "errorUpload">("idle");
+  const [flyerState, setFlyerState] = useState<"idle" | "uploading" | "errorType" | "errorUpload" | "errorReused">("idle");
+  // Refs alongside the state: beforeSubmit and body() run inside one send, before a re-render could update them.
+  const flyerRef = useRef<ShareEventFlyer | null>(null);
+  const uploadingRef = useRef(false);
   const [sent, setSent] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const set = <K extends keyof ShareEventValues>(key: K, value: string) => setValues((p) => ({ ...p, [key]: value }));
@@ -106,8 +111,11 @@ export default function ShareEventForm() {
   const pinRef = useRef<GeocodeMatch | null>(null);
   // The address last looked up and its answer, so a blur then Send share one lookup.
   const checkRef = useRef<{ q: string; result: Promise<AddressCheck> } | null>(null);
+  // Bumped by every edit and every new lookup: an answer for an older number is stale and touches nothing.
+  const lookupRef = useRef(0);
 
   function chooseMatch(m: GeocodeMatch) {
+    lookupRef.current++;
     pinRef.current = m;
     checkRef.current = { q: m.matchedAddress, result: Promise.resolve("found") };
     set("address", m.matchedAddress);
@@ -115,6 +123,8 @@ export default function ShareEventForm() {
   }
 
   function editAddress(value: string) {
+    lookupRef.current++;
+    checkRef.current = null;
     pinRef.current = null;
     set("address", value);
     if (geo.state !== "idle") setGeo({ state: "idle", options: [] });
@@ -125,10 +135,12 @@ export default function ShareEventForm() {
     if (!q) return null;
     if (checkRef.current?.q === q) return checkRef.current.result;
     setGeo({ state: "loading", options: [] });
+    const mine = ++lookupRef.current;
     const result = (async (): Promise<AddressCheck> => {
       try {
         const res = await fetch(`/events/share/geocode?q=${encodeURIComponent(q)}`);
         const data = (await res.json()) as { ok: boolean; matches?: GeocodeMatch[] };
+        if (mine !== lookupRef.current) return "stale";
         if (!data.ok || !data.matches) {
           setGeo({ state: "error", options: [] });
           return "error";
@@ -144,6 +156,7 @@ export default function ShareEventForm() {
         setGeo({ state: "none", options: [] });
         return "none";
       } catch {
+        if (mine !== lookupRef.current) return "stale";
         setGeo({ state: "error", options: [] });
         return "error";
       }
@@ -152,12 +165,23 @@ export default function ShareEventForm() {
     return result;
   }
 
-  /** Before Send: an unchecked address is checked first; only a freshly found "several" stops the send. */
+  /**
+   * Before Send: never while a flyer is still uploading (it would be sent
+   * without it); an unchecked address is checked first, and a freshly found
+   * "several" or an address edited mid-check stops the send.
+   */
   async function beforeSubmit(): Promise<boolean> {
+    if (uploadingRef.current) return false;
     if (pinRef.current) return true;
     const already = checkRef.current?.q === values.address.trim();
     const result = await checkAddress();
+    if (uploadingRef.current || result === "stale") return false;
     return !(result === "multiple" && !already);
+  }
+
+  function setFlyerBoth(next: ShareEventFlyer | null) {
+    flyerRef.current = next;
+    setFlyer(next);
   }
 
   // Free the local preview URL when it is replaced or the page goes away.
@@ -167,6 +191,7 @@ export default function ShareEventForm() {
 
   async function pickFlyer(file: File | undefined) {
     if (!file) return;
+    uploadingRef.current = true;
     setFlyerState("uploading");
     try {
       const blob = await shrinkFlyerToJpeg(file);
@@ -178,10 +203,12 @@ export default function ShareEventForm() {
         setFlyerState(data.error === "unsupported_image" ? "errorType" : "errorUpload");
         return;
       }
-      setFlyer({ key: data.key, src: URL.createObjectURL(blob), width: data.width, height: data.height });
+      setFlyerBoth({ key: data.key, src: URL.createObjectURL(blob), width: data.width, height: data.height });
       setFlyerState("idle");
     } catch (err) {
       setFlyerState(err instanceof UnsupportedImageError ? "errorType" : "errorUpload");
+    } finally {
+      uploadingRef.current = false;
     }
   }
 
@@ -231,7 +258,10 @@ export default function ShareEventForm() {
         <Eye size={18} aria-hidden />
         {t("shareEvent.preview.open", locale)}
       </button>
-      <div className="flex-1">{submit}</div>
+      {/* A disabled fieldset disables the Send button inside it while a flyer uploads. */}
+      <fieldset disabled={flyerState === "uploading"} className="min-w-0 flex-1">
+        {submit}
+      </fieldset>
     </div>
   );
 
@@ -245,6 +275,13 @@ export default function ShareEventForm() {
       onSuccess={() => setSent(true)}
       submitRow={submitRow}
       beforeSubmit={beforeSubmit}
+      onFailure={(error) => {
+        // The server refused a flyer already sent with another submission: the sender adds it again.
+        if (error === "flyer_reused") {
+          setFlyerBoth(null);
+          setFlyerState("errorReused");
+        }
+      }}
       body={() => ({
         name: values.name.trim(),
         host: values.host.trim(),
@@ -259,7 +296,7 @@ export default function ShareEventForm() {
         lng: pinRef.current?.lng,
         link_url: values.linkUrl.trim() || undefined,
         link_label: values.linkLabel,
-        flyer_key: flyer?.key,
+        flyer_key: flyerRef.current?.key,
         submitter_name: submitterName.trim(),
         submitter_email: submitterEmail.trim(),
       })}
@@ -326,7 +363,7 @@ export default function ShareEventForm() {
             )}
           </Field>
           {/* Always mounted so its changes are announced; tones per DESIGN.md: sage = found, clay = check it (never red: it never blocks). */}
-          <div className="-mt-3 empty:-mt-5" aria-live="polite">
+          <div data-testid="share-address-check" className={`${NO_CAPTURE_CLASS} -mt-3 empty:-mt-5`} aria-live="polite">
             {geo.state === "loading" && <p className="text-sm text-[var(--color-ink-500)]">{t("shareEvent.address.checking", locale)}</p>}
             {geo.state === "found" && geo.found && (
               <p className="text-sm text-[var(--color-sage-600)]">{t("shareEvent.address.found", locale, { address: geo.found })}</p>
@@ -416,7 +453,7 @@ export default function ShareEventForm() {
                   ? t("shareEvent.flyer.hint", locale)
                   : ""}
             </p>
-            {(flyerState === "errorType" || flyerState === "errorUpload") && (
+            {(flyerState === "errorType" || flyerState === "errorUpload" || flyerState === "errorReused") && (
               <p role="alert" className="mt-1 text-xs text-[var(--color-danger)]">
                 {t(`shareEvent.flyer.${flyerState}`, locale)}
               </p>
@@ -424,7 +461,7 @@ export default function ShareEventForm() {
             {flyer && (
               <button
                 type="button"
-                onClick={() => setFlyer(null)}
+                onClick={() => setFlyerBoth(null)}
                 className="mt-2 inline-flex min-h-12 items-center text-sm font-medium text-[var(--color-danger)] underline underline-offset-2"
               >
                 {t("shareEvent.flyer.remove", locale)}
@@ -473,41 +510,43 @@ export default function ShareEventForm() {
     </PublicForm>
   );
 
-  if (sent) {
-    return (
-      <div className="max-w-lg text-center">
-        {form}
-        {/* A full page load on purpose: it gives the next event a fresh Turnstile token and an empty form. */}
-        <a
-          href={pathname}
-          className="inline-flex min-h-12 items-center text-sm font-semibold text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
-        >
-          {t("shareEvent.another", locale)}
-        </a>
-      </div>
-    );
-  }
-
+  // WHY one tree for both states: PublicForm must keep its place (same parent
+  // elements) when `sent` flips, or React remounts it and its thank-you
+  // state is lost, showing the filled form again.
   return (
-    <div className="md:grid md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] md:items-start md:gap-8">
-      <div>{form}</div>
-      <aside aria-label={t("shareEvent.preview.heading", locale)} className="hidden md:block md:sticky md:top-6">
-        <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-500)]">
-          <span>{t("shareEvent.preview.heading", locale)}</span>
-          <span className="inline-flex items-center gap-1.5 normal-case tracking-normal text-[var(--color-sage-700)]">
-            <span aria-hidden className="h-2 w-2 rounded-full bg-[var(--color-sage-600)]" />
-            {t("shareEvent.preview.live", locale)}
-          </span>
-        </div>
-        {card}
-        <p className="mt-3 text-xs text-[var(--color-ink-500)]">{t("shareEvent.preview.note", locale)}</p>
-      </aside>
-      <Drawer.Root open={sheetOpen} onOpenChange={setSheetOpen}>
+    <div className={sent ? "max-w-lg text-center" : "md:grid md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] md:items-start md:gap-8"}>
+      <div>
+        {form}
+        {sent && (
+          // A full page load on purpose: it gives the next event a fresh Turnstile token and an empty form.
+          <a
+            href={pathname}
+            className="inline-flex min-h-12 items-center text-sm font-semibold text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
+          >
+            {t("shareEvent.another", locale)}
+          </a>
+        )}
+      </div>
+      {!sent && (
+        <aside aria-label={t("shareEvent.preview.heading", locale)} className="hidden md:block md:sticky md:top-6">
+          <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-500)]">
+            <span>{t("shareEvent.preview.heading", locale)}</span>
+            <span className="inline-flex items-center gap-1.5 normal-case tracking-normal text-[var(--color-sage-700)]">
+              <span aria-hidden className="h-2 w-2 rounded-full bg-[var(--color-sage-600)]" />
+              {t("shareEvent.preview.live", locale)}
+            </span>
+          </div>
+          {card}
+          <p className="mt-3 text-xs text-[var(--color-ink-500)]">{t("shareEvent.preview.note", locale)}</p>
+        </aside>
+      )}
+      <Drawer.Root open={sheetOpen && !sent} onOpenChange={setSheetOpen}>
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-[1100] bg-[rgba(26,24,23,0.45)]" />
           <Drawer.Content
             aria-describedby={undefined}
-            className="fixed inset-x-0 bottom-0 z-[1101] flex max-h-[90dvh] flex-col rounded-t-[20px] bg-[var(--color-bone-50)] outline-none md:hidden"
+            data-testid="share-preview-sheet"
+            className={`${NO_CAPTURE_CLASS} fixed inset-x-0 bottom-0 z-[1101] flex max-h-[90dvh] flex-col rounded-t-[20px] bg-[var(--color-bone-50)] outline-none md:hidden`}
           >
             <div aria-hidden className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-[var(--color-bone-300)]" />
             <Drawer.Title className="mx-auto mt-2 shrink-0 rounded-full bg-[var(--color-event-outline)] px-3 py-1 text-xs font-bold text-[var(--color-bone-50)]">

@@ -18,6 +18,7 @@ import type { Locale } from "@/lib/i18n";
 import type { PublicEventDetail } from "@/lib/events";
 import { puebloLocalToUtcIso } from "@/lib/eventTime";
 import EventCardBody from "@/components/EventCardBody";
+import { NO_CAPTURE_CLASS } from "@/lib/analytics";
 import type { ShareEventFlyer, ShareEventValues } from "@/components/ShareEventForm";
 
 const noop = () => {};
@@ -63,7 +64,8 @@ export default function ShareEventPreview({
 }) {
   const headingId = useId();
   return (
-    <div className="overflow-hidden rounded-[var(--radius-lg)] bg-[var(--color-bone-50)] elevation-2">
+    // NO_CAPTURE_CLASS: the card shows the sender's unsent text (src/lib/analytics.ts).
+    <div className={`${NO_CAPTURE_CLASS} overflow-hidden rounded-[var(--radius-lg)] bg-[var(--color-bone-50)] elevation-2`}>
       <EventCardBody
         event={toPreviewEvent(values, flyer)}
         locale={locale}

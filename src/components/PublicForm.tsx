@@ -15,7 +15,12 @@
  * - the success panel with its "Back to map" link
  *
  * Copy comes from i18n keys under the form's own prefix (`feedback.*`,
- * `report.*`, `suggest.*`), so the three keep their own wording.
+ * `report.*`, `suggest.*`, `shareEvent.*`), so each keeps its own wording.
+ *
+ * Three optional hooks exist for the "Share an event" form (#883) and change
+ * nothing for the others: `onSuccess` (it hides its live preview),
+ * `successActions` (its "Share another event" link) and `submitRow` (wraps
+ * the submit button, for its phone Preview button beside Send).
  */
 
 import { useRef, useState, type ReactNode } from "react";
@@ -25,7 +30,7 @@ import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { useTurnstile } from "@/lib/useTurnstile";
 
-type FormName = "feedback" | "report" | "suggest";
+type FormName = "feedback" | "report" | "suggest" | "shareEvent";
 export type FieldErrors<K extends string> = Partial<Record<K, string>>;
 
 // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
@@ -132,6 +137,9 @@ export default function PublicForm<K extends string>({
   validate,
   body,
   children,
+  onSuccess,
+  successActions,
+  submitRow = (submit) => submit,
 }: {
   form: FormName;
   /** POST target, e.g. "/feedback/submit". */
@@ -144,6 +152,11 @@ export default function PublicForm<K extends string>({
   /** The form's own JSON fields; `website` and `turnstileToken` are appended. */
   body: () => Record<string, unknown>;
   children: (errors: FieldErrors<NoInfer<K>>, locale: Locale) => ReactNode;
+  onSuccess?: () => void;
+  /** Rendered after "Back to map" on the success panel. */
+  successActions?: ReactNode;
+  /** Wraps the submit button (default: the button alone). */
+  submitRow?: (submit: ReactNode) => ReactNode;
 }) {
   const { locale } = useLocale();
   const [honeypot, setHoneypot] = useState("");
@@ -182,6 +195,7 @@ export default function PublicForm<K extends string>({
 
       if (data.ok) {
         setStatus("success");
+        onSuccess?.();
       } else if (data.error === "rate_limit") {
         setErrors({ [rateLimitField]: t(`${form}.error.rateLimit`, locale) } as FieldErrors<K>);
         setStatus("idle");
@@ -220,6 +234,7 @@ export default function PublicForm<K extends string>({
         >
           {t(`${form}.backToMap`, locale)}
         </Link>
+        {successActions}
       </div>
     );
   }
@@ -267,6 +282,7 @@ export default function PublicForm<K extends string>({
           )}
         </div>
 
+        {submitRow(
         <button
           type="submit"
           disabled={waiting}
@@ -286,7 +302,8 @@ export default function PublicForm<K extends string>({
             : !turnstile.token
               ? t("form.turnstile.verifying", locale)
               : t(`${form}.submit`, locale)}
-        </button>
+        </button>,
+        )}
 
         {status === "error" && (
           <button

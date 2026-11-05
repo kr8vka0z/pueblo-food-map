@@ -1,7 +1,8 @@
 /**
  * POST /events/share/flyer — the optional flyer on the public "Share an
  * event" form (#883). Multipart: `flyer` (the file) and `website` (honeypot).
- * Returns `{ ok: true, key }`; the form sends that key with the submission.
+ * Returns `{ ok: true, key, width, height }`; the form sends the key with
+ * the submission.
  *
  * Same byte rules as the admin flyer upload (src/lib/eventFlyers.ts): only a
  * real JPEG (the browser re-encodes PNG/WebP/JPEG first, imageResize.ts),
@@ -84,5 +85,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     logFormFailure("event_flyer", "db_write_failed", { message: err instanceof Error ? err.message : "unknown error" });
     return fail(502, "upload_failed");
   }
-  return NextResponse.json({ ok: true, key });
+  // Real size from the bytes, so the form's preview reserves the right shape.
+  return NextResponse.json({ ok: true, key, width: inspected.width, height: inspected.height });
 }

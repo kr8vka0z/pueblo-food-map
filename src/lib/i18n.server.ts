@@ -13,6 +13,9 @@ export const serverEn: Record<string, string> = {
   // like every other locale-facing string.
   "jsonld.website.description":
     "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores.",
+  "meta.shareEvent.title": "Share an Event",
+  "meta.shareEvent.description":
+    "Holding a food event in Pueblo County? Send us the details and see how it will look on Pueblo Food Map.",
   "meta.about.title": "About",
   "meta.about.description":
     "About Pueblo Food Map — our mission to connect Pueblo County residents with free and low-cost food resources, and how venue data is sourced.",
@@ -119,6 +122,9 @@ export const serverEn: Record<string, string> = {
 export const serverEs: Record<string, string> = {
   "jsonld.website.description":
     "Un mapa comunitario de recursos alimentarios en el condado de Pueblo, Colorado — huertos comunitarios, paisajes comestibles, despensas de alimentos y supermercados.", // [CHECK]
+  "meta.shareEvent.title": "Compartir un evento", // [CHECK]
+  "meta.shareEvent.description":
+    "¿Vas a tener un evento de comida en el Condado de Pueblo? Mándanos los detalles y mira cómo se verá en Pueblo Food Map.", // [CHECK]
   "meta.about.title": "Acerca de",
   "meta.about.description":
     "Acerca de Pueblo Food Map — nuestra misión de conectar a los residentes del Condado de Pueblo con recursos de alimentos gratuitos y de bajo costo, y cómo se obtienen los datos de los lugares.", // [CHECK]

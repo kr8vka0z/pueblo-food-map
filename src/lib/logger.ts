@@ -45,7 +45,10 @@ export type FormName =
   // confirm, stop, resubscribe, admin host-alerts) — split the same way
   // "checkin"/"checkin_photo" split two related-but-distinct write paths.
   | "adopt"
-  | "alerts";
+  | "alerts"
+  // #883: the public "Share an event" submit and its flyer upload.
+  | "event"
+  | "event_flyer";
 // "db_unavailable" (2026-09-18 security review, item 9): an unhandled D1
 // exception on a public route, distinct from "db_write_failed" (a write that
 // completed its round-trip but returned an unexpected result).

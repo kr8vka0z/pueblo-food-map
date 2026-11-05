@@ -61,7 +61,7 @@ import { checkAndIncrement } from "@/lib/checkinRateLimit";
 export const MAX_PER_IP_PER_HOUR = 5;
 export const MAX_SITE_WIDE_PER_HOUR = 50;
 
-export type FormName = "report" | "suggest" | "feedback";
+export type FormName = "report" | "suggest" | "feedback" | "event";
 
 /**
  * Returns true if this submission is under BOTH caps for `form`, atomically

@@ -188,6 +188,9 @@ export function activityBounds(filters: ActivityFilters): { lower: string; upper
 // event's English name instead (venue_id stays null, so the page shows it as
 // plain text, not a venue link). The name falls back to the audit row's own
 // JSON when the event row is gone or the `events` table doesn't exist yet.
+// Public "Share an event" rows (entity 'event_submission', #883) read the same
+// way, from their audit JSON only (it carries the event's name, never the
+// sender's details).
 const EVENT_NAME_FROM_AUDIT_SQL = "COALESCE(json_extract(a.after_json, '$.name'), json_extract(a.before_json, '$.name'))";
 const EVENT_NAME_FROM_TABLE_SQL = `COALESCE((SELECT name FROM events WHERE id = a.entity_id), ${EVENT_NAME_FROM_AUDIT_SQL})`;
 
@@ -197,7 +200,7 @@ function actionSelectSql(eventsTable: boolean): string {
 SELECT * FROM (
   SELECT a.id, a.actor_email, a.entity, a.entity_id, a.action, a.before_json, a.after_json,
          a.timestamp, a.session_id, v.id AS venue_id,
-         COALESCE(v.name, CASE a.entity WHEN 'event' THEN ${eventName} END) AS venue_name,
+         COALESCE(v.name, CASE a.entity WHEN 'event' THEN ${eventName} WHEN 'event_submission' THEN ${EVENT_NAME_FROM_AUDIT_SQL} END) AS venue_name,
          EXISTS (
            SELECT 1 FROM change_proposals cp
            WHERE cp.target_venue_id = a.entity_id AND cp.status = 'approved'
@@ -218,7 +221,7 @@ SELECT * FROM (
 const ACTION_KIND_SQL = `CASE
     WHEN action = 'publish' THEN 'publish'
     WHEN action = 'archive' THEN 'removal'
-    WHEN entity IN ('box_photo', 'box_adopter') OR from_proposal = 1
+    WHEN entity IN ('box_photo', 'box_adopter', 'event_submission') OR from_proposal = 1
       OR after_json LIKE '%"event":"public_submission_marked_done"%' THEN 'approval'
     ELSE 'edit'
   END`;
@@ -522,6 +525,12 @@ export function summarizeAction(row: AuditActionRow): ActionSummary {
     return { tag: "Cancelled event", tone: "bad", ...base };
   }
   if (row.action === "create") return { tag: "Added", tone: "good", changes: [], moreChanges: 0 };
+  // A reviewed "Share an event" submission (#883): converted or dismissed, nothing else ever happens to one.
+  if (row.entity === "event_submission") {
+    return after.status === "converted"
+      ? { tag: "Made shared event a draft", tone: "good", changes: [], moreChanges: 0 }
+      : { tag: "Dismissed shared event", tone: "neutral", changes: [], moreChanges: 0 };
+  }
   if (row.entity === "box_photo" || row.entity === "box_adopter") {
     const what = row.entity === "box_photo" ? "photo" : "sponsor";
     if (after.status === "approved") return { tag: `Approved ${what}`, tone: "good", ...base };

@@ -1691,7 +1691,12 @@ it a draft and publishes it.
   action button and Get directions are faded non-links until there is a link /
   an address, and Share / Add to calendar are left out. Desktop: beside the form
   (sticky). Phone: a Preview button beside "Send for review" opens it in a vaul
-  sheet ("Preview — not on the map yet", "Back to editing").
+  sheet ("Preview — not on the map yet", "Back to editing"). The card, the
+  sheet and the address-check results carry `NO_CAPTURE_CLASS`
+  (`ph-no-capture`, `src/lib/analytics.ts`): they show unsent personal text,
+  which `maskAllInputs` doesn't cover, so autocapture skips them and replay
+  blocks them (also listed in `REPLAY_BLOCK_SELECTOR`). Send is disabled while
+  a flyer uploads, and an address edit discards any lookup still in flight.
 - **Address check** (spec change 2026-11-05): leaving the address field (or
   pressing Send before it was checked) calls `GET /events/share/geocode`, the
   public twin of `/api/admin/geocode`: the same Census lookup
@@ -1713,7 +1718,10 @@ it a draft and publishes it.
   the validated fields with UTC times and no personal data; `submitter_name` /
   `submitter_email` are their own columns (email: never logged, never in an
   audit row, never public); `status` pending / converted / dismissed;
-  `converted_event_id`. Nothing is deleted.
+  `converted_event_id`; `review_token` (see Admin). `flyer_key` has a partial
+  UNIQUE index: one upload belongs to one submission, so a retried send that
+  reuses it is refused (409 `flyer_reused`, the form asks for the flyer again)
+  and a convert can safely move its own source. Nothing is deleted.
 - **Flyer** `POST /events/share/flyer`: uploaded when picked (shrunk in the
   browser first), same byte checks as the admin upload (`inspectFlyer`), its own
   per-IP and site-wide D1 counters (no Turnstile: the form's single-use token
@@ -1727,16 +1735,19 @@ it a draft and publishes it.
   (`POST /api/admin/event-submissions/[id]/convert`) uses the stored pin when
   the sender picked a checked address, otherwise geocodes the address with the
   Census lookup the forms use (`src/lib/censusGeocode.ts`); with a pin or
-  exactly one match it copies the flyer to the new event's own key, then one `db.batch()`
-  (`commitConversion`, `src/lib/eventSubmissions.ts`) inserts the event as
-  `draft` (status and `published_at` are SQL literals) gated on the submission
-  still being pending, writes its audit row, marks the submission converted,
-  and writes the submission's audit row (id, name, status only). It then opens
+  exactly one match `convertToDraft` (`src/lib/eventSubmissions.ts`) copies the
+  flyer to the new event's own key, sets the row's status to `draft` and
+  `published_at` to null itself (both are bound values, not SQL literals, so
+  this one function is the guarantee), then runs one `db.batch()`: mark the
+  submission converted with a fresh per-request `review_token` (only if still
+  pending), insert the event gated on that token, its audit row, and the
+  submission's audit row (id, name, status only) gated on the same token, so
+  a second admin acting in the same millisecond writes nothing. It then opens
   the draft's edit page. With no single match nothing is written (`events.lat`
   / `lng` are NOT NULL): the admin lands on `/admin/events/new?from=<id>`,
   prefilled with the address and no pin, and saving that form
   (`POST /api/admin/events` with `submission_id`, Save draft only) converts the
-  same atomic way. **"Dismiss"** is a status change with its audit row.
+  same atomic way. **"Dismiss"** is a status change with its token-gated audit row.
 - Production needs `0027` applied before this code is used; until then the page
   submit fails cleanly and the admin section is simply absent.
 

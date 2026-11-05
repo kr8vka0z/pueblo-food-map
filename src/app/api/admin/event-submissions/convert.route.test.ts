@@ -36,6 +36,7 @@ import { POST as uploadFlyer } from "@/app/(site)/events/share/flyer/route";
 import { POST as submitEvent } from "@/app/(site)/events/share/submit/route";
 import { POST as convert } from "@/app/api/admin/event-submissions/[id]/convert/route";
 import { POST as createEvent } from "@/app/api/admin/events/route";
+import { convertToDraft, dismissSubmission, draftFromPayload, loadPendingEventSubmission, parseSubmissionPayload } from "@/lib/eventSubmissions";
 
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 const SENDER_EMAIL = "pat@example.com";
@@ -99,7 +100,15 @@ async function sendIn(pin: { lat?: unknown; lng?: unknown } = {}): Promise<{ id:
     }),
   );
   const { key } = (await up.json()) as { key: string };
-  const res = await submitEvent(
+  const res = await submitWithFlyer(key, pin);
+  expect(res.status).toBe(200);
+  const { id } = sqlite.prepare("SELECT id FROM event_submissions").get() as { id: string };
+  return { id, flyerKey: key };
+}
+
+/** The public submit, with a given (already uploaded) flyer key. */
+function submitWithFlyer(key: string, pin: { lat?: unknown; lng?: unknown } = {}) {
+  return submitEvent(
     makeSubmitRequest("/events/share/submit", {
       name: "Turkey Giveaway",
       host: "Pueblo Food Project",
@@ -120,9 +129,6 @@ async function sendIn(pin: { lat?: unknown; lng?: unknown } = {}): Promise<{ id:
       turnstileToken: "token",
     }),
   );
-  expect(res.status).toBe(200);
-  const { id } = sqlite.prepare("SELECT id FROM event_submissions").get() as { id: string };
-  return { id, flyerKey: key };
 }
 
 const adminPost = (url: string, body?: unknown) =>
@@ -220,5 +226,52 @@ describe("Make it a draft event", () => {
     expect(event).toMatchObject({ status: "draft", published_at: null, lat: 38.2 });
     expect(objects.has(event.flyer_key as string)).toBe(true);
     expect(submission(id)).toMatchObject({ status: "converted", converted_event_id: event.id });
+  });
+
+  test("a second send reusing the same uploaded flyer is refused, and converting the first still moves its flyer", async () => {
+    const { id, flyerKey } = await sendIn();
+    const again = await submitWithFlyer(flyerKey);
+    expect(again.status).toBe(409);
+    expect(await again.json()).toMatchObject({ error: "flyer_reused" });
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM event_submissions").get()).toEqual({ n: 1 });
+
+    expect((await runConvert(id)).status).toBe(200);
+    const [event] = events();
+    expect(objects.has(event.flyer_key as string)).toBe(true);
+  });
+});
+
+describe("two admins acting on one submission in the same millisecond", () => {
+  const identity = { email: ADMIN_EMAIL, sessionId: "sess-1" };
+  afterEach(() => vi.useRealTimers());
+
+  test("two conversions: one event, one event audit row, one submission audit row; the loser gets 409", async () => {
+    const { id } = await sendIn();
+    // Both requests read the row while it was still pending.
+    const sub = (await loadPendingEventSubmission(sqliteD1(sqlite), id))!;
+    const payload = parseSubmissionPayload(sub.payload)!;
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-05T12:00:00.000Z"));
+    const at = new Date().toISOString();
+    const first = await convertToDraft(sqliteD1(sqlite), identity, sub, draftFromPayload("ev-a", payload, { lat: 38.2, lng: -104.6 }, ADMIN_EMAIL, at));
+    const second = await convertToDraft(sqliteD1(sqlite), identity, sub, draftFromPayload("ev-b", payload, { lat: 38.2, lng: -104.6 }, ADMIN_EMAIL, at));
+    expect(first).toBeNull();
+    expect(second?.status).toBe(409);
+    expect(events().map((e) => e.id)).toEqual(["ev-a"]);
+    expect(audits().map((a) => [a.entity, a.entity_id])).toEqual([
+      ["event", "ev-a"],
+      ["event_submission", id],
+    ]);
+    expect(JSON.parse(audits()[1].after_json as string)).toMatchObject({ converted_event_id: "ev-a" });
+  });
+
+  test("two dismissals: one status change, one audit row", async () => {
+    const { id } = await sendIn();
+    const sub = (await loadPendingEventSubmission(sqliteD1(sqlite), id))!;
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-05T12:00:00.000Z"));
+    expect(await dismissSubmission(sqliteD1(sqlite), identity, sub, "Turkey Giveaway")).toBe(true);
+    expect(await dismissSubmission(sqliteD1(sqlite), identity, sub, "Turkey Giveaway")).toBe(false);
+    expect(audits()).toHaveLength(1);
   });
 });

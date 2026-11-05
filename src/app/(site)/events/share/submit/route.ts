@@ -108,7 +108,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       )
       .run();
   } catch (err) {
-    logFormFailure("event", "db_write_failed", { message: err instanceof Error ? err.message : "unknown error" });
+    const message = err instanceof Error ? err.message : "unknown error";
+    // One flyer, one submission (UNIQUE index, migration 0027): a retried send
+    // reusing an already-sent upload is told to add the flyer again.
+    if (flyer && message.includes("UNIQUE")) {
+      return NextResponse.json({ ok: false, error: "flyer_reused", errors: { flyer: "Add the flyer again." } }, { status: 409 });
+    }
+    logFormFailure("event", "db_write_failed", { message });
     return NextResponse.json({ ok: false, error: "send_failed" }, { status: 502 });
   }
 

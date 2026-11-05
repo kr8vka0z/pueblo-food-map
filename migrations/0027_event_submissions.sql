@@ -24,7 +24,16 @@
 -- flyer_width / flyer_height: read from the stored file's bytes by the
 -- submit route, never client-reported.
 --
+-- A UNIQUE (partial) index on flyer_key: one uploaded flyer belongs to one
+-- submission, so a retried send can't share it and converting one can't
+-- delete another's picture. The submit route turns the clash into "add the
+-- flyer again".
+--
 -- status: pending -> converted (converted_event_id set) or dismissed.
+-- review_token: a random value the reviewing UPDATE writes; the audit rows
+-- (and the converted event) are gated on it, so only the request whose
+-- UPDATE really changed the row records anything, even when two admins act
+-- in the same millisecond.
 -- Nothing is ever deleted.
 --
 -- Fresh table, so this is idempotent (IF NOT EXISTS). Production still
@@ -43,8 +52,10 @@ CREATE TABLE IF NOT EXISTS event_submissions (
   converted_event_id  TEXT,
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   reviewed_at         TEXT,
-  reviewed_by         TEXT
+  reviewed_by         TEXT,
+  review_token        TEXT
 );
 
 -- The admin list's one query: WHERE status = 'pending' ORDER BY created_at DESC.
 CREATE INDEX IF NOT EXISTS idx_event_submissions_status ON event_submissions(status, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_submissions_flyer ON event_submissions(flyer_key) WHERE flyer_key IS NOT NULL;

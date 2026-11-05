@@ -5,14 +5,19 @@
  *
  * Converting is one db.batch(), so the event and the "converted" mark land
  * together or not at all:
- *   0. INSERT the event, as SELECT ... WHERE EXISTS (the submission is still
- *      pending). convertToDraft() forces status 'draft' and published_at NULL
- *      on the row it binds, so no caller can publish through this path.
- *   1. the event's audit row (EVENT_AUDIT_INSERT_SQL, gated on the new row);
- *   2. UPDATE the submission to converted (AND status = 'pending');
- *   3. the submission's audit row, gated on step 2 having applied.
- * If two admins convert the same row, the second insert matches nothing
- * (results[0].meta.changes === 0) and the caller answers 409.
+ *   0. UPDATE the submission to converted (AND status = 'pending'), writing a
+ *      fresh review_token made by this request;
+ *   1. INSERT the event, as SELECT ... WHERE EXISTS (the submission carries
+ *      THIS request's token). convertToDraft() forces status 'draft' and
+ *      published_at NULL on the row it binds, so no caller can publish here;
+ *   2. the event's audit row (EVENT_AUDIT_INSERT_SQL, gated on the new row);
+ *   3. the submission's audit row, gated on this request's token.
+ * WHY a token, not status + timestamp: two admins acting in the same
+ * millisecond would both match a timestamp guard, and the loser would write
+ * an audit row (naming an event that was never created). If two admins
+ * convert the same row, the second UPDATE matches nothing
+ * (results[0].meta.changes === 0), nothing else applies, and the caller
+ * answers 409. Dismiss uses the same token guard.
  *
  * Flyer: copied to the new event's own key (flyerKey) BEFORE the batch,
  * because R2 and D1 can't share a transaction. A failed or lost batch deletes
@@ -85,18 +90,18 @@ export async function loadPendingEventSubmission(db: D1Database, id: string): Pr
 
 const INSERT_DRAFT_FROM_SUBMISSION_SQL = `INSERT INTO events (${EVENT_INSERT_COLUMNS}, flyer_key, flyer_width, flyer_height)
   SELECT ${EVENT_INSERT_PLACEHOLDERS}, ?, ?, ?
-  WHERE EXISTS (SELECT 1 FROM event_submissions WHERE id = ? AND status = 'pending')`;
+  WHERE EXISTS (SELECT 1 FROM event_submissions WHERE id = ? AND review_token = ?)`;
 
-const MARK_CONVERTED_SQL = `UPDATE event_submissions SET status = 'converted', converted_event_id = ?, reviewed_at = ?, reviewed_by = ?
+const MARK_CONVERTED_SQL = `UPDATE event_submissions SET status = 'converted', converted_event_id = ?, reviewed_at = ?, reviewed_by = ?, review_token = ?
   WHERE id = ? AND status = 'pending'`;
 
-const MARK_DISMISSED_SQL = `UPDATE event_submissions SET status = 'dismissed', reviewed_at = ?, reviewed_by = ?
+const MARK_DISMISSED_SQL = `UPDATE event_submissions SET status = 'dismissed', reviewed_at = ?, reviewed_by = ?, review_token = ?
   WHERE id = ? AND status = 'pending'`;
 
-/** Bind order: actor, entity_id, before_json, after_json, timestamp, session_id, then the guard's id, status, reviewed_at. */
+/** Bind order: actor, entity_id, before_json, after_json, timestamp, session_id, then the guard's id and this request's review_token. */
 const SUBMISSION_AUDIT_SQL = auditInsertIfExistsSql(
   "?, 'event_submission', ?, 'update', ?, ?, ?, ?",
-  "SELECT 1 FROM event_submissions WHERE id = ? AND status = ? AND reviewed_at = ?",
+  "SELECT 1 FROM event_submissions WHERE id = ? AND review_token = ?",
 );
 
 /** A draft events row from a submission plus a location (convertToDraft adds the flyer). */
@@ -186,13 +191,14 @@ async function commitConversion(
   row: EventRow,
 ): Promise<"converted" | "gone"> {
   const now = row.created_at;
+  const token = crypto.randomUUID();
+  const mark = db.prepare(MARK_CONVERTED_SQL).bind(row.id, now, identity.email, token, sub.id);
   const insert = db
     .prepare(INSERT_DRAFT_FROM_SUBMISSION_SQL)
-    .bind(...eventInsertValues(row), row.flyer_key, row.flyer_width ?? null, row.flyer_height ?? null, sub.id);
+    .bind(...eventInsertValues(row), row.flyer_key, row.flyer_width ?? null, row.flyer_height ?? null, sub.id, token);
   const eventAudit = db
     .prepare(EVENT_AUDIT_INSERT_SQL)
     .bind(identity.email, row.id, "create", null, JSON.stringify(row), now, identity.sessionId ?? null, row.id, now);
-  const mark = db.prepare(MARK_CONVERTED_SQL).bind(row.id, now, identity.email, sub.id);
   const subAudit = db
     .prepare(SUBMISSION_AUDIT_SQL)
     .bind(
@@ -200,13 +206,13 @@ async function commitConversion(
       JSON.stringify({ id: sub.id, name: row.name, status: "pending" }),
       JSON.stringify({ id: sub.id, name: row.name, status: "converted", converted_event_id: row.id }),
       now, identity.sessionId ?? null,
-      sub.id, "converted", now,
+      sub.id, token,
     );
 
-  // insert MUST stay statement index 0 — the "gone" check reads results[0].
+  // mark MUST stay statement index 0 — the "gone" check reads results[0].
   let results: Awaited<ReturnType<typeof db.batch>>;
   try {
-    results = await db.batch([insert, eventAudit, mark, subAudit]);
+    results = await db.batch([mark, insert, eventAudit, subAudit]);
   } catch (err) {
     await deleteQuietly(r2, row.flyer_key);
     throw err;
@@ -264,8 +270,9 @@ export async function convertToDraft(
 /** Dismiss: a status change plus its audit row, one batch. Returns false when the row was not pending. */
 export async function dismissSubmission(db: D1Database, identity: AdminIdentity, sub: EventSubmissionRow, name: string): Promise<boolean> {
   const now = new Date().toISOString();
+  const token = crypto.randomUUID(); // see the header: the audit row is gated on this request's own UPDATE
   const [result] = await db.batch([
-    db.prepare(MARK_DISMISSED_SQL).bind(now, identity.email, sub.id),
+    db.prepare(MARK_DISMISSED_SQL).bind(now, identity.email, token, sub.id),
     db
       .prepare(SUBMISSION_AUDIT_SQL)
       .bind(
@@ -273,7 +280,7 @@ export async function dismissSubmission(db: D1Database, identity: AdminIdentity,
         JSON.stringify({ id: sub.id, name, status: "pending" }),
         JSON.stringify({ id: sub.id, name, status: "dismissed" }),
         now, identity.sessionId ?? null,
-        sub.id, "dismissed", now,
+        sub.id, token,
       ),
   ]);
   return result.meta.changes > 0;

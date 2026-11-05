@@ -49,3 +49,12 @@ test("one IP over the hourly cap gets 429, and that lookup never reaches the geo
   expect(await res.json()).toMatchObject({ error: "rate_limit" });
   expect(census).toHaveBeenCalledTimes(EVENT_GEOCODE_CAPS.perIp);
 });
+
+test("Census capitals come back as a readable address", async () => {
+  census.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({ result: { addressMatches: [{ matchedAddress: "1001 E ABRIENDO AVE, PUEBLO, CO, 81004", coordinates: { x: -104.6, y: 38.25 } }] } }),
+  });
+  const body = await (await lookup()).json();
+  expect(body.matches[0].matchedAddress).toBe("1001 E Abriendo Ave, Pueblo, CO 81004");
+});

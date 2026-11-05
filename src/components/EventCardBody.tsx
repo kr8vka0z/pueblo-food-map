@@ -50,6 +50,15 @@
  * Plain text only: every event string is rendered as a React text node (never
  * HTML), and the action button only renders if safeUrl() says http(s).
  *
+ * Preview (#883, `preview`): the public "Share an event" page renders this
+ * same card from the form's current values, before the event exists. Empty
+ * fields show grey placeholder text instead of disappearing; the action
+ * button and Get directions show faded and do nothing until there is a link /
+ * an address; no close button, badge-less until there are valid times, and
+ * none of the things that need a real event (Share, Add to calendar, "See
+ * places open now"). Directions never link in a preview: there is no pin yet.
+ * Default rendering (preview off) is unchanged.
+ *
  * Directions reuse DirectionButtons' googleMapsUrl (one URL builder, no travel
  * mode so the visitor picks); distance reuses haversineMiles/formatMiles.
  * Orange + navy on the button is the same owner approval as the event pin
@@ -76,7 +85,7 @@ import {
 import { t, type Locale } from "@/lib/i18n";
 import { googleMapsUrl } from "@/components/DirectionButtons";
 import { formatMiles, haversineMiles } from "@/lib/distance";
-import type { EventLinkLabel } from "@/lib/adminEventValidation";
+import { EVENT_LINK_LABELS, type EventLinkLabel } from "@/lib/adminEventValidation";
 import { eventAction, eventBadge, eventText, eventWhen, localizeEvent } from "@/lib/eventCard";
 import { downloadEventCalendar } from "@/lib/eventCalendar";
 import EventFlyer from "@/components/EventFlyer";
@@ -106,6 +115,8 @@ export interface EventCardBodyProps {
   /** "sheet" only — the sheet is sliding closed with this card still showing; return focus now. */
   closing?: boolean;
   className?: string;
+  /** The public "Share an event" live preview (#883): placeholders for empty fields, see header. */
+  preview?: boolean;
 }
 
 const SECONDARY_BUTTON =
@@ -140,14 +151,18 @@ export default function EventCardBody({
   detailSectionId,
   closing = false,
   className = "",
+  preview = false,
 }: EventCardBodyProps) {
   const now = useMinuteClock();
   const text = localizeEvent(event, locale);
   const cancelled = event.status === "cancelled";
+  // A preview with no valid times yet has no badge and no When; it still shows as upcoming.
+  const timeless = preview && !(Date.parse(event.ends_at) > Date.parse(event.starts_at));
   const badge = eventBadge(event, now, locale);
-  const active = !cancelled && badge.phase !== "ended";
-  const when = eventWhen(event, locale);
+  const active = !cancelled && (timeless || badge.phase !== "ended");
+  const when = timeless ? null : eventWhen(event, locale);
   const action = eventAction(event, locale);
+  const placeholder = (key: string) => <span className="italic text-[var(--color-ink-400)]">{t(`events.card.preview.${key}`, locale)}</span>;
   const isSheet = layout === "sheet";
   // Alt: the admin's text in the page's language, else their English text, else the event name.
   const flyer = event.flyer ? (
@@ -243,7 +258,17 @@ export default function EventCardBody({
         ? "border-[var(--color-event-outline)] bg-[var(--color-bone-50)] text-[var(--color-event-outline)]"
         : "border-[var(--color-bone-300)] bg-[var(--color-bone-200)] text-[var(--color-ink-700)]";
 
-  const topRow = (
+  const topRow = preview ? (
+    timeless ? null : (
+      <p
+        data-testid="event-badge"
+        data-phase={badge.phase}
+        className={`inline-flex items-center gap-2 self-start rounded-full border-2 px-3 py-1 text-sm font-semibold ${badgeClass}`}
+      >
+        {badge.text}
+      </p>
+    )
+  ) : (
     <div className="flex items-start justify-between gap-3">
       <p
         data-testid="event-badge"
@@ -282,10 +307,12 @@ export default function EventCardBody({
         className="text-2xl font-normal leading-tight text-[var(--color-ink-900)] outline-none"
         style={{ fontFamily: "var(--font-display)" }}
       >
-        {text.name}
+        {text.name || (preview && placeholder("name"))}
       </h2>
-      {text.host && (
+      {text.host ? (
         <p className="mt-1 text-sm text-[var(--color-ink-500)]">{t("events.card.hostedBy", locale, { host: text.host })}</p>
+      ) : (
+        preview && <p className="mt-1 text-sm">{placeholder("host")}</p>
       )}
     </div>
   );
@@ -302,8 +329,14 @@ export default function EventCardBody({
   const whenBlock = (
     <section aria-labelledby={`${headingId}-when`}>
       <h3 id={`${headingId}-when`} className={SECTION_HEADING}>{t("events.card.when", locale)}</h3>
-      <p className="text-base font-semibold text-[var(--color-ink-900)]">{when.day}</p>
-      <p className="text-sm text-[var(--color-ink-700)]">{when.time}</p>
+      {when ? (
+        <>
+          <p className="text-base font-semibold text-[var(--color-ink-900)]">{when.day}</p>
+          <p className="text-sm text-[var(--color-ink-700)]">{when.time}</p>
+        </>
+      ) : (
+        <p className="text-sm">{placeholder("when")}</p>
+      )}
     </section>
   );
 
@@ -320,14 +353,19 @@ export default function EventCardBody({
           {event.venue_name?.trim() && (
             <p className="text-sm font-semibold text-[var(--color-ink-900)]">{event.venue_name.trim()}</p>
           )}
-          <p className="text-sm text-[var(--color-ink-700)]">{event.address}</p>
+          <p className="text-sm text-[var(--color-ink-700)]">{event.address || (preview && placeholder("where"))}</p>
           {distance && <p className="mt-0.5 font-mono text-xs text-[var(--color-ink-500)]">{distance}</p>}
         </div>
       </div>
     </section>
   );
 
-  const aboutBlock = text.description ? (
+  const aboutBlock = preview && !text.description ? (
+    <section aria-labelledby={`${headingId}-about`}>
+      <h3 id={`${headingId}-about`} className={SECTION_HEADING}>{t("events.card.about", locale)}</h3>
+      <p className="text-sm">{placeholder("about")}</p>
+    </section>
+  ) : text.description ? (
     <section aria-labelledby={`${headingId}-about`}>
       <h3 id={`${headingId}-about`} className={SECTION_HEADING}>{t("events.card.about", locale)}</h3>
       <p
@@ -366,8 +404,24 @@ export default function EventCardBody({
 
   const ActionIcon = action ? ACTION_ICONS[action.kind] : null;
   // Ended/cancelled: hidden like Share and Calendar (Kyle, 2026-11-03), so it never stacks on "See places open now".
+  // Preview with no link yet: the button's look, faded, with what to add instead of the site name.
+  const PreviewIcon = ACTION_ICONS[EVENT_LINK_LABELS.find((l) => l === event.link_label) ?? "website"];
   const actionButton =
-    active && action && ActionIcon ? (
+    preview && active && !action ? (
+      <div
+        data-testid="event-action-placeholder"
+        aria-hidden
+        className="flex min-h-[60px] w-full items-center gap-3 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] px-4 py-2 text-white opacity-45"
+      >
+        <PreviewIcon size={22} className="shrink-0" />
+        <span className="min-w-0 flex-1 leading-tight">
+          <span className="block text-base font-bold">
+            {t(`events.card.action.${event.link_label && event.link_label !== "custom" ? event.link_label : "website"}`, locale)}
+          </span>
+          <span className="block truncate text-xs text-[var(--color-sage-100)]">{t("events.card.preview.link", locale)}</span>
+        </span>
+      </div>
+    ) : active && action && ActionIcon ? (
       <a
         data-testid="event-action"
         href={action.href}
@@ -403,7 +457,22 @@ export default function EventCardBody({
     </section>
   ) : null;
 
-  const directionsButton = active ? (
+  const directionsButton = preview ? (
+    active ? (
+      <div
+        data-testid="event-directions-preview"
+        aria-hidden
+        className={
+          "flex min-h-14 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-event-pin)] " +
+          "px-4 py-3 text-base font-bold text-[var(--color-event-outline)]" +
+          (event.address ? "" : " opacity-45")
+        }
+      >
+        <Navigation size={18} />
+        {t("events.card.directions", locale)}
+      </div>
+    ) : null
+  ) : active ? (
     <a
       href={googleMapsUrl(event.lat, event.lng)}
       target="_blank"
@@ -423,7 +492,7 @@ export default function EventCardBody({
     </a>
   ) : null;
 
-  const secondaryButtons = active ? (
+  const secondaryButtons = active && !preview ? (
     <div className="flex flex-col gap-2">
       <div className="flex gap-2">
         <button type="button" onClick={handleShare} className={SECONDARY_BUTTON}>
@@ -447,7 +516,7 @@ export default function EventCardBody({
     </div>
   ) : null;
 
-  const openNowButton = !active ? (
+  const openNowButton = !active && !preview ? (
     <button
       type="button"
       onClick={onSeeOpenNow}

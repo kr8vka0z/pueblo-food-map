@@ -15,10 +15,18 @@
  * the returned key rides along with the submission. A local object URL shows
  * it in the preview.
  *
+ * Live preview (ShareEventPreview): on a computer the card sits beside the
+ * form and stays in view while scrolling; on a phone a Preview button beside
+ * "Send for review" (pinned to the bottom of the screen while the form is in
+ * view) opens the card in a sheet with "Back to editing". It disappears on
+ * the thank-you screen.
+ *
  * WHY the link travels as `link_url`: `website` is PublicForm's honeypot key.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Drawer } from "vaul";
+import { Eye } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
@@ -27,6 +35,7 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { PUBLIC_EVENT_LINK_LABELS } from "@/lib/adminEventValidation";
 import { shrinkFlyerToJpeg, UnsupportedImageError } from "@/lib/imageResize";
 import PublicForm, { Field, PrivacyNote, type FieldErrors } from "@/components/PublicForm";
+import ShareEventPreview from "@/components/ShareEventPreview";
 
 const { SUGGEST_VENUE_NAME, SUGGEST_ADDRESS, SUGGEST_CONTACT, SUGGEST_NOTES, EVENT_SHORT_TEXT, EMAIL } = FIELD_LIMITS;
 
@@ -92,6 +101,8 @@ export default function ShareEventForm() {
   const [submitterEmail, setSubmitterEmail] = useState("");
   const [flyer, setFlyer] = useState<ShareEventFlyer | null>(null);
   const [flyerState, setFlyerState] = useState<"idle" | "uploading" | "errorType" | "errorUpload">("idle");
+  const [sent, setSent] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const set = <K extends keyof ShareEventValues>(key: K, value: string) => setValues((p) => ({ ...p, [key]: value }));
 
   // Free the local preview URL when it is replaced or the page goes away.
@@ -142,13 +153,36 @@ export default function ShareEventForm() {
       return <input {...control} type="text" value={values[key]} onChange={(e) => set(key, e.target.value)} maxLength={max} {...extra} />;
     };
 
-  return (
+  const card = <ShareEventPreview values={values} flyer={flyer} locale={locale} />;
+
+  // Phone only: Preview beside Send, pinned to the screen's bottom edge while the form is on screen.
+  const submitRow = (submit: ReactNode) => (
+    <div className="sticky bottom-[calc(var(--bottom-nav-clearance)+env(safe-area-inset-bottom))] z-10 -mx-4 flex gap-2 bg-[var(--color-bone-50)] px-4 py-3 md:static md:mx-0 md:p-0">
+      <button
+        type="button"
+        onClick={() => setSheetOpen(true)}
+        className={
+          "md:hidden inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-[var(--radius-md)] " +
+          "border-2 border-[var(--color-sage-600)] bg-white text-base font-semibold text-[var(--color-sage-700)] " +
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
+        }
+      >
+        <Eye size={18} aria-hidden />
+        {t("shareEvent.preview.open", locale)}
+      </button>
+      <div className="flex-1">{submit}</div>
+    </div>
+  );
+
+  const form = (
     <PublicForm
       form="shareEvent"
       url="/events/share/submit"
       fieldIds={FIELD_IDS}
       rateLimitField="name"
       validate={validate}
+      onSuccess={() => setSent(true)}
+      submitRow={submitRow}
       successActions={
         // A full page load on purpose: it gives the next event a fresh Turnstile token and an empty form.
         <a
@@ -336,5 +370,50 @@ export default function ShareEventForm() {
         </>
       )}
     </PublicForm>
+  );
+
+  if (sent) return <div className="max-w-lg">{form}</div>;
+
+  return (
+    <div className="md:grid md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] md:items-start md:gap-8">
+      <div>{form}</div>
+      <aside aria-label={t("shareEvent.preview.heading", locale)} className="hidden md:block md:sticky md:top-6">
+        <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-500)]">
+          <span>{t("shareEvent.preview.heading", locale)}</span>
+          <span className="inline-flex items-center gap-1.5 normal-case tracking-normal text-[var(--color-sage-700)]">
+            <span aria-hidden className="h-2 w-2 rounded-full bg-[var(--color-sage-600)]" />
+            {t("shareEvent.preview.live", locale)}
+          </span>
+        </div>
+        {card}
+        <p className="mt-3 text-xs text-[var(--color-ink-500)]">{t("shareEvent.preview.note", locale)}</p>
+      </aside>
+      <Drawer.Root open={sheetOpen} onOpenChange={setSheetOpen}>
+        <Drawer.Portal>
+          <Drawer.Overlay className="fixed inset-0 z-[1100] bg-[rgba(26,24,23,0.45)]" />
+          <Drawer.Content
+            aria-describedby={undefined}
+            className="fixed inset-x-0 bottom-0 z-[1101] flex max-h-[90dvh] flex-col rounded-t-[20px] bg-[var(--color-bone-50)] outline-none md:hidden"
+          >
+            <div aria-hidden className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-[var(--color-bone-300)]" />
+            <Drawer.Title className="mx-auto mt-2 shrink-0 rounded-full bg-[var(--color-event-outline)] px-3 py-1 text-xs font-bold text-[var(--color-bone-50)]">
+              {t("shareEvent.preview.sheetTag", locale)}
+            </Drawer.Title>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">{card}</div>
+            <div className="shrink-0 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-2">
+              <Drawer.Close
+                className={
+                  "flex h-12 w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-bone-300)] " +
+                  "bg-white text-base font-semibold text-[var(--color-ink-700)] focus-visible:outline-none focus-visible:ring-2 " +
+                  "focus-visible:ring-[var(--color-sage-500)]"
+                }
+              >
+                {t("shareEvent.preview.back", locale)}
+              </Drawer.Close>
+            </div>
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
+    </div>
   );
 }

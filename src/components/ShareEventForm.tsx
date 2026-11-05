@@ -21,10 +21,20 @@
  * view) opens the card in a sheet with "Back to editing". It disappears on
  * the thank-you screen.
  *
+ * Address check (#883 spec change, 2026-11-05): leaving the address field
+ * (and pressing Send, if that address wasn't checked yet) looks it up through
+ * GET /events/share/geocode (the Census lookup, Pueblo County only). One
+ * match replaces the typed address with the matched one and keeps its pin;
+ * several show buttons to pick from (a fresh "several" at Send stops that
+ * send so the sender can pick); none or a failed lookup shows a gentle note
+ * and the sender can still send. The pin rides along as lat/lng, which the
+ * server re-checks. Typing in the address drops the pin, so a pin can never
+ * belong to a different address than the one sent.
+ *
  * WHY the link travels as `link_url`: `website` is PublicForm's honeypot key.
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Drawer } from "vaul";
 import { Eye } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -82,6 +92,13 @@ const EMPTY: ShareEventValues = {
   venueName: "", address: "", linkUrl: "", linkLabel: "website",
 };
 
+interface AddressMatch {
+  lat: number;
+  lng: number;
+  matchedAddress: string;
+}
+type AddressCheck = "found" | "multiple" | "none" | "error";
+
 const SECTION = "pt-4 border-t border-[var(--color-bone-200)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]";
 
 function isHttpUrl(text: string): boolean {
@@ -104,6 +121,67 @@ export default function ShareEventForm() {
   const [sent, setSent] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const set = <K extends keyof ShareEventValues>(key: K, value: string) => setValues((p) => ({ ...p, [key]: value }));
+  const [geo, setGeo] = useState<{ state: AddressCheck | "idle" | "loading"; options: AddressMatch[]; found?: string }>({
+    state: "idle",
+    options: [],
+  });
+  // The chosen match (address + pin). A ref because PublicForm calls body() right after beforeSubmit, before a re-render.
+  const pinRef = useRef<AddressMatch | null>(null);
+  // The address last looked up and its answer, so a blur then Send share one lookup.
+  const checkRef = useRef<{ q: string; result: Promise<AddressCheck> } | null>(null);
+
+  function chooseMatch(m: AddressMatch) {
+    pinRef.current = m;
+    checkRef.current = { q: m.matchedAddress, result: Promise.resolve("found") };
+    set("address", m.matchedAddress);
+    setGeo({ state: "found", options: [], found: m.matchedAddress });
+  }
+
+  function editAddress(value: string) {
+    pinRef.current = null;
+    set("address", value);
+    if (geo.state !== "idle") setGeo({ state: "idle", options: [] });
+  }
+
+  function checkAddress(): Promise<AddressCheck> | null {
+    const q = values.address.trim();
+    if (!q) return null;
+    if (checkRef.current?.q === q) return checkRef.current.result;
+    setGeo({ state: "loading", options: [] });
+    const result = (async (): Promise<AddressCheck> => {
+      try {
+        const res = await fetch(`/events/share/geocode?q=${encodeURIComponent(q)}`);
+        const data = (await res.json()) as { ok: boolean; matches?: AddressMatch[] };
+        if (!data.ok || !data.matches) {
+          setGeo({ state: "error", options: [] });
+          return "error";
+        }
+        if (data.matches.length === 1) {
+          chooseMatch(data.matches[0]);
+          return "found";
+        }
+        if (data.matches.length > 1) {
+          setGeo({ state: "multiple", options: data.matches });
+          return "multiple";
+        }
+        setGeo({ state: "none", options: [] });
+        return "none";
+      } catch {
+        setGeo({ state: "error", options: [] });
+        return "error";
+      }
+    })();
+    checkRef.current = { q, result };
+    return result;
+  }
+
+  /** Before Send: an unchecked address is checked first; only a freshly found "several" stops the send. */
+  async function beforeSubmit(): Promise<boolean> {
+    if (pinRef.current) return true;
+    const already = checkRef.current?.q === values.address.trim();
+    const result = await checkAddress();
+    return !(result === "multiple" && !already);
+  }
 
   // Free the local preview URL when it is replaced or the page goes away.
   useEffect(() => () => {
@@ -192,6 +270,7 @@ export default function ShareEventForm() {
           {t("shareEvent.another", locale)}
         </a>
       }
+      beforeSubmit={beforeSubmit}
       body={() => ({
         name: values.name.trim(),
         host: values.host.trim(),
@@ -201,7 +280,9 @@ export default function ShareEventForm() {
         description: values.description.trim(),
         what_to_bring: values.whatToBring.trim() || undefined,
         venue_name: values.venueName.trim() || undefined,
-        address: values.address.trim(),
+        address: pinRef.current?.matchedAddress ?? values.address.trim(),
+        lat: pinRef.current?.lat,
+        lng: pinRef.current?.lng,
         link_url: values.linkUrl.trim() || undefined,
         link_label: values.linkLabel,
         flyer_key: flyer?.key,
@@ -257,8 +338,54 @@ export default function ShareEventForm() {
             {text("venueName", SUGGEST_VENUE_NAME, { placeholder: t("shareEvent.venueName.placeholder", locale) })}
           </Field>
           <Field id={FIELD_IDS.address} label={t("shareEvent.address.label", locale)} required error={errors.address}>
-            {text("address", SUGGEST_ADDRESS, { placeholder: t("shareEvent.address.placeholder", locale), autoComplete: "street-address" })}
+            {(control) => (
+              <input
+                {...control}
+                type="text"
+                value={values.address}
+                onChange={(e) => editAddress(e.target.value)}
+                onBlur={() => void checkAddress()}
+                placeholder={t("shareEvent.address.placeholder", locale)}
+                autoComplete="street-address"
+                maxLength={SUGGEST_ADDRESS}
+              />
+            )}
           </Field>
+          {/* Always mounted so its changes are announced; tones per DESIGN.md: sage = found, clay = check it (never red: it never blocks). */}
+          <div className="-mt-3 empty:-mt-5" aria-live="polite">
+            {geo.state === "loading" && <p className="text-sm text-[var(--color-ink-500)]">{t("shareEvent.address.checking", locale)}</p>}
+            {geo.state === "found" && geo.found && (
+              <p className="text-sm text-[var(--color-sage-600)]">{t("shareEvent.address.found", locale, { address: geo.found })}</p>
+            )}
+            {(geo.state === "none" || geo.state === "error") && (
+              <p className="text-sm text-[var(--color-clay-700)]">{t("shareEvent.address.notFound", locale)}</p>
+            )}
+            {geo.state === "multiple" && (
+              <div className="space-y-1.5">
+                <p id="share-address-choices" className="text-xs font-medium text-[var(--color-ink-500)]">
+                  {t("shareEvent.address.choose", locale)}
+                </p>
+                <ul aria-labelledby="share-address-choices" className="space-y-1.5">
+                  {geo.options.map((m, i) => (
+                    <li key={`${m.lat}-${m.lng}-${i}`}>
+                      <button
+                        type="button"
+                        onClick={() => chooseMatch(m)}
+                        className={
+                          "w-full min-h-12 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white " +
+                          "px-3 py-2 text-left text-sm text-[var(--color-ink-700)] " +
+                          "transition-colors duration-150 hover:bg-[var(--color-sage-50)] hover:border-[var(--color-sage-500)] " +
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                        }
+                      >
+                        {m.matchedAddress}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
 
           <p className={SECTION}>{t("shareEvent.section.link", locale)}</p>
           <Field

@@ -1692,6 +1692,17 @@ it a draft and publishes it.
   an address, and Share / Add to calendar are left out. Desktop: beside the form
   (sticky). Phone: a Preview button beside "Send for review" opens it in a vaul
   sheet ("Preview — not on the map yet", "Back to editing").
+- **Address check** (spec change 2026-11-05): leaving the address field (or
+  pressing Send before it was checked) calls `GET /events/share/geocode`, the
+  public twin of `/api/admin/geocode`: the same Census lookup
+  (`src/lib/censusGeocode.ts`), matches outside `PUEBLO_COUNTY_BBOX` dropped,
+  its own `checkFormRateLimit` name `event-geocode` with looser caps
+  (`EVENT_GEOCODE_CAPS`, 30/hour per IP, 300 site-wide), address never logged.
+  One match replaces the typed address and keeps its pin; several are buttons
+  to pick from (a fresh "several" at Send stops that send); none or a failed
+  lookup is a gentle note and the send still goes. The pin is sent as
+  `lat`/`lng`; the server keeps it only if both are finite and inside the
+  county box (`puebloPin`), else stores nulls.
 - **Submit** `POST /events/share/submit`: `parsePublicPost` (Turnstile,
   honeypot) → `checkFormRateLimit(..., "event", ...)` → `validateEventSubmission`
   (`adminEventValidation.ts`, the admin form's caps and link rule) → one
@@ -1713,9 +1724,10 @@ it a draft and publishes it.
   upload never followed by a submit stays in the bucket (no cleanup yet).
 - **Admin.** The Events tab lists pending submissions under "Sent in by the
   public" (`EventSubmissionsList`). **"Make it a draft event"**
-  (`POST /api/admin/event-submissions/[id]/convert`) geocodes the address with
-  the Census lookup the forms use (`src/lib/censusGeocode.ts`); on exactly one
-  match it copies the flyer to the new event's own key, then one `db.batch()`
+  (`POST /api/admin/event-submissions/[id]/convert`) uses the stored pin when
+  the sender picked a checked address, otherwise geocodes the address with the
+  Census lookup the forms use (`src/lib/censusGeocode.ts`); with a pin or
+  exactly one match it copies the flyer to the new event's own key, then one `db.batch()`
   (`commitConversion`, `src/lib/eventSubmissions.ts`) inserts the event as
   `draft` (status and `published_at` are SQL literals) gated on the submission
   still being pending, writes its audit row, marks the submission converted,

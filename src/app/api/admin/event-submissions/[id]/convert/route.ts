@@ -5,7 +5,9 @@
  * (commitConversion in src/lib/eventSubmissions.ts). The flyer is copied
  * onto the new event.
  *
- * Location: the typed address is geocoded here with the same Census lookup
+ * Location: when the sender picked a checked address on the public form,
+ * its stored pin is used as is (re-checked to be inside Pueblo County) and
+ * the geocoder is not called. Otherwise the typed address is geocoded here with the same Census lookup
  * as the forms' "Find location". An events row needs coordinates (lat/lng
  * are NOT NULL, migration 0018), so when the lookup fails or is ambiguous
  * (not exactly one match) nothing is written: the answer is 422
@@ -23,6 +25,7 @@ import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { geocodeAddress } from "@/lib/censusGeocode";
+import { puebloPin } from "@/lib/adminEventValidation";
 import {
   commitConversion,
   copyPendingFlyer,
@@ -53,12 +56,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!payload) return fail(422, "unreadable", "This submission can't be read. Dismiss it instead.");
 
   const openUrl = `/admin/events/new?from=${encodeURIComponent(sub.id)}`;
-  let place: { lat: number; lng: number } | null = null;
-  try {
-    const matches = await geocodeAddress(payload.address);
-    if (matches.length === 1) place = matches[0];
-  } catch {
-    // Lookup down: same as no match — the admin places it in the form.
+  let place = puebloPin(payload.lat, payload.lng);
+  if (!place) {
+    try {
+      const matches = await geocodeAddress(payload.address);
+      if (matches.length === 1) place = matches[0];
+    } catch {
+      // Lookup down: same as no match — the admin places it in the form.
+    }
   }
   if (!place) {
     return fail(422, "needs_location", "We couldn't find this address on the map. Place it in the event form.", { openUrl });

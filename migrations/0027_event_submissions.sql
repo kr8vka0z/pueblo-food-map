@@ -9,7 +9,9 @@
 -- rebuilding it, and an event's fields have nothing in common with a venue's.
 --
 -- payload: JSON of the validated event fields (validateEventSubmission in
--- src/lib/adminEventValidation.ts), times already converted to UTC. The
+-- src/lib/adminEventValidation.ts), times already converted to UTC, plus the
+-- pin (lat/lng) of the address the sender picked in the form's address
+-- check, or nulls; convert uses that pin instead of geocoding again. The
 -- sender's name and email live in their own columns, never inside payload,
 -- so the payload can be shown or copied without carrying personal data.
 -- submitter_email is personal data: stored for review only, never logged,

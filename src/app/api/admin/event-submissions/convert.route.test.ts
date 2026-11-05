@@ -86,7 +86,7 @@ afterEach(() => {
 });
 
 /** Sends an event with a flyer the way the public page does; returns the submission id and pending flyer key. */
-async function sendIn(): Promise<{ id: string; flyerKey: string }> {
+async function sendIn(pin: { lat?: unknown; lng?: unknown } = {}): Promise<{ id: string; flyerKey: string }> {
   const form = new FormData();
   form.set("flyer", new Blob([jpegBytes(40, 60) as BlobPart], { type: "image/jpeg" }), "flyer.jpg");
   const probe = new Request("http://localhost/x", { method: "POST", body: form });
@@ -113,6 +113,7 @@ async function sendIn(): Promise<{ id: string; flyerKey: string }> {
       link_url: "https://example.org/rsvp",
       link_label: "rsvp",
       flyer_key: key,
+      ...pin,
       submitter_name: "Pat",
       submitter_email: SENDER_EMAIL,
       website: "",
@@ -181,6 +182,15 @@ describe("Make it a draft event", () => {
     // A second click finds nothing pending and writes nothing.
     expect((await runConvert(id)).status).toBe(404);
     expect(events()).toHaveLength(1);
+  });
+
+  test("a pin the sender picked on the public form is used as is, and the geocoder is never called", async () => {
+    const { id } = await sendIn({ lat: 38.2601, lng: -104.6002 });
+    const res = await runConvert(id);
+    expect(res.status).toBe(200);
+    expect(events()[0]).toMatchObject({ status: "draft", lat: 38.2601, lng: -104.6002 });
+    const calls = (fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls.map(([u]) => String(u));
+    expect(calls.some((u) => u.includes("geocoding.geo.census.gov"))).toBe(false);
   });
 
   test("an address that can't be located writes nothing and points at the prefilled form, whose draft save converts it", async () => {

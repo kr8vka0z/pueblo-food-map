@@ -17,10 +17,12 @@
  * Copy comes from i18n keys under the form's own prefix (`feedback.*`,
  * `report.*`, `suggest.*`, `shareEvent.*`), so each keeps its own wording.
  *
- * Three optional hooks exist for the "Share an event" form (#883) and change
+ * Four optional hooks exist for the "Share an event" form (#883) and change
  * nothing for the others: `onSuccess` (it hides its live preview),
- * `successActions` (its "Share another event" link) and `submitRow` (wraps
- * the submit button, for its phone Preview button beside Send).
+ * `successActions` (its "Share another event" link), `submitRow` (wraps
+ * the submit button, for its phone Preview button beside Send) and
+ * `beforeSubmit` (its address check; returning false stops the send, and
+ * `body()` runs after it, so it can read what the check found from a ref).
  */
 
 import { useRef, useState, type ReactNode } from "react";
@@ -140,6 +142,7 @@ export default function PublicForm<K extends string>({
   onSuccess,
   successActions,
   submitRow = (submit) => submit,
+  beforeSubmit,
 }: {
   form: FormName;
   /** POST target, e.g. "/feedback/submit". */
@@ -157,6 +160,8 @@ export default function PublicForm<K extends string>({
   successActions?: ReactNode;
   /** Wraps the submit button (default: the button alone). */
   submitRow?: (submit: ReactNode) => ReactNode;
+  /** Runs after client validation passes, before the POST; false = don't send. */
+  beforeSubmit?: () => Promise<boolean>;
 }) {
   const { locale } = useLocale();
   const [honeypot, setHoneypot] = useState("");
@@ -181,6 +186,10 @@ export default function PublicForm<K extends string>({
     setStatus("submitting");
 
     try {
+      if (beforeSubmit && !(await beforeSubmit())) {
+        setStatus("idle");
+        return;
+      }
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

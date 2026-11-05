@@ -84,6 +84,24 @@ describe("POST /events/share/submit", () => {
     expect(row.payload).not.toContain("pat@example.com");
   });
 
+  test("a checked address's pin inside Pueblo County is stored with the payload", async () => {
+    passTurnstile();
+    expect((await post({ ...validBody, lat: 38.27, lng: -104.61 })).status).toBe(200);
+    expect(JSON.parse(rows()[0].payload as string)).toMatchObject({ lat: 38.27, lng: -104.61 });
+  });
+
+  test.each([
+    ["outside the county (Denver)", 39.74, -104.99],
+    ["swapped", -104.61, 38.27],
+    ["text", "38.27", "-104.61"],
+    ["not finite", null, Infinity],
+    ["half a pin", 38.27, undefined],
+  ])("a pin that is %s is dropped, and the event is still stored", async (_label, lat, lng) => {
+    passTurnstile();
+    expect((await post({ ...validBody, lat, lng })).status).toBe(200);
+    expect(JSON.parse(rows()[0].payload as string)).toMatchObject({ lat: null, lng: null });
+  });
+
   test("missing Turnstile token → 400, nothing stored", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const res = await post({ ...validBody, turnstileToken: undefined });

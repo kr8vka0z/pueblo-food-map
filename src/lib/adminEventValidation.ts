@@ -21,6 +21,7 @@
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { puebloLocalToUtcIso } from "@/lib/eventTime";
 import { isValidEmail } from "@/lib/email";
+import { isOutsideCounty } from "@/lib/mapBounds";
 
 export const EVENT_STATUSES = ["draft", "published", "cancelled", "archived"] as const;
 export type EventStatus = (typeof EVENT_STATUSES)[number];
@@ -215,6 +216,20 @@ export interface EventSubmissionPayload {
   address: string;
   linkUrl: string | null;
   linkLabel: PublicEventLinkLabel;
+  /**
+   * The pin of the address the sender picked in the address check (#883 spec
+   * change), or null when there was none. Only kept when both are finite and
+   * inside Pueblo County's box; anything else is dropped, never an error, so
+   * a bad pin can't block a send. Rows saved before this field read as null.
+   */
+  lat: number | null;
+  lng: number | null;
+}
+
+/** A sender-supplied pin, kept only if it is two finite numbers inside Pueblo County's box. */
+export function puebloPin(lat: unknown, lng: unknown): { lat: number; lng: number } | null {
+  if (typeof lat !== "number" || typeof lng !== "number" || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return isOutsideCounty({ lat, lng }) ? null : { lat, lng };
 }
 
 export type ValidateSubmissionResult =
@@ -269,6 +284,8 @@ export function validateEventSubmission(body: unknown): ValidateSubmissionResult
   if (date && !endsAt) errors.end_time = "Enter a valid end time.";
   else if (startsAt && endsAt && Date.parse(endsAt) <= Date.parse(startsAt)) errors.end_time = "The end must be after the start.";
 
+  const pin = puebloPin(b.lat, b.lng);
+
   if (Object.keys(errors).length > 0) return { ok: false, errors };
   return {
     ok: true,
@@ -285,6 +302,8 @@ export function validateEventSubmission(body: unknown): ValidateSubmissionResult
       address,
       linkUrl,
       linkLabel: linkLabel as PublicEventLinkLabel,
+      lat: pin?.lat ?? null,
+      lng: pin?.lng ?? null,
     },
   };
 }

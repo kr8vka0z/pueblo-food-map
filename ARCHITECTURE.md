@@ -1264,7 +1264,8 @@ One-off special events (a produce giveaway, a turkey drive), plan in issue
 slice 2 (#758) adds the map pin** (see "Map pins" below); **slice 3 (#759)
 adds the event card** (see "Event card" below); **slice 4 (#760) adds the
 flyer image** (see "Event flyer" below); **slice 6 (#762) adds a web page per
-event** (see "Event page" below).
+event** (see "Event page" below); **#883 lets the public send events in for
+review** (see "Shared events" below).
 
 - **Live, never published.** Like boxes, events are read from D1 at request
   time and are not part of the venue Publish snapshot.
@@ -1672,6 +1673,60 @@ list it as an event and a shared link previews the flyer.
 - **404 body.** A dynamic `notFound()` ships Next's blank `__next_error__` first
   paint with a real 404 status and `noindex`, exactly like `/box/[id]`; `es/not-found.tsx`
   gives the `/es` one a Spanish body once JavaScript runs.
+
+### Shared events (#883)
+
+The public can send an event in; nothing reaches the map until an admin makes
+it a draft and publishes it.
+
+- **Page** `/events/share` + `/es/events/share` (`ShareEventPageContent` →
+  `ShareEventForm` on `PublicForm`), indexable, in the sitemap as a mirrored
+  pair, linked from the menu (under "Suggest a place") and above the map's "No
+  events coming up" notice. Fields: name, host, one date with start and end
+  times (Pueblo time, converted on the server), what it is, what to bring,
+  place name, street address, link, button wording (the six built-ins, no
+  Custom), an optional flyer, and the sender's name and email.
+- **Live preview** (`ShareEventPreview`): the real `EventCardBody` in its
+  `preview` mode, fed from the form. Empty fields show grey placeholders, the
+  action button and Get directions are faded non-links until there is a link /
+  an address, and Share / Add to calendar are left out. Desktop: beside the form
+  (sticky). Phone: a Preview button beside "Send for review" opens it in a vaul
+  sheet ("Preview — not on the map yet", "Back to editing").
+- **Submit** `POST /events/share/submit`: `parsePublicPost` (Turnstile,
+  honeypot) → `checkFormRateLimit(..., "event", ...)` → `validateEventSubmission`
+  (`adminEventValidation.ts`, the admin form's caps and link rule) → one
+  `event_submissions` row (required: it is the review queue) → best-effort email
+  to suggestions@.
+- **Table `event_submissions`** (`migrations/0027_event_submissions.sql`, new
+  table because `public_submissions.kind` is CHECK-limited). `payload` JSON holds
+  the validated fields with UTC times and no personal data; `submitter_name` /
+  `submitter_email` are their own columns (email: never logged, never in an
+  audit row, never public); `status` pending / converted / dismissed;
+  `converted_event_id`. Nothing is deleted.
+- **Flyer** `POST /events/share/flyer`: uploaded when picked (shrunk in the
+  browser first), same byte checks as the admin upload (`inspectFlyer`), its own
+  per-IP and site-wide D1 counters (no Turnstile: the form's single-use token
+  belongs to the submit). Stored under `pending.submissions/<uuid>.jpg` in
+  `EVENT_FLYERS`; the dot in that prefix fails the public flyer route's id
+  pattern, so a pending flyer has no public URL. The admin sees it through
+  `GET /api/admin/event-submissions/[id]/flyer` (session only, `no-store`). An
+  upload never followed by a submit stays in the bucket (no cleanup yet).
+- **Admin.** The Events tab lists pending submissions under "Sent in by the
+  public" (`EventSubmissionsList`). **"Make it a draft event"**
+  (`POST /api/admin/event-submissions/[id]/convert`) geocodes the address with
+  the Census lookup the forms use (`src/lib/censusGeocode.ts`); on exactly one
+  match it copies the flyer to the new event's own key, then one `db.batch()`
+  (`commitConversion`, `src/lib/eventSubmissions.ts`) inserts the event as
+  `draft` (status and `published_at` are SQL literals) gated on the submission
+  still being pending, writes its audit row, marks the submission converted,
+  and writes the submission's audit row (id, name, status only). It then opens
+  the draft's edit page. With no single match nothing is written (`events.lat`
+  / `lng` are NOT NULL): the admin lands on `/admin/events/new?from=<id>`,
+  prefilled with the address and no pin, and saving that form
+  (`POST /api/admin/events` with `submission_id`, Save draft only) converts the
+  same atomic way. **"Dismiss"** is a status change with its audit row.
+- Production needs `0027` applied before this code is used; until then the page
+  submit fails cleanly and the admin section is simply absent.
 
 ---
 

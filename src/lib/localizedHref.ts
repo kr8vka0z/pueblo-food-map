@@ -31,6 +31,8 @@ const MIRRORED_STATIC = new Set([
   "/snap-wic-stores",
   "/community-gardens",
   "/blessing-boxes",
+  // #883: the public "Share an event" page has an /es twin.
+  "/events/share",
 ]);
 
 function isMirrored(basePath: string): boolean {

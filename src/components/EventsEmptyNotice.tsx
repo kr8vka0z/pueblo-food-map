@@ -9,11 +9,18 @@
  * the last event ends the visitor would otherwise face an empty map and only
  * a badge on Filters to explain it.
  *
+ * #883: a "Share an event" link sits just above the pill, as its own small
+ * pill, so the notice itself keeps its one-line width at 360px and its spot.
+ * The link stays in the visitor's tree (localizedHref).
+ *
  * It owns a useMinuteClock subscription (the one shared timer) so it appears on
  * the tick the last event ends, without MapWrapper re-rendering each minute.
  */
 
+import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
+import { localizedHref } from "@/lib/localizedHref";
 import { listOrder } from "@/lib/eventPins";
 import type { PublicEvent } from "@/lib/events";
 import { useMinuteClock } from "@/lib/useMinuteClock";
@@ -28,23 +35,35 @@ interface EventsEmptyNoticeProps {
 
 export default function EventsEmptyNotice({ events, locale, onShowPlaces, bottom }: EventsEmptyNoticeProps) {
   const now = useMinuteClock();
+  const { tree } = useLocale();
   if (listOrder(events, now).length > 0) return null;
   return (
     <div
-      role="status"
-      data-testid="events-empty-notice"
       style={{ position: "absolute", bottom, left: "50%", transform: "translateX(-50%)", zIndex: 1001, whiteSpace: "nowrap" }}
-      className="flex items-center gap-1 pl-4 pr-1 rounded-full bg-[var(--color-bone-50)] text-[var(--color-ink-700)] text-sm font-medium elevation-2"
+      className="flex flex-col items-center gap-2"
     >
-      <span>{t("events.list.empty", locale)}</span>
-      <button
-        type="button"
-        onClick={onShowPlaces}
-        data-testid="events-empty-show-places"
-        className="min-h-12 px-3 text-sm font-semibold text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded-full"
+      <Link
+        href={localizedHref("/events/share", tree)}
+        data-testid="events-empty-share"
+        className="inline-flex min-h-12 items-center rounded-full bg-[var(--color-bone-50)] px-4 text-sm font-semibold text-[var(--color-sage-600)] elevation-2 hover:text-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
       >
-        {t("events.list.emptyAction", locale)}
-      </button>
+        {t("events.list.share", locale)}
+      </Link>
+      <div
+        role="status"
+        data-testid="events-empty-notice"
+        className="flex items-center gap-1 pl-4 pr-1 rounded-full bg-[var(--color-bone-50)] text-[var(--color-ink-700)] text-sm font-medium elevation-2"
+      >
+        <span>{t("events.list.empty", locale)}</span>
+        <button
+          type="button"
+          onClick={onShowPlaces}
+          data-testid="events-empty-show-places"
+          className="min-h-12 px-3 text-sm font-semibold text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded-full"
+        >
+          {t("events.list.emptyAction", locale)}
+        </button>
+      </div>
     </div>
   );
 }

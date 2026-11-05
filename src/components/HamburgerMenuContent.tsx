@@ -29,7 +29,7 @@
  */
 
 import Link from "next/link";
-import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Lightbulb, Star, History, Compass, Heart } from "lucide-react";
+import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Lightbulb, Star, History, Compass, Heart, CalendarPlus } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import StyxCredit from "./StyxCredit";
@@ -292,6 +292,13 @@ export default function HamburgerMenuContent({
                 href="/suggest"
                 onClick={onClose}
                 icon={<MapPinPlus size={14} />}
+              />
+              {/* Share an event (#883), under Suggest a place. */}
+              <HamburgerMenuItem
+                label={t("menu.shareEvent", locale)}
+                href={localizedHref("/events/share", tree)}
+                onClick={onClose}
+                icon={<CalendarPlus size={14} />}
               />
               {/* Send us feedback (#116) */}
               <HamburgerMenuItem

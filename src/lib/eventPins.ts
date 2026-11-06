@@ -14,7 +14,7 @@
  */
 
 import { t, type Locale } from "@/lib/i18n";
-import { TIME_ZONE, puebloDateKey, puebloParts } from "@/lib/eventTime";
+import { TIME_ZONE, puebloDateKey, puebloParts, sameDenverDay } from "@/lib/eventTime";
 import type { PublicEvent } from "@/lib/events";
 
 /** Events starting further out than this stay off the map (the list view still shows them, #761). */
@@ -38,12 +38,6 @@ export interface EventPin {
   live: boolean;
   /** Pueblo calendar day of the start equals Pueblo's today (drives the "Today" label). */
   today: boolean;
-}
-
-function sameDenverDay(aMs: number, bMs: number): boolean {
-  const a = puebloParts(aMs);
-  const b = puebloParts(bMs);
-  return a.y === b.y && a.mo === b.mo && a.d === b.d;
 }
 
 /**

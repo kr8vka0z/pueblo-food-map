@@ -64,16 +64,21 @@
 
 import type { DashboardPeriod } from "@/lib/cfAnalytics";
 import { EVENTS } from "@/lib/analytics";
-import { createFetchLimiter, fetchWithRetry, startDeadline, type FetchLimiter } from "@/lib/analyticsFetch";
+import {
+  ANALYTICS_CACHE_TTL_MS,
+  MS_PER_DAY,
+  createFetchLimiter,
+  fetchWithRetry,
+  periodStartsUtc,
+  startDeadline,
+  type FetchLimiter,
+} from "@/lib/analyticsFetch";
 
-const PERIOD_DAYS: Record<DashboardPeriod, number> = { "7d": 7, "30d": 30, "90d": 90 };
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 /** Same production host cfAnalytics.ts reads, even from staging — see this file's own header. */
 const HOST = "pueblofoodmap.com";
 const DEFAULT_API_HOST = "https://us.posthog.com";
 /** PostHog's per-project cap on HogQL queries running at once (Query API docs, checked 2026-10-19). */
 const POSTHOG_MAX_CONCURRENT_QUERIES = 3;
-const CACHE_TTL_MS = 60 * 60 * 1000;
 /** Only terms searched at least this many times are shown — issue's own "only terms seen >= 3 times" (never a single visitor's one-off typo). */
 const MIN_SEARCH_TERM_COUNT = 3;
 const TOP_PLACES_LIMIT = 6;
@@ -165,10 +170,7 @@ interface PeriodBounds {
 }
 
 function periodBounds(period: DashboardPeriod, now: Date): PeriodBounds {
-  const days = PERIOD_DAYS[period];
-  const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const sinceMs = todayUTC - days * MS_PER_DAY;
-  const previousSinceMs = sinceMs - days * MS_PER_DAY;
+  const { todayUTC, sinceMs, previousSinceMs } = periodStartsUtc(period, now);
   const untilMs = todayUTC + MS_PER_DAY;
   return { since: toHogQlDateTime(sinceMs), previousSince: toHogQlDateTime(previousSinceMs), until: toHogQlDateTime(untilMs) };
 }
@@ -446,7 +448,7 @@ export async function loadMapUsageAnalytics(
       location: buildLocationPermission(locationRows),
       utmSources: buildUtmSources(utmRows),
     };
-    cache.set(period, { expiresAt: now.getTime() + CACHE_TTL_MS, data });
+    cache.set(period, { expiresAt: now.getTime() + ANALYTICS_CACHE_TTL_MS, data });
     return data;
   } catch {
     return null;

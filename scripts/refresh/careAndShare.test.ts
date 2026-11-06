@@ -1,3 +1,5 @@
+// @vitest-environment node
+// WHY node: the reader runs under tsx in Node (ESM); jsdom's URL breaks the import.meta.url file read it uses.
 // Care and Share reader (Venue Data Rebuild step 2) — the risky behaviour
 // only: a refused or partial read writes nothing, contact details never
 // survive the parse, schedules are never guessed, matching thresholds, and

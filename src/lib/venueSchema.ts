@@ -1,6 +1,6 @@
 /**
  * Pure helpers for per-venue structured data (JSON-LD) and URL construction.
- * Used by /venue/[id] page, layout.tsx, and homepage.
+ * Used by the venue, hub, about, event and home pages and RootShell (WebSite node).
  *
  * WHY: Extracted as a pure lib (no Next.js server APIs, no React) so every
  * helper is unit-testable in jsdom without mocking server components.

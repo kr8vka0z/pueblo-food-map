@@ -16,8 +16,7 @@
  * is the same pattern useBoxesList already established, and it's what lets
  * the route's own 60s Cache API layer actually do its job (a Worker
  * self-fetching its own domain during SSR risks tripping Cloudflare's loop
- * guard — see AGENTS.md's Healthchecks.io dead-man's-switch section for
- * why this repo avoids that pattern elsewhere).
+ * guard, a pattern this repo avoids).
  */
 
 import { useEffect, useState } from "react";

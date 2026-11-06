@@ -16,6 +16,7 @@
 
 import { useEffect, useState } from "react";
 import type { PublicEvent } from "@/lib/events";
+import { isCoord } from "@/lib/mapBounds";
 
 /** Keeps only rows the map can draw; one malformed row must not hide the rest. */
 function drawable(raw: unknown): PublicEvent[] {
@@ -27,8 +28,7 @@ function drawable(raw: unknown): PublicEvent[] {
       typeof e.starts_at === "string" && typeof e.ends_at === "string" &&
       // Range-checked too: mapbox throws on an impossible coordinate, which would
       // swap the whole map for the list fallback over one hand-edited bad row.
-      Number.isFinite(e.lat) && Math.abs(e.lat) <= 90 &&
-      Number.isFinite(e.lng) && Math.abs(e.lng) <= 180,
+      isCoord(e.lat, 90) && isCoord(e.lng, 180),
   );
 }
 

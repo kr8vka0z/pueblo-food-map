@@ -3,14 +3,8 @@
 data/raw/pueblo-grocery.json — the exact input scripts/ingest-osm-grocery.py
 already expects (see that script's own header comment).
 
-WHY this script exists (a real gap, found while wiring the automated refresh
-pipeline): scripts/ingest-osm-grocery.py has never itself talked to
-Overpass — it only CONVERTS an already-downloaded dump. Its header comment
-points at "scripts/README.md for the query used," but no such file exists in
-this repo; the original data/raw/pueblo-grocery.json was fetched by hand,
-once, and the query was never committed. Automating "re-run the OSM
-scraper" needed an actual fetcher, so this is new, narrowly-scoped work —
-NOT a rewrite of ingest-osm-grocery.py, which is reused completely as-is.
+WHY this script exists: scripts/ingest-osm-grocery.py only converts an
+already-downloaded dump; this is the fetcher (the query is build_query()).
 
 Run from the repo root: `python3 scripts/fetch-osm-grocery.py`.
 Then: `python3 scripts/ingest-osm-grocery.py` (unmodified) to convert the
@@ -110,10 +104,6 @@ def main() -> int:
     try:
         payload = fetch_overpass(query)
     except Exception as exc:
-        # urllib.error.URLError (network/timeout) is already an Exception
-        # subclass — the two-except split this replaced logged the same
-        # FATAL text for both, so there was nothing the split branch caught
-        # that this one doesn't.
         print(f"FATAL: Overpass request failed: {exc}", file=sys.stderr)
         return 1
 

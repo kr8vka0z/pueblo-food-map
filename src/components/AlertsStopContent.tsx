@@ -35,7 +35,7 @@ import { pageDocumentTitle } from "@/lib/site";
 import PageNav, { PAGE_NAV_CLEARANCE } from "@/components/PageNav";
 import SiteFooter from "@/components/SiteFooter";
 
-export type AlertsStopResult = "checking" | "stopped" | "invalid" | "unavailable";
+type AlertsStopResult = "checking" | "stopped" | "invalid" | "unavailable";
 
 type UndoState = "idle" | "undoing" | "undone" | "error";
 

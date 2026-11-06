@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * BoxCheckinPanel — the public check-in panel on /box/[id] (Blessing Boxes
- * slice 2, Discovery stories C1-C4: "I filled it" / "I took something" /
+ * BoxCheckinPanel — the public check-in panel inside the on-map box card
+ * (BoxCardBody) (Blessing Boxes slice 2, Discovery stories C1-C4: "I filled it" / "I took something" /
  * "Running low" / "It's empty" / "Report a problem"). Slice 5 (2026-09-18)
  * adds a 6th choice, "Add a photo" — see that section of this header below.
  *
@@ -150,7 +150,7 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { getCheckinClientToken } from "@/lib/checkinClientToken";
 import { shrinkImageToJpeg, UnsupportedImageError } from "@/lib/imageResize";
 import ReportPhotoButton from "@/components/ReportPhotoButton";
-import { useTurnstile } from "@/lib/useTurnstile";
+import { PENDING_SUBMIT_TIMEOUT_MS, useTurnstile } from "@/lib/useTurnstile";
 import { NEED_KEYS, type BoxStatus, type CheckinKind, type NeedKey } from "@/lib/blessingBoxes";
 
 const { BOX_CHECKIN_NOTE } = FIELD_LIMITS;
@@ -172,11 +172,14 @@ const KINDS_WITH_NOTE: ReadonlySet<CheckinKind> = new Set(["filled", "problem"])
 /** Only the "filled" note form gets a photo-attach option — the task's own spec names "filled" specifically, not "problem" (a problem report's photo, if ever needed, is a separate future scope). */
 const KIND_WITH_PHOTO_ATTACH: CheckinKind = "filled";
 
-// A queued tap (see this file's own header) must not wait forever for a
-// token that may never come — 15s is comfortably longer than Turnstile's own
-// typical challenge-resolution time, short enough that a real visitor isn't
-// left staring at "Sending…" wondering if their tap registered.
-const PENDING_SUBMIT_TIMEOUT_MS = 15_000;
+// Shared with the card forms (AdoptBoxForm, BoxAlertSignupForm): the primary
+// submit and the secondary cancel button in every inline form on the box card.
+export const PRIMARY_BTN =
+  "min-h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
+  "text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
+export const SECONDARY_BTN =
+  "min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]";
 
 interface BoxCheckinPanelProps {
   boxId: string;
@@ -642,6 +645,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
   const busy = submitState === "submitting" || pendingSubmit !== null || needsSubmitState === "submitting";
   // Which single button (if any) shows the "Sending…" label — either the
   // tap actually in flight, or the one queued waiting on a token.
+  const needsBusy = needsSubmitState === "submitting" || pendingSubmit?.type === "needs";
   const busyKind = pendingSubmit?.type === "checkin" ? pendingSubmit.kind : submitState === "submitting" ? lastKind : null;
 
   return (
@@ -817,7 +821,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
                   key={key}
                   type="button"
                   aria-pressed={selected}
-                  disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
+                  disabled={needsBusy}
                   onClick={() => toggleNeed(key)}
                   className={
                     "min-h-12 rounded-full border px-3.5 text-sm font-medium transition-colors duration-150 " +
@@ -843,7 +847,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
               value={needsText}
               onChange={(e) => setNeedsText(e.target.value)}
               maxLength={BOX_CHECKIN_NOTE}
-              disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
+              disabled={needsBusy}
               className={
                 "mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 " +
                 "text-base md:text-sm text-[var(--color-ink-900)] bg-white " +
@@ -855,22 +859,18 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
             <button
               type="button"
               onClick={handleNeedsSend}
-              disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
-              aria-disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
-              className={
-                "min-h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
-                "text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed " +
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-              }
+              disabled={needsBusy}
+              aria-disabled={needsBusy}
+              className={PRIMARY_BTN}
             >
-              {needsSubmitState === "submitting" || pendingSubmit?.type === "needs"
+              {needsBusy
                 ? t("box.checkin.submitting", locale)
                 : t("box.needs.send", locale)}
             </button>
             <button
               type="button"
               onClick={handleNeedsSkip}
-              className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+              className={SECONDARY_BTN}
             >
               {t("box.needs.skip", locale)}
             </button>
@@ -926,11 +926,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
               type="submit"
               disabled={busy}
               aria-disabled={busy}
-              className={
-                "min-h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
-                "text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed " +
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-              }
+              className={PRIMARY_BTN}
             >
               {submitState === "submitting" ? t("box.checkin.submitting", locale) : t("box.checkin.submit", locale)}
             </button>
@@ -940,7 +936,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
                 setOpenKind(null);
                 notePhoto.clear();
               }}
-              className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+              className={SECONDARY_BTN}
             >
               {t("box.checkin.cancel", locale)}
             </button>
@@ -962,11 +958,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
               onClick={handleSendStandalonePhoto}
               disabled={!standalonePhoto.blob || busy || photoSubmitState === "submitting"}
               aria-disabled={!standalonePhoto.blob || busy || photoSubmitState === "submitting"}
-              className={
-                "min-h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
-                "text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed " +
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-              }
+              className={PRIMARY_BTN}
             >
               {photoSubmitState === "submitting" ? t("box.photo.sending", locale) : t("box.photo.send", locale)}
             </button>
@@ -977,7 +969,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
                 standalonePhoto.clear();
                 setPhotoSubmitState("idle");
               }}
-              className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+              className={SECONDARY_BTN}
             >
               {t("box.checkin.cancel", locale)}
             </button>

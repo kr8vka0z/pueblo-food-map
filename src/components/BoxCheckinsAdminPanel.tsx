@@ -27,7 +27,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { parseAdminNeeds, type AdminCheckinRow } from "@/lib/blessingBoxes";
-// Need labels come from the public box.needs.<key> strings, always in English: this admin panel isn't locale-aware (see its hardcoded en-US dateFormatter).
 import { t } from "@/lib/i18n";
 
 interface BoxCheckinsAdminPanelProps {
@@ -98,6 +97,8 @@ export default function BoxCheckinsAdminPanel({ checkins }: BoxCheckinsAdminPane
               {row.hidden_by && ` · hidden by ${row.hidden_by}`}
             </p>
             {row.note && <p className="mt-1 text-sm text-[var(--color-ink-700)]">{row.note}</p>}
+            {/* Needs labels come from the public card's i18n keys; this
+                panel is English-only (see dateFormatter), so always "en". */}
             {parseAdminNeeds(row.needs).length > 0 && (
               <p className="mt-1 text-xs text-[var(--color-ink-500)]">
                 Needs: {parseAdminNeeds(row.needs).map((k) => t(`box.needs.${k}`, "en")).join(", ")}

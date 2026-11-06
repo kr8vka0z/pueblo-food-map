@@ -17,6 +17,7 @@
  */
 
 import Link from "next/link";
+import { pluralize } from "@/lib/pluralize";
 
 export interface BoxesToReviewBoxProps {
   /** Boxes with at least one photo or sponsor request pending — the "N" in the summary line, and what the "To review" chip/column count matches. */
@@ -37,10 +38,6 @@ const linkClass =
   "px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] transition-colors duration-150 " +
   "hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 " +
   "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2";
-
-function pluralize(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
-}
 
 export default function BoxesToReviewBox({
   reviewingBoxCount,

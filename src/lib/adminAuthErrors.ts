@@ -15,7 +15,7 @@
  * on pages, 403 on route handlers.
  *
  * WHY one shared function per surface instead of duplicating this branch
- * into every call site: five admin pages and seven /api/admin/* route
+ * into every call site: the admin pages and the /api/admin/* route
  * handlers would otherwise each carry their own copy of this if/else — a
  * single change point means the redirect-vs-403 rule can never drift
  * between call sites (the same reason getAdminDb() itself is a single choke

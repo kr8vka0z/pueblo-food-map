@@ -36,8 +36,8 @@ export function puebloParts(instantMs: number): { y: number; mo: number; d: numb
   return { y: get("year"), mo: get("month"), d: get("day"), h: get("hour"), mi: get("minute") };
 }
 
-/** Denver's UTC offset in minutes (negative) at an instant. */
-function offsetMinutesAt(instantMs: number): number {
+/** Denver's UTC offset in minutes (negative) at an instant; also read by src/lib/activityLog.ts. */
+export function offsetMinutesAt(instantMs: number): number {
   const p = puebloParts(instantMs);
   const wallAsUtc = Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi);
   return Math.round((wallAsUtc - Math.floor(instantMs / MS_PER_MIN) * MS_PER_MIN) / MS_PER_MIN);

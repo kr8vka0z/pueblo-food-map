@@ -63,6 +63,12 @@ describe("readJpegDimensions", () => {
     const noSof = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]); // SOI + EOI only
     expect(() => readJpegDimensions(noSof.buffer as ArrayBuffer)).toThrow(InvalidJpegError);
   });
+
+  test("throws InvalidJpegError when the SOF segment is too short to hold height and width", () => {
+    // A 4-byte SOF0 followed by a real SOS: the height/width bytes would come from the SOS header.
+    const shortSof = new Uint8Array([0xff, 0xd8, ...segment(0xc0, [8, 0]), ...segment(0xda, [1, 1, 0, 0, 63, 0]), 0x12, 0xff, 0xd9]);
+    expect(() => readJpegDimensions(shortSof.buffer as ArrayBuffer)).toThrow(InvalidJpegError);
+  });
 });
 
 describe("stripMetadataSegments", () => {

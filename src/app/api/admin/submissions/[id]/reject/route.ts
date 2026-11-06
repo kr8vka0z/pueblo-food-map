@@ -17,7 +17,7 @@
  * tells us whether there was anything to reject: 0 changed rows means the
  * id doesn't exist, or the row was already approved/rejected by someone
  * else (or a prior click) — surfaced to the caller as 404 rather than a
- * silent 200, so SubmissionsReviewView can tell a real reject apart from a
+ * silent 200, so SubmissionCard can tell a real reject apart from a
  * stale card.
  */
 

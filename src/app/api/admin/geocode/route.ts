@@ -12,7 +12,7 @@
  *
  * Provider: the free US Census Bureau geocoder, not Mapbox. Admin now
  * serves at the apex `/admin` path, which the app's Mapbox public token
- * (AGENTS.md "Mapbox Token Management") does cover — but that token's
+ * (AGENTS.md "Secrets" → Mapbox) does cover — but that token's
  * secret counterpart still must never reach a Worker or client bundle just
  * to add a geocoding scope. The Census geocoder needs no key/token/URL
  * allowlist to provision or rotate and covers US street addresses (Pueblo
@@ -31,10 +31,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminReadAccess } from "@/lib/adminAuthErrors";
 import { geocodeAddress } from "@/lib/censusGeocode";
 
-// WHY force-dynamic: this route reads req.headers directly (not
-// next/headers), so without this Next may statically optimize the GET
-// handler and cache a stale 200 or 403 for every caller regardless of
-// their own session. It must evaluate fresh on every request.
+// WHY force-dynamic: vinext still reads it to force no-store fetches and keep the per-session response private.
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest): Promise<Response> {

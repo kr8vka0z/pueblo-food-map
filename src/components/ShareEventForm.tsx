@@ -173,7 +173,10 @@ export default function ShareEventForm() {
   async function beforeSubmit(): Promise<boolean> {
     if (uploadingRef.current) return false;
     if (pinRef.current) return true;
-    const already = checkRef.current?.q === values.address.trim();
+    // "Already" = the choices are on screen now. checkRef is set when a lookup
+    // STARTS, so testing it alone let a Send during a running lookup (a phone
+    // tap blurs the field, starting one) skip the pick (#894).
+    const already = geo.state === "multiple" && checkRef.current?.q === values.address.trim();
     const result = await checkAddress();
     if (uploadingRef.current || result === "stale") return false;
     return !(result === "multiple" && !already);

@@ -181,7 +181,10 @@ function GroupCard({ group }: { group: ActivityGroup }) {
   if (group.kind === "event") {
     return (
       <li className={cardClass}>
-        <ActionLine item={{ kind: "auth", at: group.at, row: group.row }} />
+        {/* ActionLine is an <li>: a bare <li> in an <li> is split apart by the browser's HTML parser, putting the row outside this card until hydration. */}
+        <ul>
+          <ActionLine item={{ kind: "auth", at: group.at, row: group.row }} />
+        </ul>
       </li>
     );
   }

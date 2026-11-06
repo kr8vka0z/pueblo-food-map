@@ -238,9 +238,11 @@ export default function SubmissionCard({ submission }: SubmissionCardProps) {
 
 // ─── Per-kind detail rows ───────────────────────────────────────────────────
 
+// whitespace-pre-line: a report's description and a suggestion's notes keep
+// the visitor's paragraph breaks (#894 item 8); every other value is one line.
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <p className="text-sm text-[var(--color-ink-700)]">
+    <p className="whitespace-pre-line text-sm text-[var(--color-ink-700)]">
       <span className={fieldLabelClass}>{label}: </span>
       {value}
     </p>

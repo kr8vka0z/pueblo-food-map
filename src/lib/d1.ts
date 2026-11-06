@@ -6,7 +6,8 @@
  * Measured against the real API (#397), not docs: 100 bound parameters
  * succeed, 101 fail with `too many SQL variables at offset 235: SQLITE_ERROR`
  * (D1 error code 7500). Callers: POST /api/admin/proposals/approve-date-only
- * (#399) and boxAdopters.ts's loadApprovedAdopterNamesForVenues.
+ * (#399), boxAdopters.ts's loadApprovedAdopterNamesForVenues and
+ * blessingBoxes.ts's loadVisibleCheckinsForVenues.
  */
 
 /**

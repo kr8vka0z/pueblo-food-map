@@ -56,6 +56,9 @@ export default function SplashScreen({ onPrimary, pending, onTour }: SplashScree
   useEffect(() => {
     if (!geoRequested) return;
     if (geo.state.permission === 'prompt') return;
+    // An earlier visit's grant reads as granted with no fix yet (#894): wait
+    // for the fix (or a failure) instead of falling back to Pueblo-center.
+    if (geo.state.permission === 'granted' && geo.state.position === null) return;
 
     const mode: SplashViewport =
       geo.state.permission === 'granted' && geo.state.position !== null

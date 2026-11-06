@@ -27,6 +27,7 @@ import { categoryLabels } from "@/lib/categories";
 import { DISPLAY_DAY_KEYS } from "@/lib/hours";
 import { isValidEmail } from "@/lib/email";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
+import { isCoord } from "@/lib/mapBounds";
 import type { IrregularSchedule, VenueCategory, WeeklyHours } from "@/types/venue";
 
 // Reuses the category labels map's own keys as the enum source of truth
@@ -101,9 +102,10 @@ function optionalString(value: unknown, field: string, errors: Record<string, st
  * write, or approved-submission text folded into notes, could otherwise
  * store an arbitrarily long string that ships into the public
  * published-venues.ts bundle, same class of gap the public form routes
- * already close for their own fields via FIELD_LIMITS.
+ * already close for their own fields via FIELD_LIMITS. Also the event
+ * validator's and the translate request's text check.
  */
-function optionalStringCapped(
+export function optionalStringCapped(
   value: unknown,
   field: string,
   max: number,
@@ -350,11 +352,11 @@ export function validateCreateVenuePayload(body: unknown): ValidateCreateVenueRe
   // the authoritative boundary, so a loosely-typed caller sending "38.25"
   // as a string is a validation failure, not something to silently coerce.
   const lat = b.lat;
-  const latValid = typeof lat === "number" && Number.isFinite(lat) && lat >= -90 && lat <= 90;
+  const latValid = isCoord(lat, 90);
   if (!latValid) errors.lat = "Latitude must be a number between -90 and 90.";
 
   const lng = b.lng;
-  const lngValid = typeof lng === "number" && Number.isFinite(lng) && lng >= -180 && lng <= 180;
+  const lngValid = isCoord(lng, 180);
   if (!lngValid) errors.lng = "Longitude must be a number between -180 and 180.";
 
   const address = typeof b.address === "string" ? b.address.trim() : "";

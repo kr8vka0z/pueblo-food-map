@@ -722,26 +722,34 @@ export type StopResult = "stopped" | "not_found" | "rate_limited";
  * secret needed.
  */
 export async function stopSubscriptionByToken(db: D1Database, token: string, rateLimitSecret: string, now: Date = new Date()): Promise<StopResult> {
+  const found = await findByUnsubscribeToken(db, token, rateLimitSecret, now);
+  if (typeof found === "string") return found;
+
+  await db.prepare("UPDATE alert_subscriptions SET unsubscribed_at = ? WHERE id = ?").bind(now.toISOString(), found.id).run();
+  return "stopped";
+}
+
+/** The shared front half of stop and resubscribe: the per-token rate limit, then the token lookup. */
+async function findByUnsubscribeToken(
+  db: D1Database,
+  token: string,
+  rateLimitSecret: string,
+  now: Date,
+): Promise<{ id: number } | "not_found" | "rate_limited"> {
   const allowed = await checkAndIncrement(db, rateLimitSecret, { scope: "alert-token", id: token }, 30, now);
   if (!allowed) return "rate_limited";
 
   const row = await db.prepare("SELECT id FROM alert_subscriptions WHERE unsubscribe_token = ?").bind(token).first<{ id: number }>();
-  if (!row) return "not_found";
-
-  await db.prepare("UPDATE alert_subscriptions SET unsubscribed_at = ? WHERE id = ?").bind(now.toISOString(), row.id).run();
-  return "stopped";
+  return row ?? "not_found";
 }
 
 export type ResubscribeResult = "resubscribed" | "not_found" | "rate_limited";
 
 /** The "that was a mistake" undo on /alerts/stop — clears unsubscribed_at only; does not touch confirmed_at (they already proved the address once). */
 export async function resubscribeByToken(db: D1Database, token: string, rateLimitSecret: string, now: Date = new Date()): Promise<ResubscribeResult> {
-  const allowed = await checkAndIncrement(db, rateLimitSecret, { scope: "alert-token", id: token }, 30, now);
-  if (!allowed) return "rate_limited";
+  const found = await findByUnsubscribeToken(db, token, rateLimitSecret, now);
+  if (typeof found === "string") return found;
 
-  const row = await db.prepare("SELECT id FROM alert_subscriptions WHERE unsubscribe_token = ?").bind(token).first<{ id: number }>();
-  if (!row) return "not_found";
-
-  await db.prepare("UPDATE alert_subscriptions SET unsubscribed_at = NULL WHERE id = ?").bind(row.id).run();
+  await db.prepare("UPDATE alert_subscriptions SET unsubscribed_at = NULL WHERE id = ?").bind(found.id).run();
   return "resubscribed";
 }

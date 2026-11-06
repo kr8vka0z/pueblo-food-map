@@ -57,13 +57,7 @@ export async function GET(
 
 /** Builds the photo response: a 404 on any miss, otherwise the JPEG bytes with the 5-minute Cache-Control. */
 async function loadPhoto(photoId: number): Promise<Response> {
-  let db: D1Database;
-  let bucket: R2Bucket;
-  try {
-    ({ env: { ADMIN_DB: db, BOX_PHOTOS: bucket } } = getCloudflareContext());
-  } catch {
-    return notFound(); // no live Worker context — degrade the same as "not found," never a 500 for a public image request
-  }
+  const { env: { ADMIN_DB: db, BOX_PHOTOS: bucket } } = getCloudflareContext();
 
   let row;
   try {

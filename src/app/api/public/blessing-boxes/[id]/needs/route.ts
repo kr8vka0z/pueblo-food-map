@@ -142,12 +142,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "invalid_needs_token" }, { status: 403 });
   }
 
-  let db: D1Database;
-  try {
-    ({ env: { ADMIN_DB: db } } = getCloudflareContext());
-  } catch {
-    return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
-  }
+  const { env: { ADMIN_DB: db } } = getCloudflareContext();
 
   // Visitor cap first, box cap second — same reasoning as the checkins
   // route's own header ("WHY the visitor cap is checked BEFORE the box

@@ -162,12 +162,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "turnstile_failed" }, { status: 400 });
   }
 
-  let db: D1Database;
-  try {
-    ({ env: { ADMIN_DB: db } } = getCloudflareContext());
-  } catch {
-    return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
-  }
+  const { env: { ADMIN_DB: db } } = getCloudflareContext();
 
   const clientToken = form.get("clientToken");
   const clientTokenStr = typeof clientToken === "string" ? clientToken.slice(0, 200) : null;

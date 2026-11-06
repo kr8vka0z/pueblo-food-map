@@ -62,12 +62,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "invalid_token" }, { status: 200 });
   }
 
-  let db: D1Database;
-  try {
-    ({ env: { ADMIN_DB: db } } = getCloudflareContext());
-  } catch {
-    return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
-  }
+  const { env: { ADMIN_DB: db } } = getCloudflareContext();
 
   const now = new Date();
 

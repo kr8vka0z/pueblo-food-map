@@ -118,13 +118,4 @@ describe("POST /api/public/alerts/stop", () => {
     expect(res.status).toBe(200);
     expect((await res.json()).error).toBe("invalid_token");
   });
-
-  test("no live Cloudflare context -> 503", async () => {
-    mockGetCloudflareContext.mockImplementation(() => {
-      throw new Error("no context");
-    });
-    const res = await POST(makeRequest({ query: "?t=abc" }));
-    expect(res.status).toBe(503);
-    expect(mockStopSubscriptionByToken).not.toHaveBeenCalled();
-  });
 });

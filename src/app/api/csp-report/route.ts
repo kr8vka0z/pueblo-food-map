@@ -42,9 +42,9 @@
  * this one does NOT change the response — still 204, same as success. A
  * CSP report is fire-and-forget; the browser reads nothing from the
  * response and would gain nothing from a 429. Reaching the cap simply
- * means this report doesn't get logged. Resolving the D1 context itself
- * fails the same way (log nothing, still 204) rather than the 503 other
- * routes return — unlike a form submission, dropping a report during a D1
+ * means this report doesn't get logged. A missing rate-limit secret or a
+ * D1 error while counting fails the same way (log nothing, still 204)
+ * rather than an error status — unlike a form submission, dropping a report during a D1
  * blip has no user-facing or data-loss consequence.
  */
 
@@ -87,17 +87,12 @@ const GLOBAL_CSP_REPORT_RATE_LIMIT_ID = "all";
  * atomically incrementing both D1 counters as part of the same check (same
  * per-IP-before-site-wide ordering as src/lib/formRateLimit.ts's
  * checkFormRateLimit, so one already-over-cap IP can't keep burning the
- * shared site budget on its own rejected retries). Returns false (never
- * throws) on any failure to resolve D1 or the rate-limit secret — see this
- * file's own header for why that means "log nothing," not a 503.
+ * shared site budget on its own rejected retries). Returns false when the
+ * rate-limit secret is missing — see this file's own header for why that
+ * means "log nothing," not an error status.
  */
 async function underCspReportRateLimit(req: NextRequest): Promise<boolean> {
-  let db: D1Database;
-  try {
-    ({ env: { ADMIN_DB: db } } = getCloudflareContext());
-  } catch {
-    return false;
-  }
+  const { env: { ADMIN_DB: db } } = getCloudflareContext();
 
   const secret = process.env.CHECKIN_RATE_LIMIT_SECRET;
   if (!secret) return false;

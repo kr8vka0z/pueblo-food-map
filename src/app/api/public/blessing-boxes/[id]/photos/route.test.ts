@@ -432,14 +432,6 @@ describe("POST /api/public/blessing-boxes/[id]/photos", () => {
     const res = await callPost(baseFields());
     expect(res.status).toBe(200);
   });
-
-  test("no Cloudflare context available -> 503, never throws", async () => {
-    mockGetCloudflareContext.mockImplementation(() => {
-      throw new Error("no cloudflare context");
-    });
-    const res = await callPost(baseFields());
-    expect(res.status).toBe(503);
-  });
 });
 
 // GET /api/public/blessing-boxes/[id]/photos was removed by #525 — its only

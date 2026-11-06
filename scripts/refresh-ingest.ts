@@ -759,7 +759,7 @@ async function main(): Promise<void> {
       `cost=$${(session.stats.inputTokens * USD_PER_INPUT_TOKEN).toFixed(6)}  aiAutoApply=${aiAutoApply}`,
   );
 
-  if (allProposals.length === 0 && websiteStatements.length === 0 && aliasStatements.length === 0) {
+  if (allProposals.length === 0 && websiteStatements.length === 0) {
     console.log("Nothing to write this run.");
   } else {
     // Auto-supersede (§6.10a): any still-pending proposal from an EARLIER

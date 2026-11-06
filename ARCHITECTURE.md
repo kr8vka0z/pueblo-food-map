@@ -326,7 +326,7 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   hours change is proposed, the raw schedule text goes in `meta.schedule_text`
   and `meta.needs_review`, and the card always reads "needs a human".
   Matching runs only over our `pantry`/`meal_site` rows of any
-  `source_type` (blessing boxes stripped by `excludeBlessingBoxes`): an alias
+  `source_type` (the category filter already leaves out blessing boxes): an alias
   on file or our venue with id `cas-<locationId>` first; then **strong** =
   name overlap ≥ 0.75, within 150 m, AND the same phone (renamePairs'
   `haversineDistanceKm`/`normalizedPhoneTail`), or — when Care and Share's

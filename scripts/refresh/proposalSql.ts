@@ -240,9 +240,9 @@ function pendingInsert(proposal: ProposalDraft, sqlText: SqlText, tri: { cols: s
  * The Jev-gated lane's write (only with REFRESH_AI_AUTO_APPLY on): same
  * shape as the switch lane below — venues UPDATE, audit_log, an
  * already-approved proposal row carrying Jev's verdict — so it stays
- * reversible through audit_log exactly like a human Approve. Like the switch
- * lane it does NOT move last_verified (a machine reformat is not a human
- * confirmation; AGENTS.md, Venue Data Rebuild step 1). The caller
+ * reversible through audit_log exactly like a human Approve. Unlike the switch
+ * lane it still stamps last_verified (it predates the 2026-10-25 rule; the
+ * lane is off, REFRESH_AI_AUTO_APPLY = "false"). The caller
  * re-checked computeAutoApplyEligibility, so the one field is phone or url:
  * a plain TEXT column, no hours JSON handling needed.
  */
@@ -256,9 +256,17 @@ function buildAiAutoApplyStatements(
   const before = (proposal.proposedDiff.before ?? {}) as Partial<Venue>;
   const after = (proposal.proposedDiff.after ?? {}) as Partial<Venue>;
   const newValue = (after[field] ?? null) as string | null;
+  const newLastVerified = after.last_verified ?? null;
   return [
-    `UPDATE venues SET ${field} = ${sqlText(newValue)}, updated_by = ${sqlText(AI_AUTO_APPLY_ACTOR)}, updated_at = ${sqlText(now)} WHERE id = ${sqlText(proposal.targetVenueId)};`,
-    auditRow(AI_AUTO_APPLY_ACTOR, proposal.targetVenueId, { [field]: before[field] ?? null }, { [field]: newValue }, now, sqlText),
+    `UPDATE venues SET ${field} = ${sqlText(newValue)}, last_verified = ${sqlText(newLastVerified)}, updated_by = ${sqlText(AI_AUTO_APPLY_ACTOR)}, updated_at = ${sqlText(now)} WHERE id = ${sqlText(proposal.targetVenueId)};`,
+    auditRow(
+      AI_AUTO_APPLY_ACTOR,
+      proposal.targetVenueId,
+      { [field]: before[field] ?? null, last_verified: before.last_verified ?? null },
+      { [field]: newValue, last_verified: newLastVerified },
+      now,
+      sqlText,
+    ),
     approvedRow(proposal, AI_AUTO_APPLY_ACTOR, now, sqlText, tri, true),
   ];
 }

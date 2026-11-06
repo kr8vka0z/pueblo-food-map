@@ -60,18 +60,17 @@ describe("buildProposalWriteStatements with triage", () => {
     expect(statements[0]).toContain("'auto_apply_candidate'");
   });
 
-  test("flag ON: applies the field (never last_verified) under refresh-pipeline-ai with audit_log and an approved row", () => {
+  test("flag ON: applies the field + last_verified under refresh-pipeline-ai with audit_log and an approved row", () => {
     const { autoApplied, statements } = buildProposalWriteStatements(phoneReformat(), NOW, sqlText, {
       triage: autoCandidate,
       aiAutoApply: true,
     });
     expect(autoApplied).toBe(true);
     expect(statements[0]).toBe(
-      `UPDATE venues SET phone = '(719) 555-0100', updated_by = 'refresh-pipeline-ai', updated_at = '${NOW}' WHERE id = 'osm-node-9';`,
+      `UPDATE venues SET phone = '(719) 555-0100', last_verified = '2026-09-28', updated_by = 'refresh-pipeline-ai', updated_at = '${NOW}' WHERE id = 'osm-node-9';`,
     );
     expect(statements[1]).toContain("INSERT INTO audit_log");
-    expect(statements[1]).toContain('{"phone":"719-555-0100"}');
-    expect(statements[1]).not.toContain("last_verified");
+    expect(statements[1]).toContain('{"phone":"719-555-0100","last_verified":"2026-08-01"}');
     expect(statements[2]).toContain("'approved'");
     expect(statements[2]).toContain("'refresh-pipeline-ai'");
     expect(statements[2]).toContain("'auto_apply_candidate'");

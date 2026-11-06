@@ -25,6 +25,7 @@
 import { redirect, forbidden } from "next/navigation";
 import { NextResponse } from "next/server";
 import { AccessDeniedError } from "./adminOrigin";
+import { authorizeAdminWrite, getAdminDb, type AdminDbAccess } from "./adminDb";
 import { logAdminAuthFailure } from "./logger";
 
 /**
@@ -59,4 +60,27 @@ export function adminAuthErrorResponse(err: unknown): Response {
     return new Response("Forbidden", { status: 403 });
   }
   throw err;
+}
+
+/**
+ * Route handler gate for writes: authorizeAdminWrite() (session, then
+ * Origin), with a denial turned into its response by adminAuthErrorResponse().
+ * Callers: `const access = await adminWriteAccess(req); if (access instanceof
+ * Response) return access;`
+ */
+export async function adminWriteAccess(req: Request): Promise<AdminDbAccess | Response> {
+  try {
+    return await authorizeAdminWrite(req.headers);
+  } catch (err) {
+    return adminAuthErrorResponse(err);
+  }
+}
+
+/** Same as adminWriteAccess() for GET handlers: getAdminDb() only, no Origin check. */
+export async function adminReadAccess(req: Request): Promise<AdminDbAccess | Response> {
+  try {
+    return await getAdminDb(req.headers);
+  } catch (err) {
+    return adminAuthErrorResponse(err);
+  }
 }

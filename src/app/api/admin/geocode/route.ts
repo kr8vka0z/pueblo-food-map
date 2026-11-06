@@ -28,8 +28,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminReadAccess } from "@/lib/adminAuthErrors";
 import { geocodeAddress } from "@/lib/censusGeocode";
 
 // WHY force-dynamic: this route reads req.headers directly (not
@@ -39,11 +38,8 @@ import { geocodeAddress } from "@/lib/censusGeocode";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest): Promise<Response> {
-  try {
-    await getAdminDb(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const denied = await adminReadAccess(req);
+  if (denied instanceof Response) return denied;
 
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (!q) {

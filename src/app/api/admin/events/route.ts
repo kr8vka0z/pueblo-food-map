@@ -21,22 +21,17 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
 import { EVENT_AUDIT_INSERT_SQL, EVENT_INSERT_COLUMNS, EVENT_INSERT_PLACEHOLDERS, eventInsertValues, purgeEventsFeed } from "@/lib/adminEvents";
 import { validateEventPayload } from "@/lib/adminEventValidation";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import type { EventRow } from "@/lib/events";
 import { convertToDraft, loadPendingEventSubmission, submissionGoneResponse } from "@/lib/eventSubmissions";
 
 const INSERT_EVENT_SQL = `INSERT INTO events (${EVENT_INSERT_COLUMNS}) VALUES (${EVENT_INSERT_PLACEHOLDERS})`;
 
 export async function POST(req: NextRequest): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
 
   let body: unknown;

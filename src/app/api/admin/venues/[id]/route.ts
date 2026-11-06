@@ -105,8 +105,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
 import { computeBoxEventWrites } from "@/lib/boxEvents";
 import { logAdminVenueEditMissingPrecondition } from "@/lib/logger";
@@ -234,12 +233,8 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
   const { id } = await params;
 

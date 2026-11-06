@@ -24,8 +24,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
 import { logPublishResult } from "@/lib/logger";
 import {
   fetchPublishSnapshot,
@@ -39,12 +38,8 @@ import {
 } from "@/lib/publishVenues";
 
 export async function POST(req: NextRequest): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
 
   // #591: refuse to run unless this is the production Worker — a Publish

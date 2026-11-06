@@ -22,8 +22,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
 
 const REJECT_SUBMISSION_SQL =
   "UPDATE public_submissions SET status = 'rejected', review_reason = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ? AND status = 'pending'";
@@ -53,12 +52,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
 
   const { id: rawId } = await params;

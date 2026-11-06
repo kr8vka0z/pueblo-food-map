@@ -23,20 +23,16 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
-import { getAdminDb } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminReadAccess } from "@/lib/adminAuthErrors";
 import { loadBoxPhotoById } from "@/lib/boxPhotos";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  let db;
-  try {
-    ({ db } = await getAdminDb(req.headers));
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminReadAccess(req);
+  if (access instanceof Response) return access;
+  const { db } = access;
 
   const { id: rawId } = await params;
   const photoId = Number(rawId);

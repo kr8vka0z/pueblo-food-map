@@ -48,8 +48,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
 import type { AdminVenueSourceType } from "@/types/venue";
 import { boxEventsForCreate, BOX_EVENT_INSERT_SQL } from "@/lib/boxEvents";
@@ -202,12 +201,8 @@ async function resolveAddProposalTarget(db: D1Database, proposalId: number): Pro
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
 
   let body: unknown;

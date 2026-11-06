@@ -130,3 +130,20 @@ jobs:
           # stays OFF until a watched run's triage has been checked against
           # Kyle's own decisions (#543's order of work). "true" enables it.
           REFRESH_AI_AUTO_APPLY: "false"
+      # WHY: this run crashed silently on 2026-10-26 and 11-02 (#893) and
+      # nobody knew for two weeks. Any failed step above now messages Kyle in
+      # the Atlas Telegram chat (Kyle, 2026-11-06). The bot token is scoped to
+      # this one step, so the install steps above never see it; it is a copy
+      # of op://Atlas/Telegram - Atlas Bot Token, listed in atlas-kb
+      # "Rotate Telegram Bot Token". A failed send can't fail the run twice.
+      - name: Tell Kyle on Telegram that the refresh failed
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -sS --max-time 20 -o /dev/null "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=Pueblo Food Map: the weekly venue refresh failed, so no venue updates were written this week. Nothing to do on the site. Open a session and say \"the PFM refresh failed\" so an agent can fix it. Run: ${RUN_URL}" \
+            || echo "Telegram send failed"

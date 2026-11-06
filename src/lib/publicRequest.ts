@@ -1,7 +1,7 @@
 /**
  * publicRequest.ts — small request helpers shared by the public API routes
- * (the three form submit routes, /api/public/blessing-boxes/** and
- * /api/csp-report).
+ * (the form submit routes, /api/public/blessing-boxes/**, the events share
+ * geocode/flyer routes and /api/csp-report).
  *
  * requestIp() is byte-for-byte the expression these routes used inline. It
  * is deliberately separate from authEvents.ts's clientIp(), which reads only
@@ -9,8 +9,9 @@
  * value here is never stored (Turnstile `remoteip`, or an HMAC'd rate-limit
  * key in csp-report).
  *
- * parsePublicPost() is the anti-spam preamble the seven JSON form routes
- * share (feedback/report/suggest submit; box checkins/adopt/alerts/needs).
+ * parsePublicPost() is the anti-spam preamble the eight JSON form routes
+ * share (feedback/report/suggest/events-share submit; box
+ * checkins/adopt/alerts/needs).
  * The photos route (multipart, honeypot before Turnstile) and the routes
  * without Turnstile (csp-report, alerts confirm/stop/resubscribe, photo
  * flag) keep their own.

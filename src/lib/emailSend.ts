@@ -130,22 +130,24 @@ export function unsubscribeHeaders(stopApiUrl: string): Record<string, string> {
  */
 export async function sendResendEmail(email: OutboundEmail, apiKey = process.env.RESEND_API_KEY): Promise<void> {
   if (!apiKey) throw new Error("RESEND_API_KEY not configured");
+  await postResend("/emails", toPayload(email, email.from ?? FROM), apiKey, "Resend API");
+}
 
-  const res = await fetch("https://api.resend.com/emails", {
+/** One recipient per payload: `to` is always a one-address array. */
+function toPayload(e: OutboundEmail, from: string) {
+  return { from, to: [e.to], subject: e.subject, text: e.text, html: e.html, headers: e.headers };
+}
+
+/** POSTs to Resend; a non-OK response throws with its status and body. */
+async function postResend(path: "/emails" | "/emails/batch", body: unknown, apiKey: string, errorLabel: string): Promise<void> {
+  const res = await fetch(`https://api.resend.com${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      from: email.from ?? FROM,
-      to: [email.to],
-      subject: email.subject,
-      text: email.text,
-      html: email.html,
-      headers: email.headers,
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => "(unreadable)");
-    throw new Error(`Resend API error ${res.status}: ${body}`);
+    const text = await res.text().catch(() => "(unreadable)");
+    throw new Error(`${errorLabel} error ${res.status}: ${text}`);
   }
 }
 
@@ -175,23 +177,7 @@ export async function sendResendBatch(emails: OutboundEmail[]): Promise<void> {
 
   for (let i = 0; i < emails.length; i += RESEND_BATCH_MAX) {
     const chunk = emails.slice(i, i + RESEND_BATCH_MAX);
-    const res = await fetch("https://api.resend.com/emails/batch", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify(
-        chunk.map((e) => ({
-          from: FROM,
-          to: [e.to],
-          subject: e.subject,
-          text: e.text,
-          html: e.html,
-          headers: e.headers,
-        })),
-      ),
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "(unreadable)");
-      throw new Error(`Resend batch API error ${res.status}: ${body}`);
-    }
+    // Batch sends always use FROM (never a per-email `from`), as before.
+    await postResend("/emails/batch", chunk.map((e) => toPayload(e, FROM)), apiKey, "Resend batch API");
   }
 }

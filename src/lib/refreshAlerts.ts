@@ -49,7 +49,7 @@
  * vinext, workerd fills `process.env` from the bindings everywhere —
  * `nodejs_compat` with a compatibility date after 2025-04-01 — but the
  * binding stays the one source scheduled() is handed directly.)
- * The raw Workers binding (`env.RESEND_API_KEY`, worker-configuration.d.ts)
+ * The raw Workers binding (`env.RESEND_API_KEY`, cloudflare-env.d.ts)
  * is always populated regardless — the same reasoning custom-worker.ts's
  * existing `env.HC_PING_URL` read already established for this exact
  * handler.

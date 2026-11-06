@@ -2,7 +2,7 @@
 """Convert the Overpass grocery dump into src/data/grocery-osm.ts.
 
 Input:  data/raw/pueblo-grocery.json (Overpass `out center` payload — see
-        scripts/README.md for the query used)
+        scripts/fetch-osm-grocery.py build_query() for the query)
         public/data/pueblo-county-boundary.geojson (Census TIGER/Line polygon)
 Output: src/data/grocery-osm.ts
 

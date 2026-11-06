@@ -1,8 +1,6 @@
 /**
- * analytics.ts — PostHog core (#485). Named `track()` calls inside
- * components ship in a later PR ("PR 2 - Admin", per the issue's final
- * comment) — this file only provides the init entry point, the event
- * allowlist, and the sanitizer those calls will use.
+ * analytics.ts — PostHog core (#485): the init gate, the event allowlist
+ * and the sanitizer. Components call `track(EVENTS.X)`.
  *
  * WHY persistence: "memory" + person_profiles: "never", not cookieless_mode
  * (Kyle, 2026-09-26, "option B"): the issue originally chose
@@ -95,8 +93,8 @@ export { INTERNAL_DEVICE_STORAGE_KEY };
 /**
  * The full named-event allowlist (#485 + its 2026-09-26 amendment comment,
  * "add these so the admin dashboard (#681) can show them"). Autocapture
- * covers raw clicks; these give them meaning. Exported so PR 2's component
- * code imports the constants rather than retyping event-name strings.
+ * covers raw clicks; these give them meaning. Components import the
+ * constants rather than retyping event-name strings.
  */
 export const EVENTS = {
   NEAR_ME_CLICKED: "near_me_clicked",

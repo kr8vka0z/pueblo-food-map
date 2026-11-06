@@ -36,8 +36,15 @@ export function puebloParts(instantMs: number): { y: number; mo: number; d: numb
   return { y: get("year"), mo: get("month"), d: get("day"), h: get("hour"), mi: get("minute") };
 }
 
-/** Denver's UTC offset in minutes (negative) at an instant. */
-function offsetMinutesAt(instantMs: number): number {
+/** True when two instants fall on the same Pueblo calendar day; read by the pins and the card. */
+export function sameDenverDay(aMs: number, bMs: number): boolean {
+  const a = puebloParts(aMs);
+  const b = puebloParts(bMs);
+  return a.y === b.y && a.mo === b.mo && a.d === b.d;
+}
+
+/** Denver's UTC offset in minutes (negative) at an instant; also read by src/lib/activityLog.ts. */
+export function offsetMinutesAt(instantMs: number): number {
   const p = puebloParts(instantMs);
   const wallAsUtc = Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi);
   return Math.round((wallAsUtc - Math.floor(instantMs / MS_PER_MIN) * MS_PER_MIN) / MS_PER_MIN);

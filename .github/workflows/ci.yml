@@ -34,44 +34,8 @@ jobs:
 
       - name: Detect data-only publish-bot PR
         id: detect
-        # A branch-name check ALONE would be unsafe: anything pushed to a
-        # branch literally named "publish-bot" in this repo would silently
-        # skip lint/tests. The real safety property is the DIFF -- this only
-        # reports data_only=true when the PR both (a) really is
-        # publish-bot -> main/dev, from this repo (not a fork), AND (b) its
-        # full base...head diff touches EXACTLY src/data/published-venues.ts,
-        # the one file the publish engine (src/lib/publishVenues.ts) writes.
-        # Any other change on that branch -- code, a workflow file, a second
-        # file alongside the data file -- fails this check and gets the full
-        # pipeline below (#336).
-        #
-        # Diffed from the MERGE-BASE of base/head, not a raw two-dot diff
-        # (PR review on #383): a two-dot diff only equals "this PR's change"
-        # when base.sha is exactly head's parent. If main/dev advances
-        # between the bot branch being reset and this run evaluating it --
-        # or a `synchronize` event carries a lagging base.sha -- the two-dot
-        # diff also shows base's own commits as reversed changes, more than
-        # one path appears, data_only goes false, and the publish PR is
-        # blocked by exactly the gate this carve-out exists to bypass. Fails
-        # closed (safe) either way, but merge-base is what a squash merge
-        # actually lands, so this is strictly more correct, not looser.
-        # Checkout above already uses fetch-depth: 0 (full history), which
-        # merge-base needs to resolve.
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          data_only=false
-          if [ "$EVENT_NAME" = "pull_request" ] && [ "$HEAD_REF" = "publish-bot" ] && [ "$IS_FORK" = "false" ]; then
-            changed="$(git diff --name-only "$(git merge-base "$BASE_SHA" "$HEAD_SHA")" "$HEAD_SHA")"
-            if [ "$changed" = "src/data/published-venues.ts" ]; then
-              data_only=true
-            fi
-          fi
-          echo "data_only=$data_only" >> "$GITHUB_OUTPUT"
+        # Shared step: .github/actions/detect-data-only (the WHY lives there).
+        uses: ./.github/actions/detect-data-only
 
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -233,7 +197,17 @@ jobs:
           node-version: 22
           cache: npm
 
+      # Same key as the ci job's cache, which that job saves before this one
+      # starts (needs: ci), so this restores instead of a cold ~97s npm ci.
+      - name: Cache node_modules
+        id: nm-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Download build output

@@ -135,7 +135,7 @@ describe("sendResendEmail / sendResendBatch", () => {
     mockFetch.mockReset();
     globalThis.fetch = mockFetch as unknown as typeof fetch;
     // vi.stubEnv (not a direct `process.env.RESEND_API_KEY =`/`delete`) —
-    // worker-configuration.d.ts's generated ProcessEnv types RESEND_API_KEY
+    // cloudflare-env.d.ts's ProcessEnv types RESEND_API_KEY
     // as a required (non-optional) string, so `delete` doesn't type-check;
     // vi.stubEnv sidesteps that and is undone by vi.unstubAllEnvs() below,
     // same convention auth-options.test.ts and alertOrigin.test.ts use.

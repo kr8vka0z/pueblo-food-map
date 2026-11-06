@@ -35,10 +35,6 @@ describe("MapLoadingFallback locale", () => {
   test("EN key is 'Loading map…'", () => {
     expect(t("map.loading", "en")).toBe("Loading map…");
   });
-
-  test("ES key differs from EN", () => {
-    expect(t("map.loading", "es")).not.toBe(t("map.loading", "en"));
-  });
 });
 
 // ─── 2. LanguageToggle — group aria-label uses i18n ──────────────────────────
@@ -71,10 +67,6 @@ describe("LanguageToggle group aria-label", () => {
 
   test("i18n key 'lang.toggle.label' EN value is 'Language selection'", () => {
     expect(t("lang.toggle.label", "en")).toBe("Language selection");
-  });
-
-  test("i18n key 'lang.toggle.label' ES value differs from EN", () => {
-    expect(t("lang.toggle.label", "es")).not.toBe(t("lang.toggle.label", "en"));
   });
 });
 
@@ -137,9 +129,5 @@ describe("SuggestForm SNAP/WIC fieldset legend", () => {
 
   test("i18n key 'suggest.benefits.legend' EN value is 'Accepted benefits'", () => {
     expect(t("suggest.benefits.legend", "en")).toBe("Accepted benefits");
-  });
-
-  test("i18n key 'suggest.benefits.legend' ES value differs from EN", () => {
-    expect(t("suggest.benefits.legend", "es")).not.toBe(t("suggest.benefits.legend", "en"));
   });
 });

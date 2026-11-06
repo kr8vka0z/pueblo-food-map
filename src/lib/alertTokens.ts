@@ -19,6 +19,11 @@
 export function randomHexToken(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
+  return toHex(bytes);
+}
+
+/** Lower-case hex of `bytes`; also used by checkinRateLimit.ts's HMAC keys. */
+export function toHex(bytes: Uint8Array): string {
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
@@ -31,7 +36,7 @@ export function randomHexToken(): string {
  * task's own spec), so this lives in one place rather than two independently
  * chosen constants that could drift.
  */
-export const CONFIRM_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const CONFIRM_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** True when `createdAt` (an ISO timestamp — the row's own creation time, rotated on every confirm-email resend, see boxAlerts.ts's upsertGiverSubscription) is still within the confirm window. */
 export function isWithinConfirmWindow(createdAt: string, now: Date = new Date()): boolean {

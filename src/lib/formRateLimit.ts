@@ -1,6 +1,7 @@
 /**
- * D1-backed rate limiting for the three public submission forms —
- * /report/submit, /suggest/submit, /feedback/submit (#587).
+ * D1-backed rate limiting for every public form that writes to D1 (#587;
+ * FormName below). Callers may pass looser caps: the events share geocode
+ * (30/300) and flyer (10/100) routes do.
  *
  * WHY this replaces src/lib/rateLimit.ts's in-process Map: that store was
  * per-isolate, and Cloudflare Workers run many isolates concurrently — a
@@ -14,9 +15,8 @@
  *
  * WHY no new table or migration: checkAndIncrement's key is an HMAC of
  * `scope:id:hourBucket` in the existing box_checkin_rate_limit table — a
- * new scope label is all a new caller needs (migrations/0007). The three
- * scopes below ("form-report", "form-suggest", "form-feedback", each with a
- * "-site" sibling) can never collide with the box/visitor-box scopes the
+ * new scope label is all a new caller needs (migrations/0007). The scopes
+ * (`form-<FormName>`, each with a "-site" sibling) can never collide with the box/visitor-box scopes the
  * check-in path already uses.
  *
  * WHY two caps per form (per-IP AND site-wide): a per-IP cap alone can't

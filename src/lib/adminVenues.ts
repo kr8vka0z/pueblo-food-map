@@ -65,26 +65,20 @@ const COMPARED_VENUE_FIELDS = [
   "source",
 ] as const;
 
-/** Serializes a Venue for equality comparison, with `last_verified` stripped. Both sides of every comparison below are produced by validateAndMapRow (this file's or a past publish's), so key order — and therefore this string — is deterministic between them. */
-function venueSignature(venue: Pick<Venue, (typeof COMPARED_VENUE_FIELDS)[number]>): string {
-  const ordered: Record<string, unknown> = {};
-  for (const field of COMPARED_VENUE_FIELDS) ordered[field] = venue[field];
-  return JSON.stringify(ordered);
-}
-
 /**
  * True when `row`'s current D1 state differs from `publishedVenue` (its
  * matching src/data/published-venues.ts entry — what the public map is
  * ACTUALLY serving right now) in any field other than `last_verified`.
  * `row` is run back through validateAndMapRow (publishVenues.ts) — the same
  * function that produced `publishedVenue` at its last publish — so both
- * sides are normalized identically before comparing.
+ * sides are normalized identically before comparing; the per-field
+ * comparison is diffPublishedFields's, so the badge and the field list
+ * can never disagree.
  */
 function hasNonTrivialDiff(row: AdminVenueRow, publishedVenue: Venue | undefined): boolean {
-  if (!publishedVenue) return true; // published but no matching snapshot entry — can't confirm parity, so flag it rather than hide a real gap
-  const mapped = validateAndMapRow(row as VenueRow);
-  if (!mapped.ok) return true; // row doesn't even validate as a public Venue right now — certainly not what's live
-  return venueSignature(mapped.venue) !== venueSignature(publishedVenue);
+  // No matching snapshot entry → can't confirm parity, so flag it. A row that no longer validates diffs as `{}` against
+  // the published venue's required fields, so it is flagged by diffPublishedFields too.
+  return !publishedVenue || diffPublishedFields(row, publishedVenue).length > 0;
 }
 
 export interface DisplayStatusOptions {
@@ -111,11 +105,6 @@ export function displayStatusOf(
   // row.status === "published" from here.
   if (options.isStaging) return "live";
   return hasNonTrivialDiff(row, publishedVenue) ? "live_edits_waiting" : "live";
-}
-
-/** Built once per read from the real published snapshot — the same file the public map serves from. */
-function buildPublishedVenueById(): Map<string, Venue> {
-  return new Map(publishedVenues.map((v) => [v.id, v]));
 }
 
 export interface PublishChangeSummary {
@@ -158,7 +147,8 @@ export function summarizePublishChanges(rows: AdminVenueRow[]): PublishChangeSum
   let newDrafts = 0;
   let editedSincePublish = 0;
   let archived = 0;
-  const publishedById = buildPublishedVenueById();
+  // Built once per read from the real published snapshot — the same file the public map serves from.
+  const publishedById = new Map(publishedVenues.map((v) => [v.id, v]));
 
   for (const row of rows) {
     // Boxes never publish (Build Plan architecture call #1 — live, not

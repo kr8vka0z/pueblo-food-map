@@ -20,7 +20,7 @@
  * response or any network number. (Reversed 2026-09-19 from this file's
  * earlier design, which deliberately widened past that JOIN to keep an
  * archived box's history in the network sum; consistency with every other
- * public query in this repo won out, 2026-09-19.) Every other privacy/scope filter this
+ * public query in this repo won out.) Every other privacy/scope filter this
  * feature enforces (kind != 'problem', category = 'blessing_box',
  * visibility = 'visible') is unchanged.
  *
@@ -290,7 +290,7 @@ export interface NeedLoveBox {
   checkins: readonly CheckinStatusInput[];
 }
 
-export const NEED_LOVE_LIST_SIZE = 5;
+const NEED_LOVE_LIST_SIZE = 5;
 
 /**
  * The limit /box/[id]/history's server component passes to boxPhotos.ts's
@@ -516,12 +516,12 @@ interface VenueMetaRow {
 
 /**
  * The one new D1 read this slice adds — everything /boxes/activity's
- * Numbers section needs, in four queries, no aggregation done in SQL (the
+ * Numbers section needs, in three queries, no aggregation done in SQL (the
  * pure functions above do that, so the exact same logic that's unit-tested
  * against plain fixtures is what actually runs). Boxes/checkins are allowed
  * to throw (propagate to the caller, same "an outage is a full stats
  * outage" posture loadVisibleCheckins/loadLiveBoxes already take) — only
- * the photos and sponsor-count reads are wrapped here, mirroring blessingBoxes.ts's own
+ * the photos read is wrapped here, mirroring blessingBoxes.ts's own
  * loadLatestPhotosBestEffort: a missing/broken box_photos table must
  * degrade to "no photo numbers," never take the whole stats response down.
  *
@@ -532,39 +532,34 @@ interface VenueMetaRow {
  * shipping every raw row to the browser once.
  */
 export async function loadNetworkStatsData(db: D1Database): Promise<NetworkStatsData> {
-  // The four reads are independent, so they run in parallel (one D1 round
-  // trip of latency, not four). Not db.batch(): a batch fails as a whole,
-  // which would lose the per-table best-effort posture below. Each read is
-  // its own async function so even a synchronous prepare() throw becomes a
-  // rejection Promise.all handles (or the try/catch swallows).
-  const [venuesResult, checkinsResult, photos, approvedSponsorCount] = await Promise.all([
-    (async () => db.prepare(SELECT_ALL_BOX_VENUES_SQL).all<VenueMetaRow>())(),
-    (async () => db.prepare(SELECT_ALL_BOX_CHECKINS_SQL).all<NetworkStatsCheckin>())(),
-    (async (): Promise<NetworkStatsPhoto[]> => {
-      try {
-        return (await db.prepare(SELECT_ALL_BOX_PHOTOS_SQL).all<NetworkStatsPhoto>()).results ?? [];
-      } catch {
-        return [];
-      }
-    })(),
-    // Best-effort, same posture as the photos read: a missing/broken
-    // box_adopters table must degrade this one number to 0, never take the
-    // whole stats response down.
-    (async (): Promise<number> => {
-      try {
-        return (await db.prepare(SELECT_APPROVED_SPONSOR_COUNT_SQL).all<{ count: number }>()).results?.[0]?.count ?? 0;
-      } catch {
-        return 0;
-      }
-    })(),
-  ]);
-
+  const venuesResult = await db.prepare(SELECT_ALL_BOX_VENUES_SQL).all<VenueMetaRow>();
   const boxes: StatsBoxMeta[] = (venuesResult.results ?? []).map((r) => ({
     id: r.id,
     name: r.name,
     archived: r.status === "archived",
   }));
+
+  const checkinsResult = await db.prepare(SELECT_ALL_BOX_CHECKINS_SQL).all<NetworkStatsCheckin>();
   const checkins = checkinsResult.results ?? [];
+
+  let photos: NetworkStatsPhoto[] = [];
+  try {
+    const photosResult = await db.prepare(SELECT_ALL_BOX_PHOTOS_SQL).all<NetworkStatsPhoto>();
+    photos = photosResult.results ?? [];
+  } catch {
+    photos = [];
+  }
+
+  // Best-effort, same posture as the photos read above: a missing/broken
+  // box_adopters table must degrade this one number to 0, never take the
+  // whole stats response down.
+  let approvedSponsorCount = 0;
+  try {
+    const sponsorResult = await db.prepare(SELECT_APPROVED_SPONSOR_COUNT_SQL).all<{ count: number }>();
+    approvedSponsorCount = sponsorResult.results?.[0]?.count ?? 0;
+  } catch {
+    approvedSponsorCount = 0;
+  }
 
   return { boxes, checkins, photos, approvedSponsorCount };
 }

@@ -326,7 +326,7 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   hours change is proposed, the raw schedule text goes in `meta.schedule_text`
   and `meta.needs_review`, and the card always reads "needs a human".
   Matching runs only over our `pantry`/`meal_site` rows of any
-  `source_type` (blessing boxes stripped by `excludeBlessingBoxes`): an alias
+  `source_type` (the category filter already leaves out blessing boxes): an alias
   on file or our venue with id `cas-<locationId>` first; then **strong** =
   name overlap ≥ 0.75, within 150 m, AND the same phone (renamePairs'
   `haversineDistanceKm`/`normalizedPhoneTail`), or — when Care and Share's
@@ -639,8 +639,8 @@ one place it's stated; code comments point here.
 
 The in-scope routes (`/`, `/venues`, `/venue/[id]`, `/resources`,
 `/about`, the four SEO hubs `/food-pantries`, `/snap-wic-stores`,
-`/community-gardens`, `/blessing-boxes`, and `/event/[id]`; `ls src/app/es`
-is the live list) are **mirrored**: each has a full `/es` twin with its own root
+`/community-gardens`, `/blessing-boxes`, `/events/share` and `/event/[id]`;
+`ls src/app/es` is the live list) are **mirrored**: each has a full `/es` twin with its own root
 layout (`src/app/es/layout.tsx`, `lang="es"`, `LocaleProvider
 initialLocale="es"` — which also LOCKS the tree, so a stale `pfm-locale=en`
 cookie can never flip an `/es` page back to English post-hydration).
@@ -731,13 +731,14 @@ The rules it sets:
   `X-Robots-Tag: noindex, nofollow` to every response on any other host
   (dev., *.workers.dev), via `src/lib/indexingHost.ts`. This is deliberately a
   header, not a robots.txt `Disallow`: a crawler must be able to fetch a page
-  to see its noindex and drop it. `deploy-prod.yml`'s smoke test fails if the
-  canonical host ever sends the header, or if workers.dev stops sending it.
+  to see its noindex and drop it. The post-deploy smoke test
+  (`scripts/smoke.sh`, both deploy workflows) fails if a workers.dev origin
+  stops sending it, and on prod if the canonical host ever sends it.
 
 - **`/llms.txt`** is a hand-written static file, `public/llms.txt` (llmstxt.org
   format). Cloudflare Workers Static Assets serves it before the Worker runs
   (`text/plain; charset=utf-8`, no route or middleware involved, same as
-  `sw.js`), and `deploy-prod.yml` smoke-tests it. It carries no counts, so it
+  `sw.js`), and the post-deploy smoke test (`scripts/smoke.sh`) checks it. It carries no counts, so it
   can't go stale; update it by hand when a public page is added or renamed.
 - **AI crawler policy** lives in `src/app/robots.ts` (WHY in its header):
   answer/search bots are allowed, training-only crawlers are blocked.
@@ -811,7 +812,7 @@ rank for the queries people type ("food pantry Pueblo", "SNAP stores Pueblo").
   with `faqItemsFor`. The official source URLs and fetch dates for those
   answers are in the header of `src/lib/resourcesFaq.ts`.
 - **Sitemap and smoke test:** each hub has EN + ES entries with alternates;
-  `deploy-prod.yml` checks all eight (incl. `/blessing-boxes`) for 200 and the `/es` ones for `<html lang="es">`.
+  the post-deploy smoke test (`scripts/smoke.sh`) checks all eight (incl. `/blessing-boxes`) for 200 and the `/es` ones for `<html lang="es">`.
 - **`/blessing-boxes` (+ `/es`) is the dynamic one.** Boxes live only in D1, and
   admin edits must show immediately, so both page files set
   `export const dynamic = "force-dynamic"` (route-segment config; it affects only
@@ -965,8 +966,8 @@ re-run cost ~3 min per deploy and let flaky tests block green changes).
 design:drift, the full test suite (replaced by a published-data/venue-shape
 subset), the Python scraper self-tests, and the blocking production `npm audit`
 in "Dependency CVE Audit"; typecheck and build always run. The diff check, not
-the branch name, is the safety property — see `ci.yml`'s "Detect data-only
-publish-bot PR" step comment.
+the branch name, is the safety property — see the comment in
+`.github/actions/detect-data-only/action.yml`, the step both workflows share.
 
 **Release flow (replaced ad-hoc `dev` → `main` promotions).** Work
 merges to `dev` (`pr-title.yml` requires Conventional Commit PR titles).

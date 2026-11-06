@@ -30,7 +30,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminWriteAccess } from "@/lib/adminAuthErrors";
 import { positiveInt } from "@/lib/positiveInt";
-import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
+import { auditStatement } from "@/lib/auditLog";
 
 interface BoxCheckinRow {
   id: number;
@@ -80,19 +80,14 @@ export async function POST(
   const updateCheckin = db
     .prepare("UPDATE box_checkins SET visibility = ?, hidden_by = ?, hidden_at = ? WHERE id = ?")
     .bind(visibility, hiddenBy, hiddenAt, checkinId);
-  const insertAudit = db
-    .prepare(AUDIT_INSERT_VALUES_SQL)
-    .bind(
-      identity.email,
-      "box_checkin",
-      String(checkinId),
-      "update",
-      JSON.stringify(existing),
-      JSON.stringify(afterRow),
-      timestamp,
-      // #679: ties this action to the sign-in that made it (Activity log).
-      identity.sessionId ?? null,
-    );
+  const insertAudit = auditStatement(db, identity, {
+    entity: "box_checkin",
+    entityId: String(checkinId),
+    action: "update",
+    before: existing,
+    after: afterRow,
+    timestamp,
+  });
 
   // Atomic: the visibility flip and its own audit trail land together or not at all — same convention as every other admin mutation in this app.
   await db.batch([updateCheckin, insertAudit]);

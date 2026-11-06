@@ -24,7 +24,7 @@ import { readOptionalReason } from "@/lib/adminRequest";
 import { loadAdopterById, type BoxAdopterRow } from "@/lib/boxAdopters";
 import { unsubscribeAdopterSubscriptionStatement } from "@/lib/boxAlerts";
 import { bustEdgeCache } from "@/lib/edgeCache";
-import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
+import { auditStatement } from "@/lib/auditLog";
 
 /** Reviewer-entered reason, capped generously — internal admin note, not public-facing copy. Same convention/limit as box-photos' own reject route. */
 const MAX_REVIEW_REASON_LENGTH = 500;
@@ -64,9 +64,14 @@ export async function POST(
   const updateAdopter = db
     .prepare("UPDATE box_adopters SET status = 'rejected', reviewed_by = ?, reviewed_at = ?, review_reason = ? WHERE id = ?")
     .bind(identity.email, timestamp, reviewReason, adopterId);
-  const insertAudit = db
-    .prepare(AUDIT_INSERT_VALUES_SQL)
-    .bind(identity.email, "box_adopter", String(adopterId), "update", JSON.stringify(existing), JSON.stringify(afterRow), timestamp, identity.sessionId ?? null);
+  const insertAudit = auditStatement(db, identity, {
+    entity: "box_adopter",
+    entityId: String(adopterId),
+    action: "update",
+    before: existing,
+    after: afterRow,
+    timestamp,
+  });
   const unsubscribeStatement = unsubscribeAdopterSubscriptionStatement(db, adopterId, timestamp);
 
   await db.batch([updateAdopter, insertAudit, unsubscribeStatement]);

@@ -22,6 +22,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { positiveInt } from "@/lib/positiveInt";
+import { readOptionalReason } from "@/lib/adminRequest";
 import { adminWriteAccess } from "@/lib/adminAuthErrors";
 import { loadBoxPhotoById, type BoxPhotoRow } from "@/lib/boxPhotos";
 import { bustEdgeCache } from "@/lib/edgeCache";
@@ -48,15 +49,7 @@ export async function POST(
   // Defensive body parse — same "a bodyless POST must not throw" convention
   // ArchiveVenueButton's own route already established, since a reject can
   // reasonably be a plain button click with no reason typed.
-  let reviewReason: string | null = null;
-  try {
-    const body = (await req.json()) as { reason?: unknown };
-    if (typeof body?.reason === "string" && body.reason.trim() !== "") {
-      reviewReason = body.reason.trim().slice(0, MAX_REVIEW_REASON_LENGTH);
-    }
-  } catch {
-    // no body / not JSON — reason stays null, this is not an error
-  }
+  const reviewReason = await readOptionalReason(req, MAX_REVIEW_REASON_LENGTH);
 
   const existing = await loadBoxPhotoById(db, photoId);
   if (!existing) {

@@ -20,6 +20,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminWriteAccess } from "@/lib/adminAuthErrors";
 import { positiveInt } from "@/lib/positiveInt";
+import { readOptionalReason } from "@/lib/adminRequest";
 import { loadAdopterById, type BoxAdopterRow } from "@/lib/boxAdopters";
 import { unsubscribeAdopterSubscriptionStatement } from "@/lib/boxAlerts";
 import { bustEdgeCache } from "@/lib/edgeCache";
@@ -44,15 +45,7 @@ export async function POST(
 
   // Defensive body parse — a bodyless POST (plain "Remove" button, no reason
   // typed) must not throw, same convention box-photos' own reject route uses.
-  let reviewReason: string | null = null;
-  try {
-    const body = (await req.json()) as { reason?: unknown };
-    if (typeof body?.reason === "string" && body.reason.trim() !== "") {
-      reviewReason = body.reason.trim().slice(0, MAX_REVIEW_REASON_LENGTH);
-    }
-  } catch {
-    // no body / not JSON — reason stays null, this is not an error
-  }
+  const reviewReason = await readOptionalReason(req, MAX_REVIEW_REASON_LENGTH);
 
   const existing = await loadAdopterById(db, adopterId);
   if (!existing) {

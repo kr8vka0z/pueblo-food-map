@@ -24,6 +24,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminWriteAccess } from "@/lib/adminAuthErrors";
 import { positiveInt } from "@/lib/positiveInt";
+import { readOptionalReason } from "@/lib/adminRequest";
 
 const REJECT_SUBMISSION_SQL =
   "UPDATE public_submissions SET status = 'rejected', review_reason = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ? AND status = 'pending'";
@@ -34,20 +35,6 @@ const REJECT_SUBMISSION_SQL =
 // free-text reason with no natural existing owner. A local cap, not a new
 // shared constant, since nothing else references this limit.
 const REVIEW_REASON_MAX_LENGTH = 1000;
-
-/** Optional `{ reason }` from the JSON body -> trimmed text capped at REVIEW_REASON_MAX_LENGTH, or null. Never throws on a missing/empty/non-JSON body. */
-async function readOptionalReason(req: NextRequest): Promise<string | null> {
-  try {
-    const body: unknown = await req.json();
-    const raw = (body as { reason?: unknown })?.reason;
-    if (typeof raw !== "string") return null;
-    const trimmed = raw.trim();
-    if (trimmed.length === 0) return null;
-    return trimmed.slice(0, REVIEW_REASON_MAX_LENGTH);
-  } catch {
-    return null; // no/empty/non-JSON body — reason is optional
-  }
-}
 
 export async function POST(
   req: NextRequest,
@@ -63,7 +50,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Invalid id" }, { status: 400 });
   }
 
-  const reason = await readOptionalReason(req);
+  const reason = await readOptionalReason(req, REVIEW_REASON_MAX_LENGTH);
   const timestamp = new Date().toISOString();
 
   const result = await db

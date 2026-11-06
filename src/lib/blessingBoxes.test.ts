@@ -189,24 +189,14 @@ describe("computeBoxStatus", () => {
     expect(computeBoxStatus([], NOW, false)).toBe("unknown");
   });
 
-  test("latest visible check-in is 'filled' -> stocked", () => {
-    expect(computeBoxStatus([ci({ kind: "filled" })], NOW, false)).toBe("stocked");
-  });
-
-  test("latest visible check-in is 'low' -> low", () => {
-    expect(computeBoxStatus([ci({ kind: "low" })], NOW, false)).toBe("low");
-  });
-
-  test("latest visible check-in is 'empty' -> empty", () => {
-    expect(computeBoxStatus([ci({ kind: "empty" })], NOW, false)).toBe("empty");
-  });
-
-  test("'took' never sets a status — no other signal present -> unknown", () => {
-    expect(computeBoxStatus([ci({ kind: "took" })], NOW, false)).toBe("unknown");
-  });
-
-  test("'problem' never sets a status — no other signal present -> unknown", () => {
-    expect(computeBoxStatus([ci({ kind: "problem" })], NOW, false)).toBe("unknown");
+  test.each([
+    ["latest visible check-in is 'filled' -> stocked", "filled", "stocked"],
+    ["latest visible check-in is 'low' -> low", "low", "low"],
+    ["latest visible check-in is 'empty' -> empty", "empty", "empty"],
+    ["'took' never sets a status — no other signal present -> unknown", "took", "unknown"],
+    ["'problem' never sets a status — no other signal present -> unknown", "problem", "unknown"],
+  ] as const)("%s", (_name, kind, status) => {
+    expect(computeBoxStatus([ci({ kind })], NOW, false)).toBe(status);
   });
 
   test("a later 'took' does not override an earlier 'filled' — status stays stocked", () => {

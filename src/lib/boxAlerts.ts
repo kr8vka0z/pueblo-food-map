@@ -281,8 +281,7 @@ function buildAlertEmail(opts: {
   lang: Locale;
 }): OutboundEmail {
   const copy = ALERT_COPY[opts.kind];
-  const stopApiUrl = `${opts.origin}/api/public/alerts/stop?t=${opts.unsubscribeToken}`;
-  const stopPageUrl = `${opts.origin}/alerts/stop?t=${opts.unsubscribeToken}`;
+  const { stopApiUrl, stopPageUrl } = stopLinks(opts.origin, opts.unsubscribeToken);
   const { subject, text, html } = composeEmail({
     lang: opts.lang,
     subjectKey: copy.subjectKey,
@@ -475,6 +474,14 @@ export async function upsertGiverSubscription(
   }
 }
 
+/** The one-click API stop URL (List-Unsubscribe header) and the human stop page URL for a subscription's unsubscribe token. */
+function stopLinks(origin: string, unsubscribeToken: string): { stopApiUrl: string; stopPageUrl: string } {
+  return {
+    stopApiUrl: `${origin}/api/public/alerts/stop?t=${unsubscribeToken}`,
+    stopPageUrl: `${origin}/alerts/stop?t=${unsubscribeToken}`,
+  };
+}
+
 /** Sends the giver's confirm email — no stop link (nothing to stop until confirmed), per the task's own list of which emails carry one. */
 export async function sendGiverConfirmEmail(opts: { to: string; boxName: string; origin: string; confirmToken: string; lang: Locale }): Promise<void> {
   const url = `${opts.origin}/alerts/confirm?t=${opts.confirmToken}`;
@@ -571,8 +578,7 @@ export function removeHostSubscriptionStatement(
 
 /** Best-effort "you'll now get alerts" email to a newly-added host — no stop-link omission here, this IS a welcome email per the task's own list. */
 export async function sendHostWelcomeEmail(opts: { to: string; boxName: string; origin: string; unsubscribeToken: string; lang: Locale }): Promise<void> {
-  const stopApiUrl = `${opts.origin}/api/public/alerts/stop?t=${opts.unsubscribeToken}`;
-  const stopPageUrl = `${opts.origin}/alerts/stop?t=${opts.unsubscribeToken}`;
+  const { stopApiUrl, stopPageUrl } = stopLinks(opts.origin, opts.unsubscribeToken);
   const { subject, text, html } = composeEmail({
     lang: opts.lang,
     subjectKey: "email.hostWelcome.subject",
@@ -674,8 +680,7 @@ export async function sendAdopterApprovedEmail(opts: {
   /** The adopter's own signup-time locale (BoxAdopterRow.lang). */
   lang: Locale;
 }): Promise<void> {
-  const stopApiUrl = `${opts.origin}/api/public/alerts/stop?t=${opts.unsubscribeToken}`;
-  const stopPageUrl = `${opts.origin}/alerts/stop?t=${opts.unsubscribeToken}`;
+  const { stopApiUrl, stopPageUrl } = stopLinks(opts.origin, opts.unsubscribeToken);
   const { subject, text, html } = composeEmail({
     lang: opts.lang,
     subjectKey: "email.adoptApproved.subject",

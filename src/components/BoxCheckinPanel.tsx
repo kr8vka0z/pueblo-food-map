@@ -962,8 +962,8 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
             <button
               type="button"
               onClick={handleSendStandalonePhoto}
-              disabled={!standalonePhoto.blob || busy || photoSubmitState === "submitting"}
-              aria-disabled={!standalonePhoto.blob || busy || photoSubmitState === "submitting"}
+              disabled={!standalonePhoto.blob || busy}
+              aria-disabled={!standalonePhoto.blob || busy}
               className={PRIMARY_BTN}
             >
               {photoSubmitState === "submitting" ? t("box.photo.sending", locale) : t("box.photo.send", locale)}

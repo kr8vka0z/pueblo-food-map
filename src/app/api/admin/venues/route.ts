@@ -49,6 +49,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminWriteAccess } from "@/lib/adminAuthErrors";
+import { positiveInt } from "@/lib/positiveInt";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
 import type { AdminVenueSourceType } from "@/types/venue";
 import { boxEventsForCreate, BOX_EVENT_INSERT_SQL } from "@/lib/boxEvents";
@@ -112,22 +113,6 @@ function buildVenueInsertValues(
   ];
 }
 
-/**
- * Optional, review-queue-only field (#259): reads `body.submissionId`
- * directly rather than through validateCreateVenuePayload() (that
- * validator's ValidatedVenueFields describes only the venues table's own
- * columns — a submission id isn't one of them, and mixing it in there would
- * make that type lie about what a plain, non-review-queue create submits).
- * Accepted only as a genuine positive integer; anything else (a string, 0,
- * negative, a float, absent) is treated as "no submission to approve" rather
- * than an error — an admin's ordinary "Add place" flow must never fail
- * because of a stray/malformed field it never sends.
- */
-function readOptionalSubmissionId(body: unknown): number | null {
-  const rawSid = (body as { submissionId?: unknown })?.submissionId;
-  return typeof rawSid === "number" && Number.isInteger(rawSid) && rawSid > 0 ? rawSid : null;
-}
-
 // The `AND kind = 'new_venue'` guard closes a cross-kind
 // approval gap: a create only ever legitimately approves a 'new_venue'
 // submission, so a submissionId pointing at a 'closure' row (or any other
@@ -135,16 +120,6 @@ function readOptionalSubmissionId(body: unknown): number | null {
 // wrong submission is never silently marked approved.
 const APPROVE_SUBMISSION_SQL =
   "UPDATE public_submissions SET status = 'approved', reviewed_by = ?, reviewed_at = ? WHERE id = ? AND status = 'pending' AND kind = 'new_venue'";
-
-/**
- * Optional, review-queue-only field (#674): mirrors readOptionalSubmissionId's
- * convention exactly, for a `change_proposals` id instead of a
- * `public_submissions` one.
- */
-function readOptionalProposalId(body: unknown): number | null {
-  const raw = (body as { proposalId?: unknown })?.proposalId;
-  return typeof raw === "number" && Number.isInteger(raw) && raw > 0 ? raw : null;
-}
 
 // `AND change_type = 'add'` closes the same cross-kind gap
 // APPROVE_SUBMISSION_SQL's `AND kind = 'new_venue'` does above — a
@@ -217,8 +192,12 @@ export async function POST(req: NextRequest): Promise<Response> {
     return NextResponse.json({ ok: false, errors: validation.errors }, { status: 422 });
   }
   const { fields } = validation;
-  const submissionId = readOptionalSubmissionId(body);
-  const proposalId = readOptionalProposalId(body);
+  // Review-queue-only ids (#259 submission, #674 proposal), read outside
+  // validateCreateVenuePayload() because they aren't venues columns. Anything
+  // but a positive integer means "nothing to approve", never an error: the
+  // ordinary "Add place" flow never sends them and must not fail on a stray one.
+  const submissionId = positiveInt((body as { submissionId?: unknown })?.submissionId);
+  const proposalId = positiveInt((body as { proposalId?: unknown })?.proposalId);
 
   // #674: a proposalId claims a specific id/source_type (the scraper's own
   // — see this file's header) instead of minting a fresh manual-<uuid>. An

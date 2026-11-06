@@ -60,6 +60,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
+import { positiveInt } from "@/lib/positiveInt";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { computeNeedsToken, timingSafeEqualHex } from "@/lib/boxNeedsToken";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
@@ -105,8 +106,8 @@ export async function POST(
   // Field validation (reviewer fix pass, 2026-09-19: moved ahead of rate
   // limiting — see this file's own header for why) — shape only, no D1
   // involved yet.
-  const checkinId = body.checkinId;
-  if (typeof checkinId !== "number" || !Number.isInteger(checkinId) || checkinId <= 0) {
+  const checkinId = positiveInt(body.checkinId);
+  if (checkinId === null) {
     return NextResponse.json({ ok: false, error: "Invalid checkinId" }, { status: 422 });
   }
 

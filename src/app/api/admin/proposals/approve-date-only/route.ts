@@ -56,6 +56,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { adminWriteAccess } from "@/lib/adminAuthErrors";
+import { positiveInt } from "@/lib/positiveInt";
 import { applyApprovedProposal, isDateOnlyUpdateProposal, parseProposalRow, type ChangeProposalRow } from "@/lib/adminProposals";
 import { D1_MAX_BOUND_PARAMS, chunkArray } from "@/lib/d1";
 
@@ -69,8 +70,9 @@ function extractRequestedIds(body: unknown): number[] | null {
   if (!Array.isArray(ids) || ids.length === 0) return null;
   const parsed: number[] = [];
   for (const raw of ids) {
-    if (typeof raw !== "number" || !Number.isInteger(raw) || raw <= 0) return null;
-    parsed.push(raw);
+    const id = positiveInt(raw);
+    if (id === null) return null;
+    parsed.push(id);
   }
   return parsed;
 }

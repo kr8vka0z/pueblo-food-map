@@ -58,6 +58,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
+import { positiveInt } from "@/lib/positiveInt";
 import { resolveBoxTurnstileKey, verifyBoxTurnstile } from "@/lib/boxTurnstile";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { insertPendingPhoto, MAX_PHOTO_BYTES } from "@/lib/boxPhotos";
@@ -198,8 +199,8 @@ export async function POST(
   let checkinId: number | null = null;
   const rawCheckinId = form.get("checkinId");
   if (typeof rawCheckinId === "string" && rawCheckinId.trim() !== "") {
-    const parsed = Number(rawCheckinId);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
+    const parsed = positiveInt(Number(rawCheckinId));
+    if (parsed === null) {
       return NextResponse.json({ ok: false, error: "Invalid checkinId" }, { status: 422 });
     }
     const checkin = await db

@@ -40,6 +40,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
+import { positiveInt } from "@/lib/positiveInt";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { loadApprovedBoxPhotoById } from "@/lib/boxPhotos";
 import { bustEdgeCache } from "@/lib/edgeCache";
@@ -71,8 +72,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const { id: rawId } = await params;
-  const photoId = Number(rawId);
-  if (!Number.isInteger(photoId) || photoId <= 0) {
+  const photoId = positiveInt(Number(rawId));
+  if (photoId === null) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 

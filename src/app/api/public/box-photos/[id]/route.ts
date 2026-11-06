@@ -32,6 +32,7 @@
 
 import { NextRequest } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
+import { positiveInt } from "@/lib/positiveInt";
 import { loadApprovedBoxPhotoById } from "@/lib/boxPhotos";
 import { serveFromEdgeCache } from "@/lib/edgeCache";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
@@ -49,8 +50,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const { id: rawId } = await params;
-  const photoId = Number(rawId);
-  if (!Number.isInteger(photoId) || photoId <= 0) return notFound();
+  const photoId = positiveInt(Number(rawId));
+  if (photoId === null) return notFound();
 
   return serveFromEdgeCache(new Request(req.url, req), async () => ({ response: await loadPhoto(photoId) }));
 }

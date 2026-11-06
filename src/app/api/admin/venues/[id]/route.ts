@@ -106,6 +106,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminWriteAccess } from "@/lib/adminAuthErrors";
+import { positiveInt } from "@/lib/positiveInt";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
 import { computeBoxEventWrites } from "@/lib/boxEvents";
 import { logAdminVenueEditMissingPrecondition } from "@/lib/logger";
@@ -121,12 +122,6 @@ import {
 } from "@/lib/adminVenueEditSql";
 import type { AdminVenueRow } from "@/types/venue";
 import { RECENT_APPLIED_FOR_VENUE_SQL, resetsForEdit, SWITCH_RESET_INSERT_SQL } from "@/lib/sourceSwitch";
-
-/** Mirrors readOptionalSubmissionId's convention in the sibling create route. */
-function readOptionalProposalId(body: unknown): number | null {
-  const raw = (body as { proposalId?: unknown })?.proposalId;
-  return typeof raw === "number" && Number.isInteger(raw) && raw > 0 ? raw : null;
-}
 
 const PIN_NOTE_MAX = 500;
 
@@ -250,7 +245,7 @@ export async function PATCH(
     return NextResponse.json({ ok: false, errors: validation.errors }, { status: 422 });
   }
   const { fields } = validation;
-  const proposalId = readOptionalProposalId(body);
+  const proposalId = positiveInt((body as { proposalId?: unknown })?.proposalId); // same lenient read as the create route
   const venueToldUs = readVenueToldUs(body);
   if (venueToldUs === "too_long") {
     return NextResponse.json(

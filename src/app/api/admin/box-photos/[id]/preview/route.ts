@@ -23,6 +23,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
+import { positiveInt } from "@/lib/positiveInt";
 import { adminReadAccess } from "@/lib/adminAuthErrors";
 import { loadBoxPhotoById } from "@/lib/boxPhotos";
 
@@ -35,8 +36,8 @@ export async function GET(
   const { db } = access;
 
   const { id: rawId } = await params;
-  const photoId = Number(rawId);
-  if (!Number.isInteger(photoId) || photoId <= 0) {
+  const photoId = positiveInt(Number(rawId));
+  if (photoId === null) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 

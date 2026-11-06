@@ -50,6 +50,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { adminWriteAccess } from "@/lib/adminAuthErrors";
+import { positiveInt } from "@/lib/positiveInt";
 import { auditInsertIfExistsSql } from "@/lib/auditLog";
 
 interface PendingClosureRow {
@@ -76,8 +77,8 @@ export async function POST(
   const { db, identity } = access;
 
   const { id: rawId } = await params;
-  const id = Number(rawId);
-  if (!Number.isInteger(id) || id <= 0) {
+  const id = positiveInt(Number(rawId));
+  if (id === null) {
     return NextResponse.json({ ok: false, error: "Invalid id" }, { status: 400 });
   }
 

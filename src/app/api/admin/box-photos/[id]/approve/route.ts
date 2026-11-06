@@ -26,6 +26,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { adminWriteAccess } from "@/lib/adminAuthErrors";
+import { positiveInt } from "@/lib/positiveInt";
 import { loadBoxPhotoById, type BoxPhotoRow } from "@/lib/boxPhotos";
 import { bustEdgeCache } from "@/lib/edgeCache";
 import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
@@ -39,8 +40,8 @@ export async function POST(
   const { db, identity } = access;
 
   const { id: rawId } = await params;
-  const photoId = Number(rawId);
-  if (!Number.isInteger(photoId) || photoId <= 0) {
+  const photoId = positiveInt(Number(rawId));
+  if (photoId === null) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 

@@ -23,6 +23,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { adminWriteAccess } from "@/lib/adminAuthErrors";
+import { positiveInt } from "@/lib/positiveInt";
 import { loadAdopterById, type BoxAdopterRow } from "@/lib/boxAdopters";
 import { sendAdopterApprovedEmail, upsertApprovedAdopterSubscriptionStatement } from "@/lib/boxAlerts";
 import { resolveEmailOrigin } from "@/lib/alertOrigin";
@@ -39,8 +40,8 @@ export async function POST(
   const { db, identity } = access;
 
   const { id: rawId } = await params;
-  const adopterId = Number(rawId);
-  if (!Number.isInteger(adopterId) || adopterId <= 0) {
+  const adopterId = positiveInt(Number(rawId));
+  if (adopterId === null) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 

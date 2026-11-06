@@ -29,6 +29,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { adminWriteAccess } from "@/lib/adminAuthErrors";
+import { positiveInt } from "@/lib/positiveInt";
 import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 interface BoxCheckinRow {
@@ -50,8 +51,8 @@ export async function POST(
   if (access instanceof Response) return access;
   const { db, identity } = access;
   const { id: rawId } = await params;
-  const checkinId = Number(rawId);
-  if (!Number.isInteger(checkinId) || checkinId <= 0) {
+  const checkinId = positiveInt(Number(rawId));
+  if (checkinId === null) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 

@@ -42,6 +42,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 import { PUEBLO_COUNTY_BBOX } from "@/data/pueblo-bbox";
 import { geocodeAddress, type GeocodeMatch } from "@/lib/censusGeocode";
+import { sqlText } from "./refresh/sql";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, "..");
@@ -198,12 +199,8 @@ async function geocodeAll(sources: RealBoxSource[]): Promise<GeocodedBox[]> {
 
 // ─── SQL generation ─────────────────────────────────────────────────────────
 
-function sqlString(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
-}
-
 function sqlOptString(value: string | null | undefined): string {
-  return value ? sqlString(value) : "NULL";
+  return value ? sqlText(value) : "NULL";
 }
 
 /** Deterministic id from the street address — see header's "Idempotent re-run" note. */
@@ -281,16 +278,16 @@ function buildLoadSql(boxes: GeocodedBox[], today: string): string {
     const id = boxId(box.streetAddress);
     lines.push(
       `INSERT OR IGNORE INTO venues (${VENUES_INSERT_COLUMNS.join(", ")}) VALUES (` +
-        `${sqlString(id)}, ${sqlString(boxName(box))}, 'blessing_box', ${box.lat}, ${box.lng}, ` +
-        `${sqlString(displayAddress(box))}, ${sqlOptString(box.phone)}, ` +
+        `${sqlText(id)}, ${sqlText(boxName(box))}, 'blessing_box', ${box.lat}, ${box.lng}, ` +
+        `${sqlText(displayAddress(box))}, ${sqlOptString(box.phone)}, ` +
         `${sqlOptString(box.website)}, ${sqlOptString(box.description)}, ` +
-        `${sqlString(RUN_LABEL)}, ${sqlString(today)}, 'published', 'manual', 0, ` +
-        `${sqlString(RUN_LABEL)}, ${sqlString(RUN_LABEL)});`,
+        `${sqlText(RUN_LABEL)}, ${sqlText(today)}, 'published', 'manual', 0, ` +
+        `${sqlText(RUN_LABEL)}, ${sqlText(RUN_LABEL)});`,
     );
     // Matches migrations/0006_convert_routt_blessing_box.sql's own pattern
     // exactly: no host info known yet for any of these, an admin fills it in
     // later via the edit screen.
-    lines.push(`INSERT OR IGNORE INTO blessing_boxes (venue_id) VALUES (${sqlString(id)});`);
+    lines.push(`INSERT OR IGNORE INTO blessing_boxes (venue_id) VALUES (${sqlText(id)});`);
   }
 
   return lines.join("\n") + "\n";
@@ -306,8 +303,8 @@ function buildRemoveSql(boxes: GeocodedBox[]): string {
   ];
   for (const box of boxes) {
     const id = boxId(box.streetAddress);
-    lines.push(`DELETE FROM blessing_boxes WHERE venue_id = ${sqlString(id)};`);
-    lines.push(`DELETE FROM venues WHERE id = ${sqlString(id)};`);
+    lines.push(`DELETE FROM blessing_boxes WHERE venue_id = ${sqlText(id)};`);
+    lines.push(`DELETE FROM venues WHERE id = ${sqlText(id)};`);
   }
   return lines.join("\n") + "\n";
 }

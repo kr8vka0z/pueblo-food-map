@@ -130,10 +130,8 @@ function triageColumns(triage: TriageResult | null | undefined, now: string, sql
 }
 
 /**
- * `sqlText` is passed in rather than imported (see refresh-ingest.ts's
- * "SQL literal helpers" header): the caller already owns the
- * one canonical `sqlText`, and passing it keeps this module free of any
- * import that could pull in a stale data-module cache.
+ * `sqlText` is passed in (refresh-ingest.ts passes scripts/refresh/sql.ts's),
+ * so tests can hand in their own quoter.
  */
 export function buildProposalWriteStatements(
   proposal: ProposalDraft,
@@ -175,23 +173,50 @@ export function buildProposalWriteStatements(
   // Already-'approved' with applied_at NULL: a complete who/when trail for
   // the run (refreshAlerts.ts's staleness check reads it), while saying
   // plainly that nothing was applied to `venues`.
-  statements.push(
-    "INSERT INTO change_proposals (source, target_venue_id, change_type, proposed_diff, diff_hash, run_id, status, reviewed_by, reviewed_at) VALUES (" +
-      [
-        sqlText(proposal.source),
-        sqlText(proposal.targetVenueId),
-        sqlText(proposal.changeType),
-        sqlText(JSON.stringify(proposal.proposedDiff)),
-        sqlText(proposal.diffHash),
-        sqlText(proposal.runId),
-        sqlText("approved"),
-        sqlText(AUTO_APPLY_ACTOR),
-        sqlText(now),
-      ].join(", ") +
-      ");",
-  );
+  statements.push(approvedRow(proposal, AUTO_APPLY_ACTOR, now, sqlText, { cols: "", vals: [] }, false));
 
   return { autoApplied: true, statements };
+}
+
+/**
+ * An already-'approved' change_proposals row. `applied` adds applied_at = now
+ * (the switch and AI lanes); the date-only lane leaves it out (NULL: nothing
+ * was applied to `venues`).
+ */
+function approvedRow(
+  proposal: ProposalDraft,
+  actor: string,
+  now: string,
+  sqlText: SqlText,
+  tri: { cols: string; vals: string[] },
+  applied: boolean,
+): string {
+  return (
+    `INSERT INTO change_proposals (source, target_venue_id, change_type, proposed_diff, diff_hash, run_id, status, reviewed_by, reviewed_at${applied ? ", applied_at" : ""}${tri.cols}) VALUES (` +
+    [
+      sqlText(proposal.source),
+      sqlText(proposal.targetVenueId),
+      sqlText(proposal.changeType),
+      sqlText(JSON.stringify(proposal.proposedDiff)),
+      sqlText(proposal.diffHash),
+      sqlText(proposal.runId),
+      sqlText("approved"),
+      sqlText(actor),
+      sqlText(now),
+      ...(applied ? [sqlText(now)] : []),
+      ...tri.vals,
+    ].join(", ") +
+    ");"
+  );
+}
+
+/** The audit_log row for an automatic venues UPDATE, so it reverts like a human Approve. */
+function auditRow(actor: string, venueId: string, before: unknown, after: unknown, now: string, sqlText: SqlText): string {
+  return (
+    "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (" +
+    [sqlText(actor), sqlText("venue"), sqlText(venueId), sqlText("update"), sqlText(JSON.stringify(before)), sqlText(JSON.stringify(after)), sqlText(now)].join(", ") +
+    ");"
+  );
 }
 
 /** A plain pending row for a human to review (status from the table's DEFAULT 'pending'). */
@@ -233,32 +258,8 @@ function buildAiAutoApplyStatements(
   const newValue = (after[field] ?? null) as string | null;
   return [
     `UPDATE venues SET ${field} = ${sqlText(newValue)}, updated_by = ${sqlText(AI_AUTO_APPLY_ACTOR)}, updated_at = ${sqlText(now)} WHERE id = ${sqlText(proposal.targetVenueId)};`,
-    "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (" +
-      [
-        sqlText(AI_AUTO_APPLY_ACTOR),
-        sqlText("venue"),
-        sqlText(proposal.targetVenueId),
-        sqlText("update"),
-        sqlText(JSON.stringify({ [field]: before[field] ?? null })),
-        sqlText(JSON.stringify({ [field]: newValue })),
-        sqlText(now),
-      ].join(", ") +
-      ");",
-    `INSERT INTO change_proposals (source, target_venue_id, change_type, proposed_diff, diff_hash, run_id, status, reviewed_by, reviewed_at, applied_at${tri.cols}) VALUES (` +
-      [
-        sqlText(proposal.source),
-        sqlText(proposal.targetVenueId),
-        sqlText(proposal.changeType),
-        sqlText(JSON.stringify(proposal.proposedDiff)),
-        sqlText(proposal.diffHash),
-        sqlText(proposal.runId),
-        sqlText("approved"),
-        sqlText(AI_AUTO_APPLY_ACTOR),
-        sqlText(now),
-        sqlText(now),
-        ...tri.vals,
-      ].join(", ") +
-      ");",
+    auditRow(AI_AUTO_APPLY_ACTOR, proposal.targetVenueId, { [field]: before[field] ?? null }, { [field]: newValue }, now, sqlText),
+    approvedRow(proposal, AI_AUTO_APPLY_ACTOR, now, sqlText, tri, true),
   ];
 }
 
@@ -315,32 +316,8 @@ function buildSwitchApplyStatements(proposal: ProposalDraft, now: string, sqlTex
   });
   return [
     `UPDATE venues SET ${sets}, updated_by = ${sqlText(AUTO_SWITCH_ACTOR)}, updated_at = ${sqlText(now)} WHERE id = ${sqlText(proposal.targetVenueId)};`,
-    "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (" +
-      [
-        sqlText(AUTO_SWITCH_ACTOR),
-        sqlText("venue"),
-        sqlText(proposal.targetVenueId),
-        sqlText("update"),
-        sqlText(JSON.stringify(pick(before))),
-        sqlText(JSON.stringify(pick(after))),
-        sqlText(now),
-      ].join(", ") +
-      ");",
-    `INSERT INTO change_proposals (source, target_venue_id, change_type, proposed_diff, diff_hash, run_id, status, reviewed_by, reviewed_at, applied_at${tri.cols}) VALUES (` +
-      [
-        sqlText(proposal.source),
-        sqlText(proposal.targetVenueId),
-        sqlText(proposal.changeType),
-        sqlText(JSON.stringify(proposal.proposedDiff)),
-        sqlText(proposal.diffHash),
-        sqlText(proposal.runId),
-        sqlText("approved"),
-        sqlText(AUTO_SWITCH_ACTOR),
-        sqlText(now),
-        sqlText(now),
-        ...tri.vals,
-      ].join(", ") +
-      ");",
+    auditRow(AUTO_SWITCH_ACTOR, proposal.targetVenueId, pick(before), pick(after), now, sqlText),
+    approvedRow(proposal, AUTO_SWITCH_ACTOR, now, sqlText, tri, true),
     ...observations,
   ];
 }

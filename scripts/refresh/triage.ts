@@ -436,18 +436,16 @@ export async function runTriagePass(input: TriagePassInput): Promise<TriagePassO
   const skip = (p: ProposalDraft) =>
     p.source === "link_health" || isDateOnlyUpdateProposal({ change_type: p.changeType, source: p.source }, p.proposedDiff);
 
-  const candidates = findRenamePairCandidates(input.proposals.filter((p) => !skip(p)), input.currentRows).filter((c) => {
-    const rename = buildRenameProposal(c, today);
-    return !rejectedKeys.has(rejectionKey(rename.source, rename.targetVenueId, rename.diffHash));
-  });
-  const verdicts = await mapWithConcurrency(candidates, concurrency, (c) => confirmRenamePair(c, session));
+  const candidates = findRenamePairCandidates(input.proposals.filter((p) => !skip(p)), input.currentRows)
+    .map((c) => ({ c, rename: buildRenameProposal(c, today) }))
+    .filter(({ rename }) => !rejectedKeys.has(rejectionKey(rename.source, rename.targetVenueId, rename.diffHash)));
+  const verdicts = await mapWithConcurrency(candidates, concurrency, ({ c }) => confirmRenamePair(c, session));
 
   const replaced = new Map<ProposalDraft, ProposalDraft | null>(); // remove → rename proposal, add → null (dropped)
   const extraSupersedeKeys: string[] = [];
-  candidates.forEach((c, i) => {
+  candidates.forEach(({ c, rename }, i) => {
     const { confirmed, result } = verdicts[i];
     if (confirmed === false) return; // Jev says two different places — keep remove + add separate
-    const rename = buildRenameProposal(c, today);
     replaced.set(c.removeProposal, rename);
     replaced.set(c.addProposal, null);
     extraSupersedeKeys.push(pendingKey(c.addProposal.source, c.addProposal.targetVenueId));

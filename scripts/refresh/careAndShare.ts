@@ -142,7 +142,9 @@ function toCasSchedule(raw: Record<string, unknown>): CasSchedule | null {
 let countyRing: [number, number][] | null = null;
 function countyOutline(): [number, number][] {
   if (!countyRing) {
-    const geo = JSON.parse(readFileSync(join(__dirname, "..", "..", "public", "data", "pueblo-county-boundary.geojson"), "utf-8")) as {
+    // WHY import.meta.url: package.json is "type": "module", so tsx runs this as ESM where `__dirname` doesn't exist
+    // (vitest shims it, which is how the bare form passed tests and crashed the 2026-10-26 and 11-02 scheduled runs).
+    const geo = JSON.parse(readFileSync(new URL("../../public/data/pueblo-county-boundary.geojson", import.meta.url), "utf-8")) as {
       features: { geometry: { type: string; coordinates: [number, number][][] } }[];
     };
     countyRing = geo.features[0].geometry.coordinates[0];

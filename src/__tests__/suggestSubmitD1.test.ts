@@ -67,6 +67,14 @@ describe("POST /suggest/submit", () => {
     expect(res.status).toBe(422);
   });
 
+  // A non-string optional field used to pass the length check and then throw
+  // in stripLineBreaks (500) instead of a 422.
+  test.each(["hours", "contact", "notes"])("non-string %s → 422, not a 500", async (field) => {
+    vi.stubGlobal("fetch", mockTurnstileSuccess());
+    const res = await POST(makeSubmitRequest("/suggest/submit", { ...validBody, [field]: ["x"] }));
+    expect(res.status).toBe(422);
+  });
+
   test("invalid category → 422", async () => {
     vi.stubGlobal("fetch", mockTurnstileSuccess());
     const res = await POST(makeSubmitRequest("/suggest/submit", { ...validBody, category: "not_a_valid_category" }));

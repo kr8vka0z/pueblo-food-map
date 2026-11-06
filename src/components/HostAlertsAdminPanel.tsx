@@ -64,23 +64,24 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
 
   const genericErrorMessage = "Something went wrong. Try again.";
 
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault();
+  // POST (add) and DELETE (remove) share one request/response shape. The
+  // 409 message is POST-only: that is the one route answer it describes.
+  async function mutate(method: "POST" | "DELETE", body: object, onSuccess?: () => void) {
     setState({ status: "submitting" });
     try {
       const res = await fetch(`/api/admin/blessing-boxes/${venueId}/host-alerts`, {
-        method: "POST",
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, lang }),
+        body: JSON.stringify(body),
       });
-      const data = (await res.json().catch(() => null)) as { hosts?: HostRow[]; error?: string } | null;
+      const data = (await res.json().catch(() => null)) as { hosts?: HostRow[] } | null;
       if (res.status === 200 && data?.hosts) {
         setHosts(data.hosts);
-        setEmail("");
+        onSuccess?.();
         setState({ status: "idle" });
         return;
       }
-      if (res.status === 409) {
+      if (method === "POST" && res.status === 409) {
         setState({ status: "error", message: "That address previously stopped these emails and can't be re-added here." });
         return;
       }
@@ -90,24 +91,13 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
     }
   }
 
-  async function handleRemove(hostEmail: string) {
-    setState({ status: "submitting" });
-    try {
-      const res = await fetch(`/api/admin/blessing-boxes/${venueId}/host-alerts`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: hostEmail }),
-      });
-      const data = (await res.json().catch(() => null)) as { hosts?: HostRow[] } | null;
-      if (res.status === 200 && data?.hosts) {
-        setHosts(data.hosts);
-        setState({ status: "idle" });
-        return;
-      }
-      setState({ status: "error", message: genericErrorMessage });
-    } catch {
-      setState({ status: "error", message: genericErrorMessage });
-    }
+  function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    void mutate("POST", { email, lang }, () => setEmail(""));
+  }
+
+  function handleRemove(hostEmail: string) {
+    void mutate("DELETE", { email: hostEmail });
   }
 
   return (

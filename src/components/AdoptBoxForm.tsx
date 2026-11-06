@@ -10,43 +10,34 @@
  * Turnstile via the shared useTurnstile() hook (src/lib/) — same
  * dedicated invisible box key + managed-checkbox fallback BoxCheckinPanel
  * uses, mount details in that hook's own header. A click before a token
- * exists queues the submit (`pendingSubmit`) rather than blocking the
- * button or sending an empty token; one effect fires it the instant a
- * token arrives, and a 15s timeout (PENDING_SUBMIT_TIMEOUT_MS, same value
- * BoxCheckinPanel uses) falls through to a plain error if none ever does.
- * ponytail: this is the hook's own documented ceiling — no note/state
- * restore on failure, because this form simply stays open (nothing is
- * cleared until a real success), unlike a one-tap check-in button.
+ * exists is queued by useQueuedTurnstileSubmit (src/lib/useTurnstile.ts), which carries
+ * the 15s timeout and the ponytail note on failure handling.
  *
- * Controlled open state (card redesign, 2026-09-19) — `open`/`onOpenChange`
- * are OPTIONAL: omitted, the component behaves exactly as before (its own
- * `useState` + its own collapsed-link trigger button). Passed, the caller
+ * Controlled open state (card redesign, 2026-09-19): the caller
  * (BoxCardBody's sponsor band, whose own "Apply to sponsor this box" link is
- * now the ONE trigger for this form) owns open/closed and this component
+ * the ONE trigger for this form) owns open/closed, and this component
  * renders no trigger of its own — otherwise the label would appear twice.
- * The Turnstile container still mounts unconditionally either way (this
- * file's own header, above) since the controlled case still needs a token
- * ready before the visitor finishes typing.
+ * The Turnstile container still mounts while closed (CardFormTurnstile's
+ * header) so a token is ready before the visitor finishes typing.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
-import Script from "next/script";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { getCheckinClientToken } from "@/lib/checkinClientToken";
-import { useTurnstile } from "@/lib/useTurnstile";
-
-const PENDING_SUBMIT_TIMEOUT_MS = 15_000;
+import { useQueuedTurnstileSubmit, useTurnstile } from "@/lib/useTurnstile";
+import CardFormTurnstile from "@/components/CardFormTurnstile";
+import { PRIMARY_BTN, SECONDARY_BTN } from "@/components/BoxCheckinPanel";
 
 type SubmitState = "idle" | "submitting" | "success" | "error" | "rateLimited";
 
 interface AdoptBoxFormProps {
   boxId: string;
-  /** Controlled open state — see this file's own header. Omit for the standalone/uncontrolled case. */
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  /** Controlled open state — see this file's own header. */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 interface PendingSubmit {
@@ -57,21 +48,13 @@ interface PendingSubmit {
 
 const RATE_LIMIT_ERRORS = new Set(["rate_limit_visitor", "rate_limit_box", "rate_limit_email", "rate_limit_global"]);
 
-export default function AdoptBoxForm({ boxId, open: openProp, onOpenChange }: AdoptBoxFormProps) {
+export default function AdoptBoxForm({ boxId, open, onOpenChange }: AdoptBoxFormProps) {
   const { locale } = useLocale();
-  const isControlled = openProp !== undefined;
-  const [internalOpen, setInternalOpen] = useState(false);
-  const open = isControlled ? openProp : internalOpen;
-  function setOpen(next: boolean) {
-    if (isControlled) onOpenChange?.(next);
-    else setInternalOpen(next);
-  }
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [note, setNote] = useState("");
   const [honeypot, setHoneypot] = useState("");
   const [state, setState] = useState<SubmitState>("idle");
-  const [pending, setPending] = useState<PendingSubmit | null>(null);
 
   // The container ref stays LOCAL to this component (not returned by the
   // hook) — see useTurnstile.ts's own header for why (the React
@@ -117,47 +100,21 @@ export default function AdoptBoxForm({ boxId, open: openProp, onOpenChange }: Ad
     turnstile.reset();
   }
 
-  // Fires a queued submit the moment a token becomes available — see this
-  // file's own header. setPending(null) is deferred to a microtask (same
-  // react-hooks/set-state-in-effect workaround BoxCheckinPanel.tsx's own
-  // token-arrival effect uses) rather than called synchronously in the
-  // effect body.
-  useEffect(() => {
-    if (!turnstile.token || !pending) return;
-    const values = pending;
-    // Both the state clear AND the submit() call (which itself calls
-    // setState synchronously as its first line) are deferred to the same
-    // microtask — react-hooks/set-state-in-effect traces into a locally
-    // defined function's body, so calling submit() directly here (even
-    // with setPending(null) already deferred) still flags as a
-    // synchronous setState-in-effect.
-    queueMicrotask(() => {
-      setPending(null);
-      void submit(values);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- submit() closes over this render's turnstile.token/honeypot already; re-run per pending/token change, not per render.
-  }, [turnstile.token, pending]);
-
-  // No token ever arrives (widget failed to load/callback at all) — fail
-  // the queued submit rather than leaving it stuck on "Sending…" forever.
-  useEffect(() => {
-    if (!pending) return;
-    const timer = setTimeout(() => {
-      setPending(null);
-      setState("error");
-    }, PENDING_SUBMIT_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [pending]);
+  const { queued, queue } = useQueuedTurnstileSubmit<PendingSubmit>(
+    turnstile.token,
+    (values) => void submit(values),
+    () => setState("error"),
+  );
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (state === "submitting" || pending) return;
+    if (state === "submitting" || queued) return;
     const values: PendingSubmit = { displayName: displayName.trim(), email: email.trim(), note: note.trim() };
     if (turnstile.token) {
       void submit(values);
     } else {
       setState("submitting");
-      setPending(values);
+      queue(values);
       // No token in hand (expired after ~5 minutes on the page, or the widget
       // died) — ask for a fresh one NOW rather than hoping one turns up; the
       // token-arrival effect above sends the queued values when it lands.
@@ -165,67 +122,24 @@ export default function AdoptBoxForm({ boxId, open: openProp, onOpenChange }: Ad
     }
   }
 
-  const busy = state === "submitting" || pending !== null;
+  const busy = state === "submitting" || queued;
 
-  // The Script tag + Turnstile container render UNCONDITIONALLY, even while
-  // collapsed — mounting the (invisible) widget the instant this component
-  // exists, not only once the form is expanded, means a token is very
-  // likely already resolved by the time a visitor finishes typing and taps
-  // submit. It also fixes a real mount-timing bug: the hook's own
-  // mount-on-first-render effect runs exactly once (see
-  // useTurnstile.ts's own header) — if the container div were only
-  // rendered after `open` flips true, that effect would have already run
-  // and found no container to mount into, and nothing would ever retry.
-  //
-  // #669 — a doubted visitor's fallback checkbox must not show while the
-  // form is collapsed (it was rendering above the box's name, under the
-  // sponsor band, for a form nobody had opened). The container itself must
-  // still mount and stay in the DOM (see above) so its widget identity
-  // survives open/close/success, so it's moved OFF-SCREEN with `position:
-  // absolute` while `!open` rather than `display:none` — Cloudflare's own
-  // widget can fail to render into a `display:none` container (no laid-out
-  // box for its iframe), where an off-screen absolute position still gives
-  // it real dimensions. Shown again the moment the form opens, sitting
-  // right after the submit/cancel row (this component's own DOM position
-  // for `turnstileNodes`, unchanged) — visually "inside the form" from the
-  // visitor's point of view. Hidden again once `state === "success"`: there
-  // is nothing left to verify once the application already went through.
-  const turnstileVisible = open && state !== "success";
+  // Shown while open, sitting right after the submit/cancel row (visually
+  // "inside the form"); off-screen while closed or after success — see
+  // CardFormTurnstile's header (#669).
   const turnstileNodes = (
-    <>
-      <Script
-        src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-        strategy="afterInteractive"
-        onReady={turnstile.mount}
-      />
-      <div
-        ref={turnstileContainerRef}
-        data-testid="adopt-turnstile-widget"
-        aria-hidden={turnstileVisible ? undefined : true}
-        className={turnstileVisible ? undefined : "absolute -left-[9999px] -top-[9999px] pointer-events-none"}
-      />
-    </>
+    <CardFormTurnstile
+      containerRef={turnstileContainerRef}
+      onReady={turnstile.mount}
+      visible={open && state !== "success"}
+      testId="adopt-turnstile-widget"
+    />
   );
 
-  if (!open) {
-    return (
-      <>
-        {/* Controlled mode (BoxCardBody's sponsor band): the band's own link
-            IS the trigger — rendering a second one here would duplicate the
-            label. Uncontrolled mode (standalone use): own trigger, unchanged. */}
-        {!isControlled && (
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 min-h-[44px] text-sm font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] underline w-fit text-left"
-          >
-            {t("box.adopt.linkLabel", locale)}
-          </button>
-        )}
-        {turnstileNodes}
-      </>
-    );
-  }
+  // The sponsor band's own link is the trigger (header), so closed renders
+  // only the Turnstile container — as fragment child #2, the same tree
+  // position the open and success branches use, so the container survives.
+  if (!open) return <>{null}{turnstileNodes}</>;
 
   if (state === "success") {
     return (
@@ -320,14 +234,14 @@ export default function AdoptBoxForm({ boxId, open: openProp, onOpenChange }: Ad
           type="submit"
           disabled={busy}
           aria-disabled={busy}
-          className="min-h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+          className={PRIMARY_BTN}
         >
           {busy ? t("box.adopt.submitting", locale) : t("box.adopt.submit", locale)}
         </button>
         <button
           type="button"
-          onClick={() => setOpen(false)}
-          className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+          onClick={() => onOpenChange(false)}
+          className={SECONDARY_BTN}
         >
           {t("box.adopt.cancel", locale)}
         </button>
@@ -348,9 +262,7 @@ export default function AdoptBoxForm({ boxId, open: openProp, onOpenChange }: Ad
       </div>
     </form>
     {/* OUTSIDE the form, in the same tree position as the closed and success
-        branches above (fragment child #2) — so React keeps the SAME container
-        div across open/close/success instead of unmounting it and orphaning
-        the Turnstile widget mounted inside. */}
+        branches above (fragment child #2) — CardFormTurnstile's header. */}
     {turnstileNodes}
     </>
   );

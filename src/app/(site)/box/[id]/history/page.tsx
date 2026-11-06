@@ -15,10 +15,8 @@
  * this one box, not a second query.
  *
  * Passes the FULL loaded `box` (fix, PR review 2026-09-18), not just its id
- * and name — BoxHistoryContent now also renders BoxCardBody (status,
- * check-in panel) above the list, since a mapUnavailable visitor is routed
- * straight here with no other way to check in. Same D1 read already done
- * for `generateMetadata`, not a second query.
+ * and name. The page calls `loadBox` again rather than reusing the
+ * `generateMetadata` read, so a request makes that D1 read twice.
  */
 
 import { notFound } from "next/navigation";

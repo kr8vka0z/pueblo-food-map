@@ -5,23 +5,22 @@
  * form on a blessing box's card (Blessing Boxes slice 6, Build Plan card
  * UX item 4). Posts to POST /api/public/blessing-boxes/[id]/alerts (that
  * route's own header has the full guard order and rate-limit scopes) —
- * one field, email only. Mirrors AdoptBoxForm.tsx's Turnstile/queued-submit
- * shape exactly (see that file's own header for the full reasoning); kept
- * as a separate component rather than a shared base because the two
+ * one field, email only. Shares AdoptBoxForm.tsx's Turnstile pieces
+ * (useQueuedTurnstileSubmit in src/lib/useTurnstile.ts, CardFormTurnstile);
+ * kept as a separate component rather than a shared base because the two
  * payload shapes and success copy differ enough that a shared wrapper
  * would need as many branches as it saved lines.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
-import Script from "next/script";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { getCheckinClientToken } from "@/lib/checkinClientToken";
-import { useTurnstile } from "@/lib/useTurnstile";
-
-const PENDING_SUBMIT_TIMEOUT_MS = 15_000;
+import { useQueuedTurnstileSubmit, useTurnstile } from "@/lib/useTurnstile";
+import CardFormTurnstile from "@/components/CardFormTurnstile";
+import { PRIMARY_BTN, SECONDARY_BTN } from "@/components/BoxCheckinPanel";
 
 type SubmitState = "idle" | "submitting" | "success" | "error" | "rateLimited";
 
@@ -37,7 +36,6 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
   const [email, setEmail] = useState("");
   const [honeypot, setHoneypot] = useState("");
   const [state, setState] = useState<SubmitState>("idle");
-  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   // The container ref stays LOCAL to this component (not returned by the
   // hook) — see useTurnstile.ts's own header for why (the React
@@ -79,70 +77,37 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
     turnstile.reset();
   }
 
-  // Fires a queued submit the moment a token becomes available — see
-  // AdoptBoxForm.tsx's own header for the full reasoning (identical here).
-  useEffect(() => {
-    if (!turnstile.token || !pendingEmail) return;
-    const value = pendingEmail;
-    // Both the state clear AND the submit() call (which itself calls
-    // setState synchronously as its first line) are deferred to the same
-    // microtask — see AdoptBoxForm.tsx's own header on this exact effect
-    // for the full reasoning.
-    queueMicrotask(() => {
-      setPendingEmail(null);
-      void submit(value);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- submit() closes over this render's turnstile.token/honeypot already; re-run per pendingEmail/token change, not per render.
-  }, [turnstile.token, pendingEmail]);
-
-  useEffect(() => {
-    if (!pendingEmail) return;
-    const timer = setTimeout(() => {
-      setPendingEmail(null);
-      setState("error");
-    }, PENDING_SUBMIT_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [pendingEmail]);
+  const { queued, queue } = useQueuedTurnstileSubmit<string>(
+    turnstile.token,
+    (value) => void submit(value),
+    () => setState("error"),
+  );
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (state === "submitting" || pendingEmail) return;
+    if (state === "submitting" || queued) return;
     const value = email.trim();
     if (turnstile.token) {
       void submit(value);
     } else {
       setState("submitting");
-      setPendingEmail(value);
+      queue(value);
       // Ask for a fresh token now — see AdoptBoxForm.tsx's handleSubmit.
       turnstile.reset();
     }
   }
 
-  const busy = state === "submitting" || pendingEmail !== null;
+  const busy = state === "submitting" || queued;
 
-  // Unconditional Script + container — see AdoptBoxForm.tsx's own header
-  // comment on this exact block for the full reasoning (the hook's
-  // mount-on-first-render effect only ever runs once; the container must
-  // already exist in the very first render, not only after `open` flips).
-  //
-  // #669 — same off-screen-while-closed fix as AdoptBoxForm.tsx's own
-  // `turnstileVisible`; see that file's header for the full reasoning
-  // (`display:none` risks Turnstile not rendering into a zero-layout box).
-  const turnstileVisible = open && state !== "success";
+  // Rendered in every branch, off-screen while closed or after success — see
+  // CardFormTurnstile's header (#669).
   const turnstileNodes = (
-    <>
-      <Script
-        src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-        strategy="afterInteractive"
-        onReady={turnstile.mount}
-      />
-      <div
-        ref={turnstileContainerRef}
-        data-testid="box-alert-turnstile-widget"
-        aria-hidden={turnstileVisible ? undefined : true}
-        className={turnstileVisible ? undefined : "absolute -left-[9999px] -top-[9999px] pointer-events-none"}
-      />
-    </>
+    <CardFormTurnstile
+      containerRef={turnstileContainerRef}
+      onReady={turnstile.mount}
+      visible={open && state !== "success"}
+      testId="box-alert-turnstile-widget"
+    />
   );
 
   if (!open) {
@@ -225,14 +190,14 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
           type="submit"
           disabled={busy}
           aria-disabled={busy}
-          className="min-h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+          className={PRIMARY_BTN}
         >
           {busy ? t("box.alerts.submitting", locale) : t("box.alerts.submit", locale)}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+          className={SECONDARY_BTN}
         >
           {t("box.alerts.cancel", locale)}
         </button>
@@ -252,8 +217,8 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
         />
       </div>
     </form>
-    {/* Outside the form, same tree position as the other two branches — see
-        AdoptBoxForm.tsx's matching comment. */}
+    {/* Outside the form, same tree position as the other two branches —
+        CardFormTurnstile's header. */}
     {turnstileNodes}
     </>
   );

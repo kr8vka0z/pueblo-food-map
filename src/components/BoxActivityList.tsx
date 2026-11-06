@@ -6,6 +6,8 @@
  * activity log on /box/<id>/history (BoxHistoryContent). Kept as one
  * component, not two, so the line template, timestamp formatting, and
  * empty-state copy can never drift between the two surfaces.
+ * `PagedBoxActivityList` (below) adds the status line and Prev/Next pager
+ * both surfaces wrap it in.
  *
  * Timestamp rule: items within 7 days use the existing relative-time
  * helper ("3 hours ago"); older items switch to a short calendar date
@@ -136,6 +138,70 @@ export default function BoxActivityList({
           onClose={() => setOpenPhotoIndex(null)}
           locale={locale}
         />
+      )}
+    </>
+  );
+}
+
+/**
+ * The status line, list and Prev/Next pager both activity surfaces render.
+ * Prev/Next, not "Load more": no accumulated-items state. Returns a fragment,
+ * so each caller keeps its own wrapper.
+ */
+export function PagedBoxActivityList({
+  items,
+  loading,
+  page,
+  hasMore,
+  setPage,
+  showVenueName,
+  emptyMessageKey,
+}: {
+  items: ActivityItem[];
+  loading: boolean;
+  page: number;
+  hasMore: boolean;
+  setPage: (update: (p: number) => number) => void;
+  showVenueName: boolean;
+  emptyMessageKey?: string;
+}) {
+  const { locale } = useLocale();
+  return (
+    <>
+      {/* aria-live is scoped to this one short status line, not the list
+          below it (PR #472 review, nit 2) — a live region around the
+          whole 25-item list re-announces every item to a screen reader
+          on each filter change; a "12 results" count is the meaningful
+          update, and the list itself is read normally, once, like any
+          other static content. */}
+      <p aria-live="polite" className="text-sm text-[var(--color-ink-500)]">
+        {loading && items.length === 0
+          ? t("activity.loading", locale)
+          : t("activity.resultCount", locale, { count: String(items.length) })}
+      </p>
+      {!(loading && items.length === 0) && (
+        <BoxActivityList items={items} showVenueName={showVenueName} emptyMessageKey={emptyMessageKey} />
+      )}
+
+      {items.length > 0 && (
+        <div className="flex items-center justify-between gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {t("activity.prevPage", locale)}
+          </button>
+          <button
+            type="button"
+            onClick={() => setPage((p) => p + 1)}
+            disabled={!hasMore}
+            className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {t("activity.nextPage", locale)}
+          </button>
+        </div>
       )}
     </>
   );

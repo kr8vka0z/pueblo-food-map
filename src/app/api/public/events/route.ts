@@ -22,24 +22,21 @@
  */
 
 import { NextRequest } from "next/server";
-import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { loadPublicEvents, type PublicEvent } from "@/lib/events";
 import { logEventsReadFailure } from "@/lib/logger";
-import { respondWithEdgeCache, type BestEffortResult } from "@/lib/edgeCache";
+import { bestEffort, respondWithEdgeCache } from "@/lib/edgeCache";
 
 export const dynamic = "force-dynamic";
 
-async function loadEventsBestEffort(): Promise<BestEffortResult<{ events: PublicEvent[] }>> {
-  try {
-    const { env } = getCloudflareContext();
-    const events = await loadPublicEvents(env.ADMIN_DB);
-    return { data: { events }, degraded: false };
-  } catch (err) {
-    logEventsReadFailure(err instanceof Error ? err.message : "unknown error");
-    return { data: { events: [] }, degraded: true };
-  }
-}
-
 export async function GET(req: NextRequest): Promise<Response> {
-  return respondWithEdgeCache(req, loadEventsBestEffort, { ignoreQuery: true });
+  return respondWithEdgeCache(
+    req,
+    () =>
+      bestEffort(
+        async (db): Promise<{ events: PublicEvent[] }> => ({ events: await loadPublicEvents(db) }),
+        { events: [] },
+        logEventsReadFailure,
+      ),
+    { ignoreQuery: true },
+  );
 }

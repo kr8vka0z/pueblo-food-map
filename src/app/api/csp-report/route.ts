@@ -118,16 +118,26 @@ async function underCspReportRateLimit(req: NextRequest): Promise<boolean> {
 export async function POST(req: NextRequest): Promise<Response> {
   try {
     const body: unknown = await req.json();
-    // next.config.ts's CSP sets only the legacy `report-uri` directive, whose
-    // reports post { "csp-report": {...} }. The Reporting API's `report-to`
-    // array shape never reaches here; read it too the day `report-to` is set.
-    const report = (body as Record<string, unknown> | null)?.["csp-report"] as Record<string, unknown> | undefined;
+    // Two shapes reach this endpoint depending on browser/report format: the
+    // legacy `report-uri` CSP directive (what next.config.ts's CSP actually
+    // sets) posts { "csp-report": {...} }; the newer Reporting API
+    // `report-to` posts an array of { type, body: {...} }. This app only
+    // sets report-uri, so the array branch is defensive, not exercised by
+    // this app's own header today.
+    const record = body as Record<string, unknown>;
+    const report = Array.isArray(body)
+      ? ((body[0] as Record<string, unknown> | undefined)?.body as Record<string, unknown> | undefined)
+      : (record?.["csp-report"] as Record<string, unknown> | undefined);
 
     if (report && (await underCspReportRateLimit(req))) {
+      // Reporting API v1 CSP report bodies use `effectiveDirective`, not
+      // `violatedDirective` (blockedURL/documentURL are correct as-is) —
+      // this branch is defensive/unexercised (see comment above), but get
+      // the field name right in case a `report-to` header ever points here.
       logCspViolation({
-        violatedDirective: asString(report["violated-directive"]),
-        blockedUri: asString(report["blocked-uri"]),
-        documentUri: stripQuery(report["document-uri"]),
+        violatedDirective: asString(report["violated-directive"] ?? report.effectiveDirective),
+        blockedUri: asString(report["blocked-uri"] ?? report.blockedURL),
+        documentUri: stripQuery(report["document-uri"] ?? report.documentURL),
       });
     }
   } catch {

@@ -124,6 +124,29 @@ describe("POST /api/csp-report", () => {
     expect(logged.documentUri.length).toBeLessThanOrEqual(500);
   });
 
+  test("reads the Reporting API v1 field name (effectiveDirective) on the defensive report-to branch", async () => {
+    await POST(
+      postReport(
+        [
+          {
+            type: "csp-violation",
+            body: {
+              effectiveDirective: "style-src-attr",
+              blockedURL: "inline",
+              documentURL: "https://pueblofoodmap.com/venues",
+            },
+          },
+        ],
+        "application/reports+json",
+      ),
+    );
+
+    const logged = JSON.parse(warnSpy.mock.calls[0][0] as string);
+    expect(logged.violatedDirective).toBe("style-src-attr");
+    expect(logged.blockedUri).toBe("inline");
+    expect(logged.documentUri).toBe("https://pueblofoodmap.com/venues");
+  });
+
   test("checks the per-IP cap before the site-wide cap, keyed off cf-connecting-ip", async () => {
     await POST(postReport({ "csp-report": { "violated-directive": "script-src" } }));
 

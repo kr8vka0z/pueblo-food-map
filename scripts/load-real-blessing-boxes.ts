@@ -31,9 +31,15 @@
  *   bun run scripts/load-real-blessing-boxes.ts
  * (or: bunx tsx scripts/load-real-blessing-boxes.ts)
  * This only WRITES the files below; review them, then apply with wrangler
- * yourself (staging or prod — your call, not this script's):
- *   npx wrangler d1 execute <db-name> --remote --file=scripts/generated/load-real-blessing-boxes.sql
- *   npx wrangler d1 execute <db-name> --remote --file=scripts/generated/remove-real-blessing-boxes.sql
+ * yourself (staging or prod — your call, not this script's). Remote writes
+ * go as chunked `--command` calls, never `--file`, which routes through D1's
+ * import API (AGENTS.md "Automated venue-refresh pipeline"). One statement per
+ * line, so scripts/refresh/sqlChunks.ts splits it safely, as
+ * refresh-ingest.ts does; for <file> use either generated file:
+ *   bun -e 'import { readFileSync } from "node:fs"; import { execFileSync } from "node:child_process"; import { chunkSqlStatements } from "./scripts/refresh/sqlChunks"; const [file, db] = process.argv.slice(-2); for (const c of chunkSqlStatements(readFileSync(file, "utf-8"))) execFileSync("npx", ["wrangler", "d1", "execute", db, "--remote", "--command", c], { stdio: "inherit" });' scripts/generated/<file>.sql <db-name>
+ * Files: load-real-blessing-boxes.sql (insert), remove-real-blessing-boxes.sql
+ * (undo). Both are idempotent, so a chunk that fails partway is fixed by
+ * running the same command again.
  */
 
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";

@@ -445,6 +445,8 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   handles the
   supersede race, stale applies and rejection memory: atlas-kb "PFM AGENTS
   History — Venue-Refresh Pipeline", "Change-proposal review queue (#390)".
+  A reject saves the card's optional reason in `change_proposals.review_reason`
+  (#904, migration `0028`, null when none was given); the admin doesn't show it.
   Auto-supersede (§6.10a) and rejection memory (§6.10b) stay the ingestion
   job's concern, with one review-side exception: approving an update
   supersedes that venue's other pending update cards whose every change is

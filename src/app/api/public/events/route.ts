@@ -16,9 +16,9 @@
  * migration is applied there (the production migration is a manual,
  * owner-approved step, AGENTS.md "Promotion checklist"). A missing table or
  * any D1 failure therefore answers an empty list with a 200, not a 500, and
- * flags it `degraded` so respondWithEdgeCache() never stores the fallback —
- * the empty answer lives at most the 60s browser max-age, and the first
- * request after the table appears serves real data.
+ * flags it `degraded` so respondWithEdgeCache() never stores the fallback
+ * and sends it `no-store` — the first request after the table appears
+ * serves real data.
  */
 
 import { NextRequest } from "next/server";

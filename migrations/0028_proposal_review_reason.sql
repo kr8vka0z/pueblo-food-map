@@ -1,0 +1,15 @@
+-- migrations/0028_proposal_review_reason.sql
+--
+-- Issue #904: the proposal card sends an optional rejection reason, but
+-- change_proposals had nowhere to keep it, so the reject route threw it away.
+-- review_reason mirrors public_submissions.review_reason: the admin's own
+-- words, trimmed and capped by the route (readOptionalReason in
+-- src/lib/adminRequest.ts), NULL when no reason was given.
+--
+-- ADD COLUMN only, nullable: no existing row or write changes. NOT idempotent
+-- (a re-run fails with "duplicate column"), so production applies it with
+-- `wrangler d1 migrations apply`, never `d1 execute --file` (AGENTS.md
+-- "Promotion checklist — D1 migrations"). The reject route writes this
+-- column, so it must reach a database before the code does: until then a
+-- proposal reject there fails.
+ALTER TABLE change_proposals ADD COLUMN review_reason TEXT;

@@ -47,6 +47,7 @@
  *      tap on the map behind the sheet does not close it.
  *   3. The close button: since #882 hidden on the phone until it gets keyboard
  *      focus (HIDDEN_UNTIL_FOCUS), so keyboard and screen-reader users keep it
+ *      as a dismiss path.
  *
  * Route strip (#509, walk-route standard for every venue card): starting a
  * walking route (a box's address tap, or an ordinary place's Walk button —
@@ -90,7 +91,8 @@ import { sheetSnapPoints, type SheetSnaps } from "@/lib/sheetSnap";
 import { prefersReducedMotion } from "@/lib/useMediaQuery";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
-import VenueCardBody, { displayAddress } from "@/components/VenueCardBody";
+import VenueCardBody from "@/components/VenueCardBody";
+import { displayAddress } from "@/lib/venueSummary";
 import type { Walk } from "@/lib/useWalkingRoute";
 import RouteStrip, { ROUTE_STRIP_HEIGHT_PX } from "@/components/RouteStrip";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
@@ -786,7 +788,7 @@ export default function BottomSheet({
               route-strip-only, no venue yet — has SOME description, never a
               dangling reference.
               Same OSM placeholder guard as the visible address line
-              (VenueCardBody's displayAddress) — a screen reader must never hear the literal "Address not in
+              (venueSummary.ts's displayAddress) — a screen reader must never hear the literal "Address not in
               OpenStreetMap" string either. */}
           <Drawer.Description className="sr-only">
             {venue
@@ -831,11 +833,6 @@ export default function BottomSheet({
               </button>
             </div>
           )}
-          {/* Card-redesign box actions slot (Share/Fav/Close) — one JSX
-              constant so it's built once and handed to BoxCardBody's
-              `actions` prop below, rather than duplicating this markup
-              between the box and non-box branches. Same visual weight/
-              position as the ordinary header row's own trio. */}
           {venue && showStrip && (
             // #509: strip replaces the full card entirely while a route is
             // active and not revealed — same `walk` object (onWalk /

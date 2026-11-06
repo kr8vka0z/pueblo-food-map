@@ -270,9 +270,8 @@ function ReviewCell({ items }: { items: ReviewItem[] }) {
       {items.map((item) => {
         const lane = itemLane(item);
         const badge = lane ? LANE_BADGE[lane] : { label: "Public", className: PUBLIC_BADGE_CLASS };
-        const key = item.kind === "proposal" ? item.proposal.row.id : `s-${item.submission.id}`;
         return (
-          <li key={key} className="flex items-center gap-1.5 text-xs">
+          <li key={reviewItemKey(item)} className="flex items-center gap-1.5 text-xs">
             <span className="text-[var(--color-ink-700)]">{summarizeItemForRow(item)}</span>
             <span className={`inline-flex items-center rounded px-1 py-0.5 font-medium ${badge.className}`}>{badge.label}</span>
           </li>

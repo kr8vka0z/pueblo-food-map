@@ -77,11 +77,7 @@ afterEach(() => {
 function renderForm(locale: "en" | "es" = "en") {
   return render(
     <LocaleProvider initialLocale={locale}>
-      <ReportForm
-        venueId="garden-rmser"
-        venueName="RMSER Community Garden"
-        venueAddress="330 Lake Ave, Pueblo, CO 81004"
-      />
+      <ReportForm venueId="garden-rmser" />
     </LocaleProvider>,
   );
 }

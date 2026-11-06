@@ -122,6 +122,7 @@ import {
 } from "@/lib/adminVenueEditSql";
 import type { AdminVenueRow } from "@/types/venue";
 import { RECENT_APPLIED_FOR_VENUE_SQL, resetsForEdit, SWITCH_RESET_INSERT_SQL } from "@/lib/sourceSwitch";
+import { FIELD_LIMITS } from "@/lib/fieldLimits";
 
 /** Mirrors readOptionalSubmissionId's convention in the sibling create route. */
 function readOptionalProposalId(body: unknown): number | null {
@@ -129,7 +130,7 @@ function readOptionalProposalId(body: unknown): number | null {
   return typeof raw === "number" && Number.isInteger(raw) && raw > 0 ? raw : null;
 }
 
-const PIN_NOTE_MAX = 500;
+const PIN_NOTE_MAX = FIELD_LIMITS.VENUE_TOLD_US_NOTE;
 
 /**
  * "The venue told us" (Venue Data Rebuild step 1): optional `venueToldUs`

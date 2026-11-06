@@ -35,7 +35,7 @@ import { Phone } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { localizedHref } from "@/lib/localizedHref";
-import { PLACEHOLDER_ADDRESS, type NearbyVenue } from "@/lib/venueSummary";
+import { displayAddress, type NearbyVenue } from "@/lib/venueSummary";
 import { formatMiles } from "@/lib/distance";
 import type { Venue } from "@/types/venue";
 import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
@@ -123,12 +123,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
           >
             {v.name}
           </h1>
-          {/* Same OSM placeholder guard as BottomSheet.tsx/DesktopVenueWindow.tsx's
-              own address lines — never render the literal "Address not in
-              OpenStreetMap" string. */}
-          <p className="mt-1 text-sm text-[var(--color-ink-500)]">
-            {v.address === PLACEHOLDER_ADDRESS ? `${v.lat}, ${v.lng}` : v.address}
-          </p>
+          <p className="mt-1 text-sm text-[var(--color-ink-500)]">{displayAddress(v)}</p>
           {/* Answer-first summary (#704) — the fact people actually search
               for ("[name] hours", "does [store] take EBT"), assembled from
               verified fields only. Includes "Last verified" (decision 6:
@@ -211,7 +206,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
           </section>
         )}
 
-        {/* Phone / Contact — same tel: link pattern as BottomSheet/DesktopVenueWindow */}
+        {/* Phone / Contact — same tel: link pattern as VenueCardBody.tsx */}
         {v.phone && (
           <section aria-label={t("detail.contact", locale)}>
             <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)] mb-2">
@@ -227,7 +222,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
           </section>
         )}
 
-        {/* Notes — same boilerplate guard as BottomSheet/DesktopVenueWindow
+        {/* Notes — same boilerplate guard as VenueCardBody.tsx
             (src/lib/venueNotes.ts); without it Plentiful's auto-generated
             "{name}. in Pueblo, CO. Phone: ..." filler leaked onto this page
             even where the map card already hid it. */}

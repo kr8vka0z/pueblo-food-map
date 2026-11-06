@@ -2,17 +2,17 @@
 
 /**
  * Client-side map/splash-gate body for the homepage — mounted inside the
- * server-rendered shell in page.tsx.
+ * server-rendered shell in HomeShell.tsx (src/components/HomeShell.tsx).
  *
  * Spec: docs/pueblo-food-map-v2-handoff.md §Open question #4
  *
  * Split out of page.tsx (SEO PR1): a Client Component's first render is
  * always empty until effects resolve, so leaving all of this in page.tsx
  * meant crawlers — and the ItemList JSON-LD that used to live in this same
- * component — never got real markup in the server response. page.tsx is now
- * a synchronous Server Component that emits the JSON-LD + a sr-only <h1> +
- * metadata unconditionally, then mounts this component for the interactive
- * body. See page.tsx's header for the full rationale.
+ * component — never got real markup in the server response. HomeShell.tsx is
+ * now a synchronous Server Component that emits the JSON-LD + a sr-only <h1>
+ * unconditionally, then mounts this component for the interactive body. See
+ * HomeShell.tsx's header for the full rationale.
  *
  * localStorage key 'pfm.splash.seen.v2' gates the splash:
  * - Not set → show SplashScreen as a frosted overlay above the live map
@@ -28,11 +28,11 @@
  * ~180 KB of JS hydrates. localStorage and the URL are unknown server-side, so
  * `splashShown` starts null and the layout effect below resolves it. Returning
  * visitors and deep links never see the pending splash: on a full page load,
- * page.tsx's inline SPLASH_GATE_SCRIPT sets a data attribute on <html> before
+ * HomeShell.tsx's inline SPLASH_GATE_SCRIPT sets a data attribute on <html> before
  * it is parsed and globals.css hides it until React unmounts it; on
  * client-side navigation the script doesn't run, but the layout effect
  * resolves the gate before the browser paints. <main>/MapWrapper mount only
- * once resolved. page.tsx's synchronous server output (JSON-LD, sr-only <h1>)
+ * once resolved. HomeShell.tsx's synchronous server output (JSON-LD, sr-only <h1>)
  * renders above this component regardless.
  *
  * #99: showSplashAgain() re-shows the splash overlay WITHOUT clearing

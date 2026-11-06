@@ -138,8 +138,6 @@ const enClient: Record<string, string> = {
   "empty.tryCategoryInstead": "Try a category instead:",
   "empty.showCategoryAria": "Show {label} places",
 
-  // Sponsor credit (#69)
-
   // Operator attribution (#63)
   "operator.operated_by": "Operated by",
 
@@ -162,9 +160,6 @@ const enClient: Record<string, string> = {
   "locationCard.failed.body.unavailable": "Your phone couldn't work out where you are right now.",
   "locationCard.tapPin": "Tap any pin on the map to see hours and directions.",
   "locationCard.retry": "Try again",
-
-  // Wordmark (#61)
-  "wordmark.ariaLabel": "Pueblo Food Map — reset map view",
 
   // Search typeahead (#67)
   "typeahead.matchCount": "{count} places match",

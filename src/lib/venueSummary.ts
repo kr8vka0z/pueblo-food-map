@@ -51,16 +51,17 @@ export const FREE_CATEGORIES: ReadonlySet<Venue["category"]> = new Set([
 
 /**
  * The OSM-import placeholder venue.address stores when OpenStreetMap had no
- * address data. Same literal BottomSheet.tsx and DesktopVenueWindow.tsx
- * already guard against (their own inline `venue.address === "Address not
- * in OpenStreetMap"` checks — no shared exported constant exists yet in
- * this repo to import, so this mirrors their literal rather than inventing
- * a cross-file dependency those two map-card components don't otherwise
- * need). Unlike those two (which fall back to raw lat/lng), a summary
- * sentence drops the address entirely and falls back to the parsed city —
- * "at 38.27, -104.61" reads like a bug in a sentence meant for a human.
+ * address data. The map card and the venue page show coordinates instead
+ * (displayAddress below); a summary sentence drops the address entirely and
+ * falls back to the parsed city — "at 38.27, -104.61" reads like a bug in a
+ * sentence meant for a human.
  */
 export const PLACEHOLDER_ADDRESS = "Address not in OpenStreetMap";
+
+/** The address to show for a venue: OSM's placeholder text is never shown, its coordinates are. */
+export function displayAddress(venue: Venue): string {
+  return venue.address === PLACEHOLDER_ADDRESS ? `${venue.lat}, ${venue.lng}` : venue.address;
+}
 
 // ─── City parsing (title's "{City}, CO", and the no-address sentence) ──────
 

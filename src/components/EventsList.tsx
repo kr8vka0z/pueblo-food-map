@@ -20,7 +20,7 @@ import { formatEventWhen } from "@/lib/eventTime";
 import type { EventListItem } from "@/lib/adminEventReads";
 import type { EventStatus } from "@/lib/adminEventValidation";
 
-export interface EventsListProps {
+interface EventsListProps {
   /** null = the read failed. */
   events: EventListItem[] | null;
 }

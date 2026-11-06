@@ -96,8 +96,8 @@ export interface WalkingRouteGeoJSON {
  * Distance + time text for the walking route.
  * Previously used for a map overlay pill; now consumed by DirectionButtons
  * in-card so the readout is visible on mobile (the overlay was hidden behind
- * the BottomSheet). Kept here as the canonical type; MapWrapper imports it
- * to type its walkingRouteInfo state.
+ * the BottomSheet). Kept here as the canonical type; useWalkingRoute.ts
+ * imports it for its `info` state.
  */
 export interface WalkingRouteInfo {
   distance: string; // e.g. "0.4 mi"
@@ -193,10 +193,10 @@ const COUNTY_BORDER_LAYER: LayerProps = {
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface MapProps {
-  venues: Venue[];
+  /** distanceMiles (from useMapFilters) feeds each marker's aria-label. */
+  venues: Array<Venue & { distanceMiles?: number }>;
   selectedVenueId: string | null;
   userLocation: { lat: number; lng: number } | null;
-  userDistances: Map<string, number>;
   onSelectVenue: (id: string) => void;
   /** Called once after the map loads. Receives the underlying mapboxgl.Map instance. */
   onMapReady?: (map: mapboxgl.Map) => void;
@@ -277,7 +277,6 @@ export default function Map({
   venues,
   selectedVenueId,
   userLocation,
-  userDistances,
   onSelectVenue,
   onMapReady,
   locale = "en",
@@ -531,7 +530,7 @@ export default function Map({
           key={venue.id}
           venue={venue}
           selected={venue.id === selectedVenueId}
-          distanceMiles={userDistances.get(venue.id)}
+          distanceMiles={venue.distanceMiles}
           onSelect={onSelectVenue}
           onHover={handleMarkerHover}
           onLeave={handleMarkerLeave}

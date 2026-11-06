@@ -36,6 +36,16 @@ export function puebloParts(instantMs: number): { y: number; mo: number; d: numb
   return { y: get("year"), mo: get("month"), d: get("day"), h: get("hour"), mi: get("minute") };
 }
 
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** "2026-10-10" from Pueblo wall-clock parts. */
+const dateKeyOf = (p: { y: number; mo: number; d: number }) => `${p.y}-${pad(p.mo)}-${pad(p.d)}`;
+
+/** Pueblo calendar day of an instant as "2026-10-10". */
+export function puebloDateKey(instantMs: number): string {
+  return dateKeyOf(puebloParts(instantMs));
+}
+
 /** Denver's UTC offset in minutes (negative) at an instant. */
 function offsetMinutesAt(instantMs: number): number {
   const p = puebloParts(instantMs);
@@ -98,15 +108,13 @@ export function utcIsoToPuebloOffsetIso(iso: string): string {
   if (!Number.isFinite(ms)) return "";
   const off = offsetMinutesAt(ms);
   const p = puebloParts(ms);
-  const pad = (n: number) => String(n).padStart(2, "0");
   const abs = Math.abs(off);
   // Minute resolution: events are stored at whole minutes (the admin form has no seconds).
-  return `${p.y}-${pad(p.mo)}-${pad(p.d)}T${pad(p.h)}:${pad(p.mi)}:00${off < 0 ? "-" : "+"}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+  return `${dateKeyOf(p)}T${pad(p.h)}:${pad(p.mi)}:00${off < 0 ? "-" : "+"}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
 }
 
 /** "2026-11-21T17:00:00.000Z" -> "2026-11-21T10:00" (Pueblo wall clock, for pre-filling the edit form). */
 export function utcIsoToPuebloLocal(iso: string): string {
   const p = puebloParts(Date.parse(iso));
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${p.y}-${pad(p.mo)}-${pad(p.d)}T${pad(p.h)}:${pad(p.mi)}`;
+  return `${dateKeyOf(p)}T${pad(p.h)}:${pad(p.mi)}`;
 }

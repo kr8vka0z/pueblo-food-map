@@ -119,6 +119,10 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = [], initial
   const filteredVenues = useMemo(() => {
     if (filterEvents) return [];
     const now = new Date();
+    // Each venue's open state, computed once in the filter pass and read back
+    // by the sort comparator (which would otherwise recompute it for both
+    // sides of every comparison, re-parsing the hours each time).
+    const openState = new Map<object, string>();
 
     const afterFilters = venuesWithDistance
       .filter((v) => {
@@ -127,6 +131,7 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = [], initial
         }
         if (filterOpenNow) {
           const status = computeVenueOpenStatus(v, now);
+          openState.set(v, status.state);
           // "no_hours" survives the filter deliberately (board review finding
           // #1): 74 of 107 venues have no hours_weekly data, so treating
           // "unknown" the same as "closed" hid 25 of 35 food pantries behind
@@ -151,8 +156,8 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = [], initial
         // MapWrapper when geolocation is unavailable — never NaN/undefined),
         // so no special-casing is needed for a missing-distance case.
         if (filterOpenNow) {
-          const aOpen = computeVenueOpenStatus(a, now).state === "open";
-          const bOpen = computeVenueOpenStatus(b, now).state === "open";
+          const aOpen = openState.get(a) === "open";
+          const bOpen = openState.get(b) === "open";
           if (aOpen !== bOpen) return aOpen ? -1 : 1;
         }
         return a.distanceMiles - b.distanceMiles;

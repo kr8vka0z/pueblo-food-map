@@ -22,7 +22,7 @@ import { categoryColors } from "@/lib/categories";
 import { formatMiles } from "@/lib/distance";
 import { computeVenueOpenStatus, nextIrregularOccurrence, formatIrregularOccurrence } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
-import { PLACEHOLDER_ADDRESS } from "@/lib/venueSummary";
+import { displayAddress } from "@/lib/venueSummary";
 import { t, type Locale } from "@/lib/i18n";
 import { safeUrl } from "@/lib/safeUrl";
 import { HIDDEN_UNTIL_FOCUS, PRESS_FEEDBACK } from "@/lib/interactionStyles";
@@ -34,11 +34,6 @@ import ShareButton from "@/components/ShareButton";
 import HoursList from "@/components/HoursList";
 import DirectionButtons from "@/components/DirectionButtons";
 import EventHereLine, { type EventHere } from "@/components/EventHereLine";
-
-/** The address to show for a venue: OSM's placeholder text is never shown, its coordinates are. */
-export function displayAddress(venue: Venue): string {
-  return venue.address === PLACEHOLDER_ADDRESS ? `${venue.lat}, ${venue.lng}` : venue.address;
-}
 
 interface VenueCardBodyProps {
   venue: Venue & { distanceMiles?: number };

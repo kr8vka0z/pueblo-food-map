@@ -6,7 +6,7 @@
  * Walk: triggers the in-app Mapbox Directions walking route (onWalk callback).
  *   The parent (MapWrapper) owns the fetch and state; this component just fires
  *   the callback and optionally shows an active/clear state.
- *   When a route is active, shows a collapsible turn-by-turn step list (walkSteps prop)
+ *   When a route is active, shows a step-through turn-by-turn WalkStepper (walkSteps prop)
  *   and a secondary "Open in Google Maps" text link for users who want native GPS (#134).
  *   When Walk is tapped with no shared location, MapWrapper requests geolocation
  *   instead of drawing a route from downtown; if that's denied/unavailable it sets
@@ -72,8 +72,8 @@ export interface RouteInfo {
 
 /**
  * A single turn-by-turn step. Instruction text is pre-localized by Mapbox.
- * Re-exported here so callers (BottomSheet, DesktopVenueWindow) can import
- * from a single component file without reaching into Map.tsx.
+ * Re-exported here so RouteStrip can import it from a single component file
+ * without reaching into Map.tsx.
  */
 export type { WalkStep } from "@/components/Map";
 // WHY re-export from Map.tsx: Map.tsx is the canonical home of the type
@@ -118,12 +118,6 @@ interface DirectionButtonsProps {
   onStepChange?: (index: number) => void;
 }
 
-// ─── Google Maps deeplink builder ────────────────────────────────────────────
-
-// The builder moved to src/lib/googleMapsUrl.ts (#762) so the server-rendered
-// event page can call it; re-exported so every existing import still works.
-export { googleMapsUrl };
-
 // ─── Per-step distance formatter ─────────────────────────────────────────────
 
 // WHY feet below 160 m (≈528 ft / 0.1 mi): showing "0.0 mi" for a 50-meter
@@ -146,33 +140,27 @@ function formatStepDistance(meters: number, locale: Locale): string {
 // ─── Step list (extracted, #531) ──────────────────────────────────────────────
 //
 // The `<ol>` of turn-by-turn steps only — no toggle, no "Clear route"/"Open in
-// Google Maps" links. Pulled out of WalkRouteStatus below (which still owns
-// those, wrapping this list behind its own Show/Hide steps disclosure) so
-// RouteStrip.tsx's "Steps" sheet (#531 — the strip's own way into the same
-// list, two taps away otherwise) can render the identical markup instead of
-// forking a second copy that could drift from this one (distance thresholds,
-// per-step layout, i18n keys).
-export interface WalkStepsListProps {
+// Google Maps" links: the <ol> WalkStepper's "All turns" disclosure renders.
+interface WalkStepsListProps {
   steps: Array<{ instruction: string; distance: number }>;
   locale: Locale;
-  /** Forwarded to the `<ol>` — lets a disclosure trigger elsewhere point `aria-controls` at it. Omit when nothing needs to reference it (RouteStrip's sheet doesn't). */
+  /** Forwarded to the `<ol>` — lets the "All turns" trigger point `aria-controls` at it. */
   id?: string;
-  /** WalkRouteStatus hides (not unmounts) the list while its toggle is collapsed, so screen readers skip it (`hidden`, not CSS display:none). RouteStrip's sheet never needs this — its own conditional mount already covers the same requirement. */
+  /** WalkStepper hides (not unmounts) the list while "All turns" is collapsed, so screen readers skip it (`hidden`, not CSS display:none). */
   hidden?: boolean;
-  /** Caller-owned layout classes (spacing, max-height/scroll, text size) — this component supplies no default so the two callers can size it differently (WalkRouteStatus scrolls inside a fixed-height card; RouteStrip's sheet scrolls inside its own panel). */
+  /** Caller-owned layout classes (spacing, max-height/scroll, text size) — this component supplies no default. */
   className?: string;
   /**
    * #555: when provided, each row becomes a button that calls this with its
    * index — WalkStepper's "All turns" disclosure uses this to let someone
-   * jump straight to an arbitrary turn. Omit (both pre-#555 callers do,
-   * unchanged) to keep the plain, non-interactive list exactly as it was.
+   * jump straight to an arbitrary turn. Omit to keep a plain, non-interactive list.
    */
   onSelectStep?: (index: number) => void;
   /** #555: highlights the row matching this index. Only meaningful alongside `onSelectStep`. */
   activeIndex?: number;
 }
 
-export function WalkStepsList({ steps, locale, id, hidden, className, onSelectStep, activeIndex }: WalkStepsListProps) {
+function WalkStepsList({ steps, locale, id, hidden, className, onSelectStep, activeIndex }: WalkStepsListProps) {
   return (
     <ol
       id={id}
@@ -438,9 +426,7 @@ export function WalkStepper({
 // own `aria-describedby` must point at the same id this component puts on
 // the hint `<p>`, and a trigger rendered by the CALLER (this component's own
 // Walk button, or BoxCardBody's address button) can't reach an id minted
-// inside a child it hasn't rendered yet. `stepsListId` has no such
-// cross-component wiring need — nothing outside this component ever
-// references it — so it stays internal via useId(), same as before extraction.
+// inside a child it hasn't rendered yet.
 export interface WalkRouteStatusProps {
   /** Only id/name/lat/lng are read — a box (PublicBlessingBox extends Venue) or an ordinary Venue both satisfy this with no conversion. */
   venue: Pick<Venue, "id" | "name" | "lat" | "lng">;
@@ -671,8 +657,7 @@ export default function DirectionButtons({
 }: DirectionButtonsProps) {
   // Per-instance id for the "share your location" hint (#207) — aria-describedby
   // target on the Walk button below, shared with WalkRouteStatus's own <p id>
-  // (see that component's own header for why this one stays a prop instead of
-  // being generated internally like stepsListId).
+  // (see that component's own header for why this one is a prop).
   const locationHintId = useId();
 
   const busUrl = googleMapsUrl(venue.lat, venue.lng, "transit");

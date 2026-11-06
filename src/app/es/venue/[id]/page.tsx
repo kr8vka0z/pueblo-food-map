@@ -11,26 +11,18 @@
  * own comment for why that tradeoff is accepted. scripts/check-pages-serve.sh
  * checks this route too (AGENTS.md "Discoverability / SEO traps").
  *
- * VenueContent is the SAME client component the EN page mounts, already
- * reading useLocale() (#289) — under this tree's locked provider it renders
- * Spanish body copy with no changes needed here. JSON-LD (venue +
- * breadcrumb) is built with locale: "es" so it matches (#689 supersedes
- * #386's "always English" rule).
+ * The metadata and body come from src/lib/venuePageData.tsx, shared with
+ * the EN page: VenueContent is the SAME client component, already reading
+ * useLocale() (#289) — under this tree's locked provider it renders Spanish
+ * body copy. JSON-LD (venue + breadcrumb) is built with locale: "es" so it
+ * matches (#689 supersedes #386's "always English" rule).
  */
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { buildPageMetadata } from "@/lib/site";
-import {
-  getVenueById,
-  buildVenueJsonLd,
-  buildVenueBreadcrumbJsonLd,
-  venuePageMetadataFields,
-  serializeJsonLd,
-} from "@/lib/venueSchema";
-import { nearbyVenues, buildVenueSummaries } from "@/lib/venueSummary";
+import { getVenueById } from "@/lib/venueSchema";
+import { venuePageMetadata, VenuePageBody } from "@/lib/venuePageData";
 import { venues } from "@/data/venues";
-import VenueContent from "@/components/VenueContent";
 
 export const dynamicParams = false;
 
@@ -43,14 +35,7 @@ export async function generateMetadata({
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
-  const { id } = await params;
-  const v = getVenueById(id);
-  if (!v) return {};
-  return buildPageMetadata({
-    ...venuePageMetadataFields(v, "es"),
-    locale: "es",
-    mirrored: true,
-  });
+  return venuePageMetadata((await params).id, "es");
 }
 
 export default async function EsVenuePage({
@@ -61,22 +46,5 @@ export default async function EsVenuePage({
   const { id } = await params;
   const v = getVenueById(id);
   if (!v) notFound();
-
-  return (
-    <>
-      {/* Venue-specific JSON-LD structured data — matches the URL's language (#689) */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildVenueJsonLd(v, "es")) }}
-      />
-      {/* BreadcrumbList — mirrors VenueContent's visible breadcrumb */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: serializeJsonLd(buildVenueBreadcrumbJsonLd(v, "es")),
-        }}
-      />
-      <VenueContent venue={v} nearby={nearbyVenues(v, venues)} summary={buildVenueSummaries(v)} />
-    </>
-  );
+  return <VenuePageBody venue={v} locale="es" />;
 }

@@ -22,7 +22,7 @@
  * renders them) but only inside the FULL card — from the strip, reaching
  * them was "Show card" then "Show steps", two taps. "Steps" here opens them
  * directly as a sheet over the map, reusing DirectionButtons.tsx's own
- * `WalkStepsList` (same `<ol>` markup, not a second copy — see that
+ * `WalkStepper` (same markup as the card, not a second copy — see that
  * component's own header). Built as a native `<dialog>` + `showModal()`,
  * the same primitive PhotoViewer.tsx (#508) already established for this
  * repo's one other ad-hoc overlay — see that file's own header for why

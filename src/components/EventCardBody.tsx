@@ -59,7 +59,7 @@
  * places open now"). Directions never link in a preview: there is no pin yet.
  * Default rendering (preview off) is unchanged.
  *
- * Directions reuse DirectionButtons' googleMapsUrl (one URL builder, no travel
+ * Directions reuse src/lib/googleMapsUrl.ts (one URL builder, no travel
  * mode so the visitor picks); distance reuses haversineMiles/formatMiles.
  * Orange + navy on the button is the same owner approval as the event pin
  * (DESIGN.md) and clears contrast (7.8:1).
@@ -83,14 +83,14 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
-import { googleMapsUrl } from "@/components/DirectionButtons";
+import { googleMapsUrl } from "@/lib/googleMapsUrl";
 import { formatMiles, haversineMiles } from "@/lib/distance";
 import { EVENT_LINK_LABELS, type EventLinkLabel } from "@/lib/adminEventValidation";
 import { eventAction, eventBadge, eventText, eventWhen, localizeEvent } from "@/lib/eventCard";
 import { downloadEventCalendar } from "@/lib/eventCalendar";
 import EventFlyer from "@/components/EventFlyer";
 import type { PublicEventDetail } from "@/lib/events";
-import { HIDDEN_UNTIL_FOCUS, PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { eventSecondaryButton, HIDDEN_UNTIL_FOCUS, PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { eventShareUrl, shareLink } from "@/lib/share";
 import { useMinuteClock } from "@/lib/useMinuteClock";
 
@@ -119,12 +119,7 @@ export interface EventCardBodyProps {
   preview?: boolean;
 }
 
-const SECONDARY_BUTTON =
-  "inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-[var(--radius-md)] " +
-  "border border-[var(--color-bone-300)] bg-[var(--color-bone-50)] px-3 text-sm font-semibold " +
-  "text-[var(--color-ink-700)] transition-colors hover:bg-[var(--color-bone-100)] touch-manipulation " +
-  PRESS_FEEDBACK +
-  " focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
+const SECONDARY_BUTTON = eventSecondaryButton("flex-1");
 
 const SECTION_HEADING = "mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]";
 
@@ -241,11 +236,6 @@ export default function EventCardBody({
       setCopied(false);
       copiedTimer.current = null;
     }, 2000);
-  }
-
-  // ── Add to calendar ────────────────────────────────────────────────────────
-  function handleCalendar() {
-    downloadEventCalendar(event, locale);
   }
 
   // ── Pieces ─────────────────────────────────────────────────────────────────
@@ -492,7 +482,7 @@ export default function EventCardBody({
           {copied ? <Check size={16} aria-hidden /> : <Share2 size={16} aria-hidden />}
           {copied ? t("events.card.shareCopied", locale) : t("events.card.share", locale)}
         </button>
-        <button type="button" onClick={handleCalendar} className={SECONDARY_BUTTON}>
+        <button type="button" onClick={() => downloadEventCalendar(event, locale)} className={SECONDARY_BUTTON}>
           <CalendarPlus size={16} aria-hidden />
           {t("events.card.calendar", locale)}
         </button>

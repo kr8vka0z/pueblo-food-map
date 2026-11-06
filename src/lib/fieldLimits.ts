@@ -65,4 +65,8 @@ export const FIELD_LIMITS = {
   // The event card's own button wording (#882, "Custom"): it sits on one line
   // of a full-width button at 360px, so a few words at most.
   EVENT_LINK_LABEL: 25,
+
+  // Admin venue edit: the "Who told us, and how" note kept with a
+  // venue_direct pin (the PATCH route's 422 and the form's maxlength).
+  VENUE_TOLD_US_NOTE: 500,
 } as const;

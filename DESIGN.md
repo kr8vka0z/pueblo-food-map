@@ -361,7 +361,7 @@ Two fonts with clearly delineated roles, both self-hosted as variable woff2 file
 
 `ui-monospace` appears only in distance readouts where coordinates fall back to raw lat/lng — a single context where fixed-width numerals prevent layout jitter.
 
-The wordmark uses the `.wordmark` CSS utility class: Fraunces + 0.04em letter-spacing. In splash display mode it scales from `text-4xl` (375px mobile) to `text-6xl` (768px+ desktop). In map-reset button mode it drops to `text-sm / text-base` inside a frosted white pill.
+The wordmark uses the `.wordmark` CSS utility class: Fraunces + 0.04em letter-spacing. On the splash it scales from `text-4xl` (375px mobile) to `text-6xl` (768px+ desktop).
 
 Section headers in detail cards (hours, contact, about) are 10–11px uppercase with wider tracking, in `ink-400` — a govtech convention that organizes dense data without adding visual weight.
 

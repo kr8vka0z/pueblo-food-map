@@ -15,12 +15,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatEventWhen } from "@/lib/eventTime";
 import type { PendingEventSubmission } from "@/lib/eventSubmissions";
+import { ADMIN_PRIMARY_BUTTON } from "@/components/formClasses";
 
-const primary =
-  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] px-4 " +
-  "text-base font-semibold text-[var(--color-bone-50)] transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-60 disabled:cursor-not-allowed";
 const secondary =
   "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-4 " +
   "text-sm font-medium text-[var(--color-ink-700)] transition-colors duration-150 hover:bg-[var(--color-bone-100)] " +
@@ -112,7 +108,7 @@ function SubmissionCard({ item }: { item: PendingEventSubmission }) {
       )}
       <div className="mt-3 flex flex-wrap gap-3">
         {p && (
-          <button type="button" disabled={busy} onClick={() => void act("convert")} className={primary}>
+          <button type="button" disabled={busy} onClick={() => void act("convert")} className={ADMIN_PRIMARY_BUTTON}>
             Make it a draft event
           </button>
         )}

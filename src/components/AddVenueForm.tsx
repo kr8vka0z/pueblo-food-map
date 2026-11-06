@@ -9,11 +9,9 @@
  * here — the Better Auth gate (getAdminDb()) lives in the parent Server Component
  * (src/app/(site)/admin/venues/new/page.tsx or .../[id]/edit/page.tsx, same
  * pattern as AGENTS.md "Admin authentication"). This mirrors SuggestForm.tsx's
- * own form/route split; this component imitates SuggestForm's
- * input/label/error token classes (bone borders, sage focus rings) directly
- * rather than importing them — no shared form-component library exists
- * between the public and admin surfaces, so each form owns its own copy,
- * same as SuggestForm already does.
+ * own form/route split. Its input/label/error token classes (bone borders,
+ * sage focus rings) come from formClasses.ts, shared with the other admin
+ * forms; the public forms keep their own copies.
  *
  * ONE component serves both modes (#255 explicitly asked for this, not a
  * forked near-identical form) — create and edit submit the identical field
@@ -74,6 +72,7 @@ import { categoryLabels } from "@/lib/categories";
 import StaticLocationMap from "@/components/StaticLocationMap";
 import { DISPLAY_DAY_KEYS, type DayKey } from "@/lib/hours";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
+import { errorClass, inputBase, inputBorder, labelClass } from "@/components/formClasses";
 import { EMAIL_RE } from "@/lib/email";
 import type { IrregularSchedule, VenueCategory, WeeklyHours } from "@/types/venue";
 
@@ -621,18 +620,6 @@ export default function AddVenueForm({
     }
   }
 
-  // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
-  const inputBase =
-    "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
-    // #534: --color-ink-300 undefined — DESIGN.md documents ink-400 as the
-    // placeholder-text token.
-    "bg-white placeholder:text-[var(--color-ink-400)] " +
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-    "focus-visible:border-[var(--color-sage-500)]";
-  const inputBorder = (hasError: boolean) =>
-    hasError ? "border-[var(--color-danger)]" : "border-[var(--color-bone-300)]";
-  const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
-  const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
   // Secondary (bordered, sage-text) action — visually lower weight than the
   // primary sage-filled submit button below, but still sage per DESIGN.md
   // ("use sage for every interactive affordance"), not the ink-toned
@@ -1356,7 +1343,7 @@ export default function AddVenueForm({
                 type="text"
                 id="venue-told-us-note"
                 value={venueToldUsNote}
-                maxLength={500}
+                maxLength={FIELD_LIMITS.VENUE_TOLD_US_NOTE}
                 onChange={(e) => setVenueToldUsNote(e.target.value)}
                 placeholder="e.g. Heather, admin assistant, by email"
                 className={`${inputBase} ${inputBorder(false)}`}

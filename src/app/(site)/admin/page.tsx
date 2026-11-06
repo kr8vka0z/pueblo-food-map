@@ -85,6 +85,8 @@ import DashboardNeedsStrip, { type NeedsCardData } from "@/components/DashboardN
 import KpiCard from "@/components/KpiCard";
 import BarList from "@/components/BarList";
 import DailyBars from "@/components/DailyBars";
+// The Worker runs in UTC; refresh dates are shown as Pueblo calendar days.
+import { TIME_ZONE } from "@/lib/eventTime";
 
 const DEFAULT_PERIOD: DashboardPeriod = "30d";
 const PERIOD_LABELS: Record<DashboardPeriod, string> = { "7d": "7 days", "30d": "30 days", "90d": "90 days" };
@@ -563,7 +565,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <p className="mt-3 text-sm text-[var(--color-ink-500)]">
             {latestRefresh ? (
               <>
-                Last data refresh {new Date(latestRefresh.createdAt).toLocaleDateString()} — {latestRefresh.suggestedCount} suggested changes.{" "}
+                Last data refresh {new Date(latestRefresh.createdAt).toLocaleDateString("en-US", { timeZone: TIME_ZONE })} — {latestRefresh.suggestedCount} suggested changes.{" "}
                 <Link href="/admin/places?show=review" className="font-medium text-[var(--color-sage-700)] underline underline-offset-2">
                   Review →
                 </Link>

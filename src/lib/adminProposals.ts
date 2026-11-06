@@ -115,6 +115,14 @@ export function parseProposalRow(row: ChangeProposalRow): ParsedProposal {
 const DATE_ONLY_BULK_SOURCES: ReadonlySet<string> = new Set(["osm", "plentiful", "care_and_share", "website"]);
 
 /**
+ * Most ids POST /api/admin/proposals/approve-date-only takes per request.
+ * The route enforces it; ToReviewSummaryBox sends at most this many, so
+ * with more date-only updates waiting one click approves the first batch
+ * and the rest stay for the next click (#894 item 9).
+ */
+export const BULK_APPROVE_MAX_IDS = 200;
+
+/**
  * True for exactly the shape the first production pipeline run mostly
  * produced (89 of 107 proposals): "still there, nothing else changed." Used
  * by BOTH the client (ToReviewSummaryBox, to compute which currently-

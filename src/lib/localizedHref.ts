@@ -11,9 +11,9 @@
  * LocaleContext's `tree` field) is fixed by the ROUTE the page was served
  * from — it can never change client-side, unlike `locale`.
  *
- * Only MIRRORED paths (#689 scope table: /, /venues, /venue/<id>,
- * /resources, /about, plus the #709 hubs /food-pantries, /snap-wic-stores,
- * /community-gardens) get rewritten. A path with no /es counterpart
+ * Only paths in MIRRORED_STATIC below plus /venue/* get rewritten (keep that
+ * set in step with `ls src/app/es`; /event/<id> has an /es twin but no
+ * caller links to it through here). A path with no /es counterpart
  * (/suggest, /privacy, /feedback, /boxes/activity, ...) is returned
  * unchanged even when `tree` is "es" — those pages deliberately stay
  * single-URL (issue #689 "Out" scope), so a link to them from an /es page

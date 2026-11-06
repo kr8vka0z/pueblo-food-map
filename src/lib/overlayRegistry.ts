@@ -37,7 +37,7 @@
  *     then a bubble-phase `document` keydown listener that calls its
  *     `onEscape` ONLY while this instance is topmost. Covers every overlay
  *     that owns a plain `document.addEventListener` Escape handler
- *     (FilterPanel, HamburgerMenu, DesktopVenueWindow). BottomSheet.tsx is
+ *     (FilterPanel, HamburgerMenu, DesktopSidePanel, LocationHelpCard). BottomSheet.tsx is
  *     the one exception — vaul/Radix routes Escape through `Drawer.Content`'s
  *     own `onEscapeKeyDown` prop, not a listener this file could intercept
  *     (see dialogGuard.ts's header for why), so it calls

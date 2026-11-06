@@ -1,7 +1,7 @@
 /**
  * DailyBars — "Visitors per day" bar chart, plain SVG (#680's own "no chart
  * library" instruction). Must stay legible with up to 90 bars (the 90-day
- * period) on a ~360px phone screen (AGENTS.md "low/mid-end mobile first")
+ * period) on a ~360px phone screen (DESIGN.md "Viewport")
  * — a fixed `viewBox` scales every bar to fit rather than growing the
  * chart's real pixel width, and there's no per-bar text/animation to
  * clutter that many columns.

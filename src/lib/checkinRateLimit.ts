@@ -62,7 +62,7 @@
  * concerns (bot verification vs. write-frequency capping) with no reason
  * to share a rotation lifecycle. Set as its own runtime secret the same
  * way as RESEND_API_KEY/TURNSTILE_SECRET_KEY (see .env.example and
- * AGENTS.md's Secrets table).
+ * docs/agents/secrets.md).
  *
  * Atomicity: one `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` statement
  * per check — this is the load-bearing part. A read-then-write ("SELECT the

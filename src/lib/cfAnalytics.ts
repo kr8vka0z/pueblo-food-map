@@ -77,7 +77,7 @@ export interface VisitorsAnalytics {
   phoneSharePct: number | null;
   /** Mobile p75 LCP in ms this period ("about" — RUM is sampled) — null when Cloudflare has too few samples, or the vitals call itself failed. */
   phoneLcpMs: number | null;
-  /** This period only, oldest first, one point per day that had at least one visit. */
+  /** This period only, oldest first, one point per day Cloudflare returned any row for (a day of only same-site navigations is a 0 point). */
   dailyVisitors: DailyVisitorsPoint[];
   /** This period only, visits desc. */
   referrers: ReferrerGroup[];

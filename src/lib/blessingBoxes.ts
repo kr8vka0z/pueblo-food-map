@@ -197,10 +197,7 @@ const STATUS_SETTING_KIND: Readonly<Record<string, BoxStatus>> = {
  *   1. `outOfService` (an admin pause or confirmed damage) wins over every
  *      check-in, however recent — the diagram's own annotation: "An admin
  *      pause or confirmed damage sends ANY status to Out of service."
- *      Slice 2 has no admin UI that can set this true yet (that's slice 3's
- *      box_events "paused" lifecycle action) — callers pass `false` today;
- *      the branch exists so slice 3 only has to supply the input, not
- *      redo this function.
+ *      Callers derive it from `removed_on` (see mapRowToPublicBox).
  *   2. Otherwise, find the most recent VISIBLE check-in whose kind sets a
  *      status (filled/low/empty — never 'took' or 'problem', see
  *      STATUS_SETTING_KIND above). A hidden row is skipped even if it's

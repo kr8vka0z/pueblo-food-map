@@ -32,7 +32,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { isDateOnlyUpdateProposal } from "@/lib/adminProposals";
+import { BULK_APPROVE_MAX_IDS, isDateOnlyUpdateProposal } from "@/lib/adminProposals";
 import type { ParsedProposal } from "@/lib/adminProposals";
 import { primaryButtonClass } from "@/lib/adminCardStyles";
 
@@ -59,16 +59,23 @@ export default function ToReviewSummaryBox({ reviewRowCount, proposals, submissi
   const router = useRouter();
   const [bulkState, setBulkState] = useState<BulkApproveState>({ status: "idle" });
 
+  // Capped at the route's per-request limit: past it the route refuses the
+  // whole request, so the button approves the first batch and the rest wait.
   const dateOnlyIds = useMemo(
-    () => proposals.filter((p) => !p.parseError && isDateOnlyUpdateProposal(p.row, p.diff)).map((p) => p.row.id),
+    () =>
+      proposals
+        .filter((p) => !p.parseError && isDateOnlyUpdateProposal(p.row, p.diff))
+        .map((p) => p.row.id)
+        .slice(0, BULK_APPROVE_MAX_IDS),
     [proposals],
   );
+  const allOrCount = dateOnlyIds.length < BULK_APPROVE_MAX_IDS ? `all ${dateOnlyIds.length}` : String(BULK_APPROVE_MAX_IDS);
 
   if (reviewRowCount === 0) return null;
 
   async function handleBulkApprove(ids: number[]) {
     const confirmed = window.confirm(
-      `Approve all ${ids.length} proposals that only update the last-verified date? Real changes are not included.`,
+      `Approve ${allOrCount} proposals that only update the last-verified date? Real changes are not included.`,
     );
     if (!confirmed) return;
     setBulkState({ status: "submitting" });
@@ -122,7 +129,7 @@ export default function ToReviewSummaryBox({ reviewRowCount, proposals, submissi
             disabled={bulkState.status === "submitting"}
             className={primaryButtonClass}
           >
-            {bulkState.status === "submitting" ? "Approving…" : `Approve all ${dateOnlyIds.length} date-only updates`}
+            {bulkState.status === "submitting" ? "Approving…" : `Approve ${allOrCount} date-only updates`}
           </button>
         )}
       </div>

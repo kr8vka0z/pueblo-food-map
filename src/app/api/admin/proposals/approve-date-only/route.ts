@@ -47,7 +47,7 @@
  * **D1's 100-bound-parameter ceiling (#397)** means the pre-validation
  * `SELECT * FROM change_proposals WHERE id IN (...)` can't bind more than
  * 100 ids in one statement — src/lib/d1.ts's chunkArray()/D1_MAX_BOUND_PARAMS
- * split the request's id list into ≤100-id chunks. The per-request cap below (200) is comfortably above what a
+ * split the request's id list into ≤100-id chunks. The per-request cap (BULK_APPROVE_MAX_IDS, 200) is comfortably above what a
  * single admin's filtered "date-only" queue is ever likely to hold in one
  * sitting, but still finite — an unbounded `ids` array would otherwise let
  * one request bind an arbitrarily large batch of small per-proposal
@@ -57,11 +57,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminWriteAccess } from "@/lib/adminAuthErrors";
 import { positiveInt } from "@/lib/positiveInt";
-import { applyApprovedProposal, isDateOnlyUpdateProposal, parseProposalRow, type ChangeProposalRow } from "@/lib/adminProposals";
+import {
+  BULK_APPROVE_MAX_IDS,
+  applyApprovedProposal,
+  isDateOnlyUpdateProposal,
+  parseProposalRow,
+  type ChangeProposalRow,
+} from "@/lib/adminProposals";
 import { D1_MAX_BOUND_PARAMS, chunkArray } from "@/lib/d1";
-
-/** Cap chosen well above any real review queue's date-only subset (the first production run's whole queue was 107 proposals total) while still bounding one request's worth of sequential db.batch() calls. */
-const MAX_IDS_PER_REQUEST = 200;
 
 /** `null` on any shape the client should never legitimately send — missing/non-array `ids`, an empty array, or a non-positive-integer entry — collapsed to one 400, distinct from a request that's shaped correctly but simply too long (checked separately by the caller so that case gets its own, more specific handling). */
 function extractRequestedIds(body: unknown): number[] | null {
@@ -109,7 +112,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (requestedIds === null) {
     return NextResponse.json({ ok: false, error: "invalid_body" }, { status: 400 });
   }
-  if (requestedIds.length > MAX_IDS_PER_REQUEST) {
+  if (requestedIds.length > BULK_APPROVE_MAX_IDS) {
     return NextResponse.json({ ok: false, error: "too_many_ids" }, { status: 400 });
   }
 

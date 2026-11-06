@@ -133,6 +133,7 @@ unfamiliar reader doesn't mistake them for part of the flow above:
 | `auth-cli.config.ts` | CLI-only Better Auth config for `@better-auth/cli generate`/`migrate` — never imported by the app |
 | `check-banned.mjs` | Banned-string lint (old font names, retired Tailwind palettes) — wired into `npm run lint` |
 | `check-pages-serve.sh` | `vite build`, serves the Worker in local workerd, and requests real venue/report pages (200 with the venue name) and unknown ids (404) — `ci.yml` runs it so a `next` / vinext / vite bump that breaks them fails its PR |
+| `smoke.sh` | Post-deploy smoke test of a deployed Worker origin (200s, `/es` bodies, 404s, noindex policy) — run by `deploy-prod.yml` and `deploy-dev.yml` |
 | `check-design-drift.mjs` | Token parity check between `globals.css` and `DESIGN.md` — `npm run design:drift`, a blocking CI gate |
 
 ## Not built: GTFS transit data

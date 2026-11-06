@@ -44,13 +44,7 @@ export async function GET(
   const { id, file } = await params;
   if (!FLYER_EVENT_ID_RE.test(id) || !FLYER_FILE_RE.test(file)) return notFound();
 
-  let db: D1Database;
-  let bucket: R2Bucket;
-  try {
-    ({ env: { ADMIN_DB: db, EVENT_FLYERS: bucket } } = getCloudflareContext());
-  } catch {
-    return notFound(); // no live Worker context: degrade like "not found", never a 500 for an image
-  }
+  const { env: { ADMIN_DB: db, EVENT_FLYERS: bucket } } = getCloudflareContext();
 
   const key = `${id}/${file}`;
   let row: { flyer_key: string | null; status: string } | null;

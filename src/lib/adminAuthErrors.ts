@@ -15,7 +15,7 @@
  * on pages, 403 on route handlers.
  *
  * WHY one shared function per surface instead of duplicating this branch
- * into every call site: five admin pages and seven /api/admin/* route
+ * into every call site: the admin pages and the /api/admin/* route
  * handlers would otherwise each carry their own copy of this if/else — a
  * single change point means the redirect-vs-403 rule can never drift
  * between call sites (the same reason getAdminDb() itself is a single choke
@@ -25,6 +25,7 @@
 import { redirect, forbidden } from "next/navigation";
 import { NextResponse } from "next/server";
 import { AccessDeniedError } from "./adminOrigin";
+import { authorizeAdminWrite, getAdminDb, type AdminDbAccess } from "./adminDb";
 import { logAdminAuthFailure } from "./logger";
 
 /**
@@ -59,4 +60,27 @@ export function adminAuthErrorResponse(err: unknown): Response {
     return new Response("Forbidden", { status: 403 });
   }
   throw err;
+}
+
+/**
+ * Route handler gate for writes: authorizeAdminWrite() (session, then
+ * Origin), with a denial turned into its response by adminAuthErrorResponse().
+ * Callers: `const access = await adminWriteAccess(req); if (access instanceof
+ * Response) return access;`
+ */
+export async function adminWriteAccess(req: Request): Promise<AdminDbAccess | Response> {
+  try {
+    return await authorizeAdminWrite(req.headers);
+  } catch (err) {
+    return adminAuthErrorResponse(err);
+  }
+}
+
+/** Same as adminWriteAccess() for GET handlers: getAdminDb() only, no Origin check. */
+export async function adminReadAccess(req: Request): Promise<AdminDbAccess | Response> {
+  try {
+    return await getAdminDb(req.headers);
+  } catch (err) {
+    return adminAuthErrorResponse(err);
+  }
 }

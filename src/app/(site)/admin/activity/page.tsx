@@ -15,13 +15,12 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
-import { loadAdminNavCounts, type AdminNavCounts } from "@/lib/adminNavCounts";
+import { loadAdminNavCounts } from "@/lib/adminNavCounts";
 import {
   buildActivityDays,
   loadActivityPage,
   loadActivityPeople,
   parseActivityFilters,
-  type ActivityDay,
   type ActivityFilters,
 } from "@/lib/activityLog";
 import AdminNav from "@/components/AdminNav";
@@ -43,44 +42,23 @@ export default async function ActivityPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 } = {}) {
-  let email: string;
-  let isOwner = false;
-  let db: D1Database;
-  let navCounts: AdminNavCounts;
-
-  try {
-    const access = await getAdminDb(await headers());
-    email = access.identity.email;
-    isOwner = access.identity.isOwner === true;
-    db = access.db;
-  } catch (err) {
-    handlePageAuthError(err);
-  }
+  const { db, identity } = await getAdminDb(await headers()).catch(handlePageAuthError);
 
   // Owner gate — checked before a single activity row is read.
-  if (!isOwner) notFound();
+  if (identity.isOwner !== true) notFound();
 
   const filters = parseActivityFilters(searchParams ? await searchParams : {});
-  let days: ActivityDay[];
-  let people: string[];
-  let nextUntil: string | null;
-  try {
-    const [page, loadedPeople, counts] = await Promise.all([
-      loadActivityPage(db, filters),
-      loadActivityPeople(db),
-      loadAdminNavCounts(db),
-    ]);
-    days = buildActivityDays(page);
-    people = loadedPeople;
-    nextUntil = page.nextUntil;
-    navCounts = counts;
-  } catch (err) {
-    handlePageAuthError(err);
-  }
+  const [page, people, navCounts] = await Promise.all([
+    loadActivityPage(db, filters),
+    loadActivityPeople(db),
+    loadAdminNavCounts(db),
+  ]);
+  const days = buildActivityDays(page);
+  const nextUntil = page.nextUntil;
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="activity" counts={navCounts} showActivity />
+      <AdminNav email={identity.email} active="activity" counts={navCounts} showActivity />
       <div className="px-4 py-6 sm:px-6">
         <h2 className="wordmark mx-auto mb-4 max-w-3xl text-lg text-[var(--color-ink-900)]">Activity</h2>
         <ActivityLog

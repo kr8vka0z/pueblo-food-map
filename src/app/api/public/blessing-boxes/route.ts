@@ -22,29 +22,19 @@
  */
 
 import { NextRequest } from "next/server";
-import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { loadLiveBoxes, type PublicBlessingBox } from "@/lib/blessingBoxes";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
-import { respondWithEdgeCache, type BestEffortResult } from "@/lib/edgeCache";
+import { bestEffort, respondWithEdgeCache } from "@/lib/edgeCache";
 
 export const dynamic = "force-dynamic";
 
-async function loadBoxesBestEffort(): Promise<BestEffortResult<{ boxes: PublicBlessingBox[] }>> {
-  try {
-    const { env } = getCloudflareContext();
-    const boxes = await loadLiveBoxes(env.ADMIN_DB);
-    return { data: { boxes }, degraded: false };
-  } catch (err) {
-    // Best-effort, never blocking (same convention as public_submissions'
-    // insert path, src/lib/publicSubmissions.ts): a D1 blip degrades the
-    // live layer to "no boxes this request" rather than 500ing the map —
-    // but `degraded: true` tells respondWithEdgeCache() to never cache
-    // this fallback (see edgeCache.ts's own header).
-    logBlessingBoxesReadFailure(err instanceof Error ? err.message : "unknown error");
-    return { data: { boxes: [] }, degraded: true };
-  }
-}
-
 export async function GET(req: NextRequest): Promise<Response> {
-  return respondWithEdgeCache(req, loadBoxesBestEffort);
+  // A D1 blip degrades the live layer to "no boxes this request" rather than 500ing the map (bestEffort).
+  return respondWithEdgeCache(req, () =>
+    bestEffort(
+      async (db): Promise<{ boxes: PublicBlessingBox[] }> => ({ boxes: await loadLiveBoxes(db) }),
+      { boxes: [] },
+      logBlessingBoxesReadFailure,
+    ),
+  );
 }

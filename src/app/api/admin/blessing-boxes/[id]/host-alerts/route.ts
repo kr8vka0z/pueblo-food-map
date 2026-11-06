@@ -30,8 +30,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
 import { resolveEmailOrigin } from "@/lib/alertOrigin";
@@ -44,7 +43,7 @@ import {
   removeHostSubscriptionStatement,
   sendHostWelcomeEmail,
 } from "@/lib/boxAlerts";
-import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
+import { auditStatement } from "@/lib/auditLog";
 
 /** Normalizes ONCE at this route's boundary (item 3) — every lookup/write below reuses this same value, so "Foo@X.com" and "foo@x.com" are always the same row. */
 function parseEmail(raw: unknown): string | null {
@@ -57,12 +56,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
   const { id: venueId } = await params;
 
@@ -92,19 +87,14 @@ export async function POST(
 
   const timestamp = new Date().toISOString();
   const insertStatement = insertHostSubscriptionStatement(db, { venueId, email, lang }, new Date(timestamp));
-  const insertAudit = db
-    .prepare(AUDIT_INSERT_VALUES_SQL)
-    .bind(
-      identity.email,
-      "box_host_alert",
-      venueId,
-      "update",
-      null,
-      JSON.stringify({ venue_id: venueId, email }),
-      timestamp,
-      // #679: ties this action to the sign-in that made it (Activity log).
-      identity.sessionId ?? null,
-    );
+  const insertAudit = auditStatement(db, identity, {
+    entity: "box_host_alert",
+    entityId: venueId,
+    action: "update",
+    before: null,
+    after: { venue_id: venueId, email },
+    timestamp,
+  });
   await db.batch([insertStatement, insertAudit]);
 
   try {
@@ -136,12 +126,8 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
   const { id: venueId } = await params;
 
@@ -158,19 +144,14 @@ export async function DELETE(
 
   const timestamp = new Date().toISOString();
   const removeStatement = removeHostSubscriptionStatement(db, venueId, email, new Date(timestamp));
-  const insertAudit = db
-    .prepare(AUDIT_INSERT_VALUES_SQL)
-    .bind(
-      identity.email,
-      "box_host_alert",
-      venueId,
-      "update",
-      JSON.stringify({ venue_id: venueId, email, unsubscribed_at: null }),
-      JSON.stringify({ venue_id: venueId, email, unsubscribed_at: timestamp }),
-      timestamp,
-      // #679: ties this action to the sign-in that made it (Activity log).
-      identity.sessionId ?? null,
-    );
+  const insertAudit = auditStatement(db, identity, {
+    entity: "box_host_alert",
+    entityId: venueId,
+    action: "update",
+    before: { venue_id: venueId, email, unsubscribed_at: null },
+    after: { venue_id: venueId, email, unsubscribed_at: timestamp },
+    timestamp,
+  });
   await db.batch([removeStatement, insertAudit]);
 
   const hosts = await loadHostSubscriptions(db, venueId);

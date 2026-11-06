@@ -22,11 +22,10 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
-import { eventConflictResponse, EVENT_AUDIT_INSERT_SQL, nextTimestamp, purgeEventsFeed } from "@/lib/adminEvents";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
+import { eventColumnsFrom, eventConflictResponse, EVENT_AUDIT_INSERT_SQL, nextTimestamp, purgeEventsFeed } from "@/lib/adminEvents";
 import { validateEventPayload, type EventStatus } from "@/lib/adminEventValidation";
 import { loadEvent } from "@/lib/adminEventReads";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import type { EventRow } from "@/lib/events";
 
 const UPDATE_EVENT_SQL = `UPDATE events SET name = ?, name_es = ?, host = ?, host_es = ?, description = ?, description_es = ?,
@@ -48,12 +47,8 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
   const { id } = await params;
 
@@ -103,31 +98,16 @@ export async function PATCH(
   }
 
   const now = nextTimestamp(existing.updated_at);
+  // The note belongs to cancelling (or editing an already-cancelled event, whose form shows it);
+  // every other save leaves it alone.
+  const noteFromForm = action === "cancel" || existing.status === "cancelled";
   const after: EventRow = {
     ...existing,
-    name: fields.name,
-    name_es: fields.nameEs,
-    host: fields.host,
-    host_es: fields.hostEs,
-    description: fields.description,
-    description_es: fields.descriptionEs,
-    what_to_bring: fields.whatToBring,
-    what_to_bring_es: fields.whatToBringEs,
-    // The note belongs to cancelling (or editing an already-cancelled event, whose form shows it);
-    // every other save leaves it alone.
-    cancel_note: action === "cancel" || existing.status === "cancelled" ? fields.cancelNote : existing.cancel_note,
-    cancel_note_es: action === "cancel" || existing.status === "cancelled" ? fields.cancelNoteEs : existing.cancel_note_es,
-    starts_at: fields.startsAt,
-    ends_at: fields.endsAt,
-    lat: fields.lat,
-    lng: fields.lng,
-    address: fields.address,
-    venue_id: fields.venueId,
-    venue_name: fields.venueName,
-    link_url: fields.linkUrl,
-    link_label: fields.linkLabel,
-    link_label_custom: fields.linkLabelCustom,
-    link_label_custom_es: fields.linkLabelCustomEs,
+    ...eventColumnsFrom(
+      fields,
+      noteFromForm ? fields.cancelNote : existing.cancel_note,
+      noteFromForm ? fields.cancelNoteEs : existing.cancel_note_es,
+    ),
     status,
     published_at: existing.status !== "published" && status === "published" ? now : existing.published_at,
     updated_by: identity.email,

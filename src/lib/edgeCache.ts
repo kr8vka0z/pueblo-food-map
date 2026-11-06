@@ -150,3 +150,23 @@ export async function respondWithEdgeCache<T>(
     return { response, degraded };
   });
 }
+
+/**
+ * The best-effort read the public list routes hand to respondWithEdgeCache():
+ * runs `load` against ADMIN_DB, and on any throw logs it and answers with
+ * `fallback` flagged `degraded`, so a D1 blip shows an empty list for one
+ * request instead of a 500 and is never cached.
+ */
+export async function bestEffort<T>(
+  load: (db: D1Database) => Promise<T>,
+  fallback: T,
+  logFailure: (message: string) => void,
+): Promise<BestEffortResult<T>> {
+  try {
+    const { env } = getCloudflareContext();
+    return { data: await load(env.ADMIN_DB), degraded: false };
+  } catch (err) {
+    logFailure(err instanceof Error ? err.message : "unknown error");
+    return { data: fallback, degraded: true };
+  }
+}

@@ -18,12 +18,13 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
+import { positiveInt } from "@/lib/positiveInt";
+import { readOptionalReason } from "@/lib/adminRequest";
 import { loadAdopterById, type BoxAdopterRow } from "@/lib/boxAdopters";
 import { unsubscribeAdopterSubscriptionStatement } from "@/lib/boxAlerts";
 import { bustEdgeCache } from "@/lib/edgeCache";
-import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
+import { auditStatement } from "@/lib/auditLog";
 
 /** Reviewer-entered reason, capped generously — internal admin note, not public-facing copy. Same convention/limit as box-photos' own reject route. */
 const MAX_REVIEW_REASON_LENGTH = 500;
@@ -32,31 +33,19 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
 
   const { id: rawId } = await params;
-  const adopterId = Number(rawId);
-  if (!Number.isInteger(adopterId) || adopterId <= 0) {
+  const adopterId = positiveInt(Number(rawId));
+  if (adopterId === null) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
   // Defensive body parse — a bodyless POST (plain "Remove" button, no reason
   // typed) must not throw, same convention box-photos' own reject route uses.
-  let reviewReason: string | null = null;
-  try {
-    const body = (await req.json()) as { reason?: unknown };
-    if (typeof body?.reason === "string" && body.reason.trim() !== "") {
-      reviewReason = body.reason.trim().slice(0, MAX_REVIEW_REASON_LENGTH);
-    }
-  } catch {
-    // no body / not JSON — reason stays null, this is not an error
-  }
+  const reviewReason = await readOptionalReason(req, MAX_REVIEW_REASON_LENGTH);
 
   const existing = await loadAdopterById(db, adopterId);
   if (!existing) {
@@ -75,9 +64,14 @@ export async function POST(
   const updateAdopter = db
     .prepare("UPDATE box_adopters SET status = 'rejected', reviewed_by = ?, reviewed_at = ?, review_reason = ? WHERE id = ?")
     .bind(identity.email, timestamp, reviewReason, adopterId);
-  const insertAudit = db
-    .prepare(AUDIT_INSERT_VALUES_SQL)
-    .bind(identity.email, "box_adopter", String(adopterId), "update", JSON.stringify(existing), JSON.stringify(afterRow), timestamp, identity.sessionId ?? null);
+  const insertAudit = auditStatement(db, identity, {
+    entity: "box_adopter",
+    entityId: String(adopterId),
+    action: "update",
+    before: existing,
+    after: afterRow,
+    timestamp,
+  });
   const unsubscribeStatement = unsubscribeAdopterSubscriptionStatement(db, adopterId, timestamp);
 
   await db.batch([updateAdopter, insertAudit, unsubscribeStatement]);

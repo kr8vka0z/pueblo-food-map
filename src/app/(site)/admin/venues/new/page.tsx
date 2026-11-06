@@ -58,7 +58,7 @@
 import { headers } from "next/headers";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
-import { loadAdminNavCounts, ZERO_ADMIN_NAV_COUNTS, type AdminNavCounts } from "@/lib/adminNavCounts";
+import { loadAdminNavCounts } from "@/lib/adminNavCounts";
 import AdminNav from "@/components/AdminNav";
 import AddVenueForm, { type AddVenueFormValues } from "@/components/AddVenueForm";
 import ProposalCard from "@/components/ProposalCard";
@@ -144,31 +144,19 @@ export default async function NewVenuePage({
 }: {
   searchParams?: Promise<{ submission?: string; proposal?: string }>;
 } = {}) {
-  let email: string;
-  let showActivity = false;
-  let prefill: NewVenuePrefill | null = null;
-  let proposalPrefill: NewVenueProposalPrefill | null = null;
-  let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
-
-  try {
-    const { db, identity } = await getAdminDb(await headers());
-    email = identity.email;
-    showActivity = identity.isOwner === true;
-    const { submission, proposal } = searchParams ? await searchParams : {};
-    // Independent reads, one round trip's wait instead of three (each D1 call
-    // is an edge -> primary round trip).
-    [prefill, proposalPrefill, navCounts] = await Promise.all([
-      resolveSubmissionPrefill(db, submission),
-      resolveProposalPrefill(db, proposal),
-      loadAdminNavCounts(db),
-    ]);
-  } catch (err) {
-    handlePageAuthError(err);
-  }
+  const { db, identity } = await getAdminDb(await headers()).catch(handlePageAuthError);
+  const { submission, proposal } = searchParams ? await searchParams : {};
+  // Independent reads, one round trip's wait instead of three (each D1 call
+  // is an edge -> primary round trip).
+  const [prefill, proposalPrefill, navCounts] = await Promise.all([
+    resolveSubmissionPrefill(db, submission),
+    resolveProposalPrefill(db, proposal),
+    loadAdminNavCounts(db),
+  ]);
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="places" counts={navCounts} showActivity={showActivity} />
+      <AdminNav email={identity.email} active="places" counts={navCounts} showActivity={identity.isOwner === true} />
       <div className="px-4 py-6 sm:px-6 space-y-6">
         <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Add a venue</h2>
         {proposalPrefill && (

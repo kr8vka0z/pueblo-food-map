@@ -49,8 +49,8 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
+import { positiveInt } from "@/lib/positiveInt";
 import { auditInsertIfExistsSql } from "@/lib/auditLog";
 
 interface PendingClosureRow {
@@ -72,17 +72,13 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
 
   const { id: rawId } = await params;
-  const id = Number(rawId);
-  if (!Number.isInteger(id) || id <= 0) {
+  const id = positiveInt(Number(rawId));
+  if (id === null) {
     return NextResponse.json({ ok: false, error: "Invalid id" }, { status: 400 });
   }
 

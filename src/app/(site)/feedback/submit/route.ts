@@ -22,7 +22,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { FEEDBACK_TYPES, type FeedbackTypeKey } from "@/lib/feedbackTypes";
-import { isValidEmail, stripLineBreaks } from "@/lib/email";
+import { isValidEmail, normalizeLineBreaks, stripLineBreaks } from "@/lib/email";
 import { checkFormRateLimit } from "@/lib/formRateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     await sendFeedbackEmail({
       feedbackType: body.feedbackType as FeedbackTypeKey,
-      message: stripLineBreaks(body.message.trim()),
+      message: normalizeLineBreaks(body.message.trim()),
       contactEmail: stripLineBreaks(body.contactEmail.trim()),
     });
   } catch (err) {

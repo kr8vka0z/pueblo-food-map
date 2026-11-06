@@ -26,7 +26,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { categoryLabels } from "@/lib/categories";
 import type { VenueCategory } from "@/types/venue";
-import { isValidEmail, stripLineBreaks } from "@/lib/email";
+import { isValidEmail, normalizeLineBreaks, stripLineBreaks } from "@/lib/email";
 import { checkFormRateLimit } from "@/lib/formRateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
@@ -174,7 +174,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     contact: body.contact ? stripLineBreaks(body.contact) : undefined,
     acceptsSnap: Boolean(body.acceptsSnap),
     acceptsWic: Boolean(body.acceptsWic),
-    notes: body.notes ? stripLineBreaks(body.notes) : undefined,
+    notes: body.notes ? normalizeLineBreaks(body.notes) : undefined,
     submitterEmail: stripLineBreaks(body.submitterEmail.trim()),
   };
 

@@ -23,6 +23,7 @@ import Script from "next/script";
 import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { localizedHref } from "@/lib/localizedHref";
 import { useTurnstile } from "@/lib/useTurnstile";
 
 type FormName = "feedback" | "report" | "suggest" | "shareEvent";
@@ -156,7 +157,7 @@ export default function PublicForm<K extends string>({
   /** Told the server's error code before the generic error banner shows. */
   onFailure?: (error: string | undefined) => void;
 }) {
-  const { locale } = useLocale();
+  const { locale, tree } = useLocale();
   const [honeypot, setHoneypot] = useState("");
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
   const turnstile = useTurnstile(turnstileContainerRef, { rebuildDeadWidget: false });
@@ -225,8 +226,9 @@ export default function PublicForm<K extends string>({
         {/* #534: --color-ink-600 undefined in globals.css @theme — mapped to
             ink-700, DESIGN.md's documented body-text token. */}
         <p className="text-sm text-[var(--color-ink-700)] mb-6 leading-relaxed">{t(`${form}.success.body`, locale)}</p>
+        {/* The tree, not the locale: /es pages go back to /es (#894); an EN page read in Spanish stays on "/". */}
         <Link
-          href="/"
+          href={localizedHref("/", tree)}
           className={
             "inline-flex items-center justify-center px-5 h-10 rounded-[var(--radius-md)] " +
             "bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +

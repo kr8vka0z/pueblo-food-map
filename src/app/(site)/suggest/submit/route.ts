@@ -116,13 +116,13 @@ function validate(body: SubmitPayload): string | null {
   if (typeof body.category !== "string" || !Object.hasOwn(categoryLabels, body.category)) {
     return "Invalid category";
   }
-  if (body.hours && body.hours.length > FIELD_LIMITS.SUGGEST_HOURS) {
+  if (body.hours !== undefined && (typeof body.hours !== "string" || body.hours.length > FIELD_LIMITS.SUGGEST_HOURS)) {
     return `Hours must be ${FIELD_LIMITS.SUGGEST_HOURS} characters or fewer`;
   }
-  if (body.contact && body.contact.length > FIELD_LIMITS.SUGGEST_CONTACT) {
+  if (body.contact !== undefined && (typeof body.contact !== "string" || body.contact.length > FIELD_LIMITS.SUGGEST_CONTACT)) {
     return `Contact must be ${FIELD_LIMITS.SUGGEST_CONTACT} characters or fewer`;
   }
-  if (body.notes && body.notes.length > FIELD_LIMITS.SUGGEST_NOTES) {
+  if (body.notes !== undefined && (typeof body.notes !== "string" || body.notes.length > FIELD_LIMITS.SUGGEST_NOTES)) {
     return `Notes must be ${FIELD_LIMITS.SUGGEST_NOTES} characters or fewer`;
   }
   // #232: submitterEmail is required (was optional) — never trust the client's

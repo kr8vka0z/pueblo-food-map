@@ -165,7 +165,7 @@ const LINK_HEALTH_DELAY_MS = 500; // politeness — same order of magnitude as s
 // quoted SQL strings apart word-by-word). `process.execPath` is the exact
 // node binary already running this script — resolving wrangler's real bin
 // file directly sidesteps PATH/shell/.cmd entirely, identically on Windows
-// dev machines (this repo's primary environment, AGENTS.md) and Linux CI.
+// and Linux.
 const WRANGLER_BIN = join(REPO_ROOT, "node_modules", "wrangler", "bin", "wrangler.js");
 const PYTHON_CMD = process.platform === "win32" ? "python" : "python3";
 
@@ -401,11 +401,6 @@ async function main(): Promise<void> {
   }
 
   // ── 1 + 2: scrape, load current D1 state ──
-  // Sequential, not Promise.all — each scraper shells out via execFileSync,
-  // which blocks Node's single thread until that child process exits, so
-  // the two scrapes were never actually concurrent despite the old
-  // Promise.all wrapping (a misleading-but-harmless read, fixed here to
-  // match what actually runs).
   const plentifulIncoming = singleSource ? [] : await scrapePlentiful();
   const osmIncoming = singleSource ? [] : await scrapeOsm();
   const currentByType: Record<RefreshSource, CurrentVenueRow[]> = {
@@ -775,7 +770,7 @@ async function main(): Promise<void> {
       `cost=$${(session.stats.inputTokens * USD_PER_INPUT_TOKEN).toFixed(6)}  aiAutoApply=${aiAutoApply}`,
   );
 
-  if (allProposals.length === 0 && websiteStatements.length === 0) {
+  if (allProposals.length === 0 && websiteStatements.length === 0 && aliasStatements.length === 0) {
     console.log("Nothing to write this run.");
   } else {
     // Auto-supersede (§6.10a): any still-pending proposal from an EARLIER
@@ -818,9 +813,6 @@ async function main(): Promise<void> {
 
     statements.push(...aliasStatements, ...websiteStatements);
 
-    // mkdtempSync already creates tmpDir — a following mkdirSync(tmpDir) was
-    // a redundant no-op (recursive:true tolerates an existing dir) removed
-    // here, not a behavior change.
     const tmpDir = mkdtempSync(join(tmpdir(), "pfp-refresh-"));
     const sqlFile = join(tmpDir, "proposals.sql");
     writeFileSync(sqlFile, statements.join("\n") + "\n", "utf-8");

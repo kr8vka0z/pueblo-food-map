@@ -2,13 +2,13 @@
  * triage.ts — TypeSafe Jev triage + rename pairing for the refresh pipeline
  * (issue #543).
  *
- * WHY this exists: /admin/flags gets every non-date-only proposal a run
- * produces, with no way to tell "probably nothing changed" from "a human
+ * WHY this exists: /admin/places "To review" (VenueListView) gets every
+ * non-date-only proposal a run produces, with no way to tell "probably nothing changed" from "a human
  * must decide" from "these two rows are one renamed venue." Weekly runs
  * (#543) quadruple that queue. Jev is a DECISION api — typed yes/no and
  * choice questions answered with calibrated probabilities, no generated
  * text — so each proposal gets ONE batched call and a lane that is a
- * sorting/filtering aid at /admin/flags.
+ * sorting/filtering aid at /admin/places "To review" (VenueListView).
  *
  * Request/response shape verified against https://docs.typesafe.ai/api.md
  * (2026-09-24): `POST https://api.typesafe.ai/v1/systemone`, Bearer key,

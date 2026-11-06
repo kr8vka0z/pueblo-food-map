@@ -42,7 +42,7 @@ import type { ProposalDraft } from "./diffEngine";
 import { computeAutoApplyEligibility, serializeTriageResult, type TriageResult } from "./triage";
 
 export interface ProposalWriteStatements {
-  /** true = this proposal auto-applied to `venues` this run (date-only); false = it was written as a normal pending row for a human to review. */
+  /** true = this run wrote the proposal as already approved (date-only observation, switch lane, or AI lane); false = it was written as a normal pending row for a human to review. */
   autoApplied: boolean;
   statements: string[];
 }
@@ -106,7 +106,8 @@ export interface ProposalWriteOptions {
   /**
    * REFRESH_AI_AUTO_APPLY (default OFF). When on, an `auto_apply_candidate`
    * that ALSO re-passes the deterministic formatting-only check is applied
-   * like a date-only bump, under AI_AUTO_APPLY_ACTOR. Off → it is written
+   * under AI_AUTO_APPLY_ACTOR (venues UPDATE + audit_log + approved row).
+   * Off → it is written
    * as a normal pending row with its lane stored.
    */
   aiAutoApply?: boolean;
@@ -212,9 +213,11 @@ function pendingInsert(proposal: ProposalDraft, sqlText: SqlText, tri: { cols: s
 
 /**
  * The Jev-gated lane's write (only with REFRESH_AI_AUTO_APPLY on): same
- * three-statement shape as the date-only branch — venues UPDATE, audit_log,
- * an already-approved proposal row carrying Jev's verdict — so it stays
- * reversible through audit_log exactly like a human Approve. The caller
+ * shape as the switch lane below — venues UPDATE, audit_log, an
+ * already-approved proposal row carrying Jev's verdict — so it stays
+ * reversible through audit_log exactly like a human Approve. Like the switch
+ * lane it does NOT move last_verified (a machine reformat is not a human
+ * confirmation; AGENTS.md, Venue Data Rebuild step 1). The caller
  * re-checked computeAutoApplyEligibility, so the one field is phone or url:
  * a plain TEXT column, no hours JSON handling needed.
  */
@@ -228,17 +231,16 @@ function buildAiAutoApplyStatements(
   const before = (proposal.proposedDiff.before ?? {}) as Partial<Venue>;
   const after = (proposal.proposedDiff.after ?? {}) as Partial<Venue>;
   const newValue = (after[field] ?? null) as string | null;
-  const newLastVerified = after.last_verified ?? null;
   return [
-    `UPDATE venues SET ${field} = ${sqlText(newValue)}, last_verified = ${sqlText(newLastVerified)}, updated_by = ${sqlText(AI_AUTO_APPLY_ACTOR)}, updated_at = ${sqlText(now)} WHERE id = ${sqlText(proposal.targetVenueId)};`,
+    `UPDATE venues SET ${field} = ${sqlText(newValue)}, updated_by = ${sqlText(AI_AUTO_APPLY_ACTOR)}, updated_at = ${sqlText(now)} WHERE id = ${sqlText(proposal.targetVenueId)};`,
     "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (" +
       [
         sqlText(AI_AUTO_APPLY_ACTOR),
         sqlText("venue"),
         sqlText(proposal.targetVenueId),
         sqlText("update"),
-        sqlText(JSON.stringify({ [field]: before[field] ?? null, last_verified: before.last_verified ?? null })),
-        sqlText(JSON.stringify({ [field]: newValue, last_verified: newLastVerified })),
+        sqlText(JSON.stringify({ [field]: before[field] ?? null })),
+        sqlText(JSON.stringify({ [field]: newValue })),
         sqlText(now),
       ].join(", ") +
       ");",
@@ -287,7 +289,7 @@ export function isSwitchApplicable(proposal: ProposalDraft, states: SwitchState[
 
 /**
  * venues UPDATE + audit_log + an already-approved proposal row + one
- * accepted observation per field. Unlike the older AI lane it does NOT move
+ * accepted observation per field. Like the AI lane it does NOT move
  * last_verified: AGENTS.md (step 1) — last_verified moves only on a human
  * approve or edit; a source applying its own change is not a confirmation.
  * The accepted observation is what records which source backs the value.

@@ -21,8 +21,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
 import { geocodeAddress } from "@/lib/censusGeocode";
 import { puebloPin } from "@/lib/adminEventValidation";
 import { convertToDraft, draftFromPayload, loadPendingEventSubmission, parseSubmissionPayload } from "@/lib/eventSubmissions";
@@ -33,12 +32,8 @@ const fail = (status: number, error: string, message: string, extra: Record<stri
   NextResponse.json({ ok: false, error, message, ...extra }, { status });
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
   const { id } = await params;
 

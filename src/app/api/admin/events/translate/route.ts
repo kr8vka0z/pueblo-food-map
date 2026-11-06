@@ -12,16 +12,12 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
-import { authorizeAdminWrite } from "@/lib/adminDb";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
 import { suggestSpanish, TranslateError, validateTranslateRequest } from "@/lib/eventTranslate";
 
 export async function POST(req: NextRequest): Promise<Response> {
-  try {
-    await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const denied = await adminWriteAccess(req);
+  if (denied instanceof Response) return denied;
 
   let body: unknown;
   try {

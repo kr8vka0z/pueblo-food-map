@@ -96,7 +96,7 @@ import Link from "next/link";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
-import { loadAdminNavCounts, ZERO_ADMIN_NAV_COUNTS, type AdminNavCounts } from "@/lib/adminNavCounts";
+import { loadAdminNavCounts } from "@/lib/adminNavCounts";
 import AdminNav from "@/components/AdminNav";
 import AddVenueForm from "@/components/AddVenueForm";
 import ArchiveVenueButton from "@/components/ArchiveVenueButton";
@@ -112,8 +112,9 @@ import { loadAllCheckinsForBox, type AdminCheckinRow } from "@/lib/blessingBoxes
 import { loadHostSubscriptions } from "@/lib/boxAlerts";
 import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
-import { toVenueLookup, type VenueLookup } from "@/lib/adminVenueLookup";
+import { toVenueLookup } from "@/lib/adminVenueLookup";
 import {
+  buildPublishedVenueById,
   displayStatusOf,
   diffPublishedFields,
   attributeFieldChange,
@@ -121,8 +122,7 @@ import {
   type ApprovedProposalMark,
 } from "@/lib/adminVenues";
 import { isProductionWorker } from "@/lib/publishVenues";
-import { publishedVenues } from "@/data/published-venues";
-import type { AdminVenueRow } from "@/types/venue";
+import type { AdminVenueRow, Venue } from "@/types/venue";
 import type { PublicSubmissionRow } from "@/lib/publicSubmissions";
 
 interface LinkHealthProposalContext {
@@ -247,10 +247,10 @@ async function resolvePendingSubmissions(db: D1Database, venueId: string) {
 async function resolveWaitingToPublishChanges(
   db: D1Database,
   venue: AdminVenueRow,
+  published: Venue | undefined,
   viewerEmail: string,
 ): Promise<WaitingToPublishChange[]> {
-  const publishedById = new Map(publishedVenues.map((v) => [v.id, v]));
-  const diffs = diffPublishedFields(venue, publishedById.get(venue.id));
+  const diffs = diffPublishedFields(venue, published);
   if (diffs.length === 0) return [];
 
   try {
@@ -300,103 +300,74 @@ export default async function EditVenuePage({
   searchParams: Promise<{ proposal?: string }>;
 }) {
   const { id } = await params;
-  let email: string;
-  let showActivity = false;
-  let venue: AdminVenueRow | null;
-  let linkHealthContext: LinkHealthProposalContext | null = null;
-  let boxCheckins: AdminCheckinRow[] = [];
-  let hostAlerts: { id: number; email: string }[] = [];
-  let boxReviewPhotos: AdminBoxPhotoRow[] = [];
-  let boxReviewAdopters: AdminBoxAdopterRow[] = [];
-  let waitingToPublish: WaitingToPublishChange[] = [];
-  let pendingProposals: ParsedProposal[] = [];
-  let suggestionItems: ReviewItem[] = [];
-  let suggestionsVenue: VenueLookup | null = null;
-  let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
-
-  try {
-    const { db, identity } = await getAdminDb(await headers());
-    email = identity.email;
-    showActivity = identity.isOwner === true;
-    // WHY Promise.all throughout (was ~10 awaits in a row): every D1 call is
-    // an edge -> primary round trip, so a serial chain cost the SUM of them.
-    // Only the venue row stays sequential: it gates the rest (an unknown id
-    // still 404s with no extra reads). Every resolver below
-    // already degrades to an empty value instead of rejecting, and
-    // loadAdminNavCounts never rejects, so overlapping them changes no
-    // failure behavior. The session check above still runs first and alone.
-    // Nav counts start now and are awaited with the phase-2 reads below, so
-    // they overlap the venue read without holding up what depends on it.
-    const navCountsPromise = loadAdminNavCounts(db);
-    venue = await db.prepare("SELECT * FROM venues WHERE id = ?").bind(id).first<AdminVenueRow>();
-    if (venue) {
-      const { proposal } = await searchParams;
-      // #673 pt.3: only fetch/compute the diff for a place actually waiting
-      // — displayStatusOf() is the single source of truth for that (never a
-      // box, a draft, an unedited live place, or — on staging — anything at
-      // all), same rule the Places tab's own status badge uses.
-      const { env } = await getCloudflareContext({ async: true });
-      const isStaging = !isProductionWorker(env);
-      const publishedById = new Map(publishedVenues.map((v) => [v.id, v]));
-      const status = displayStatusOf(venue, publishedById.get(venue.id), { isStaging });
-      const isBox = venue.category === "blessing_box";
-      const noReviewItems = { photos: [] as AdminBoxPhotoRow[], adopters: [] as AdminBoxAdopterRow[] };
-      const [linkHealth, checkins, alerts, reviewItems, proposals, pendingSubmissions, waiting, counts] =
-        await Promise.all([
-          resolveLinkHealthProposalContext(db, id, proposal),
-          // Fail soft to []: a D1 failure, or a missing alert_subscriptions
-          // table (migration 0010 not applied), must not break the edit page.
-          isBox
-            ? loadAllCheckinsForBox(db, id).catch(() => [] as AdminCheckinRow[])
-            : Promise.resolve([] as AdminCheckinRow[]),
-          isBox
-            ? loadHostSubscriptions(db, id).catch(() => [] as { id: number; email: string }[])
-            : Promise.resolve([] as { id: number; email: string }[]),
-          isBox ? resolveBoxReviewItems(db, id) : Promise.resolve(noReviewItems),
-          // #674: "Suggestions to review" box — every pending change_proposals
-          // row targeting this venue (an archived venue can have one too: a
-          // restore, ProposalCard.tsx's own `isRestore` branch).
-          resolvePendingProposals(db, id),
-          // #675: every pending closure report targeting this venue joins the
-          // SAME "Suggestions to review" box as the proposals above — one
-          // ReviewItem[] the box dispatches on by `kind`, see SuggestionsBox.tsx.
-          resolvePendingSubmissions(db, id),
-          status === "live_edits_waiting"
-            ? resolveWaitingToPublishChanges(db, venue, identity.email)
-            : Promise.resolve([] as WaitingToPublishChange[]),
-          navCountsPromise,
-        ]);
-      navCounts = counts;
-      linkHealthContext = linkHealth;
-      boxCheckins = checkins;
-      hostAlerts = alerts;
-      boxReviewPhotos = reviewItems.photos;
-      boxReviewAdopters = reviewItems.adopters;
-      pendingProposals = proposals;
-      waitingToPublish = waiting;
-      suggestionItems = [
-        ...pendingProposals.map((proposal): ReviewItem => ({ kind: "proposal", proposal })),
-        ...pendingSubmissions.map((submission): ReviewItem => ({ kind: "submission", submission })),
-      ];
-      // Mapped from the row already loaded above, so no second venues read.
-      if (suggestionItems.length > 0) suggestionsVenue = toVenueLookup(venue);
-    } else {
-      navCounts = await navCountsPromise;
-    }
-  } catch (err) {
-    handlePageAuthError(err);
+  const { db, identity } = await getAdminDb(await headers()).catch(handlePageAuthError);
+  // WHY Promise.all throughout (was ~10 awaits in a row): every D1 call is
+  // an edge -> primary round trip, so a serial chain cost the SUM of them.
+  // Only the venue row stays sequential: it gates the rest (an unknown id
+  // still 404s with no extra reads). Every resolver below
+  // already degrades to an empty value instead of rejecting, and
+  // loadAdminNavCounts never rejects, so overlapping them changes no
+  // failure behavior. The session check above still runs first and alone.
+  // Nav counts start now and are awaited with the phase-2 reads below, so
+  // they overlap the venue read without holding up what depends on it.
+  const navCountsPromise = loadAdminNavCounts(db);
+  const venue = await db.prepare("SELECT * FROM venues WHERE id = ?").bind(id).first<AdminVenueRow>();
+  if (!venue) {
+    await navCountsPromise;
+    notFound();
   }
 
-  if (!venue) notFound();
+  const { proposal } = await searchParams;
+  // #673 pt.3: only fetch/compute the diff for a place actually waiting
+  // — displayStatusOf() is the single source of truth for that (never a
+  // box, a draft, an unedited live place, or — on staging — anything at
+  // all), same rule the Places tab's own status badge uses.
+  const { env } = await getCloudflareContext({ async: true });
+  const isStaging = !isProductionWorker(env);
+  // Looked up once here and handed to resolveWaitingToPublishChanges, so the
+  // ~2000-entry snapshot is mapped once per request, not twice.
+  const published = buildPublishedVenueById().get(venue.id);
+  const status = displayStatusOf(venue, published, { isStaging });
+  const isBox = venue.category === "blessing_box";
+  const noReviewItems = { photos: [] as AdminBoxPhotoRow[], adopters: [] as AdminBoxAdopterRow[] };
+  const [linkHealthContext, boxCheckins, hostAlerts, boxReview, pendingProposals, pendingSubmissions, waitingToPublish, navCounts] =
+    await Promise.all([
+      resolveLinkHealthProposalContext(db, id, proposal),
+      // Fail soft to []: a D1 failure, or a missing alert_subscriptions
+      // table (migration 0010 not applied), must not break the edit page.
+      isBox
+        ? loadAllCheckinsForBox(db, id).catch(() => [] as AdminCheckinRow[])
+        : Promise.resolve([] as AdminCheckinRow[]),
+      isBox
+        ? loadHostSubscriptions(db, id).catch(() => [] as { id: number; email: string }[])
+        : Promise.resolve([] as { id: number; email: string }[]),
+      isBox ? resolveBoxReviewItems(db, id) : Promise.resolve(noReviewItems),
+      // #674: "Suggestions to review" box — every pending change_proposals
+      // row targeting this venue (an archived venue can have one too: a
+      // restore, ProposalCard.tsx's own `isRestore` branch).
+      resolvePendingProposals(db, id),
+      // #675: every pending closure report targeting this venue joins the
+      // SAME "Suggestions to review" box as the proposals above — one
+      // ReviewItem[] the box dispatches on by `kind`, see SuggestionsBox.tsx.
+      resolvePendingSubmissions(db, id),
+      status === "live_edits_waiting"
+        ? resolveWaitingToPublishChanges(db, venue, published, identity.email)
+        : Promise.resolve([] as WaitingToPublishChange[]),
+      navCountsPromise,
+    ]);
+  const suggestionItems: ReviewItem[] = [
+    ...pendingProposals.map((proposal): ReviewItem => ({ kind: "proposal", proposal })),
+    ...pendingSubmissions.map((submission): ReviewItem => ({ kind: "submission", submission })),
+  ];
+  // Mapped from the row already loaded above, so no second venues read.
+  const suggestionsVenue = suggestionItems.length > 0 ? toVenueLookup(venue) : null;
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="places" counts={navCounts} showActivity={showActivity} />
+      <AdminNav email={identity.email} active="places" counts={navCounts} showActivity={identity.isOwner === true} />
       <div className="px-4 py-6 sm:px-6 space-y-6">
         <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Edit {venue.name}</h2>
-        {venue.category === "blessing_box" && (
-          <BoxReviewBox photos={boxReviewPhotos} adopters={boxReviewAdopters} />
-        )}
+        {isBox && <BoxReviewBox photos={boxReview.photos} adopters={boxReview.adopters} />}
         {suggestionItems.length > 0 && suggestionsVenue && (
           <SuggestionsBox items={suggestionItems} venue={suggestionsVenue} />
         )}
@@ -424,18 +395,17 @@ export default async function EditVenuePage({
           expectedUpdatedAt={venue.updated_at}
         />
 
-        {venue.category === "blessing_box" && (
-          <div className="max-w-2xl border-t border-[var(--color-bone-200)] pt-5">
-            <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">Check-ins</h2>
-            <BoxCheckinsAdminPanel checkins={boxCheckins} />
-          </div>
-        )}
-
-        {venue.category === "blessing_box" && (
-          <div className="max-w-2xl border-t border-[var(--color-bone-200)] pt-5">
-            <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">Host alert emails</h2>
-            <HostAlertsAdminPanel venueId={venue.id} initialHosts={hostAlerts} />
-          </div>
+        {isBox && (
+          <>
+            <div className="max-w-2xl border-t border-[var(--color-bone-200)] pt-5">
+              <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">Check-ins</h2>
+              <BoxCheckinsAdminPanel checkins={boxCheckins} />
+            </div>
+            <div className="max-w-2xl border-t border-[var(--color-bone-200)] pt-5">
+              <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">Host alert emails</h2>
+              <HostAlertsAdminPanel venueId={venue.id} initialHosts={hostAlerts} />
+            </div>
+          </>
         )}
 
         <div className="max-w-2xl border-t border-[var(--color-bone-200)] pt-5">

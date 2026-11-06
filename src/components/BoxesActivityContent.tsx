@@ -57,19 +57,12 @@ import {
   rankSlowestRefill,
   type PeriodKey,
 } from "@/lib/boxStats";
-import BoxActivityList from "@/components/BoxActivityList";
-import BoxNumbersPanel from "@/components/BoxNumbersPanel";
+import { PagedBoxActivityList } from "@/components/BoxActivityList";
+import BoxNumbersPanel, { FIELD_LABEL, SELECT_CLASS } from "@/components/BoxNumbersPanel";
 import BoxNeedLoveList from "@/components/BoxNeedLoveList";
 import BoxMilestones from "@/components/BoxMilestones";
 import SiteFooter from "@/components/SiteFooter";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
-
-const FIELD_LABEL = "block text-xs font-medium text-[var(--color-ink-700)] mb-1";
-// text-base md:text-sm, not a bare text-sm: iOS Safari auto-zooms the page
-// on focusing any field under 16px (see mobile-viewport-and-form-zoom.test.ts).
-const SELECT_CLASS =
-  "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm " +
-  "text-[var(--color-ink-900)] bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
 
 export default function BoxesActivityContent() {
   const { locale } = useLocale();
@@ -277,41 +270,14 @@ export default function BoxesActivityContent() {
           </button>
         )}
 
-        {/* aria-live is scoped to this one short status line, not the list
-            below it (PR #472 review, nit 2) — a live region around the
-            whole 25-item list re-announces every item to a screen reader
-            on each filter change; a "12 results" count is the meaningful
-            update, and the list itself is read normally, once, like any
-            other static content. */}
-        <p aria-live="polite" className="text-sm text-[var(--color-ink-500)]">
-          {loading && activityPage.items.length === 0
-            ? t("activity.loading", locale)
-            : t("activity.resultCount", locale, { count: String(activityPage.items.length) })}
-        </p>
-        {!(loading && activityPage.items.length === 0) && (
-          <BoxActivityList items={activityPage.items} showVenueName />
-        )}
-
-        {activityPage.items.length > 0 && (
-          <div className="flex items-center justify-between gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t("activity.prevPage", locale)}
-            </button>
-            <button
-              type="button"
-              onClick={() => setPage((p) => p + 1)}
-              disabled={!activityPage.hasMore}
-              className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t("activity.nextPage", locale)}
-            </button>
-          </div>
-        )}
+        <PagedBoxActivityList
+          items={activityPage.items}
+          loading={loading}
+          page={page}
+          hasMore={activityPage.hasMore}
+          setPage={setPage}
+          showVenueName
+        />
       </div>
 
       <SiteFooter />

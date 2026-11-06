@@ -6,9 +6,11 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
+import { useState } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { LocaleProvider } from "@/lib/LocaleContext";
+import { LocaleProvider, useLocale } from "@/lib/LocaleContext";
+import { t } from "@/lib/i18n";
 import AdoptBoxForm from "@/components/AdoptBoxForm";
 
 const mockTurnstile = {
@@ -35,20 +37,32 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// Stands in for the real caller, BoxCardBody's sponsor band, which owns
+// open/closed and renders the trigger link (the form renders none).
+function Harness() {
+  const { locale } = useLocale();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      {!open && (
+        <button type="button" onClick={() => setOpen(true)}>
+          {t("box.adopt.linkLabel", locale)}
+        </button>
+      )}
+      <AdoptBoxForm boxId="box-1" open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
+
 function renderForm(locale: "en" | "es" = "en") {
   return render(
     <LocaleProvider initialLocale={locale}>
-      <AdoptBoxForm boxId="box-1" />
+      <Harness />
     </LocaleProvider>,
   );
 }
 
 describe("AdoptBoxForm", () => {
-  test("starts collapsed as a plain link", () => {
-    renderForm();
-    expect(screen.getByRole("button", { name: "Apply to sponsor this box" })).toBeDefined();
-    expect(screen.queryByLabelText(/your name/i)).toBeNull();
-  });
 
   // #669 — the fallback checkbox showed above the box's name while the
   // adopt form was still closed. The widget must keep mounting early (the

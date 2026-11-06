@@ -54,11 +54,16 @@ import type {
   ReviewLane,
 } from "@/lib/adminProposals";
 import type { VenueLookup } from "@/lib/adminVenueLookup";
+import {
+  cardClass,
+  dangerButtonClass,
+  fieldLabelClass,
+  formatSubmittedAt,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from "@/lib/adminCardStyles";
 
 // ─── Shared styling (reuses existing DESIGN.md tokens — no new ones) ───────
-
-const cardClass =
-  "elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5";
 
 // Exported: VenueListView.tsx reuses this SAME label map for its own source
 // display, rather than a second copy that could drift from this one.
@@ -90,11 +95,9 @@ const pct = (p: number) => `${Math.round(p * 100)}%`;
 
 /**
  * One plain sentence from the stored Jev answers (triage_json), or null
- * when the row was never triaged. Exported for tests and for
- * adminProposals.ts's Places "To review" row summary, which reuses this
- * exact sentence rather than a second copy.
+ * when the row was never triaged.
  */
-export function triageSummary(row: Pick<ChangeProposalRow, "triage_json">): string | null {
+function triageSummary(row: Pick<ChangeProposalRow, "triage_json">): string | null {
   if (!row.triage_json) return null;
   type Answer = { noul?: number; choice?: string; probabilities?: Record<string, number> };
   let parsed: { answers?: Record<string, Answer> };
@@ -115,34 +118,11 @@ export function triageSummary(row: Pick<ChangeProposalRow, "triage_json">): stri
   return null;
 }
 
-export const CHANGE_TYPE_LABEL: Record<ProposalChangeType, string> = {
+const CHANGE_TYPE_LABEL: Record<ProposalChangeType, string> = {
   add: "New venue",
   update: "Field update",
   remove: "Remove",
 };
-
-const primaryButtonClass =
-  "inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
-  "px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] transition-colors duration-150 " +
-  "hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 " +
-  "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
-
-const secondaryButtonClass =
-  "inline-flex items-center rounded-[var(--radius-md)] border border-[var(--color-bone-300)] " +
-  "px-3 py-1.5 text-sm font-medium text-[var(--color-ink-700)] bg-transparent " +
-  "transition-colors duration-150 hover:bg-[var(--color-bone-100)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
-
-const dangerButtonClass =
-  "inline-flex items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] " +
-  "px-3 py-1.5 text-sm font-medium text-[var(--color-danger)] bg-transparent " +
-  "transition-colors duration-150 hover:bg-[var(--color-danger)] hover:text-[var(--color-bone-50)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
-
-const fieldLabelClass = "text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-400)]";
 
 const FIELD_LABELS: Record<string, string> = {
   name: "Name",
@@ -209,12 +189,6 @@ export function formatFieldValue(field: string, value: unknown): string {
   return String(value);
 }
 
-function formatSubmittedAt(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(date);
-}
-
 // ─── Component ──────────────────────────────────────────────────────────────
 
 type ActionState = { status: "idle" } | { status: "submitting" } | { status: "error"; message: string };
@@ -259,11 +233,12 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
     });
   }
 
-  async function handleApprove(confirmMessage?: string) {
-    if (confirmMessage && !window.confirm(confirmMessage)) return;
-    setApproveState({ status: "submitting" });
+  // One body for Approve and Reject: the two differ only in path, request
+  // body, which state they drive and the failure sentence.
+  async function act(path: "approve" | "reject", body: unknown, setState: (s: ActionState) => void, failMessage: string) {
+    setState({ status: "submitting" });
     try {
-      const res = await postAction("approve");
+      const res = await postAction(path, body);
       if (res.status === 200) {
         router.refresh();
         return;
@@ -272,46 +247,27 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
       // handled: already approved, rejected, superseded or already on the
       // map — not a failure, so drop the card like a success would.
       if (data?.handled) {
-        setApproveState({ status: "idle" });
+        setState({ status: "idle" });
         router.refresh();
         return;
       }
-      setApproveState({
-        status: "error",
-        message: data?.message ?? "Something went wrong. This wasn't applied. Try again.",
-      });
+      setState({ status: "error", message: data?.message ?? failMessage });
     } catch {
-      setApproveState({ status: "error", message: "Something went wrong. This wasn't applied. Try again." });
+      setState({ status: "error", message: failMessage });
     }
   }
 
+  async function handleApprove(confirmMessage?: string) {
+    if (confirmMessage && !window.confirm(confirmMessage)) return;
+    await act("approve", undefined, setApproveState, "Something went wrong. This wasn't applied. Try again.");
+  }
+
   async function handleConfirmReject() {
-    setRejectState({ status: "submitting" });
-    try {
-      // #675 fix: this used to post an empty {} body, silently dropping the
-      // reason typed into the textarea just above — SubmissionCard.tsx's own
-      // reject already sends { reason }; this card fell out of sync when it
-      // was extracted from the old /admin/flags queue.
-      const res = await postAction("reject", { reason });
-      if (res.status === 200) {
-        router.refresh();
-        return;
-      }
-      const data = (await res.json().catch(() => null)) as { message?: string; handled?: boolean } | null;
-      // handled: already approved, rejected, superseded or already on the
-      // map — not a failure, so drop the card like a success would.
-      if (data?.handled) {
-        setRejectState({ status: "idle" });
-        router.refresh();
-        return;
-      }
-      setRejectState({
-        status: "error",
-        message: data?.message ?? "Something went wrong. This wasn't rejected. Try again.",
-      });
-    } catch {
-      setRejectState({ status: "error", message: "Something went wrong. This wasn't rejected. Try again." });
-    }
+    // #675 fix: this used to post an empty {} body, silently dropping the
+    // reason typed into the textarea just above — SubmissionCard.tsx's own
+    // reject already sends { reason }; this card fell out of sync when it
+    // was extracted from the old /admin/flags queue.
+    await act("reject", { reason }, setRejectState, "Something went wrong. This wasn't rejected. Try again.");
   }
 
   return (

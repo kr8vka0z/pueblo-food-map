@@ -26,7 +26,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { parseAdminNeeds, type AdminCheckinRow, type NeedKey } from "@/lib/blessingBoxes";
+import { parseAdminNeeds, type AdminCheckinRow } from "@/lib/blessingBoxes";
+import { t } from "@/lib/i18n";
 
 interface BoxCheckinsAdminPanelProps {
   checkins: AdminCheckinRow[];
@@ -38,19 +39,6 @@ const KIND_LABEL: Record<AdminCheckinRow["kind"], string> = {
   low: "Running low",
   empty: "Empty",
   problem: "Problem report",
-};
-
-/** Plain English labels, same convention as KIND_LABEL above — this admin panel isn't locale-aware anywhere else (see its own dateFormatter, hardcoded en-US), so needs labels don't route through i18n.ts either (migration 0012). */
-const NEED_LABEL: Record<NeedKey, string> = {
-  canned_food: "Canned food",
-  fresh_food: "Fresh food",
-  bread: "Bread",
-  baby_items: "Baby items",
-  diapers: "Diapers",
-  hygiene: "Hygiene items",
-  pet_food: "Pet food",
-  drinks: "Drinks",
-  warm_clothing: "Warm clothing",
 };
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
@@ -109,9 +97,11 @@ export default function BoxCheckinsAdminPanel({ checkins }: BoxCheckinsAdminPane
               {row.hidden_by && ` · hidden by ${row.hidden_by}`}
             </p>
             {row.note && <p className="mt-1 text-sm text-[var(--color-ink-700)]">{row.note}</p>}
+            {/* Needs labels come from the public card's i18n keys; this
+                panel is English-only (see dateFormatter), so always "en". */}
             {parseAdminNeeds(row.needs).length > 0 && (
               <p className="mt-1 text-xs text-[var(--color-ink-500)]">
-                Needs: {parseAdminNeeds(row.needs).map((k) => NEED_LABEL[k]).join(", ")}
+                Needs: {parseAdminNeeds(row.needs).map((k) => t(`box.needs.${k}`, "en")).join(", ")}
               </p>
             )}
             {errorId === row.id && (

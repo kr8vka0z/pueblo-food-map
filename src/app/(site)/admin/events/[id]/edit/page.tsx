@@ -2,7 +2,7 @@
  * /admin/events/[id]/edit — "Edit event" (#757). Auth gate, then the event
  * row + the place-picker's venue list; EventForm does the rest.
  *
- * The event read is its own try/catch (separate from the auth gate) so a
+ * The event read fails soft on its own (`.catch`, apart from the auth gate) so a
  * missing `events` table or a D1 blip renders a "couldn't load, retry"
  * panel instead of a 500; an unknown id is a real 404 (notFound()). An
  * archived event is read-only: archiving is final, same as venues, so the
@@ -16,7 +16,7 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
-import { loadAdminNavCounts, type AdminNavCounts } from "@/lib/adminNavCounts";
+import { loadAdminNavCounts } from "@/lib/adminNavCounts";
 import { loadEvent, loadVenueChoices, type VenueChoice } from "@/lib/adminEventReads";
 import { utcIsoToPuebloLocal } from "@/lib/eventTime";
 import { publicFlyerOf, type EventRow } from "@/lib/events";
@@ -60,30 +60,18 @@ export default async function EditEventPage({
 }) {
   const { id } = await params;
   const { saved } = searchParams ? await searchParams : {};
-  let email: string;
-  let showActivity = false;
-  let event: EventRow | null | undefined; // undefined = the read failed
-  let venues: VenueChoice[] = [];
-  let navCounts: AdminNavCounts;
-
-  try {
-    const { db, identity } = await getAdminDb(await headers());
-    email = identity.email;
-    showActivity = identity.isOwner === true;
-    [event, venues, navCounts] = await Promise.all([
-      loadEvent(db, id).catch(() => undefined),
-      loadVenueChoices(db).catch(() => [] as VenueChoice[]),
-      loadAdminNavCounts(db),
-    ]);
-  } catch (err) {
-    handlePageAuthError(err);
-  }
+  const { db, identity } = await getAdminDb(await headers()).catch(handlePageAuthError);
+  const [event, venues, navCounts] = await Promise.all([
+    loadEvent(db, id).catch(() => undefined), // undefined = the read failed
+    loadVenueChoices(db).catch(() => [] as VenueChoice[]),
+    loadAdminNavCounts(db),
+  ]);
 
   if (event === null) notFound();
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="events" counts={navCounts} showActivity={showActivity} />
+      <AdminNav email={identity.email} active="events" counts={navCounts} showActivity={identity.isOwner === true} />
       <div className="space-y-6 px-4 py-6 sm:px-6">
         <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Edit event</h2>
         {event === undefined ? (

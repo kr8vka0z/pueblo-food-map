@@ -51,6 +51,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { PublishChangeSummary } from "@/lib/adminVenues";
+import { pluralize } from "@/lib/pluralize";
 
 export interface PublishPanelProps {
   summary: PublishChangeSummary;
@@ -91,10 +92,6 @@ const primaryButtonClass =
   "transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
   "focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
-
-function pluralize(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
-}
 
 /**
  * #568 item 2: a removals-only publish (0 new/edited, N archived) used to

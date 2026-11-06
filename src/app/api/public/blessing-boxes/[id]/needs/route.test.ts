@@ -317,12 +317,4 @@ describe("POST /api/public/blessing-boxes/[id]/needs", () => {
     await expect(callPost(await validBody())).rejects.toThrow("CHECKIN_RATE_LIMIT_SECRET not configured");
     expect(mockGetCloudflareContext).not.toHaveBeenCalled();
   });
-
-  test("no Cloudflare context available -> 503, never throws", async () => {
-    mockGetCloudflareContext.mockImplementation(() => {
-      throw new Error("no cloudflare context");
-    });
-    const res = await callPost(await validBody());
-    expect(res.status).toBe(503);
-  });
 });

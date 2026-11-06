@@ -22,41 +22,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminBoxAdopterRow } from "@/lib/boxAdopters";
+import {
+  cardClass,
+  dangerButtonTallClass as dangerButtonClass,
+  fieldLabelClass,
+  formatSubmittedAt,
+  primaryButtonTallClass as primaryButtonClass,
+  secondaryButtonTallClass as secondaryButtonClass,
+} from "@/lib/adminCardStyles";
 
 export interface SponsorRequestCardProps {
   adopter: AdminBoxAdopterRow;
-}
-
-const cardClass =
-  "elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5";
-
-const primaryButtonClass =
-  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
-  "px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] transition-colors duration-150 " +
-  "hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 " +
-  "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
-
-const secondaryButtonClass =
-  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-bone-300)] " +
-  "px-3 py-1.5 text-sm font-medium text-[var(--color-ink-700)] bg-transparent " +
-  "transition-colors duration-150 hover:bg-[var(--color-bone-100)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
-
-const dangerButtonClass =
-  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] " +
-  "px-3 py-1.5 text-sm font-medium text-[var(--color-danger)] bg-transparent " +
-  "transition-colors duration-150 hover:bg-[var(--color-danger)] hover:text-[var(--color-bone-50)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
-
-const fieldLabelClass = "text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-400)]";
-
-function formatSubmittedAt(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
 type ActionState = { status: "idle" } | { status: "submitting" } | { status: "error"; message: string };

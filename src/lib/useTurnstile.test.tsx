@@ -6,8 +6,8 @@
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { useRef } from "react";
-import { render, screen, fireEvent, act } from "@testing-library/react";
-import { useTurnstile } from "@/lib/useTurnstile";
+import { render, renderHook, screen, fireEvent, act } from "@testing-library/react";
+import { PENDING_SUBMIT_TIMEOUT_MS, useQueuedTurnstileSubmit, useTurnstile } from "@/lib/useTurnstile";
 
 function Harness() {
   // The container ref is created here (not by the hook) — see
@@ -124,5 +124,26 @@ describe("useTurnstile", () => {
     expect(removeMock).toHaveBeenCalledWith("widget-dead");
     expect(renderMock).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId("token").textContent).toBe("fresh-token");
+  });
+});
+
+describe("useQueuedTurnstileSubmit", () => {
+  // The card forms' only way out of "Sending…" when no token ever arrives
+  // (the token-arrival path is covered through AdoptBoxForm.test.tsx).
+  test("a queued submit with no token times out: onTimeout runs, submit never does", () => {
+    vi.useFakeTimers();
+    try {
+      const submit = vi.fn();
+      const onTimeout = vi.fn();
+      const { result } = renderHook(() => useQueuedTurnstileSubmit<string>(null, submit, onTimeout));
+      act(() => result.current.queue("a@example.com"));
+      expect(result.current.queued).toBe(true);
+      act(() => vi.advanceTimersByTime(PENDING_SUBMIT_TIMEOUT_MS));
+      expect(onTimeout).toHaveBeenCalledTimes(1);
+      expect(submit).not.toHaveBeenCalled();
+      expect(result.current.queued).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

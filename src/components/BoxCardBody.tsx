@@ -25,10 +25,6 @@
  * caller's container (vaul's `Drawer.Content` deliberately has none — see
  * that component's own note on the drag-to-dismiss risk).
  *
- * `headingLevel` (default "h2") lets `BoxHistoryContent` ask for this card's
- * own name to render as the page's `<h1>` instead of duplicating a second
- * heading above it — see that component for the caller-side half of this.
- *
  * No orange "Directions" button, no Walk/Bus/Drive row — deviation from a
  * literal reading of the original task brief, resolved via `advisor()`
  * mid-build (2026-09-19). `DirectionButtons.tsx` (Walk/Bus/Drive) has
@@ -41,9 +37,9 @@
  * result and asked to KEEP the in-app walking route (2026-09-19, walk
  * restore pass): the address stays the one visible control (no icon, no
  * extra row) but now DOUBLES as that Walk trigger when a map is present.
- * `walk` presence is the switch: absent (BoxHistoryContent, no map
- * to draw a route on) → the address is a plain external `<a>` to Google
- * Maps, unchanged from before. Present (BottomSheet/DesktopVenueWindow,
+ * `walk` presence is the switch: absent (no live caller today — both pass
+ * it; only some tests omit it) → the address is a plain external `<a>` to
+ * Google Maps, unchanged from before. Present (BottomSheet/DesktopVenueWindow,
  * the `walk` object MapWrapper builds with `useWalkingRoute`'s `walkFor`) → the address
  * is a `<button>` that fires the SAME callback, geolocation-request, and
  * location-hint behavior DirectionButtons' own Walk button uses for every
@@ -107,8 +103,8 @@ import {
 interface BoxCardBodyProps {
   box: PublicBlessingBox;
   /**
-   * Default "default" — the photo-first order `DesktopVenueWindow` and
-   * `BoxHistoryContent` render. "sheet" is BottomSheet's own
+   * Default "default" — the photo-first order `DesktopVenueWindow`
+   * renders. "sheet" is BottomSheet's own
    * mobile redesign (#667): name -> inline status -> address -> most
    * needed -> host note -> check-in panel render first and unclipped;
    * photo, the sponsor band and the footer links move below a clipped
@@ -122,23 +118,21 @@ interface BoxCardBodyProps {
   /** "sheet" layout only — DOM id for the below-the-fold wrapper, so BottomSheet's grab bar `aria-controls` can point at it (mirrors the ordinary-venue detail section's own id). */
   detailSectionId?: string;
   onCheckinSuccess?: (result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => void;
-  /** See this file's own header. Default true — hidden only where a caller already provides an equivalent link elsewhere (DesktopVenueWindow's header, the history page itself). */
+  /** See this file's own header. Default true — hidden only where a caller already provides an equivalent link elsewhere (DesktopVenueWindow's header). */
   showHistoryLink?: boolean;
-  /** Default "h2" — BoxHistoryContent passes "h1" so the card's own name serves as that page's page-level heading instead of a duplicate. */
-  headingLevel?: "h1" | "h2";
   /** Outer-wrapper passthrough (e.g. BottomSheet's safe-area bottom padding). */
   className?: string;
   /** Corner-radius classes for the photo's own top edge — put on the <img> itself rather than a caller's overflow-hidden wrapper. Default "" (DesktopVenueWindow's container already clips via its own overflow-hidden). */
   photoRadiusClassName?: string;
   /** Rendered to the right of the name (Share/Favorite/Close, owned by the caller — different per caller, see BottomSheet/DesktopVenueWindow). */
   actions?: React.ReactNode;
-  /** DOM id for the name heading (fix pass, 2026-09-19, BLOCKER). DesktopVenueWindow's outer `role="dialog"` points `aria-labelledby` at `venue-window-title-<id>` — before BoxCardBody owned the whole card, that id lived on a header-rendered heading; now it has to live on THIS component's own name heading, or the dialog's accessible name dangles (points at no element) for every box. Optional/undefined elsewhere (BottomSheet uses a Drawer.Title instead, and BoxHistoryContent's page has no such dialog role to satisfy). */
+  /** DOM id for the name heading (fix pass, 2026-09-19, BLOCKER). DesktopVenueWindow's outer `role="dialog"` points `aria-labelledby` at `venue-window-title-<id>` — before BoxCardBody owned the whole card, that id lived on a header-rendered heading; now it has to live on THIS component's own name heading, or the dialog's accessible name dangles (points at no element) for every box. Optional/undefined elsewhere (BottomSheet uses a Drawer.Title instead). */
   nameId?: string;
   /**
    * In-app walking directions (walk restore pass, 2026-09-19) — see this
    * file's own header for the full rationale. Absent (default): the address
-   * renders as a plain external `<a>` to Google Maps (BoxHistoryContent — no
-   * map on that page to draw a route on). Present: the address becomes a
+   * renders as a plain external `<a>` to Google Maps (no live caller omits
+   * it today). Present: the address becomes a
    * `<button>` calling `walk.onWalk(box)`, the SAME callback DirectionButtons'
    * own Walk button uses (it self-toggles off on a second tap), and the
    * active-route readout renders below it.
@@ -288,7 +282,6 @@ export default function BoxCardBody({
   detailSectionId,
   onCheckinSuccess,
   showHistoryLink = true,
-  headingLevel = "h2",
   className = "",
   photoRadiusClassName = "",
   actions,
@@ -316,7 +309,6 @@ export default function BoxCardBody({
   // there's no admin text at all (task spec: "if the box's admin-typed
   // most_needed is set — show it exactly as today (admin wins)").
   const neededFromVisitors = mostNeededChips.length === 0 ? (box.box.neededFromVisitors ?? []) : [];
-  const NameTag = headingLevel;
 
   // ── Blocks — each defined once, ordered per layout below ────────────────
   // (#725: the two layouts used to be two full copies of the same markup.)
@@ -335,20 +327,20 @@ export default function BoxCardBody({
         </span>
         {actions && <div className="flex shrink-0 items-center gap-4">{actions}</div>}
       </div>
-      <NameTag
+      <h2
         id={nameId}
         className="text-xl font-normal leading-tight text-[var(--color-ink-900)]"
         style={{ fontFamily: "var(--font-display)" }}
       >
         {box.name}
-      </NameTag>
+      </h2>
     </div>
   );
 
   // Address — the text itself is the directions link/trigger (mockup v3,
   // option B — Kyle's pick, no icon, no button row). See this file's own
-  // header for the walk-restore rationale. `walk` absent (BoxHistoryContent,
-  // no map on that page): plain external `<a>` to Google Maps with NO preset
+  // header for the walk-restore rationale. `walk` absent (no live caller
+  // today): plain external `<a>` to Google Maps with NO preset
   // travelmode (fix pass, item 4 — many box visitors walk or ride the bus).
   // `walk` present: a `<button>` starting the SAME in-app walking route
   // DirectionButtons' Walk button does, styled identically, and its visible
@@ -566,7 +558,7 @@ export default function BoxCardBody({
     );
   }
 
-  // ── Default layout — desktop panel and the box history page ─────────────
+  // ── Default layout — desktop panel (DesktopVenueWindow) ─────────────────
   // Photo first, full-bleed, with the status pill overlaid; no photo -> a
   // plain inline pill instead, never a placeholder image.
   return (

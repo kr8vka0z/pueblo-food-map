@@ -30,26 +30,14 @@
  */
 
 import { NextRequest } from "next/server";
-import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { loadNetworkStatsData, type NetworkStatsData } from "@/lib/boxStats";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
-import { respondWithEdgeCache, type BestEffortResult } from "@/lib/edgeCache";
+import { bestEffort, respondWithEdgeCache } from "@/lib/edgeCache";
 
 export const dynamic = "force-dynamic";
 
 const EMPTY_DATA: NetworkStatsData = { boxes: [], checkins: [], photos: [] };
 
-async function loadNetworkStatsBestEffort(): Promise<BestEffortResult<NetworkStatsData>> {
-  try {
-    const { env } = getCloudflareContext();
-    const data = await loadNetworkStatsData(env.ADMIN_DB);
-    return { data, degraded: false };
-  } catch (err) {
-    logBlessingBoxesReadFailure(err instanceof Error ? err.message : "unknown error");
-    return { data: EMPTY_DATA, degraded: true };
-  }
-}
-
 export async function GET(req: NextRequest): Promise<Response> {
-  return respondWithEdgeCache(req, loadNetworkStatsBestEffort);
+  return respondWithEdgeCache(req, () => bestEffort(loadNetworkStatsData, EMPTY_DATA, logBlessingBoxesReadFailure));
 }

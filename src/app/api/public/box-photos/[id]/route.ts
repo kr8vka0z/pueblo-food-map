@@ -32,6 +32,7 @@
 
 import { NextRequest } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
+import { positiveInt } from "@/lib/positiveInt";
 import { loadApprovedBoxPhotoById } from "@/lib/boxPhotos";
 import { serveFromEdgeCache } from "@/lib/edgeCache";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
@@ -49,21 +50,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const { id: rawId } = await params;
-  const photoId = Number(rawId);
-  if (!Number.isInteger(photoId) || photoId <= 0) return notFound();
+  const photoId = positiveInt(Number(rawId));
+  if (photoId === null) return notFound();
 
   return serveFromEdgeCache(new Request(req.url, req), async () => ({ response: await loadPhoto(photoId) }));
 }
 
 /** Builds the photo response: a 404 on any miss, otherwise the JPEG bytes with the 5-minute Cache-Control. */
 async function loadPhoto(photoId: number): Promise<Response> {
-  let db: D1Database;
-  let bucket: R2Bucket;
-  try {
-    ({ env: { ADMIN_DB: db, BOX_PHOTOS: bucket } } = getCloudflareContext());
-  } catch {
-    return notFound(); // no live Worker context — degrade the same as "not found," never a 500 for a public image request
-  }
+  const { env: { ADMIN_DB: db, BOX_PHOTOS: bucket } } = getCloudflareContext();
 
   let row;
   try {

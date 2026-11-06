@@ -54,6 +54,7 @@ import EventFlyerField from "@/components/EventFlyerField";
 import type { PublicFlyer } from "@/lib/events";
 import type { VenueChoice } from "@/lib/adminEventReads";
 import type { EventLinkLabel, EventStatus } from "@/lib/adminEventValidation";
+import type { GeocodeMatch } from "@/lib/censusGeocode";
 
 export interface EventFormValues {
   name: string;
@@ -100,12 +101,6 @@ export interface EventFormProps {
 
 // Keys match the server's error map (adminEventValidation.ts): snake_case field names, `place`, `starts_at`, `ends_at`, `_form`.
 type FieldErrors = Record<string, string | undefined>;
-
-interface GeocodeMatch {
-  lat: number;
-  lng: number;
-  matchedAddress: string;
-}
 
 const EMPTY: EventFormValues = {
   name: "", nameEs: "", host: "", hostEs: "", description: "", descriptionEs: "",
@@ -415,7 +410,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         <div role="status" className="rounded-[var(--radius-md)] border border-[var(--color-sage-500)] bg-[var(--color-sage-50)] px-4 py-3 text-sm text-[var(--color-sage-700)]">
           <p className="font-medium">Saved.</p>
           <p className="mt-1 flex flex-wrap gap-x-4">
-            {/* ?event=<id> deep-links the map to this event; the map ignores it until slice 2 (#758). */}
+            {/* ?event=<id> opens this event's card on the map (#758). */}
             <Link href={`/?event=${saved.id}`} className="font-medium underline underline-offset-2">
               View on map
             </Link>

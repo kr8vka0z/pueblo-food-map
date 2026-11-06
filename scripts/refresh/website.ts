@@ -91,7 +91,7 @@ function hostIn(host: string, list: string[]): boolean {
  * the reader at this server's own services, the tailnet (100.64/10) or the
  * router. Names with no dot ("localhost", a tailnet machine name) and
  * local-only suffixes are refused too. Checks the name, not what it
- * resolves to (see websiteIo.ts's publicFetch).
+ * resolves to (see websiteIo.ts's makePinnedLookup).
  */
 export function isPublicHttpUrl(url: string | null | undefined): boolean {
   if (!url) return false;

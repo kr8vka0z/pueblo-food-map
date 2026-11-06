@@ -42,7 +42,7 @@ import type { ProposalDraft } from "./diffEngine";
 import { computeAutoApplyEligibility, serializeTriageResult, type TriageResult } from "./triage";
 
 export interface ProposalWriteStatements {
-  /** true = this proposal auto-applied to `venues` this run (date-only); false = it was written as a normal pending row for a human to review. */
+  /** true = this run wrote the proposal as already approved (date-only observation, switch lane, or AI lane); false = it was written as a normal pending row for a human to review. */
   autoApplied: boolean;
   statements: string[];
 }
@@ -106,7 +106,8 @@ export interface ProposalWriteOptions {
   /**
    * REFRESH_AI_AUTO_APPLY (default OFF). When on, an `auto_apply_candidate`
    * that ALSO re-passes the deterministic formatting-only check is applied
-   * like a date-only bump, under AI_AUTO_APPLY_ACTOR. Off → it is written
+   * under AI_AUTO_APPLY_ACTOR (venues UPDATE + audit_log + approved row).
+   * Off → it is written
    * as a normal pending row with its lane stored.
    */
   aiAutoApply?: boolean;
@@ -129,10 +130,8 @@ function triageColumns(triage: TriageResult | null | undefined, now: string, sql
 }
 
 /**
- * `sqlText` is passed in rather than imported (see refresh-ingest.ts's
- * "SQL literal helpers" header): the caller already owns the
- * one canonical `sqlText`, and passing it keeps this module free of any
- * import that could pull in a stale data-module cache.
+ * `sqlText` is passed in (refresh-ingest.ts passes scripts/refresh/sql.ts's),
+ * so tests can hand in their own quoter.
  */
 export function buildProposalWriteStatements(
   proposal: ProposalDraft,
@@ -174,23 +173,50 @@ export function buildProposalWriteStatements(
   // Already-'approved' with applied_at NULL: a complete who/when trail for
   // the run (refreshAlerts.ts's staleness check reads it), while saying
   // plainly that nothing was applied to `venues`.
-  statements.push(
-    "INSERT INTO change_proposals (source, target_venue_id, change_type, proposed_diff, diff_hash, run_id, status, reviewed_by, reviewed_at) VALUES (" +
-      [
-        sqlText(proposal.source),
-        sqlText(proposal.targetVenueId),
-        sqlText(proposal.changeType),
-        sqlText(JSON.stringify(proposal.proposedDiff)),
-        sqlText(proposal.diffHash),
-        sqlText(proposal.runId),
-        sqlText("approved"),
-        sqlText(AUTO_APPLY_ACTOR),
-        sqlText(now),
-      ].join(", ") +
-      ");",
-  );
+  statements.push(approvedRow(proposal, AUTO_APPLY_ACTOR, now, sqlText, { cols: "", vals: [] }, false));
 
   return { autoApplied: true, statements };
+}
+
+/**
+ * An already-'approved' change_proposals row. `applied` adds applied_at = now
+ * (the switch and AI lanes); the date-only lane leaves it out (NULL: nothing
+ * was applied to `venues`).
+ */
+function approvedRow(
+  proposal: ProposalDraft,
+  actor: string,
+  now: string,
+  sqlText: SqlText,
+  tri: { cols: string; vals: string[] },
+  applied: boolean,
+): string {
+  return (
+    `INSERT INTO change_proposals (source, target_venue_id, change_type, proposed_diff, diff_hash, run_id, status, reviewed_by, reviewed_at${applied ? ", applied_at" : ""}${tri.cols}) VALUES (` +
+    [
+      sqlText(proposal.source),
+      sqlText(proposal.targetVenueId),
+      sqlText(proposal.changeType),
+      sqlText(JSON.stringify(proposal.proposedDiff)),
+      sqlText(proposal.diffHash),
+      sqlText(proposal.runId),
+      sqlText("approved"),
+      sqlText(actor),
+      sqlText(now),
+      ...(applied ? [sqlText(now)] : []),
+      ...tri.vals,
+    ].join(", ") +
+    ");"
+  );
+}
+
+/** The audit_log row for an automatic venues UPDATE, so it reverts like a human Approve. */
+function auditRow(actor: string, venueId: string, before: unknown, after: unknown, now: string, sqlText: SqlText): string {
+  return (
+    "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (" +
+    [sqlText(actor), sqlText("venue"), sqlText(venueId), sqlText("update"), sqlText(JSON.stringify(before)), sqlText(JSON.stringify(after)), sqlText(now)].join(", ") +
+    ");"
+  );
 }
 
 /** A plain pending row for a human to review (status from the table's DEFAULT 'pending'). */
@@ -212,9 +238,11 @@ function pendingInsert(proposal: ProposalDraft, sqlText: SqlText, tri: { cols: s
 
 /**
  * The Jev-gated lane's write (only with REFRESH_AI_AUTO_APPLY on): same
- * three-statement shape as the date-only branch — venues UPDATE, audit_log,
- * an already-approved proposal row carrying Jev's verdict — so it stays
- * reversible through audit_log exactly like a human Approve. The caller
+ * shape as the switch lane below — venues UPDATE, audit_log, an
+ * already-approved proposal row carrying Jev's verdict — so it stays
+ * reversible through audit_log exactly like a human Approve. Unlike the switch
+ * lane it still stamps last_verified (it predates the 2026-10-25 rule; the
+ * lane is off, REFRESH_AI_AUTO_APPLY = "false"). The caller
  * re-checked computeAutoApplyEligibility, so the one field is phone or url:
  * a plain TEXT column, no hours JSON handling needed.
  */
@@ -231,32 +259,15 @@ function buildAiAutoApplyStatements(
   const newLastVerified = after.last_verified ?? null;
   return [
     `UPDATE venues SET ${field} = ${sqlText(newValue)}, last_verified = ${sqlText(newLastVerified)}, updated_by = ${sqlText(AI_AUTO_APPLY_ACTOR)}, updated_at = ${sqlText(now)} WHERE id = ${sqlText(proposal.targetVenueId)};`,
-    "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (" +
-      [
-        sqlText(AI_AUTO_APPLY_ACTOR),
-        sqlText("venue"),
-        sqlText(proposal.targetVenueId),
-        sqlText("update"),
-        sqlText(JSON.stringify({ [field]: before[field] ?? null, last_verified: before.last_verified ?? null })),
-        sqlText(JSON.stringify({ [field]: newValue, last_verified: newLastVerified })),
-        sqlText(now),
-      ].join(", ") +
-      ");",
-    `INSERT INTO change_proposals (source, target_venue_id, change_type, proposed_diff, diff_hash, run_id, status, reviewed_by, reviewed_at, applied_at${tri.cols}) VALUES (` +
-      [
-        sqlText(proposal.source),
-        sqlText(proposal.targetVenueId),
-        sqlText(proposal.changeType),
-        sqlText(JSON.stringify(proposal.proposedDiff)),
-        sqlText(proposal.diffHash),
-        sqlText(proposal.runId),
-        sqlText("approved"),
-        sqlText(AI_AUTO_APPLY_ACTOR),
-        sqlText(now),
-        sqlText(now),
-        ...tri.vals,
-      ].join(", ") +
-      ");",
+    auditRow(
+      AI_AUTO_APPLY_ACTOR,
+      proposal.targetVenueId,
+      { [field]: before[field] ?? null, last_verified: before.last_verified ?? null },
+      { [field]: newValue, last_verified: newLastVerified },
+      now,
+      sqlText,
+    ),
+    approvedRow(proposal, AI_AUTO_APPLY_ACTOR, now, sqlText, tri, true),
   ];
 }
 
@@ -287,7 +298,7 @@ export function isSwitchApplicable(proposal: ProposalDraft, states: SwitchState[
 
 /**
  * venues UPDATE + audit_log + an already-approved proposal row + one
- * accepted observation per field. Unlike the older AI lane it does NOT move
+ * accepted observation per field. Like the AI lane it does NOT move
  * last_verified: AGENTS.md (step 1) — last_verified moves only on a human
  * approve or edit; a source applying its own change is not a confirmation.
  * The accepted observation is what records which source backs the value.
@@ -313,32 +324,8 @@ function buildSwitchApplyStatements(proposal: ProposalDraft, now: string, sqlTex
   });
   return [
     `UPDATE venues SET ${sets}, updated_by = ${sqlText(AUTO_SWITCH_ACTOR)}, updated_at = ${sqlText(now)} WHERE id = ${sqlText(proposal.targetVenueId)};`,
-    "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (" +
-      [
-        sqlText(AUTO_SWITCH_ACTOR),
-        sqlText("venue"),
-        sqlText(proposal.targetVenueId),
-        sqlText("update"),
-        sqlText(JSON.stringify(pick(before))),
-        sqlText(JSON.stringify(pick(after))),
-        sqlText(now),
-      ].join(", ") +
-      ");",
-    `INSERT INTO change_proposals (source, target_venue_id, change_type, proposed_diff, diff_hash, run_id, status, reviewed_by, reviewed_at, applied_at${tri.cols}) VALUES (` +
-      [
-        sqlText(proposal.source),
-        sqlText(proposal.targetVenueId),
-        sqlText(proposal.changeType),
-        sqlText(JSON.stringify(proposal.proposedDiff)),
-        sqlText(proposal.diffHash),
-        sqlText(proposal.runId),
-        sqlText("approved"),
-        sqlText(AUTO_SWITCH_ACTOR),
-        sqlText(now),
-        sqlText(now),
-        ...tri.vals,
-      ].join(", ") +
-      ");",
+    auditRow(AUTO_SWITCH_ACTOR, proposal.targetVenueId, pick(before), pick(after), now, sqlText),
+    approvedRow(proposal, AUTO_SWITCH_ACTOR, now, sqlText, tri, true),
     ...observations,
   ];
 }

@@ -32,7 +32,6 @@ import { PUEBLO_COUNTY_BBOX } from "@/data/pueblo-bbox";
 import { slotToIsoTimes } from "@/lib/hours";
 import {
   computeDiffHash,
-  excludeBlessingBoxes,
   rejectionKey,
   type CurrentVenueRow,
   type ProposalDraft,
@@ -551,13 +550,11 @@ const SWITCH_FIELDS_FOR_CAS = ["address", "phone", "url", "hours_weekly", "hours
  */
 export function buildCareAndShareProposals(params: CareAndShareBuildParams): CareAndShareBuildResult {
   const { today, runId, fetchedAt } = params;
-  const stripped = excludeBlessingBoxes(params.venues, []);
   const boxIds = new Set(params.venues.filter((v) => v.category === "blessing_box").map((v) => v.id));
-  const pool = stripped.currentRows.filter((v) => MATCHABLE_CATEGORIES.has(v.category));
+  const pool = params.venues.filter((v) => MATCHABLE_CATEGORIES.has(v.category));
   const byId = new Map(pool.map((v) => [v.id, v]));
   const aliasMap = new Map(params.aliases.filter((a) => a.source === CAS_SOURCE).map((a) => [a.upstream_id, a.venue_id]));
-  const schedulesById = new Map<number, CasSchedule[]>();
-  for (const s of params.schedules) (schedulesById.get(s.locationId) ?? schedulesById.set(s.locationId, []).get(s.locationId)!).push(s);
+  const schedulesById = Map.groupBy(params.schedules, (s) => s.locationId);
 
   type Claim = { loc: CasLocation; venue: CurrentVenueRow; kind: "known" | "strong" | "ambiguous"; evidence?: Evidence };
   const claims: Claim[] = [];
@@ -592,8 +589,7 @@ export function buildCareAndShareProposals(params: CareAndShareBuildParams): Car
     claims.push({ loc, venue: scored[0].venue, kind: "ambiguous", evidence: scored[0].evidence });
   }
 
-  const claimsByVenue = new Map<string, Claim[]>();
-  for (const c of claims) (claimsByVenue.get(c.venue.id) ?? claimsByVenue.set(c.venue.id, []).get(c.venue.id)!).push(c);
+  const claimsByVenue = Map.groupBy(claims, (c) => c.venue.id);
 
   const proposals: ProposalDraft[] = [];
   const aliasWrites: CareAndShareBuildResult["aliasWrites"] = [];
@@ -637,7 +633,7 @@ export function buildCareAndShareProposals(params: CareAndShareBuildParams): Car
     // spread across the listings: read every listing's rows, not just the
     // lowest id's.
     const rows = sortedGroup.flatMap((c) => schedulesById.get(c.loc.locationId) ?? []);
-    const diff = diffLocation(claim.loc, rows, current, today, fetchedAt);
+    const diff = diffLocation(claim.loc, rows, current, fetchedAt);
     if (diff.unconvertible) stats.unconvertible++;
     const meta: Record<string, unknown> = { ...diff.meta, ...(alsoListedAs ? { also_listed_as: alsoListedAs } : {}) };
     // First run of a self-made link: marked (meta isn't hashed) so the
@@ -771,8 +767,7 @@ interface LocationDiff {
  * their side never proposes clearing ours (a blank field on a listing isn't
  * a statement that the venue has no phone).
  */
-function diffLocation(loc: CasLocation, rows: CasSchedule[], current: CurrentVenueRow, today: string, fetchedAt: string): LocationDiff {
-  void today;
+function diffLocation(loc: CasLocation, rows: CasSchedule[], current: CurrentVenueRow, fetchedAt: string): LocationDiff {
   const before: Record<string, unknown> = {};
   const after: Record<string, unknown> = {};
   const meta: Record<string, unknown> = { locationId: loc.locationId, fetched_at: fetchedAt };

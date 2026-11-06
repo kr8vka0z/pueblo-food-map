@@ -1,21 +1,16 @@
 /**
  * load-real-blessing-boxes.ts — turns Kyle's real Pueblo-area blessing-box
- * address list into ready-to-apply SQL. Real-data sibling of
- * scripts/seed-blessing-boxes.ts (same shape: this only WRITES two SQL
- * files into scripts/generated/ — gitignored, derivable from this committed
- * script — and never touches D1 itself).
+ * address list into ready-to-apply SQL. It only WRITES two SQL files into
+ * scripts/generated/ (gitignored, derivable from this committed script) and
+ * never touches D1 itself.
  *
  * Source list: atlas-kb/projects/Pueblo Food Map/Blessing Boxes - Initial
  * Location List.md — 27 real locations from Kyle's Google My Maps layer
  * (2026-09-18). "216 W Routt" is intentionally NOT here: that box is
  * already live via migrations/0006_convert_routt_blessing_box.sql.
  *
- * Geocoding: the same free US Census geocoder the admin venue-create path
- * uses (src/app/api/admin/geocode/route.ts) — same endpoint, benchmark, and
- * coordinate rounding. That route's own parser (parseMatches/round6) isn't
- * exported, so this script can't import it directly without editing an
- * unrelated admin route out of this slice's scope; it mirrors the same
- * request shape instead. Results are cached to
+ * Geocoding: src/lib/censusGeocode.ts, the same Census lookup the admin
+ * venue-create path uses. Results are cached to
  * scripts/generated/load-real-blessing-boxes-geocode-cache.json so re-runs
  * don't re-hit the service.
  *
@@ -32,7 +27,7 @@
  * The SQL carries no environment-specific values, so the same two files
  * apply to staging and production alike.
  *
- * RUN — one-time, human-reviewed, same convention as seed-blessing-boxes.ts:
+ * RUN — one-time, human-reviewed:
  *   bun run scripts/load-real-blessing-boxes.ts
  * (or: bunx tsx scripts/load-real-blessing-boxes.ts)
  * This only WRITES the files below; review them, then apply with wrangler
@@ -44,7 +39,10 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { setTimeout as sleep } from "node:timers/promises";
 import { PUEBLO_COUNTY_BBOX } from "@/data/pueblo-bbox";
+import { geocodeAddress, type GeocodeMatch } from "@/lib/censusGeocode";
+import { sqlText } from "./refresh/sql";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, "..");
@@ -114,32 +112,19 @@ const REAL_BOXES: RealBoxSource[] = [
   { order: 27, streetAddress: "2529 E 8th St", cityStateZip: PUEBLO },
 ];
 
-// ─── Census geocoder (mirrors src/app/api/admin/geocode/route.ts) ─────────
+// ─── Census geocoder cache ─────────────────────────────────────────────────
 
-const CENSUS_GEOCODER_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress";
-const CENSUS_BENCHMARK = "Public_AR_Current";
-const FETCH_TIMEOUT_MS = 8000;
 // ponytail: politeness delay between live geocoder calls — Census documents
 // no hard rate limit for this endpoint, but 27 back-to-back requests from a
 // script is exactly the kind of burst a free public API might throttle.
 const REQUEST_DELAY_MS = 250;
 
-interface CensusMatch {
-  lat: number;
-  lng: number;
-  matchedAddress: string;
-}
-
 interface CacheEntry {
   queriedAt: string;
-  matches: CensusMatch[];
+  matches: GeocodeMatch[];
 }
 
 type GeocodeCache = Record<string, CacheEntry>;
-
-function round6(n: number): number {
-  return Math.round(n * 1e6) / 1e6;
-}
 
 function loadCache(): GeocodeCache {
   if (!existsSync(CACHE_FILE)) return {};
@@ -153,31 +138,6 @@ function loadCache(): GeocodeCache {
 function saveCache(cache: GeocodeCache): void {
   mkdirSync(GENERATED_DIR, { recursive: true });
   writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2) + "\n", "utf-8");
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** Same shape as the admin geocode route's own CensusGeocoderResponse parsing. */
-async function geocodeAddress(query: string): Promise<CensusMatch[]> {
-  const url = `${CENSUS_GEOCODER_URL}?address=${encodeURIComponent(query)}&benchmark=${CENSUS_BENCHMARK}&format=json`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-  if (!res.ok) throw new Error(`Census geocoder HTTP ${res.status}`);
-  const data = (await res.json()) as {
-    result?: { addressMatches?: { matchedAddress?: unknown; coordinates?: { x?: unknown; y?: unknown } }[] };
-  };
-  const raw = data.result?.addressMatches;
-  if (!Array.isArray(raw)) return [];
-  const matches: CensusMatch[] = [];
-  for (const entry of raw) {
-    const x = entry.coordinates?.x;
-    const y = entry.coordinates?.y;
-    const matchedAddress = entry.matchedAddress;
-    if (typeof x !== "number" || typeof y !== "number" || typeof matchedAddress !== "string") continue;
-    matches.push({ lat: round6(y), lng: round6(x), matchedAddress });
-  }
-  return matches;
 }
 
 /** [[lngWest, latSouth], [lngEast, latNorth]] per src/data/pueblo-bbox.ts's own doc comment. */
@@ -207,7 +167,7 @@ async function geocodeAll(sources: RealBoxSource[]): Promise<GeocodedBox[]> {
     let entry = cache[fullQuery];
 
     if (!entry) {
-      let matches: CensusMatch[];
+      let matches: GeocodeMatch[];
       try {
         matches = await geocodeAddress(fullQuery);
       } catch (err) {
@@ -239,12 +199,8 @@ async function geocodeAll(sources: RealBoxSource[]): Promise<GeocodedBox[]> {
 
 // ─── SQL generation ─────────────────────────────────────────────────────────
 
-function sqlString(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
-}
-
 function sqlOptString(value: string | null | undefined): string {
-  return value ? sqlString(value) : "NULL";
+  return value ? sqlText(value) : "NULL";
 }
 
 /** Deterministic id from the street address — see header's "Idempotent re-run" note. */
@@ -322,16 +278,16 @@ function buildLoadSql(boxes: GeocodedBox[], today: string): string {
     const id = boxId(box.streetAddress);
     lines.push(
       `INSERT OR IGNORE INTO venues (${VENUES_INSERT_COLUMNS.join(", ")}) VALUES (` +
-        `${sqlString(id)}, ${sqlString(boxName(box))}, 'blessing_box', ${box.lat}, ${box.lng}, ` +
-        `${sqlString(displayAddress(box))}, ${sqlOptString(box.phone)}, ` +
+        `${sqlText(id)}, ${sqlText(boxName(box))}, 'blessing_box', ${box.lat}, ${box.lng}, ` +
+        `${sqlText(displayAddress(box))}, ${sqlOptString(box.phone)}, ` +
         `${sqlOptString(box.website)}, ${sqlOptString(box.description)}, ` +
-        `${sqlString(RUN_LABEL)}, ${sqlString(today)}, 'published', 'manual', 0, ` +
-        `${sqlString(RUN_LABEL)}, ${sqlString(RUN_LABEL)});`,
+        `${sqlText(RUN_LABEL)}, ${sqlText(today)}, 'published', 'manual', 0, ` +
+        `${sqlText(RUN_LABEL)}, ${sqlText(RUN_LABEL)});`,
     );
     // Matches migrations/0006_convert_routt_blessing_box.sql's own pattern
     // exactly: no host info known yet for any of these, an admin fills it in
     // later via the edit screen.
-    lines.push(`INSERT OR IGNORE INTO blessing_boxes (venue_id) VALUES (${sqlString(id)});`);
+    lines.push(`INSERT OR IGNORE INTO blessing_boxes (venue_id) VALUES (${sqlText(id)});`);
   }
 
   return lines.join("\n") + "\n";
@@ -347,8 +303,8 @@ function buildRemoveSql(boxes: GeocodedBox[]): string {
   ];
   for (const box of boxes) {
     const id = boxId(box.streetAddress);
-    lines.push(`DELETE FROM blessing_boxes WHERE venue_id = ${sqlString(id)};`);
-    lines.push(`DELETE FROM venues WHERE id = ${sqlString(id)};`);
+    lines.push(`DELETE FROM blessing_boxes WHERE venue_id = ${sqlText(id)};`);
+    lines.push(`DELETE FROM venues WHERE id = ${sqlText(id)};`);
   }
   return lines.join("\n") + "\n";
 }

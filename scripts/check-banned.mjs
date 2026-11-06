@@ -9,6 +9,7 @@
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PATTERNS = [
   { name: 'Inter font import',          re: /["'`]Inter["'`]|next\/font\/google.*Inter|font-family:\s*["']?Inter["']?/i },
@@ -18,12 +19,7 @@ const PATTERNS = [
   { name: 'Source Sans Pro font',       re: /["'`]Source Sans Pro["'`]/i },
   { name: 'system-ui-only stack',       re: /font-family:\s*system-ui\s*;/i },
   { name: 'next/font/google import',    re: /from\s+["']next\/font\/google["']/ },
-  { name: 'Tailwind gray palette',      re: /\bgray-(50|100|200|300|400|500|600|700|800|900)\b/ },
-  { name: 'Tailwind blue palette',      re: /\bblue-(50|100|200|300|400|500|600|700|800|900)\b/ },
-  { name: 'Tailwind slate palette',     re: /\bslate-(50|100|200|300|400|500|600|700|800|900)\b/ },
-  { name: 'Tailwind zinc palette',      re: /\bzinc-(50|100|200|300|400|500|600|700|800|900)\b/ },
-  { name: 'Tailwind neutral palette',   re: /\bneutral-(50|100|200|300|400|500|600|700|800|900)\b/ },
-  { name: 'Tailwind stone palette',     re: /\bstone-(50|100|200|300|400|500|600|700|800|900)\b/ },
+  { name: 'Tailwind neutral/blue palette', re: /\b(gray|blue|slate|zinc|neutral|stone)-(50|100|200|300|400|500|600|700|800|900)\b/ },
   // Chromatic palettes too: form errors had drifted to stock red-500/600/700
   // instead of the `danger` token. Every color here is a custom @theme token.
   { name: 'Tailwind chromatic palette', re: /\b(red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|indigo|violet|purple|fuchsia|pink|rose)-(50|100|200|300|400|500|600|700|800|900|950)\b/ },
@@ -34,7 +30,7 @@ const PATTERNS = [
     allowFiles: ['src/components/BoxReportsChart.tsx'] },
 ];
 
-const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '').replace(/^\/([A-Z]:)/, '$1');
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 // .wrangler/dist/.vinext/coverage are build/output dirs (see .gitignore; .open-next is the old
 // OpenNext output dir, still skipped because check-banned.test.mjs pins it) — they

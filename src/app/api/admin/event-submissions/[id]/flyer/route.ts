@@ -7,19 +7,14 @@
 
 import { type NextRequest } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
+import { adminReadAccess } from "@/lib/adminAuthErrors";
 import { PENDING_FLYER_KEY_RE } from "@/lib/eventFlyers";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await getAdminDb(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminReadAccess(req);
+  if (access instanceof Response) return access;
   const { id } = await params;
   const row = await access.db.prepare("SELECT flyer_key FROM event_submissions WHERE id = ?").bind(id).first<{ flyer_key: string | null }>();
   if (!row?.flyer_key || !PENDING_FLYER_KEY_RE.test(row.flyer_key)) return new Response(null, { status: 404 });

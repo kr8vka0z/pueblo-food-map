@@ -200,14 +200,6 @@ describe("POST /api/public/alerts/confirm", () => {
     expect(await res.json()).toEqual({ ok: false, error: "invalid_token" });
   });
 
-  test("no Cloudflare context available -> 503, never throws", async () => {
-    mockGetCloudflareContext.mockImplementation(() => {
-      throw new Error("no cloudflare context");
-    });
-    const res = await POST(makeRequest({ token: "any-token" }));
-    expect(res.status).toBe(503);
-  });
-
   // 2026-09-18 security review, item 9: a D1 exception on either table's
   // lookup (a transient outage, or "no such table" if migration 0010 hasn't
   // landed on this environment) used to bubble up as an unhandled 500.

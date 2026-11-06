@@ -178,14 +178,4 @@ describe("POST /api/csp-report", () => {
     expect(res.status).toBe(204);
     expect(warnSpy).not.toHaveBeenCalled();
   });
-
-  test("fails closed (never logs) when the Cloudflare D1 context can't be resolved, without 500ing the response", async () => {
-    mockGetCloudflareContext.mockImplementation(() => {
-      throw new Error("no live Worker context");
-    });
-    const res = await POST(postReport({ "csp-report": { "violated-directive": "script-src" } }));
-
-    expect(res.status).toBe(204);
-    expect(warnSpy).not.toHaveBeenCalled();
-  });
 });

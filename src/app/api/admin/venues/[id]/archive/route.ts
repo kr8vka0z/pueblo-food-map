@@ -59,8 +59,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
 import type { AdminVenueRow } from "@/types/venue";
 // #265: the edit route's SELECT-form insert. Its WHERE EXISTS guard skips the
 // audit row when the archive UPDATE below didn't apply; the trailing two bind
@@ -71,12 +70,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
   const { id } = await params;
 

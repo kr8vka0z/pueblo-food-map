@@ -101,12 +101,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     throw new Error("CHECKIN_RATE_LIMIT_SECRET not configured");
   }
 
-  let db: D1Database;
-  try {
-    ({ env: { ADMIN_DB: db } } = getCloudflareContext());
-  } catch {
-    return respond(wantsHtml, false, "unavailable", 503);
-  }
+  const { env: { ADMIN_DB: db } } = getCloudflareContext();
 
   const result = await stopSubscriptionByToken(db, token, rateLimitSecret);
   // "rate_limited" folds into the same neutral outcome as "not_found" —

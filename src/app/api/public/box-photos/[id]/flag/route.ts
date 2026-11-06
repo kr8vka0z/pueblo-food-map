@@ -20,7 +20,7 @@
  * photo. A real client always has one (getCheckinClientToken() mints it on
  * first localStorage read), so requiring it here costs nothing for a real
  * visitor and closes the free-for-all. Order: id -> clientToken presence
- * (400) -> live D1 context (503) -> per-visitor cap (429) -> a NEW
+ * (400) -> per-visitor cap (429) -> a NEW
  * site-wide cap across ALL photos (429, ~30/hour — closes the "rotate
  * clientToken to bypass the per-visitor cap" gap the per-visitor check
  * alone can't) -> load the photo AS APPROVED ONLY -> flip.
@@ -40,6 +40,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
+import { positiveInt } from "@/lib/positiveInt";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { loadApprovedBoxPhotoById } from "@/lib/boxPhotos";
 import { bustEdgeCache } from "@/lib/edgeCache";
@@ -71,8 +72,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const { id: rawId } = await params;
-  const photoId = Number(rawId);
-  if (!Number.isInteger(photoId) || photoId <= 0) {
+  const photoId = positiveInt(Number(rawId));
+  if (photoId === null) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
@@ -88,12 +89,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "missing_client_token" }, { status: 400 });
   }
 
-  let db: D1Database;
-  try {
-    ({ env: { ADMIN_DB: db } } = getCloudflareContext());
-  } catch {
-    return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
-  }
+  const { env: { ADMIN_DB: db } } = getCloudflareContext();
 
   const checkinRateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
   if (!checkinRateLimitSecret) {

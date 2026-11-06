@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { bustEdgeCache } from "@/lib/edgeCache";
 import { auditInsertIfExistsSql } from "@/lib/auditLog";
 import type { EventRow } from "@/lib/events";
+import type { ValidatedEventFields } from "@/lib/adminEventValidation";
 
 /** The public feed's path — every events write purges this edge-cache entry. */
 const PUBLIC_EVENTS_PATH = "/api/public/events";
@@ -77,4 +78,40 @@ export function purgeEventsFeed(req: Request, eventId: string): Promise<void> {
 export function nextTimestamp(previous: string): string {
   const now = new Date().toISOString();
   return now > previous ? now : new Date(Date.parse(previous) + 1).toISOString();
+}
+
+/**
+ * The validated form fields as events-row columns, for the create and edit
+ * routes. The cancel note is passed in because each route decides it (a
+ * create ignores it). Keys stay in table order: the create route's row is
+ * JSON-encoded into audit_log as built.
+ */
+export function eventColumnsFrom(
+  fields: ValidatedEventFields,
+  cancelNote: string | null,
+  cancelNoteEs: string | null,
+) {
+  return {
+    name: fields.name,
+    name_es: fields.nameEs,
+    host: fields.host,
+    host_es: fields.hostEs,
+    description: fields.description,
+    description_es: fields.descriptionEs,
+    what_to_bring: fields.whatToBring,
+    what_to_bring_es: fields.whatToBringEs,
+    cancel_note: cancelNote,
+    cancel_note_es: cancelNoteEs,
+    starts_at: fields.startsAt,
+    ends_at: fields.endsAt,
+    lat: fields.lat,
+    lng: fields.lng,
+    address: fields.address,
+    venue_id: fields.venueId,
+    venue_name: fields.venueName,
+    link_url: fields.linkUrl,
+    link_label: fields.linkLabel,
+    link_label_custom: fields.linkLabelCustom,
+    link_label_custom_es: fields.linkLabelCustomEs,
+  } satisfies Partial<EventRow>;
 }

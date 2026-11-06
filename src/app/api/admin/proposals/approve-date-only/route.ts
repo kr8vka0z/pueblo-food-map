@@ -55,8 +55,8 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
+import { positiveInt } from "@/lib/positiveInt";
 import { applyApprovedProposal, isDateOnlyUpdateProposal, parseProposalRow, type ChangeProposalRow } from "@/lib/adminProposals";
 import { D1_MAX_BOUND_PARAMS, chunkArray } from "@/lib/d1";
 
@@ -70,8 +70,9 @@ function extractRequestedIds(body: unknown): number[] | null {
   if (!Array.isArray(ids) || ids.length === 0) return null;
   const parsed: number[] = [];
   for (const raw of ids) {
-    if (typeof raw !== "number" || !Number.isInteger(raw) || raw <= 0) return null;
-    parsed.push(raw);
+    const id = positiveInt(raw);
+    if (id === null) return null;
+    parsed.push(id);
   }
   return parsed;
 }
@@ -93,12 +94,8 @@ async function loadProposalsByIds(db: D1Database, ids: number[]): Promise<Map<nu
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
 
   let body: unknown;

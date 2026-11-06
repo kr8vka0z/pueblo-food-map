@@ -34,10 +34,9 @@
  */
 
 import { NextRequest } from "next/server";
-import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { loadBoxActivity, type ActivityFilters, type ActivityPage } from "@/lib/boxActivity";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
-import { respondWithEdgeCache, type BestEffortResult } from "@/lib/edgeCache";
+import { bestEffort, respondWithEdgeCache } from "@/lib/edgeCache";
 
 export const dynamic = "force-dynamic";
 
@@ -58,20 +57,11 @@ function parseFilters(url: URL): ActivityFilters {
   };
 }
 
-async function loadActivityBestEffort(filters: ActivityFilters): Promise<BestEffortResult<ActivityPage>> {
-  try {
-    const { env } = getCloudflareContext();
-    const page = await loadBoxActivity(env.ADMIN_DB, filters);
-    return { data: page, degraded: false };
-  } catch (err) {
-    logBlessingBoxesReadFailure(err instanceof Error ? err.message : "unknown error");
-    // `degraded: true` tells respondWithEdgeCache() to never cache this
-    // fallback — see edgeCache.ts's own header.
-    return { data: { items: [], hasMore: false, page: 1 }, degraded: true };
-  }
-}
+const EMPTY_PAGE: ActivityPage = { items: [], hasMore: false, page: 1 };
 
 export async function GET(req: NextRequest): Promise<Response> {
   const filters = parseFilters(new URL(req.url));
-  return respondWithEdgeCache(req, () => loadActivityBestEffort(filters));
+  return respondWithEdgeCache(req, () =>
+    bestEffort((db) => loadBoxActivity(db, filters), EMPTY_PAGE, logBlessingBoxesReadFailure),
+  );
 }

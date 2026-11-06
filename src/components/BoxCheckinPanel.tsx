@@ -541,7 +541,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
   }
 
   function handleTap(kind: CheckinKind) {
-    if (submitState === "submitting" || pendingSubmit) return;
+    if (submitState === "submitting" || pendingSubmit || photoSubmitState === "submitting") return;
     if (KINDS_WITH_NOTE.has(kind)) {
       setOpenKind(kind);
       setNote("");
@@ -642,7 +642,13 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
   // never touches submitState/pendingSubmit at all, so without this the
   // just-reappeared button grid would be tappable WHILE that request is
   // still in flight.
-  const busy = submitState === "submitting" || pendingSubmit !== null || needsSubmitState === "submitting";
+  // Includes photoSubmitState (#894): a photo upload holds the single-use
+  // token until it answers, so a status tap meanwhile re-sent a spent token.
+  const busy =
+    submitState === "submitting" ||
+    pendingSubmit !== null ||
+    needsSubmitState === "submitting" ||
+    photoSubmitState === "submitting";
   // Which single button (if any) shows the "Sending…" label — either the
   // tap actually in flight, or the one queued waiting on a token.
   const needsBusy = needsSubmitState === "submitting" || pendingSubmit?.type === "needs";

@@ -54,7 +54,7 @@ import { loadBoxHealthEntries } from "@/lib/adminBoxes";
 import { countStalePlaces, resolvePlaceUsageRows } from "@/lib/adminDashboard";
 import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
-import { fetchPublishBotPrStatus, isProductionWorker, type PublishBotPrStatus } from "@/lib/publishVenues";
+import { fetchPublishBotPrStatus, isProductionWorker } from "@/lib/publishVenues";
 import {
   filterByPeriod,
   filterByPreviousPeriod,
@@ -62,7 +62,6 @@ import {
   computeNetworkPairAverages,
   computeNetworkOverview,
   computeMilestones,
-  formatDurationMs,
   rankLongestSinceLastFill,
   loadNetworkStatsData,
   loadNetworkNeedRows,
@@ -72,6 +71,8 @@ import {
   groupCheckinsByVenue,
   periodStartMs,
 } from "@/lib/boxStats";
+import { formatDurationLabel } from "@/lib/formatDurationLabel";
+import { t } from "@/lib/i18n";
 import { loadVisitorsAnalytics, DASHBOARD_PERIODS, type DashboardPeriod } from "@/lib/cfAnalytics";
 import { loadMapUsageAnalytics } from "@/lib/posthogQuery";
 import { createFetchLimiter } from "@/lib/analyticsFetch";
@@ -87,18 +88,6 @@ import DailyBars from "@/components/DailyBars";
 
 const DEFAULT_PERIOD: DashboardPeriod = "30d";
 const PERIOD_LABELS: Record<DashboardPeriod, string> = { "7d": "7 days", "30d": "30 days", "90d": "90 days" };
-/** Community label per box_checkins.needs key (migration 0012) — same nine keys as the public "what would help you next time?" ask; kept here rather than importing a component-facing label map since only these lowercase keys need a Dashboard-facing display string. */
-const NEED_LABELS: Record<string, string> = {
-  canned_food: "Canned food",
-  fresh_food: "Fresh food",
-  bread: "Bread",
-  baby_items: "Baby items",
-  diapers: "Diapers",
-  hygiene: "Hygiene items",
-  pet_food: "Pet food",
-  drinks: "Drinks",
-  warm_clothing: "Warm clothing",
-};
 
 function parsePeriod(raw: string | undefined): DashboardPeriod {
   return (DASHBOARD_PERIODS as readonly string[]).includes(raw ?? "") ? (raw as DashboardPeriod) : DEFAULT_PERIOD;
@@ -130,118 +119,77 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const period: DashboardPeriod = parsePeriod(rawPeriod);
   const now = new Date();
 
-  let email: string;
-  let showActivity = false;
-  let venues: AdminVenueRow[];
-  let submissionsTotal: number;
-  let proposalsTotal: number;
-  let photos: AdminBoxPhotoRow[];
-  let adopters: AdminBoxAdopterRow[];
-  let boxHealthEntries: Awaited<ReturnType<typeof loadBoxHealthEntries>>;
-  let publishBotStatus: PublishBotPrStatus | null;
-  let networkStats: Awaited<ReturnType<typeof loadNetworkStatsData>>;
-  let needRows: Awaited<ReturnType<typeof loadNetworkNeedRows>>;
-  let problemReportRows: Awaited<ReturnType<typeof loadProblemReports>>;
-  let latestRefresh: { runId: string; createdAt: string; suggestedCount: number } | null;
-  let env: Awaited<ReturnType<typeof getCloudflareContext>>["env"];
-  let visitors: Awaited<ReturnType<typeof loadVisitorsAnalytics>>;
-  let mapUsage: Awaited<ReturnType<typeof loadMapUsageAnalytics>>;
+  const { db, identity } = await getAdminDb(await headers()).catch(handlePageAuthError);
+  // Read only after the session check above. Both bindings are needed
+  // before the D1 burst below so the two analytics calls can start with it.
+  const { env } = await getCloudflareContext({ async: true });
 
-  try {
-    const { db, identity } = await getAdminDb(await headers());
-    email = identity.email;
-    showActivity = identity.isOwner === true;
-    // Read only after the session check above. Both bindings are needed
-    // before the D1 burst below so the two analytics calls can start with it.
-    ({ env } = await getCloudflareContext({ async: true }));
+  const publishToken = process.env.GITHUB_PUBLISH_TOKEN;
+  const periodStart = periodStartMs(period, now);
+  const cutoffIso = periodStart === null ? new Date(0).toISOString() : new Date(periodStart).toISOString();
+  // One limiter for this render, shared by both analytics loaders, so their
+  // fetches together never exceed 5 open (the Worker's limit is 6 and the
+  // publish-status GitHub fetch takes one): src/lib/analyticsFetch.ts.
+  const analyticsLimit = createFetchLimiter();
 
-    const publishToken = process.env.GITHUB_PUBLISH_TOKEN;
-    const periodStart = periodStartMs(period, now);
-    const cutoffIso = periodStart === null ? new Date(0).toISOString() : new Date(periodStart).toISOString();
-    // One limiter for this render, shared by both analytics loaders, so their
-    // fetches together never exceed 5 open (the Worker's limit is 6 and the
-    // publish-status GitHub fetch takes one): src/lib/analyticsFetch.ts.
-    const analyticsLimit = createFetchLimiter();
+  const [
+    venuesResult,
+    submissionsTotal,
+    proposalsTotal,
+    photos,
+    adopters,
+    boxHealthEntries,
+    publishBotStatus,
+    networkStats,
+    needRows,
+    problemReportRows,
+    latestRefreshRow,
+    visitors,
+    mapUsage,
+  ] = await Promise.all([
+    db.prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC").all<AdminVenueRow>(),
+    countPendingSubmissions(db),
+    countPendingProposals(db),
+    loadReviewQueue(db).catch(() => [] as AdminBoxPhotoRow[]),
+    loadPendingAdopters(db).catch(() => [] as AdminBoxAdopterRow[]),
+    loadBoxHealthEntries(db).catch(() => [] as Awaited<ReturnType<typeof loadBoxHealthEntries>>),
+    publishToken ? fetchPublishBotPrStatus(publishToken).catch(() => null) : Promise.resolve(null),
+    loadNetworkStatsData(db).catch(() => ({ boxes: [], checkins: [], photos: [], approvedSponsorCount: 0 })),
+    loadNetworkNeedRows(db, cutoffIso),
+    loadProblemReports(db),
+    // The suggested-count is a subquery, not a second read after this
+    // burst: a dependent query would cost one more D1 round trip.
+    db
+      .prepare(
+        // Derived table: pick the newest row first, then count once. A
+        // correlated subquery on the outer rows would run the COUNT per row
+        // before the ORDER BY (no index on created_at) and slow as the table grows.
+        "SELECT l.run_id, l.created_at, (SELECT COUNT(*) FROM change_proposals WHERE run_id = l.run_id) AS n " +
+          "FROM (SELECT run_id, created_at FROM change_proposals ORDER BY created_at DESC LIMIT 1) l",
+      )
+      .first<{ run_id: string; created_at: string; n: number }>(),
+    // WHY these two sit in the same Promise.all as the D1 reads: Cloudflare
+    // and PostHog are independent network calls (8s timeout per attempt, one
+    // retry, at most 5 open at once, each loader gives up after 20s:
+    // src/lib/analyticsFetch.ts), and the
+    // in-memory caches are empty on a cold Worker, the usual first
+    // visit after sign-in). Awaiting them after the D1 burst stacked their
+    // latency on top of it. Neither ever rejects (both return null on any
+    // failure), so they still degrade independently of every D1 read, see
+    // this file's own header. PostHog's project id / API host are plain
+    // wrangler vars, read via the binding per AGENTS.md "Runtime reads".
+    loadVisitorsAnalytics(period, now, analyticsLimit),
+    loadMapUsageAnalytics(period, env.POSTHOG_PROJECT_ID, env.POSTHOG_API_HOST, now, analyticsLimit),
+  ]);
+  const venues = venuesResult.results;
 
-    const [
-      venuesResult,
-      submissionsTotalResult,
-      proposalsTotalResult,
-      photosAll,
-      adoptersAll,
-      boxHealth,
-      publishBotStatusResult,
-      networkStatsResult,
-      needRowsResult,
-      problemReportsResult,
-      latestRefreshRow,
-      visitorsResult,
-      mapUsageResult,
-    ] = await Promise.all([
-      db.prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC").all<AdminVenueRow>(),
-      countPendingSubmissions(db),
-      countPendingProposals(db),
-      loadReviewQueue(db).catch(() => [] as AdminBoxPhotoRow[]),
-      loadPendingAdopters(db).catch(() => [] as AdminBoxAdopterRow[]),
-      loadBoxHealthEntries(db).catch(() => [] as Awaited<ReturnType<typeof loadBoxHealthEntries>>),
-      publishToken ? fetchPublishBotPrStatus(publishToken).catch(() => null) : Promise.resolve(null),
-      loadNetworkStatsData(db).catch(() => ({ boxes: [], checkins: [], photos: [], approvedSponsorCount: 0 })),
-      loadNetworkNeedRows(db, cutoffIso),
-      loadProblemReports(db),
-      // The suggested-count is a subquery, not a second read after this
-      // burst: a dependent query would cost one more D1 round trip.
-      db
-        .prepare(
-          // Derived table: pick the newest row first, then count once. A
-          // correlated subquery on the outer rows would run the COUNT per row
-          // before the ORDER BY (no index on created_at) and slow as the table grows.
-          "SELECT l.run_id, l.created_at, (SELECT COUNT(*) FROM change_proposals WHERE run_id = l.run_id) AS n " +
-            "FROM (SELECT run_id, created_at FROM change_proposals ORDER BY created_at DESC LIMIT 1) l",
-        )
-        .first<{ run_id: string; created_at: string; n: number }>(),
-      // WHY these two sit in the same Promise.all as the D1 reads: Cloudflare
-      // and PostHog are independent network calls (8s timeout per attempt, one
-      // retry, at most 5 open at once, each loader gives up after 20s:
-      // src/lib/analyticsFetch.ts), and the
-      // in-memory caches are empty on a cold Worker, the usual first
-      // visit after sign-in). Awaiting them after the D1 burst stacked their
-      // latency on top of it. Neither ever rejects (both return null on any
-      // failure), so they still degrade independently of every D1 read, see
-      // this file's own header. PostHog's project id / API host are plain
-      // wrangler vars, read via the binding per AGENTS.md "Runtime reads".
-      loadVisitorsAnalytics(period, now, analyticsLimit),
-      loadMapUsageAnalytics(period, env.POSTHOG_PROJECT_ID, env.POSTHOG_API_HOST, now, analyticsLimit),
-    ]);
-    visitors = visitorsResult;
-    mapUsage = mapUsageResult;
-
-    venues = venuesResult.results;
-    submissionsTotal = submissionsTotalResult;
-    proposalsTotal = proposalsTotalResult;
-    photos = photosAll;
-    adopters = adoptersAll;
-    boxHealthEntries = boxHealth;
-    publishBotStatus = publishBotStatusResult;
-    networkStats = networkStatsResult;
-    needRows = needRowsResult;
-    problemReportRows = problemReportsResult;
-
-    // `latestRefreshRow?.run_id` (not just `latestRefreshRow`) — a lenient
-    // test fake or a D1 shape mismatch could hand back a truthy row with no
-    // real column data, which must read as "no refresh yet," never as an
-    // Invalid Date.
-    if (latestRefreshRow?.run_id) {
-      latestRefresh = {
-        runId: latestRefreshRow.run_id,
-        createdAt: latestRefreshRow.created_at,
-        suggestedCount: latestRefreshRow.n ?? 0,
-      };
-    } else {
-      latestRefresh = null;
-    }
-  } catch (err) {
-    handlePageAuthError(err);
-  }
+  // `latestRefreshRow?.run_id` (not just `latestRefreshRow`) — a lenient
+  // test fake or a D1 shape mismatch could hand back a truthy row with no
+  // real column data, which must read as "no refresh yet," never as an
+  // Invalid Date.
+  const latestRefresh = latestRefreshRow?.run_id
+    ? { runId: latestRefreshRow.run_id, createdAt: latestRefreshRow.created_at, suggestedCount: latestRefreshRow.n ?? 0 }
+    : null;
 
   // Same "staging can never Publish" gate /admin/places uses (#673 pt.6) —
   // a live "waiting to publish" bar on staging would show test-only D1 data
@@ -344,7 +292,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="dashboard" counts={navCounts} showActivity={showActivity} />
+      <AdminNav email={identity.email} active="dashboard" counts={navCounts} showActivity={identity.isOwner === true} />
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-6">
         {publishBotStatus && (
           <PublishBotStatusBanner
@@ -365,7 +313,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="wordmark text-xl text-[var(--color-ink-900)]">Hi {email.split("@")[0]}</h1>
+          <h1 className="wordmark text-xl text-[var(--color-ink-900)]">Hi {identity.email.split("@")[0]}</h1>
           <nav aria-label="Time period" className="flex gap-1 rounded-[var(--radius-md)] border border-[var(--color-bone-200)] bg-white p-1">
             {DASHBOARD_PERIODS.map((p) => (
               <Link
@@ -565,7 +513,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <KpiCard label="Reported empty" displayValue={String(counts.emptyReports)} value={counts.emptyReports} previousValue={previousCounts.emptyReports} />
             <KpiCard
               label="Avg. empty → refilled"
-              displayValue={networkAverages.emptyToFillMs === null ? "—" : formatDuration(networkAverages.emptyToFillMs)}
+              displayValue={formatDurationLabel(networkAverages.emptyToFillMs, "en")}
               value={networkAverages.emptyToFillMs ?? 0}
             />
           </div>
@@ -587,7 +535,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 items={longestSinceFill.map((b) => ({
                   label: b.name,
                   value: b.lastFilledAt ? now.getTime() - new Date(b.lastFilledAt).getTime() : now.getTime(),
-                  displayValue: b.lastFilledAt ? formatDuration(now.getTime() - new Date(b.lastFilledAt).getTime()) : "never",
+                  displayValue: b.lastFilledAt ? formatDurationLabel(now.getTime() - new Date(b.lastFilledAt).getTime(), "en") : "never",
                 }))}
                 emptyMessage="No boxes yet."
               />
@@ -595,7 +543,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <div>
               <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Most-needed items</h3>
               <BarList
-                items={mostNeeded.map((n) => ({ label: NEED_LABELS[n.key] ?? n.key, value: n.count, displayValue: `${n.count} asks` }))}
+                items={mostNeeded.map((n) => ({ label: t(`box.needs.${n.key}`, "en"), value: n.count, displayValue: `${n.count} asks` }))}
                 emptyMessage="Not enough check-ins yet to say."
               />
             </div>
@@ -633,9 +581,4 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </div>
     </main>
   );
-}
-
-function formatDuration(ms: number): string {
-  const { value, unit } = formatDurationMs(ms);
-  return `${value} ${unit}`;
 }

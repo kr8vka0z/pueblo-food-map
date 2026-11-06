@@ -114,7 +114,7 @@ export function displayStatusOf(
 }
 
 /** Built once per read from the real published snapshot — the same file the public map serves from. */
-function buildPublishedVenueById(): Map<string, Venue> {
+export function buildPublishedVenueById(): Map<string, Venue> {
   return new Map(publishedVenues.map((v) => [v.id, v]));
 }
 

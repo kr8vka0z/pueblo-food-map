@@ -15,7 +15,7 @@
 import { headers } from "next/headers";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
-import { loadAdminNavCounts, type AdminNavCounts } from "@/lib/adminNavCounts";
+import { loadAdminNavCounts } from "@/lib/adminNavCounts";
 import { loadVenueChoices, type VenueChoice } from "@/lib/adminEventReads";
 import AdminNav from "@/components/AdminNav";
 import EventForm, { type EventFormValues } from "@/components/EventForm";
@@ -24,43 +24,32 @@ import { utcIsoToPuebloLocal } from "@/lib/eventTime";
 
 export default async function NewEventPage({ searchParams }: { searchParams?: Promise<{ from?: string }> }) {
   const { from } = searchParams ? await searchParams : {};
-  let email: string;
-  let showActivity = false;
-  let venues: VenueChoice[] = [];
-  let navCounts: AdminNavCounts;
-  let fromSubmission: { id: string; values: Partial<EventFormValues> } | null = null;
-
-  try {
-    const { db, identity } = await getAdminDb(await headers());
-    email = identity.email;
-    showActivity = identity.isOwner === true;
-    [venues, navCounts] = await Promise.all([loadVenueChoices(db).catch(() => [] as VenueChoice[]), loadAdminNavCounts(db)]);
-    const sub = from ? await loadPendingEventSubmission(db, from).catch(() => null) : null;
-    const p = sub ? parseSubmissionPayload(sub.payload) : null;
-    if (sub && p) {
-      fromSubmission = {
-        id: sub.id,
-        values: {
-          name: p.name,
-          host: p.host,
-          description: p.description,
-          whatToBring: p.whatToBring ?? "",
-          startsLocal: utcIsoToPuebloLocal(p.startsAt),
-          endsLocal: utcIsoToPuebloLocal(p.endsAt),
-          address: p.address,
-          venueName: p.venueName ?? "",
-          linkUrl: p.linkUrl ?? "",
-          linkLabel: p.linkLabel,
-        },
-      };
-    }
-  } catch (err) {
-    handlePageAuthError(err);
-  }
+  const { db, identity } = await getAdminDb(await headers()).catch(handlePageAuthError);
+  const [venues, navCounts] = await Promise.all([loadVenueChoices(db).catch(() => [] as VenueChoice[]), loadAdminNavCounts(db)]);
+  const sub = from ? await loadPendingEventSubmission(db, from).catch(() => null) : null;
+  const p = sub ? parseSubmissionPayload(sub.payload) : null;
+  const fromSubmission: { id: string; values: Partial<EventFormValues> } | null =
+    sub && p
+      ? {
+          id: sub.id,
+          values: {
+            name: p.name,
+            host: p.host,
+            description: p.description,
+            whatToBring: p.whatToBring ?? "",
+            startsLocal: utcIsoToPuebloLocal(p.startsAt),
+            endsLocal: utcIsoToPuebloLocal(p.endsAt),
+            address: p.address,
+            venueName: p.venueName ?? "",
+            linkUrl: p.linkUrl ?? "",
+            linkLabel: p.linkLabel,
+          },
+        }
+      : null;
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="events" counts={navCounts} showActivity={showActivity} />
+      <AdminNav email={identity.email} active="events" counts={navCounts} showActivity={identity.isOwner === true} />
       <div className="space-y-6 px-4 py-6 sm:px-6">
         <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Add event</h2>
         {fromSubmission && (

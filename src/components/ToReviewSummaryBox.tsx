@@ -34,6 +34,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isDateOnlyUpdateProposal } from "@/lib/adminProposals";
 import type { ParsedProposal } from "@/lib/adminProposals";
+import { primaryButtonClass } from "@/lib/adminCardStyles";
 
 export interface ToReviewSummaryBoxProps {
   /** Places rows (existing venues + "Suggested new place" rows) with at least one pending item (a proposal, a submission, or both). */
@@ -46,13 +47,6 @@ export interface ToReviewSummaryBoxProps {
 
 const cardClass =
   "elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-3 mb-4";
-
-const primaryButtonClass =
-  "inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
-  "px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] transition-colors duration-150 " +
-  "hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 " +
-  "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
 
 /** Bulk-approve's own local result state — mirrors ProposalsReviewView.tsx's original BulkApproveState exactly (same route, same response shape). */
 type BulkApproveState =

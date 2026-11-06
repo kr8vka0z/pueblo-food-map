@@ -89,21 +89,16 @@ function formatSponsors(names: string[]): string {
   return `${names[0]}, ${names[1]}, +${names.length - 2} more`;
 }
 
-/** Days-since comparator, "no reports yet" (null) sorting as the OLDEST possible value — same null convention src/lib/boxHealth.ts's rankQuiet used before #671 removed it. Descending: most-stale first. */
-function compareDaysDesc(a: number | null, b: number | null): number {
-  if (a === null && b === null) return 0;
-  if (a === null) return -1;
-  if (b === null) return 1;
-  return b - a;
-}
-
-/** Same comparator, ascending (least-stale/most-recent first) — "no reports yet" sorts LAST here, since it's the opposite of "newest". */
+/** Days-since comparator, ascending (least-stale/most-recent first) — "no reports yet" (null) sorts LAST here, since it's the opposite of "newest". */
 function compareDaysAsc(a: number | null, b: number | null): number {
   if (a === null && b === null) return 0;
   if (a === null) return 1;
   if (b === null) return -1;
   return a - b;
 }
+
+/** Descending: most-stale first, "no reports yet" (null) sorting as the OLDEST possible value — same null convention src/lib/boxHealth.ts's rankQuiet used before #671 removed it. Exactly the ascending order reversed. */
+const compareDaysDesc = (a: number | null, b: number | null): number => compareDaysAsc(b, a);
 
 function sortEntries(
   entries: BoxHealthEntry[],

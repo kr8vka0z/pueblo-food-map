@@ -50,7 +50,7 @@ type PasskeyRegisterStatus = "idle" | "registering" | "error";
 
 const CODE_LENGTH = 6;
 /** Seconds "Resend code" stays disabled after each send (#684). */
-export const RESEND_COOLDOWN_SECONDS = 30;
+const RESEND_COOLDOWN_SECONDS = 30;
 
 /** Maps Better Auth's error to the copy #684 asks for — never reveals whether an email is an admin. */
 function codeErrorMessage(error: { code?: string; status?: number } | null | undefined): string {

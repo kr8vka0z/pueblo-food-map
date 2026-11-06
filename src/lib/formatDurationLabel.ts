@@ -1,10 +1,10 @@
 /**
  * formatDurationLabel — a box-stats duration ("5 hours", "2.5 days") in the
- * visitor's language, shared by BoxNumbersPanel and BoxNeedLoveList.
+ * visitor's language, shared by BoxNumbersPanel, BoxNeedLoveList and the
+ * admin Dashboard (which always passes "en").
  *
- * WHY not in boxStats.ts: boxStats is pure math that server code (the admin
- * dashboard) also imports, and it has no i18n dependency; the translated
- * label belongs with the public components that render it.
+ * WHY not in boxStats.ts: boxStats is pure math with no i18n dependency;
+ * the translated label is a separate, presentation-only step.
  */
 
 import { t, type Locale } from "@/lib/i18n";

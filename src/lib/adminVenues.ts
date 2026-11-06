@@ -76,10 +76,9 @@ const COMPARED_VENUE_FIELDS = [
  * can never disagree.
  */
 function hasNonTrivialDiff(row: AdminVenueRow, publishedVenue: Venue | undefined): boolean {
-  if (!publishedVenue) return true; // published but no matching snapshot entry — can't confirm parity, so flag it rather than hide a real gap
-  const mapped = validateAndMapRow(row as VenueRow);
-  if (!mapped.ok) return true; // row doesn't even validate as a public Venue right now — certainly not what's live
-  return diffPublishedFields(row, publishedVenue).length > 0;
+  // No matching snapshot entry → can't confirm parity, so flag it. A row that no longer validates diffs as `{}` against
+  // the published venue's required fields, so it is flagged by diffPublishedFields too.
+  return !publishedVenue || diffPublishedFields(row, publishedVenue).length > 0;
 }
 
 export interface DisplayStatusOptions {

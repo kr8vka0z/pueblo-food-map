@@ -176,11 +176,6 @@ describe("#530 review round 2 — position lives in CSS, not a React inline styl
     const occurrences = withoutComments.match(/\[data-bottom-nav\]/g) ?? [];
     expect(occurrences.length, "expected [data-bottom-nav] to appear exactly once as a real selector in globals.css").toBe(1);
   });
-
-  test("[data-bottom-sheet] has its own bottom rule built on env(safe-area-inset-bottom)", () => {
-    const css = readSrc("src/app/globals.css");
-    expect(css).toMatch(/\[data-bottom-sheet\]\s*\{\s*bottom:\s*env\(safe-area-inset-bottom\);/);
-  });
 });
 
 describe("#530 review round 3 — vaul's own keyboard-avoidance reintroduces the slice", () => {

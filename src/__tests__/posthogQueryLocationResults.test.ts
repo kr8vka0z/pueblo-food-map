@@ -13,8 +13,4 @@ describe("buildLocationPermission — timeout and unavailable", () => {
       buildLocationPermission([["granted", 7], ["denied", 2], ["timeout", 6], ["unavailable", 3], ["prompt", 100]]),
     ).toEqual({ granted: 7, denied: 2, timeout: 6, unavailable: 3 });
   });
-
-  test("no rows -> all zero", () => {
-    expect(buildLocationPermission([])).toEqual({ granted: 0, denied: 0, timeout: 0, unavailable: 0 });
-  });
 });

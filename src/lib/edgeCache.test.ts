@@ -94,10 +94,12 @@ describe("respondWithEdgeCache", () => {
     expect(res.status).toBe(200);
   });
 
-  test("response carries a 60s Cache-Control header regardless of degraded state", async () => {
+  test("a degraded response is no-store; a normal one carries the 60s Cache-Control header", async () => {
     delete (globalThis as { caches?: unknown }).caches;
-    const res = await respondWithEdgeCache(makeRequest(), async () => ({ data: {}, degraded: true }));
-    expect(res.headers.get("Cache-Control")).toBe("public, max-age=60");
+    const degraded = await respondWithEdgeCache(makeRequest(), async () => ({ data: {}, degraded: true }));
+    expect(degraded.headers.get("Cache-Control")).toBe("no-store");
+    const ok = await respondWithEdgeCache(makeRequest(), async () => ({ data: {}, degraded: false }));
+    expect(ok.headers.get("Cache-Control")).toBe("public, max-age=60");
   });
 });
 

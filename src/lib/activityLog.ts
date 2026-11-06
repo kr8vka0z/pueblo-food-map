@@ -23,7 +23,7 @@
  * `db` getAdminDb() returned.
  */
 
-import { TIME_ZONE, offsetMinutesAt } from "@/lib/eventTime";
+import { TIME_ZONE, puebloLocalToUtcIso } from "@/lib/eventTime";
 
 const DEFAULT_RANGE_DAYS = 30;
 /** Rows fetched per source per page; the page offers "Show older" past it. */
@@ -93,11 +93,15 @@ export interface AuditActionRow {
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
-/** UTC instant (ms) of local midnight at the start of `ymd`. */
+/**
+ * UTC instant (ms) of local midnight at the start of `ymd`. Uses midnight's
+ * own offset: on a clock-change day noon's differs (#904). Denver changes
+ * clocks at 02:00, so midnight always exists and the conversion never fails;
+ * shiftYmd(ymd, 0) first normalises an out-of-range day like 02-30, which the
+ * filter regex lets through and the converter would reject.
+ */
 function localDayStartMs(ymd: string): number {
-  const [y, m, d] = ymd.split("-").map(Number);
-  const noonUtc = Date.UTC(y, m - 1, d, 12);
-  return Date.UTC(y, m - 1, d) - offsetMinutesAt(noonUtc) * 60_000;
+  return Date.parse(puebloLocalToUtcIso(`${shiftYmd(ymd, 0)}T00:00`)!);
 }
 
 /** Local calendar date (YYYY-MM-DD) of an instant. */

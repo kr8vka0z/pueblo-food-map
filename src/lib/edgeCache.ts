@@ -124,8 +124,8 @@ export interface EdgeCacheOptions {
 
 /**
  * Serves a GET request from the Workers edge cache when possible, otherwise
- * runs `load()`, returns its data as JSON with a 60s Cache-Control header,
- * and — ONLY when the load was not degraded and is a 200 — stores that
+ * runs `load()`, returns its data as JSON with a 60s Cache-Control header
+ * (no-store when degraded or non-200), and — ONLY when the load was not degraded and is a 200 — stores that
  * response in the cache for the next request (serveFromEdgeCache). Mirrors
  * the caches.default pattern both public blessing-box routes established
  * (see each route's own file header for the wider Cache API rationale).
@@ -142,10 +142,11 @@ export async function respondWithEdgeCache<T>(
     const { data, degraded, status = 200 } = await load();
     const response = NextResponse.json(data, {
       status,
-      // A non-200 (404 for a not-yet-published event, or a degraded read) must
+      // A non-200 (404 for a not-yet-published event) or a degraded read must
       // not sit in a browser cache for a minute: the admin purge can't reach
-      // it, so a link shared just before publishing would look dead.
-      headers: { "Cache-Control": status === 200 ? `public, max-age=${CACHE_TTL_SECONDS}` : "no-store" },
+      // it, so a link shared just before publishing would look dead, and an
+      // empty fallback list would outlive the D1 blip that caused it (#904).
+      headers: { "Cache-Control": status === 200 && !degraded ? `public, max-age=${CACHE_TTL_SECONDS}` : "no-store" },
     });
     return { response, degraded };
   });

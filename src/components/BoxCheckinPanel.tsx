@@ -973,7 +973,9 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
               onClick={() => {
                 setPhotoOpen(false);
                 standalonePhoto.clear();
-                setPhotoSubmitState("idle");
+                // An upload already sent keeps "submitting" (#894): resetting it
+                // would free the status buttons while the token is still in use.
+                setPhotoSubmitState((s) => (s === "submitting" ? s : "idle"));
               }}
               className={SECONDARY_BTN}
             >

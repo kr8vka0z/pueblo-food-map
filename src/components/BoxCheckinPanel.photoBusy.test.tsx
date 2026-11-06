@@ -42,16 +42,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test("status buttons are disabled while a photo uploads, and a status tap works once it finishes", async () => {
-  let finishUpload!: (v: unknown) => void;
+let finishUpload!: (v: unknown) => void;
+
+async function startUpload(user: ReturnType<typeof userEvent.setup>) {
   mockFetch.mockImplementationOnce(() => new Promise((r) => (finishUpload = r)));
-  const user = userEvent.setup();
   render(
     <LocaleProvider initialLocale="en">
       <BoxCheckinPanel boxId="box-1" onCheckinSuccess={vi.fn()} />
     </LocaleProvider>,
   );
-
   await user.click(await screen.findByRole("button", { name: "Add a photo" }));
   await user.upload(
     document.getElementById("box-photo-standalone-input") as HTMLInputElement,
@@ -59,6 +58,21 @@ test("status buttons are disabled while a photo uploads, and a status tap works 
   );
   await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).toBeEnabled());
   await user.click(screen.getByRole("button", { name: "Send" }));
+}
+
+test("Cancel during an upload does not free the status buttons before it finishes", async () => {
+  const user = userEvent.setup();
+  await startUpload(user);
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(screen.getByRole("button", { name: "Running low" })).toBeDisabled();
+
+  await act(async () => finishUpload({ ok: true, json: async () => ({ ok: true }) }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Running low" })).toBeEnabled());
+});
+
+test("status buttons are disabled while a photo uploads, and a status tap works once it finishes", async () => {
+  const user = userEvent.setup();
+  await startUpload(user);
 
   const statusButtons = ["I filled it", "Running low", "It's empty", "I used this box"].map((name) =>
     screen.getByRole("button", { name }),

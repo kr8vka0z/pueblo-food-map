@@ -1637,7 +1637,7 @@ list it as an event and a shared link previews the flyer.
   `src/lib/eventCalendar.ts` (the same file builder the map card now uses).
   Directions use `googleMapsUrl`, moved to `src/lib/googleMapsUrl.ts` because a
   function imported from the "use client" `DirectionButtons` cannot be called from a
-  server component (DirectionButtons re-exports it).
+  server component; every caller imports it from there.
 - **Visibility.** The read is `loadPublicEventById` (published, including ended, and
   cancelled). Draft, archived, unknown ids, a missing `events` table, a D1 error and
   a missing Cloudflare context all return `null` -> `notFound()` -> HTTP 404, so a

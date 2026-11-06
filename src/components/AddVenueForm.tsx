@@ -11,7 +11,7 @@
  * pattern as AGENTS.md "Admin authentication"). This mirrors SuggestForm.tsx's
  * own form/route split. Its input/label/error token classes (bone borders,
  * sage focus rings) come from formClasses.ts, shared with the other admin
- * forms; the public forms keep their own copies.
+ * forms (the public forms use PublicForm.tsx's).
  *
  * ONE component serves both modes (#255 explicitly asked for this, not a
  * forked near-identical form) — create and edit submit the identical field

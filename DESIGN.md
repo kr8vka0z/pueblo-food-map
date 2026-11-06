@@ -108,9 +108,6 @@ components:
   desktopVenueWindow:
     backgroundColor: "{colors.bone50}"
     rounded: "{rounded.lg}"
-  wordmarkMapButton:
-    backgroundColor: "{colors.white}"
-    rounded: "{rounded.xl}"
   plentifulLink:
     backgroundColor: "{colors.sage50}"
     textColor: "{colors.sage600}"
@@ -527,7 +524,7 @@ One ladder for everything that floats. A new floating element joins an existing 
 | 800 | Mobile venue card | `BottomSheet.tsx`, `DirectionButtons.tsx` |
 | 900 | Desktop side panel (venue/box card content); walking-route strip | `DesktopSidePanel.tsx`, `DesktopVenueWindow.tsx`, `RouteStrip.tsx` |
 | 999 | Search popovers — results, no-matches, ViewSuggestion | `SearchResultsPopover.tsx`, `EmptySearchPopover.tsx`, `ViewSuggestion.tsx` |
-| 1000 | Persistent chrome: search bar, wordmark map button, BottomNav at `2xl`+ | `SearchBar.tsx`, `Wordmark.tsx`, `BottomNav.tsx` |
+| 1000 | Persistent chrome: search bar, BottomNav at `2xl`+ | `SearchBar.tsx`, `BottomNav.tsx` |
 | 1001 | Menu backdrop; outside-county notice pill | `HamburgerMenu.tsx`, `MapWrapper.tsx` |
 | 1002 | Menu panel | `HamburgerMenu.tsx` |
 | 1003 | BottomNav below `2xl` — above the Menu so its own button can close it (on mobile the full-sheet Menu unmounts the nav instead, `overlayRegistry.ts`) | `BottomNav.tsx` |

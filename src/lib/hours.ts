@@ -21,9 +21,6 @@
  * why) and combined with the weekly logic above by computeVenueOpenStatus().
  */
 import type { DayKey, IrregularSchedule, Venue, WeeklyHours } from "@/types/venue";
-// eventTime.ts has no imports of its own, so scripts/refresh (which imports
-// this file) stays free of i18n and React.
-import { puebloParts } from "@/lib/eventTime";
 
 export type { DayKey };
 
@@ -248,6 +245,8 @@ export function slotToIsoTimes(
 // re-interpreted through a timezone) — so DST transitions can never
 // corrupt the arithmetic, only the single initial conversion.
 
+const DENVER_TZ = "America/Denver";
+
 interface DenverDateTime {
   year: number;
   month: number; // 1-12
@@ -257,13 +256,22 @@ interface DenverDateTime {
 
 /** Converts a real UTC instant to Denver calendar date + clock time. The only timezone-aware step in this whole section — see the module section header above. */
 function getDenverDateTime(instant: Date): DenverDateTime {
-  // The America/Denver h23 formatter is eventTime.ts's puebloParts (one shared copy).
-  const p = puebloParts(instant.getTime());
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: DENVER_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(instant);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
   // ICU's h23 cycle has a known quirk: some engines render midnight as "24"
   // rather than "00". % 24 normalizes either form to the same 0-23 value —
   // same defensive pattern this file's own formatTime() already uses for a
   // 24:00 slot-close time, above.
-  return { year: p.y, month: p.mo, day: p.d, minutes: (p.h % 24) * 60 + p.mi };
+  const hour = get("hour") % 24;
+  return { year: get("year"), month: get("month"), day: get("day"), minutes: hour * 60 + get("minute") };
 }
 
 /** Days in a given (year, 1-12 month), via a UTC date-math trick — no timezone read involved. */

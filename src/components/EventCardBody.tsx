@@ -90,7 +90,7 @@ import { eventAction, eventBadge, eventText, eventWhen, localizeEvent } from "@/
 import { downloadEventCalendar } from "@/lib/eventCalendar";
 import EventFlyer from "@/components/EventFlyer";
 import type { PublicEventDetail } from "@/lib/events";
-import { eventSecondaryButton, HIDDEN_UNTIL_FOCUS, PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { HIDDEN_UNTIL_FOCUS, PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { eventShareUrl, shareLink } from "@/lib/share";
 import { useMinuteClock } from "@/lib/useMinuteClock";
 
@@ -119,7 +119,12 @@ export interface EventCardBodyProps {
   preview?: boolean;
 }
 
-const SECONDARY_BUTTON = eventSecondaryButton("flex-1");
+const SECONDARY_BUTTON =
+  "inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-[var(--radius-md)] " +
+  "border border-[var(--color-bone-300)] bg-[var(--color-bone-50)] px-3 text-sm font-semibold " +
+  "text-[var(--color-ink-700)] transition-colors hover:bg-[var(--color-bone-100)] touch-manipulation " +
+  PRESS_FEEDBACK +
+  " focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
 
 const SECTION_HEADING = "mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]";
 

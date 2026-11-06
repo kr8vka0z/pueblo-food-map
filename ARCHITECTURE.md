@@ -828,8 +828,8 @@ rank for the queries people type ("food pantry Pueblo", "SNAP stores Pueblo").
   map link (never "0 boxes"), no JSON-LD, and the metadata adds
   `robots: { index: false, follow: true }`. Each box links to the map card at
   `/?venue=<id>` (`/es?venue=<id>`). Read-only per REVIEW.md: no check-in,
-  photo, adopt or alert controls. No page caching (`force-dynamic`); the cost is 2 D1 reads (~30 box rows, then their check-ins) per page
-  view, and the upgrade path is an edge-cached read like `src/lib/edgeCache.ts`.
+  photo, adopt or alert controls. No page caching (`force-dynamic`); the cost is 2 D1 reads (~30 box rows, then their check-ins; one more check-in read per
+  extra 100 boxes) per page view, and the upgrade path is an edge-cached read like `src/lib/edgeCache.ts`.
 
 ## Form-route triad
 

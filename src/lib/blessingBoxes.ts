@@ -703,7 +703,7 @@ export async function loadLiveBoxes(db: D1Database, now: Date = new Date()): Pro
 
 /**
  * Slim variant of loadLiveBoxes for /blessing-boxes: the boxes query plus the
- * visible check-ins (needed for `status`) — 2 D1 reads instead of 5. The page
+ * visible check-ins (needed for `status`) — 2 D1 reads instead of 5 (plus one check-ins read per extra 100 boxes). The page
  * shows only name, address, status, so photos/adopters/needs are skipped and
  * come back empty. Same SQL and mapper as loadLiveBoxes, so the shape and
  * status rule cannot drift; a check-ins failure throws (like loadLiveBoxes),

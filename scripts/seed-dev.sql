@@ -10,9 +10,10 @@
 -- PublishPanel, SubmissionsReviewView) needs something to render — an empty
 -- table shows every "0 venues" / "up to date" empty state and exercises
 -- none of the real UI. 15 'published' + 3 'draft' + 2 'archived' covers the
--- three states VenueListView filters on; every category in the schema's
--- CHECK constraint (migrations/0001_init_admin_schema.sql) appears at least
--- twice. Coordinates are scattered near PUEBLO_CENTER (src/data/pueblo-
+-- three states VenueListView filters on; every category from the CHECK
+-- constraint in migrations/0001_init_admin_schema.sql appears at least
+-- twice (blessing boxes are seeded by scripts/load-real-blessing-boxes.ts,
+-- not here). Coordinates are scattered near PUEBLO_CENTER (src/data/pueblo-
 -- bbox.ts, 38.2544/-104.6091), well inside PUEBLO_COUNTY_BBOX, so nothing
 -- here would ever trip the outside_county flag.
 --
@@ -22,8 +23,11 @@
 -- DELETE FROM venues) so it never touches a real row if one is ever
 -- created on staging by hand.
 --
--- APPLY:
---   npx wrangler d1 execute pueblo-food-map-admin-staging --remote --env staging --file=scripts/seed-dev.sql
+-- APPLY: never `d1 execute --remote --file` (it routes through D1's import
+-- API; AGENTS.md forbids it for remote D1). Send each statement below with
+-- `npx wrangler d1 execute pueblo-food-map-admin-staging --remote --env staging
+-- --command "..."`, chunked the way scripts/refresh-ingest.ts's d1ApplyFile
+-- does (chunking helper: scripts/refresh/sqlChunks.ts).
 --
 -- VERIFY:
 --   npx wrangler d1 execute pueblo-food-map-admin-staging --remote --env staging \

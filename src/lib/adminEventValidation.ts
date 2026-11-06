@@ -21,7 +21,8 @@
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { puebloLocalToUtcIso } from "@/lib/eventTime";
 import { isValidEmail } from "@/lib/email";
-import { isOutsideCounty } from "@/lib/mapBounds";
+import { isCoord, isOutsideCounty } from "@/lib/mapBounds";
+import { optionalStringCapped } from "@/lib/adminVenueValidation";
 
 export const EVENT_STATUSES = ["draft", "published", "cancelled", "archived"] as const;
 export type EventStatus = (typeof EVENT_STATUSES)[number];
@@ -60,24 +61,8 @@ export type ValidateEventResult<A extends string> =
   | { ok: true; fields: ValidatedEventFields; action: A }
   | { ok: false; errors: Record<string, string> };
 
-/** Trims; blank or non-string -> null. Over-cap sets an error and returns null. */
-function optionalText(value: unknown, key: string, max: number, errors: Record<string, string>): string | null {
-  if (value === undefined || value === null) return null;
-  if (typeof value !== "string") {
-    errors[key] = "Must be text.";
-    return null;
-  }
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (trimmed.length > max) {
-    errors[key] = `Must be ${max} characters or fewer.`;
-    return null;
-  }
-  return trimmed;
-}
-
 function validateLinkUrl(value: unknown, errors: Record<string, string>): string | null {
-  const text = optionalText(value, "link_url", FIELD_LIMITS.SUGGEST_CONTACT, errors);
+  const text = optionalStringCapped(value, "link_url", FIELD_LIMITS.SUGGEST_CONTACT, errors);
   if (text === null) return null;
   // http(s) only: this value becomes a public href, and `javascript:` would run on click.
   try {
@@ -88,10 +73,6 @@ function validateLinkUrl(value: unknown, errors: Record<string, string>): string
   }
   errors.link_url = "Enter a full web address starting with http:// or https://.";
   return null;
-}
-
-function isCoord(n: unknown, limit: number): n is number {
-  return typeof n === "number" && Number.isFinite(n) && n >= -limit && n <= limit;
 }
 
 /**
@@ -117,15 +98,15 @@ export function validateEventPayload<A extends string>(
   else if (name.length > FIELD_LIMITS.SUGGEST_VENUE_NAME) {
     errors.name = `Name must be ${FIELD_LIMITS.SUGGEST_VENUE_NAME} characters or fewer.`;
   }
-  const nameEs = optionalText(b.name_es, "name_es", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors);
-  const host = optionalText(b.host, "host", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors);
-  const hostEs = optionalText(b.host_es, "host_es", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors);
-  const description = optionalText(b.description, "description", FIELD_LIMITS.SUGGEST_NOTES, errors);
-  const descriptionEs = optionalText(b.description_es, "description_es", FIELD_LIMITS.SUGGEST_NOTES, errors);
-  const whatToBring = optionalText(b.what_to_bring, "what_to_bring", FIELD_LIMITS.EVENT_SHORT_TEXT, errors);
-  const whatToBringEs = optionalText(b.what_to_bring_es, "what_to_bring_es", FIELD_LIMITS.EVENT_SHORT_TEXT, errors);
-  const cancelNote = optionalText(b.cancel_note, "cancel_note", FIELD_LIMITS.EVENT_SHORT_TEXT, errors);
-  const cancelNoteEs = optionalText(b.cancel_note_es, "cancel_note_es", FIELD_LIMITS.EVENT_SHORT_TEXT, errors);
+  const nameEs = optionalStringCapped(b.name_es, "name_es", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors);
+  const host = optionalStringCapped(b.host, "host", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors);
+  const hostEs = optionalStringCapped(b.host_es, "host_es", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors);
+  const description = optionalStringCapped(b.description, "description", FIELD_LIMITS.SUGGEST_NOTES, errors);
+  const descriptionEs = optionalStringCapped(b.description_es, "description_es", FIELD_LIMITS.SUGGEST_NOTES, errors);
+  const whatToBring = optionalStringCapped(b.what_to_bring, "what_to_bring", FIELD_LIMITS.EVENT_SHORT_TEXT, errors);
+  const whatToBringEs = optionalStringCapped(b.what_to_bring_es, "what_to_bring_es", FIELD_LIMITS.EVENT_SHORT_TEXT, errors);
+  const cancelNote = optionalStringCapped(b.cancel_note, "cancel_note", FIELD_LIMITS.EVENT_SHORT_TEXT, errors);
+  const cancelNoteEs = optionalStringCapped(b.cancel_note_es, "cancel_note_es", FIELD_LIMITS.EVENT_SHORT_TEXT, errors);
   if (b.action === "cancel" && !cancelNote && !errors.cancel_note) {
     errors.cancel_note = "Add a note explaining the cancellation.";
   }
@@ -142,11 +123,11 @@ export function validateEventPayload<A extends string>(
   let linkLabelCustom: string | null = null;
   let linkLabelCustomEs: string | null = null;
   if (linkLabel === "custom") {
-    linkLabelCustom = optionalText(b.link_label_custom, "link_label_custom", FIELD_LIMITS.EVENT_LINK_LABEL, errors);
-    linkLabelCustomEs = optionalText(b.link_label_custom_es, "link_label_custom_es", FIELD_LIMITS.EVENT_LINK_LABEL, errors);
+    linkLabelCustom = optionalStringCapped(b.link_label_custom, "link_label_custom", FIELD_LIMITS.EVENT_LINK_LABEL, errors);
+    linkLabelCustomEs = optionalStringCapped(b.link_label_custom_es, "link_label_custom_es", FIELD_LIMITS.EVENT_LINK_LABEL, errors);
     if (!linkLabelCustom && !errors.link_label_custom) errors.link_label_custom = "Type what the button should say.";
   }
-  const venueName = optionalText(b.venue_name, "venue_name", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors);
+  const venueName = optionalStringCapped(b.venue_name, "venue_name", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors);
 
   // Times: Pueblo wall clock in, UTC instants out; compare instants, never the typed text.
   const startsAt = typeof b.starts_at_local === "string" ? puebloLocalToUtcIso(b.starts_at_local) : null;
@@ -167,7 +148,7 @@ export function validateEventPayload<A extends string>(
   } else if (!isCoord(b.lat, 90) || !isCoord(b.lng, 180)) {
     errors.place = "Find the location for this address, or choose a place from the list.";
   }
-  const venueId = optionalText(b.venue_id, "venue_id", FIELD_LIMITS.SUGGEST_CONTACT, errors);
+  const venueId = optionalStringCapped(b.venue_id, "venue_id", FIELD_LIMITS.SUGGEST_CONTACT, errors);
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
@@ -255,7 +236,7 @@ export function validateEventSubmission(body: unknown): ValidateSubmissionResult
   const b = body as Record<string, unknown>;
   const errors: Record<string, string> = {};
   const required = (key: string, max: number, message: string): string => {
-    const text = optionalText(b[key], key, max, errors);
+    const text = optionalStringCapped(b[key], key, max, errors);
     if (!text && !errors[key]) errors[key] = message;
     return text ?? "";
   };
@@ -263,8 +244,8 @@ export function validateEventSubmission(body: unknown): ValidateSubmissionResult
   const name = required("name", FIELD_LIMITS.SUGGEST_VENUE_NAME, "Name is required.");
   const host = required("host", FIELD_LIMITS.SUGGEST_VENUE_NAME, "Say who is hosting it.");
   const description = required("description", FIELD_LIMITS.SUGGEST_NOTES, "Say what the event is.");
-  const whatToBring = optionalText(b.what_to_bring, "what_to_bring", FIELD_LIMITS.EVENT_SHORT_TEXT, errors);
-  const venueName = optionalText(b.venue_name, "venue_name", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors);
+  const whatToBring = optionalStringCapped(b.what_to_bring, "what_to_bring", FIELD_LIMITS.EVENT_SHORT_TEXT, errors);
+  const venueName = optionalStringCapped(b.venue_name, "venue_name", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors);
   const address = required("address", FIELD_LIMITS.SUGGEST_ADDRESS, "Enter the street address.");
   const linkUrl = validateLinkUrl(b.link_url, errors);
   const linkLabel = PUBLIC_EVENT_LINK_LABELS.find((l) => l === (b.link_label ?? "website"));

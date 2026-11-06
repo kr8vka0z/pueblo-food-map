@@ -66,40 +66,8 @@ jobs:
 
       - name: Detect data-only publish-bot PR
         id: detect
-        # Same diff-scope guard as ci.yml's "Lint, typecheck, build" job --
-        # duplicated rather than shared, since GitHub Actions has no
-        # cross-workflow step-output reuse. A branch-name check ALONE would
-        # be unsafe (anything pushed to a branch literally named
-        # "publish-bot" would silently skip the CVE gate); the real safety
-        # property is the DIFF -- data_only=true only when the PR is really
-        # publish-bot -> main/dev, from this repo (not a fork), AND its full
-        # base...head diff touches EXACTLY src/data/published-venues.ts, the
-        # one file the publish engine (src/lib/publishVenues.ts) writes (#336).
-        #
-        # Diffed from the MERGE-BASE of base/head, not a raw two-dot diff
-        # (PR review on #383) -- see ci.yml's matching step for the full WHY:
-        # a two-dot diff only equals "this PR's change" when base.sha is
-        # exactly head's parent, and a lagging base.sha on a `synchronize`
-        # event (or main/dev advancing between bot-branch reset and this run)
-        # makes it show base's own commits as reversed changes, breaking
-        # data_only exactly when the publish carve-out needs to hold. This
-        # job's checkout above already uses fetch-depth: 0, which merge-base
-        # needs to resolve.
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          data_only=false
-          if [ "$EVENT_NAME" = "pull_request" ] && [ "$HEAD_REF" = "publish-bot" ] && [ "$IS_FORK" = "false" ]; then
-            changed="$(git diff --name-only "$(git merge-base "$BASE_SHA" "$HEAD_SHA")" "$HEAD_SHA")"
-            if [ "$changed" = "src/data/published-venues.ts" ]; then
-              data_only=true
-            fi
-          fi
-          echo "data_only=$data_only" >> "$GITHUB_OUTPUT"
+        # Shared step: .github/actions/detect-data-only (the WHY lives there).
+        uses: ./.github/actions/detect-data-only
 
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

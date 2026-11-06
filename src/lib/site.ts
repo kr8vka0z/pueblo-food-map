@@ -25,9 +25,49 @@ export const OG_IMAGE = {
   alt: "Pueblo Food Map — find food pantries, gardens, grocery & meal sites in Pueblo County, Colorado",
 } as const;
 
-// WHY: the site-wide fallback description is the homepage's description (owner
-// decision), read from the same i18n key the homepage uses so the two can't drift.
-export const ROOT_DESCRIPTION = t("meta.home.description", "en");
+const OG_LOCALE: Record<Locale, string> = { en: "en_US", es: "es_US" };
+
+/**
+ * A root layout's metadata object, built per tree. The site-wide fallback
+ * title and description are the homepage's (owner decision), read from the
+ * same i18n keys the homepage uses so the two can't drift.
+ */
+function rootMetadata(locale: Locale): Metadata {
+  const title = t("meta.home.title", locale);
+  const description = t("meta.home.description", locale);
+  return {
+    // WHY: metadataBase is required so relative paths resolve to absolute URLs
+    // for crawlers and social platforms. OG_IMAGE.url is now absolute, but
+    // metadataBase is still needed for any other relative path Next.js resolves.
+    metadataBase: new URL(SITE_URL),
+    title: {
+      default: title,
+      // Template lets child pages set short titles; root appends the brand name.
+      template: "%s · Pueblo Food Map",
+    },
+    description,
+    // WHY: No canonical set here. A root-level canonical propagates to every
+    // child route via Next.js metadata inheritance, causing /suggest, /feedback,
+    // and /privacy to all report "/" as their canonical — a de-indexing risk.
+    // Each page that needs a canonical sets its own (see per-page metadata).
+    openGraph: {
+      type: "website",
+      siteName: SITE_NAME,
+      title,
+      description,
+      url: locale === "es" ? `${SITE_URL}/es` : SITE_URL,
+      locale: OG_LOCALE[locale],
+      alternateLocale: [OG_LOCALE[locale === "es" ? "en" : "es"]],
+      images: [OG_IMAGE],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [{ url: OG_IMAGE.url, alt: OG_IMAGE.alt }],
+    },
+  };
+}
 
 /**
  * The root layout's metadata object (src/app/(site)/layout.tsx), also
@@ -38,38 +78,7 @@ export const ROOT_DESCRIPTION = t("meta.home.description", "en");
  * silently regress to nothing instead of inheriting the brand defaults a
  * visitor sees on every other page.
  */
-export const ROOT_METADATA: Metadata = {
-  // WHY: metadataBase is required so relative paths resolve to absolute URLs
-  // for crawlers and social platforms. OG_IMAGE.url is now absolute, but
-  // metadataBase is still needed for any other relative path Next.js resolves.
-  metadataBase: new URL(SITE_URL),
-  title: {
-    default: "Pueblo Food Map — Food Resources in Pueblo County, CO",
-    // Template lets child pages set short titles; root appends the brand name.
-    template: "%s · Pueblo Food Map",
-  },
-  description: ROOT_DESCRIPTION,
-  // WHY: No canonical set here. A root-level canonical propagates to every
-  // child route via Next.js metadata inheritance, causing /suggest, /feedback,
-  // and /privacy to all report "/" as their canonical — a de-indexing risk.
-  // Each page that needs a canonical sets its own (see per-page metadata).
-  openGraph: {
-    type: "website",
-    siteName: SITE_NAME,
-    title: "Pueblo Food Map — Food Resources in Pueblo County, CO",
-    description: ROOT_DESCRIPTION,
-    url: SITE_URL,
-    locale: "en_US",
-    alternateLocale: ["es_US"],
-    images: [OG_IMAGE],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Pueblo Food Map — Food Resources in Pueblo County, CO",
-    description: ROOT_DESCRIPTION,
-    images: [{ url: OG_IMAGE.url, alt: OG_IMAGE.alt }],
-  },
-};
+export const ROOT_METADATA: Metadata = rootMetadata("en");
 
 /**
  * The root layout's viewport export, reused by app/global-not-found.tsx for
@@ -92,30 +101,7 @@ export const ROOT_VIEWPORT: Viewport = {
  * matters as the title.template default — same reason ROOT_METADATA's
  * title/description duplicate the homepage's own.
  */
-export const ES_ROOT_METADATA: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  title: {
-    default: t("meta.home.title", "es"),
-    template: "%s · Pueblo Food Map",
-  },
-  description: t("meta.home.description", "es"),
-  openGraph: {
-    type: "website",
-    siteName: SITE_NAME,
-    title: t("meta.home.title", "es"),
-    description: t("meta.home.description", "es"),
-    url: `${SITE_URL}/es`,
-    locale: "es_US",
-    alternateLocale: ["en_US"],
-    images: [OG_IMAGE],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: t("meta.home.title", "es"),
-    description: t("meta.home.description", "es"),
-    images: [{ url: OG_IMAGE.url, alt: OG_IMAGE.alt }],
-  },
-};
+export const ES_ROOT_METADATA: Metadata = rootMetadata("es");
 
 /**
  * Compose a client-side <title> matching the format layout.tsx's
@@ -132,8 +118,6 @@ export const ES_ROOT_METADATA: Metadata = {
 export function pageDocumentTitle(shortTitle: string): string {
   return `${shortTitle} · ${SITE_NAME}`;
 }
-
-const OG_LOCALE: Record<Locale, string> = { en: "en_US", es: "es_US" };
 
 /**
  * Given a page's OWN path (as it exists in its own tree — `/about` for the

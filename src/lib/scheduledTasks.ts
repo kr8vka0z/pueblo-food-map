@@ -23,11 +23,9 @@
  * created this shared module — one orchestrator, not a duplicated
  * ping-guard-plus-gate pattern per feature.
  *
- * WHY no `@/` alias imports here (relative imports only): this file is
- * reached from custom-worker.ts, which wrangler's own bundler (not Next's
- * webpack) compiles when it builds the top-level `main` entry — tsconfig
- * `paths` aliases aren't resolved there. Same constraint emailRetention.ts
- * and refreshAlerts.ts each already document for the same reason.
+ * Relative imports only: a holdover from OpenNext (wrangler's bundler didn't
+ * resolve `@/`); vinext resolves them, so this is house style for the cron
+ * modules, not a constraint (same note as refreshAlerts.ts).
  *
  * Each job below gets its OWN independent `ctx.waitUntil` call, never
  * nested or chained against another: the HC.io ping must never be gated

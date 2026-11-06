@@ -35,8 +35,8 @@
  * Exits 0 if all in-scope tokens match, 1 if any drift or unmapped tokens detected.
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { resolve, dirname, join, relative } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { resolve, dirname, extname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -249,41 +249,23 @@ const designRounded = parseFrontmatterSection(fmLines, 'rounded');
 const designTokens = new Map();
 const errors = [];
 
-for (const [key, val] of Object.entries(designColors)) {
-  const cssVar = colorKeyToCssVar(key);
-  if (cssVar === null) continue; // intentionally DESIGN.md-only
-  if (cssVar === undefined) {
-    errors.push(
-      `DESIGN.md colors: key "${key}" is unrecognized by the drift map.\n` +
-      `  -> Update colorKeyToCssVar() in scripts/check-design-drift.mjs.`
-    );
-    continue;
+for (const [section, entries, toCssVar] of [
+  ['colors', designColors, colorKeyToCssVar],
+  ['spacing', designSpacing, spacingKeyToCssVar],
+  ['rounded', designRounded, roundedKeyToCssVar],
+]) {
+  for (const [key, val] of Object.entries(entries)) {
+    const cssVar = toCssVar(key);
+    if (cssVar === null) continue; // intentionally DESIGN.md-only (colors)
+    if (cssVar === undefined) {
+      errors.push(
+        `DESIGN.md ${section}: key "${key}" is unrecognized by the drift map.\n` +
+        `  -> Update ${toCssVar.name}() in scripts/check-design-drift.mjs.`
+      );
+      continue;
+    }
+    designTokens.set(cssVar, normalizeValue(val));
   }
-  designTokens.set(cssVar, normalizeValue(val));
-}
-
-for (const [key, val] of Object.entries(designSpacing)) {
-  const cssVar = spacingKeyToCssVar(key);
-  if (cssVar === undefined) {
-    errors.push(
-      `DESIGN.md spacing: key "${key}" is unrecognized by the drift map.\n` +
-      `  -> Update spacingKeyToCssVar() in scripts/check-design-drift.mjs.`
-    );
-    continue;
-  }
-  designTokens.set(cssVar, normalizeValue(val));
-}
-
-for (const [key, val] of Object.entries(designRounded)) {
-  const cssVar = roundedKeyToCssVar(key);
-  if (cssVar === undefined) {
-    errors.push(
-      `DESIGN.md rounded: key "${key}" is unrecognized by the drift map.\n` +
-      `  -> Update roundedKeyToCssVar() in scripts/check-design-drift.mjs.`
-    );
-    continue;
-  }
-  designTokens.set(cssVar, normalizeValue(val));
 }
 
 // Check 1: every in-scope globals token must be in DESIGN.md.
@@ -329,59 +311,23 @@ for (const [cssVar, designVal] of designTokens) {
 const SRC_DIR = resolve(ROOT, 'src');
 const SCAN_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.css']);
 
-/** Recursively collect scannable source files under a directory. */
-function collectSourceFiles(dir, results = []) {
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      collectSourceFiles(full, results);
-    } else if (SCAN_EXTS.has(full.slice(full.lastIndexOf('.')))) {
-      results.push(full);
-    }
-  }
-  return results;
-}
-
-/**
- * Grandfather key: file + token, NOT token alone. Keying by name only means
- * a brand-new file introducing `var(--color-ink-300)` for the first time
- * would pass silently, because the NAME was already exempt somewhere else —
- * the exemption has to be tied to the exact site captured at authoring time,
- * so it protects only the 21 original (file, token) pairs and nothing else
- * with that name, in that file or any other.
- */
-function grandfatherKey(rel, varName) {
-  return `${rel}::${varName}`;
-}
-
-// Pre-existing undefined-token usages found while building this check
-// (2026-09-19, PR for #528/#529) were grandfathered here so this new check
-// could ship without failing the build on bugs it didn't introduce. #534
-// fixed all 21 (file, token) sites by mapping each to the nearest existing
-// DESIGN.md token — the list is intentionally empty now, not deleted, so a
-// future one-off grandfather (same rationale as #532) has a documented spot
-// to land instead of a raw `if` escape hatch. Do NOT re-add an entry for
-// convenience — only for a genuinely pre-existing bug this check surfaces.
-const GRANDFATHERED_UNDEFINED_COLOR_TOKENS = new Set([]);
+const sourceFiles = readdirSync(SRC_DIR, { recursive: true, withFileTypes: true })
+  .filter((d) => d.isFile() && SCAN_EXTS.has(extname(d.name)))
+  .map((d) => join(d.parentPath, d.name));
 
 const definedColorVars = new Set(
   [...allCssVars.keys()].filter((v) => v.startsWith('--color-'))
 );
 
-let grandfatheredHits = 0;
 const colorUsageErrors = [];
 
-for (const filePath of collectSourceFiles(SRC_DIR)) {
+for (const filePath of sourceFiles) {
   const rel = relative(ROOT, filePath).replace(/\\/g, '/');
   const lines = readFileSync(filePath, 'utf8').split('\n');
   lines.forEach((line, i) => {
     for (const m of line.matchAll(/var\(\s*(--color-[a-z0-9-]+)\s*\)/g)) {
       const varName = m[1];
       if (definedColorVars.has(varName)) continue;
-      if (GRANDFATHERED_UNDEFINED_COLOR_TOKENS.has(grandfatherKey(rel, varName))) {
-        grandfatheredHits++;
-        continue;
-      }
       colorUsageErrors.push(
         `UNDEFINED COLOR TOKEN  ${varName}\n` +
         `  ${rel}:${i + 1}  ${line.trim()}\n` +
@@ -398,7 +344,7 @@ if (errors.length === 0) {
   console.log('Design token parity check passed.');
   console.log(`  Compared ${globalsTokens.size} in-scope globals.css tokens against DESIGN.md.`);
   console.log('  All values match.');
-  console.log(`  Scanned src/ for var(--color-...) usage: 0 undefined (${grandfatheredHits} pre-existing, grandfathered).`);
+  console.log('  Scanned src/ for var(--color-...) usage: 0 undefined.');
   process.exit(0);
 } else {
   console.error(`Design token parity check FAILED -- ${errors.length} issue(s):\n`);

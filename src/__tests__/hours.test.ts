@@ -224,41 +224,27 @@ describe("real Plentiful pantry — Pueblo Community Soup Kitchen", () => {
 describe("formatSlot", () => {
   // ── 12-hour Plentiful format ─────────────────────────────────────────────
 
-  test("12h slot with minutes on start: 10:30 AM - 12:00 PM → 10:30am – 12pm", () => {
+  test.each([
     // Before fix: formatSlot split on "-" producing start="10:30 AM " end=" 12:00 PM"
     // which parsed as NaN minutes → "10am – 12pm" (minutes silently dropped)
-    expect(formatSlot("10:30 AM - 12:00 PM")).toBe("10:30am – 12pm");
-  });
-
-  test("12h slot with minutes on both sides: 8:30 AM - 9:30 AM → 8:30am – 9:30am", () => {
-    expect(formatSlot("8:30 AM - 9:30 AM")).toBe("8:30am – 9:30am");
-  });
-
-  test("12h slot with no minutes on either side: 1:00 PM - 5:00 PM → 1pm – 5pm", () => {
-    expect(formatSlot("1:00 PM - 5:00 PM")).toBe("1pm – 5pm");
-  });
-
-  test("12h slot spanning noon: 10:00 AM - 12:00 PM → 10am – 12pm", () => {
-    expect(formatSlot("10:00 AM - 12:00 PM")).toBe("10am – 12pm");
+    ["12h slot with minutes on start: 10:30 AM - 12:00 PM → 10:30am – 12pm", "10:30 AM - 12:00 PM", "10:30am – 12pm"],
+    ["12h slot with minutes on both sides: 8:30 AM - 9:30 AM → 8:30am – 9:30am", "8:30 AM - 9:30 AM", "8:30am – 9:30am"],
+    ["12h slot with no minutes on either side: 1:00 PM - 5:00 PM → 1pm – 5pm", "1:00 PM - 5:00 PM", "1pm – 5pm"],
+    ["12h slot spanning noon: 10:00 AM - 12:00 PM → 10am – 12pm", "10:00 AM - 12:00 PM", "10am – 12pm"],
+  ])("%s", (_name, slot, out) => {
+    expect(formatSlot(slot)).toBe(out);
   });
 
   // ── 24-hour format — regression guard (output must be byte-identical to before) ─
 
-  test("24h slot whole hours: 09:00-17:00 → 9am – 5pm", () => {
-    expect(formatSlot("09:00-17:00")).toBe("9am – 5pm");
-  });
-
-  test("24h slot with minutes on open: 09:30-17:00 → 9:30am – 5pm", () => {
-    expect(formatSlot("09:30-17:00")).toBe("9:30am – 5pm");
-  });
-
-  test("24h slot with minutes on close: 09:00-17:30 → 9am – 5:30pm", () => {
-    expect(formatSlot("09:00-17:30")).toBe("9am – 5:30pm");
-  });
-
-  test("24h slot noon close: 09:00-13:00 → 9am – 1pm", () => {
+  test.each([
+    ["24h slot whole hours: 09:00-17:00 → 9am – 5pm", "09:00-17:00", "9am – 5pm"],
+    ["24h slot with minutes on open: 09:30-17:00 → 9:30am – 5pm", "09:30-17:00", "9:30am – 5pm"],
+    ["24h slot with minutes on close: 09:00-17:30 → 9am – 5:30pm", "09:00-17:30", "9am – 5:30pm"],
     // Used by HoursList.test.tsx fixtures — must stay unchanged
-    expect(formatSlot("9:00-13:00")).toBe("9am – 1pm");
+    ["24h slot noon close: 09:00-13:00 → 9am – 1pm", "9:00-13:00", "9am – 1pm"],
+  ])("%s", (_name, slot, out) => {
+    expect(formatSlot(slot)).toBe(out);
   });
 
   // ── Full-day / midnight close (the 24-hour-store bug) ────────────────────

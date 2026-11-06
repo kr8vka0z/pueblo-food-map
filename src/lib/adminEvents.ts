@@ -12,7 +12,7 @@ import { auditInsertIfExistsSql } from "@/lib/auditLog";
 import type { EventRow } from "@/lib/events";
 
 /** The public feed's path — every events write purges this edge-cache entry. */
-export const PUBLIC_EVENTS_PATH = "/api/public/events";
+const PUBLIC_EVENTS_PATH = "/api/public/events";
 
 /**
  * SELECT-form so `WHERE EXISTS` can skip the audit row when the event UPDATE

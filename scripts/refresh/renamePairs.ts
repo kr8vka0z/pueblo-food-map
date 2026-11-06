@@ -113,7 +113,7 @@ export function findRenamePairCandidates(proposals: ProposalDraft[], currentRows
   return out;
 }
 
-/** `meta.rename` on a rename proposal's proposed_diff — read by the approve path and /admin/flags. */
+/** `meta.rename` on a rename proposal's proposed_diff — read by the approve path and /admin/places "To review" (VenueListView). */
 export interface RenameMeta {
   from_id: string;
   to_id: string;

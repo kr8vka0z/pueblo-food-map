@@ -42,7 +42,7 @@ import time
 import urllib.parse
 import urllib.request
 from collections import defaultdict
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 try:
@@ -85,7 +85,6 @@ GEOCODE_SLEEP = 1.1  # seconds between Nominatim requests
 
 # Days for WeeklyHours inference
 _DOW_NAMES = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-_PY_DOW_TO_NAME = {0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat", 6: "sun"}
 
 # Category override rule: names containing this string -> meal_site
 MEAL_SITE_SUBSTRING = "Soup Kitchen"
@@ -345,7 +344,7 @@ def _parse_hours_card(soup: BeautifulSoup) -> tuple[Optional[dict], list[dict]]:
     proves this function against them without a live fetch.
 
     Returns (hours_weekly, hours_irregular) — hours_weekly is None when no
-    "Every week" row was found (matches _infer_weekly_hours's old contract);
+    "Every week" row was found;
     hours_irregular is a list of IrregularSchedule-shaped dicts
     (src/types/venue.ts) for every non-weekly row (empty list when none).
     "Once a month" + "Nth Weekday" becomes `monthly_ordinal`; any other
@@ -410,15 +409,6 @@ def _parse_hours_card(soup: BeautifulSoup) -> tuple[Optional[dict], list[dict]]:
         hours_irregular.append(entry)
 
     return hours_weekly, hours_irregular
-
-
-def _infer_weekly_hours(html: str) -> Optional[dict]:
-    """Thin wrapper over _parse_hours_card() for callers that only need the
-    WeeklyHours half — kept as its own function so the name stays stable for
-    anything reasoning about this module's history."""
-    soup = BeautifulSoup(html, "html.parser")
-    hours_weekly, _ = _parse_hours_card(soup)
-    return hours_weekly
 
 
 def parse_detail(html: str) -> dict:
@@ -743,15 +733,6 @@ def _self_check() -> int:
     check("no Hours card at all", "no_hours_section.html", None, [])
     check("Hours card present but empty (no schedule-freq/table rows)", "empty_hours_heading.html", None, [])
 
-    # _infer_weekly_hours() is a thin wrapper kept for any future caller
-    # that only needs the WeeklyHours half — prove it isn't dead code by
-    # exercising it against the same fixture bytes _parse_hours_card() uses.
-    weekly_html = (FIXTURES_DIR / "weekly.html").read_text(encoding="utf-8")
-    wrapper_result = _infer_weekly_hours(weekly_html)
-    assert wrapper_result == {"mon": ["4:00 PM - 6:00 PM"]}, f"_infer_weekly_hours wrapper: got {wrapper_result!r}"
-    checked += 1
-    print("  OK  _infer_weekly_hours() wrapper")
-
     # parse_detail() notes: proves the meta-description-as-notes bug (fixed
     # by fix/venue-page-phone-notes) stays fixed, while the eligibility-
     # keyword sentence and recurrence-notes logic it must NOT break keep
@@ -852,11 +833,6 @@ def main() -> int:
         "--skip-details",
         action="store_true",
         help="Skip fetching detail pages (faster, no hours/SNAP/WIC data)",
-    )
-    parser.add_argument(
-        "--skip-geocode",
-        action="store_true",
-        help="Skip Nominatim geocoding (uses cached values only)",
     )
     parser.add_argument(
         "--self-check",
@@ -1007,9 +983,8 @@ def main() -> int:
             f"({entry['lat']}, {entry['lng']})"
         )
 
-    if not args.skip_geocode:
-        save_geocode_cache(geocache)
-        print(f"  Geocode cache saved to {GEOCODE_CACHE.relative_to(REPO)}")
+    save_geocode_cache(geocache)
+    print(f"  Geocode cache saved to {GEOCODE_CACHE.relative_to(REPO)}")
 
     # ---- Step 5: write raw JSON audit trail ----
     RAW_DIR.mkdir(parents=True, exist_ok=True)

@@ -170,11 +170,7 @@ export function buildAuthOptions(
     // (`key`/`count`/`lastRequest` fields) is verified in
     // node_modules/@better-auth/core/dist/db/get-tables.mjs's
     // `rateLimitTable` literal — migrations/0004_rate_limit_table.sql adds
-    // it (see that file's own header for how its column types/constraints
-    // were hand-derived from the same installed source, since the
-    // `@better-auth/cli generate` workflow that produced 0003 could not be
-    // run this session — no working shell — and needs parent
-    // confirmation/regeneration before this lands on remote D1).
+    // it.
     //
     // WHY these `customRules` (#684, replacing the old 1h/5 rule on the
     // removed sign-in-link endpoint): the emailOTP plugin ships its own 60s/3 rule
@@ -199,16 +195,13 @@ export function buildAuthOptions(
       },
     },
     // #318 Phase 4 item 5 — short-lived session for this single
-    // high-privilege admin account, replacing Better Auth's 7-day default
-    // (node_modules/@better-auth/core/dist/types/init-options.d.mts:801,
-    // `@default 7 days`).
+    // high-privilege admin account, replacing Better Auth's 7-day default.
     //
-    // WHY 12h `expiresIn` + 1h `updateAge`, ROLLING (not absolute):
-    // verified in node_modules/better-auth/dist/api/routes/session.mjs:203-238
-    // that a session refreshes — `expiresAt` is recomputed as
+    // WHY 12h `expiresIn` + 1h `updateAge`, ROLLING (not absolute): a
+    // session refreshes — `expiresAt` is recomputed as
     // `now + expiresIn` — once less than `updateAge` remains before it
     // would expire (`shouldBeUpdated = expiresAt - expiresIn*1000 +
-    // updateAge*1000 <= now`), and that this refresh is a real DB write
+    // updateAge*1000 <= now`), and the refresh is a real DB write
     // (`internalAdapter.updateSession`) gated by that check specifically
     // so an active session doesn't rewrite its row on every single
     // request — only roughly once per `updateAge` window. 12h/1h means an
@@ -216,10 +209,8 @@ export function buildAuthOptions(
     // continuously active one is re-checked/extended at most once an hour.
     //
     // WHY no separate hard-absolute-cap on top of this: the only
-    // mechanism 1.6.23 exposes that touches this is
-    // `disableSessionRefresh` (same init-options.d.mts, lines ~811-817;
-    // behavior confirmed in the session.mjs refresh check above via its
-    // `disableRefresh` short-circuit) — but that option does not ADD an
+    // mechanism Better Auth exposes that touches this is
+    // `disableSessionRefresh` — but that option does not ADD an
     // absolute ceiling alongside the rolling window above; it REPLACES the
     // rolling behavior outright, since disabling refresh means
     // `expiresAt` (set once at sign-in) is never recomputed, silently
@@ -228,8 +219,7 @@ export function buildAuthOptions(
     // the rolling/idle design this task also asks for (an `updateAge` that
     // meaningfully avoids rewriting on every request) — it's a binary
     // trade-off between the two, not an additive second cap. No other
-    // absolute-cap option exists in this version (confirmed by reading the
-    // full `session` block of init-options.d.mts, lines 797-924 — only
+    // absolute-cap option exists (the `session` options are only
     // `expiresIn`, `updateAge`, `disableSessionRefresh`, the unrelated
     // cookie-cache block, and `freshAge` — a distinct "is this session
     // fresh enough for a sensitive re-auth-gated action" check, not a
@@ -260,8 +250,7 @@ export function buildAuthOptions(
     // file, so no `Domain` attribute is ever attached — the third
     // `__Host-` invariant is satisfied by simply never opting in.
     // auth-options.test.ts asserts the exact resolved name/attributes via
-    // better-auth's own `getCookies()` helper; a true end-to-end browser
-    // check still happens at Kyle's live preview (Phase 3 report).
+    // better-auth's own `getCookies()` helper.
     //
     // #595 security review — `useSecureCookies: false` above suppresses
     // Secure on EVERY Better Auth cookie, not just session_token (verified

@@ -13,7 +13,27 @@
  * others. The limiter holds analytics to DASHBOARD_FETCH_SLOTS (5), leaving
  * one connection for GitHub, and each attempt's timeout starts only once it
  * holds a slot.
+ *
+ * Also home to the period arithmetic and cache lifetime both loaders share.
  */
+
+import type { DashboardPeriod } from "@/lib/cfAnalytics";
+
+const PERIOD_DAYS: Record<DashboardPeriod, number> = { "7d": 7, "30d": 30, "90d": 90 };
+export const MS_PER_DAY = 24 * 60 * 60 * 1000;
+/** How long each loader keeps a period's result in its per-isolate cache. */
+export const ANALYTICS_CACHE_TTL_MS = 60 * 60 * 1000;
+
+/** The period's length in days, today's UTC midnight, and the starts of the current and previous windows before it (ms). */
+export function periodStartsUtc(
+  period: DashboardPeriod,
+  now: Date,
+): { days: number; todayUTC: number; sinceMs: number; previousSinceMs: number } {
+  const days = PERIOD_DAYS[period];
+  const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const sinceMs = todayUTC - days * MS_PER_DAY;
+  return { days, todayUTC, sinceMs, previousSinceMs: sinceMs - days * MS_PER_DAY };
+}
 
 /** Per attempt. A cold PostHog HogQL query has been measured at 1.5–2.7s, once over 4s; warm ones take ~200ms. */
 export const ANALYTICS_FETCH_TIMEOUT_MS = 8000;

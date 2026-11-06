@@ -8,11 +8,11 @@
 // WHY a scoped named-type import for ExecutionContext/ExportedHandler/ScheduledController
 // (not a bare `wrangler types` full-runtime include, and not `.wrangler`'s own generated
 // runtime.d.ts, which is itself gitignored build output — absent in a fresh checkout, so
-// relying on it would only work by local-cache accident, not in CI): AGENTS.md's "Don't run
-// bare `wrangler types`" bullet documents why this app never enables wrangler's full runtime type set
-// (`wrangler types` default) — it collides Cloudflare's HTMLRewriter `Element` with
-// lib.dom's `Element` and corrupts DOM types project-wide. cloudflare-env.d.ts already
-// works around this by importing only the one runtime type it needs (`D1Database`) from
+// relying on it would only work by local-cache accident, not in CI): this app never enables
+// wrangler's full runtime type set (`wrangler types` default; see cloudflare-env.d.ts's header)
+// — it collides Cloudflare's HTMLRewriter `Element` with lib.dom's `Element` and corrupts DOM
+// types project-wide. cloudflare-env.d.ts already works around this by importing only the
+// runtime types it needs (`D1Database`, `R2Bucket`, `Fetcher`) from
 // `@cloudflare/workers-types/experimental` instead of pulling in the whole ambient set.
 // This file follows the exact same pattern for the three Workers runtime types a
 // scheduled()-handler signature needs — none of which is `Element` or collides with DOM.

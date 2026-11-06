@@ -1,70 +1,88 @@
-// cloudflare-env.d.ts — gives the project a typed `CloudflareEnv` (bindings
-// and vars) for src/lib/cloudflareContext.ts's getCloudflareContext(), and
-// supplies the Workers runtime types this project's own .ts files reference
-// directly.
+// cloudflare-env.d.ts — the one hand-written type for the Worker's env: every
+// binding, var and secret in wrangler.jsonc, as `CloudflareEnv` (read by
+// src/lib/cloudflareContext.ts's getCloudflareContext(), cloudflare-workers.d.ts's
+// `import { env } from "cloudflare:workers"`, and custom-worker.ts's handlers),
+// plus the `process.env` typing for the secrets and vars read that way.
+// Add a new binding, var or secret here in the same PR that adds it to
+// wrangler.jsonc.
 //
-// WHY this file exists: `npx wrangler types` (run against wrangler.jsonc)
-// writes worker-configuration.d.ts with the real `Env` interface (ADMIN_DB,
-// BOX_PHOTOS, ASSETS, vars) but no secrets or hand-typed vars;
-// `CloudflareEnv extends Env` below adds those, so
-// `getCloudflareContext().env.ADMIN_DB` type-checks (src/lib/adminDb.ts).
-//
-// WHY `D1Database` is imported here from @cloudflare/workers-types rather
-// than generated via `wrangler types --include-runtime` (the default): this
-// app also targets the DOM (tsconfig `lib: ["dom", ...]` — Mapbox, forms,
-// etc.). Wrangler's bundled runtime types include Cloudflare's HTMLRewriter
-// `Element` type, which collides with lib.dom's `Element` and silently
-// corrupts unrelated DOM types across the whole project (observed: every
-// `as HTMLSelectElement` cast in the existing form tests broke, plus
-// src/components/Map.tsx's GeoJSON typing) — see #237 checkpoint c report.
-// worker-configuration.d.ts is therefore regenerated with
-// `--include-runtime=false` (Env/binding shapes only); importing just the
-// one runtime type actually used avoids the collision entirely.
-// Regenerate worker-configuration.d.ts (`npx wrangler types
-// --include-runtime=false`) after any wrangler.jsonc binding change — this
-// file itself only needs to change if a *new* binding introduces another
-// runtime type (e.g. KVNamespace) alongside D1Database.
+// WHY hand-written, not `wrangler types`: this app also targets the DOM
+// (tsconfig `lib: ["dom", ...]` — Mapbox, forms, etc.). Wrangler's runtime
+// types include Cloudflare's HTMLRewriter `Element` type, which collides with
+// lib.dom's `Element` and silently corrupts unrelated DOM types across the
+// whole project (observed: every `as HTMLSelectElement` cast in the form tests
+// broke, plus src/components/Map.tsx's GeoJSON typing — see #237 checkpoint c
+// report). Without the runtime types, the generated file names types it can't
+// resolve (`Fetcher`, `Ai`) and drops secrets that exist only as Worker
+// secrets, so it had to be hand-patched after every run anyway. Instead, the
+// few runtime types used are imported by name from
+// @cloudflare/workers-types/experimental, which adds no globals.
 import type {
   D1Database as CFD1Database,
+  Fetcher,
   R2Bucket as CFR2Bucket,
 } from "@cloudflare/workers-types/experimental";
 import type { AiBinding } from "@/lib/eventTranslate";
 
 declare global {
   type D1Database = CFD1Database;
-  // Blessing Boxes slice 5 (photos) — BOX_PHOTOS binding. Same narrow-import
-  // reasoning as D1Database above: a bare `wrangler types` full-runtime
-  // include would reintroduce the HTMLRewriter `Element`/lib.dom `Element`
-  // collision this file's own header warns about.
   type R2Bucket = CFR2Bucket;
-  interface CloudflareEnv extends Env {
-    // #318 passkey isolation — staging-only override of auth-options.ts's
-    // rpID (unset/undefined on prod). Declared here rather than regenerated
-    // via `npx wrangler types`, same rationale as this file's own D1Database
-    // import above: it's a plain wrangler `var`, not a binding worth a full
-    // runtime-type regen for one optional string field.
-    BETTER_AUTH_RP_ID?: string;
-    // #485 (PostHog analytics) — comma-separated IP/CIDR list (both prod and
-    // env.staging get one, see wrangler.jsonc) custom-worker.ts's /ingest
-    // proxy checks via src/lib/ipMatch.ts before forwarding to PostHog.
-    // Declared here rather than regenerated via `npx wrangler types`, same
-    // rationale as BETTER_AUTH_RP_ID above: a plain wrangler `var`, not worth
-    // a full runtime-type regen for one optional string field.
-    ANALYTICS_EXCLUDED_IPS?: string;
-    // #679 — the one account that sees /admin/activity (src/lib/adminOwner.ts).
-    // Same "plain var, declared by hand" rationale as the two above.
-    ADMIN_OWNER_EMAIL?: string;
+
+  interface CloudflareEnv {
+    // Bindings (prod and env.staging each declare their own).
+    ADMIN_DB: D1Database;
+    BOX_PHOTOS: R2Bucket;
+    EVENT_FLYERS: R2Bucket;
+    ASSETS: Fetcher;
     // #757 Workers AI binding ("Suggest Spanish" on the admin event form,
-    // src/lib/eventTranslate.ts). Typed by hand with the one method used,
-    // for the same reason as D1Database above: a regenerated `AI: Ai` needs
-    // the full runtime types, which collide with lib.dom. Optional because
+    // src/lib/eventTranslate.ts). Typed with the one method used: the runtime
+    // `Ai` type needs the full runtime types (see header). Optional because
     // local dev and tests have no binding and the route treats that as a
     // clean 503.
     AI?: AiBinding;
-    // #681 (admin Dashboard "What people do on the map") — POSTHOG_PROJECT_ID
-    // and POSTHOG_API_HOST are declared once, in worker-configuration.d.ts's
-    // hand-patched `Env` (see that file's header), and reach this interface
-    // through the `extends Env` above — no redeclaration needed here.
+
+    // Vars. #318 passkey isolation: BETTER_AUTH_RP_ID is set on staging only,
+    // so it is undefined on prod (auth-options.ts, isProductionWorker).
+    BETTER_AUTH_RP_ID?: string;
+    // #485 comma-separated IP/CIDR list custom-worker.ts's /ingest proxy checks
+    // via src/lib/ipMatch.ts before forwarding to PostHog.
+    ANALYTICS_EXCLUDED_IPS?: string;
+    CF_ANALYTICS_ACCOUNT_ID: string;
+    POSTHOG_PROJECT_ID: string;
+    // #679 the one account that sees /admin/activity (src/lib/adminOwner.ts).
+    ADMIN_OWNER_EMAIL?: string;
+
+    // Secrets (docs/agents/secrets.md). HC_PING_URL is prod only.
+    POSTHOG_API_HOST?: string;
+    NEXT_PUBLIC_MAPBOX_TOKEN: string;
+    RESEND_API_KEY: string;
+    HC_PING_URL?: string;
+  }
+
+  // Wrangler's convention: `Cloudflare.Env` is the env type workerd's
+  // `cloudflare:workers` module types against; GlobalProps names the entry.
+  namespace Cloudflare {
+    // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- an alias by declaration merging, Wrangler's own pattern
+    interface Env extends CloudflareEnv {}
+    interface GlobalProps {
+      mainModule: typeof import("./custom-worker");
+    }
+  }
+
+  // workerd mirrors vars and secrets into process.env (AGENTS.md "Runtime
+  // reads"). Optionality matches what wrangler used to generate: tests set
+  // RESEND_API_KEY with vi.stubEnv because a required key can't be deleted.
+  namespace NodeJS {
+    interface ProcessEnv {
+      BETTER_AUTH_RP_ID?: string;
+      ANALYTICS_EXCLUDED_IPS: string;
+      CF_ANALYTICS_ACCOUNT_ID: string;
+      POSTHOG_PROJECT_ID: string;
+      POSTHOG_API_HOST?: string;
+      NEXT_PUBLIC_MAPBOX_TOKEN: string;
+      RESEND_API_KEY: string;
+      HC_PING_URL?: string;
+    }
   }
 }
 

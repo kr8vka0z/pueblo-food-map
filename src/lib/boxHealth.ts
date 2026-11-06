@@ -44,9 +44,15 @@ export interface BoxHealth {
 }
 
 /** A report older than this, with nothing since, reads as "gone quiet" rather than "ok" — task spec's own number, independent of blessingBoxes.ts's 7-day PUBLIC fade window (see this file's header for why the two must not be unified). */
-export const QUIET_WINDOW_DAYS = 30;
+const QUIET_WINDOW_DAYS = 30;
 
-const NEEDS_HELP_KINDS: ReadonlySet<CheckinKind> = new Set(["low", "empty", "problem"]);
+/**
+ * The statuses that mean "someone should go check on this box" — shared by
+ * computeBoxHealth (a check-in of one of these kinds sets that status),
+ * rankNeedsHelp (the Dashboard's "Boxes empty or low" count) and
+ * AllBoxesTable's "Needs help" filter, so the screens never disagree.
+ */
+export const NEEDS_HELP_STATUSES: ReadonlySet<BoxHealthStatus> = new Set(["low", "empty", "problem"]);
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -70,7 +76,7 @@ export function computeBoxHealth(checkins: BoxHealthCheckin[], now: Date = new D
   if (!latest) return { status: "quiet", latest: null, daysSinceLastReport: null };
 
   const days = daysSince(latest.createdAt, now);
-  if (NEEDS_HELP_KINDS.has(latest.kind)) {
+  if (NEEDS_HELP_STATUSES.has(latest.kind as BoxHealthStatus)) {
     return { status: latest.kind as "low" | "empty" | "problem", latest, daysSinceLastReport: days };
   }
   if (days > QUIET_WINDOW_DAYS) return { status: "quiet", latest, daysSinceLastReport: days };
@@ -122,13 +128,6 @@ export interface BoxHealthEntry {
 export function activeBoxes(entries: BoxHealthEntry[]): BoxHealthEntry[] {
   return entries.filter((e) => e.removedOn === null);
 }
-
-/**
- * The statuses that mean "someone should go check on this box" — shared by
- * rankNeedsHelp (the Dashboard's "Boxes empty or low" count) and
- * AllBoxesTable's "Needs help" filter, so the two screens never disagree.
- */
-export const NEEDS_HELP_STATUSES: ReadonlySet<BoxHealthStatus> = new Set(["low", "empty", "problem"]);
 
 /**
  * Boxes needing help right now (NEEDS_HELP_STATUSES), most recent report

@@ -295,7 +295,6 @@ export interface DiffSourceParams {
   today: string;
   /** (source, target, diff_hash) keys of proposals a human has already explicitly rejected (§6.10b). */
   rejectedKeys?: ReadonlySet<string>;
-  /** (source, target) keys of still-`pending` proposals from an EARLIER run — flipped to `superseded` by the caller, not written again identically here (§6.10a) is the caller's job; this just tells the caller which keys are being superseded. */
 }
 
 export interface DiffSourceResult {

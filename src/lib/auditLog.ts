@@ -8,8 +8,8 @@
  * own UPDATE didn't apply (a stale `updated_at`, an already-reviewed row) use
  * a SELECT ... WHERE EXISTS form instead, so a rejected write never leaves an
  * audit row claiming it happened (#265). Callers: AUDIT_INSERT_SQL
- * (adminVenueEditSql.ts), EVENT_AUDIT_INSERT_SQL (adminEvents.ts), and the
- * submissions "done" route.
+ * (adminVenueEditSql.ts), EVENT_AUDIT_INSERT_SQL (adminEvents.ts),
+ * eventSubmissions.ts, and the submissions "done" route.
  */
 const AUDIT_INSERT_INTO =
   "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id)";

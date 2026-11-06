@@ -44,22 +44,10 @@ describe("sitemap", () => {
     }
   });
 
-  test("/suggest is included", async () => {
+  test.each(["/suggest", "/feedback", "/privacy"])("%s is included", async (path) => {
     const entries = await sitemap();
     const urls = entries.map((e) => e.url);
-    expect(urls).toContain(`${SITE_URL}/suggest`);
-  });
-
-  test("/feedback is included", async () => {
-    const entries = await sitemap();
-    const urls = entries.map((e) => e.url);
-    expect(urls).toContain(`${SITE_URL}/feedback`);
-  });
-
-  test("/privacy is included", async () => {
-    const entries = await sitemap();
-    const urls = entries.map((e) => e.url);
-    expect(urls).toContain(`${SITE_URL}/privacy`);
+    expect(urls).toContain(`${SITE_URL}${path}`);
   });
 
   // SEO/AEO plan Phase 0: `/boxes` never existed (a 404 in every crawl), and

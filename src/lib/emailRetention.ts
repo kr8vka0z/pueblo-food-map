@@ -22,7 +22,7 @@
  * Next.js request context to read. The D1 binding is passed in directly
  * from `env.ADMIN_DB` (same direct-binding pattern the two public,
  * unauthenticated submit routes already use for public_submissions —
- * AGENTS.md "Admin panel" — never getAdminDb(), which requires a live
+ * ARCHITECTURE.md "Admin panel" — never getAdminDb(), which requires a live
  * admin session that a cron trigger will never have).
  *
  * SQL shape, one UPDATE/DELETE per table, all idempotent and gated on the
@@ -147,7 +147,7 @@ async function runOne(db: D1Database, sql: string, cutoff: string, errors: strin
  * public_submissions errored) would lose those counts entirely: the
  * caller's failure log would show only an error string, with no record
  * that real cleanup still happened that day. logEmailRetentionResult can
- * still be called with `counts` on this path (custom-worker.ts does),
+ * still be called with `counts` on this path (scheduledTasks.ts does),
  * same PII-free numbers-only shape as the success case.
  */
 export class EmailRetentionPartialFailure extends Error {
@@ -168,7 +168,8 @@ export class EmailRetentionPartialFailure extends Error {
  * risk concurrent D1 statements against the same database. Throws
  * EmailRetentionPartialFailure (after every statement has had its own
  * independent attempt — see runOne above) if any statement failed, so the
- * caller's own failure log (custom-worker.ts's logEmailRetentionFailure)
+ * caller's own failure log (scheduledTasks.ts calls logger.ts's
+ * logEmailRetentionFailure)
  * still fires; counts already committed by the other statements are not
  * rolled back by this throw — each is its own D1 commit, and the thrown
  * error still carries them so they aren't lost from the log entirely.

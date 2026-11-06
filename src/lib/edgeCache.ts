@@ -45,7 +45,7 @@ export interface BestEffortResult<T> {
  * in vitest/node, so route tests stub it; every caller treats undefined as
  * "always compute fresh" rather than throwing.
  */
-export function edgeCacheDefault(): Cache | undefined {
+function edgeCacheDefault(): Cache | undefined {
   return (globalThis as { caches?: { default?: Cache } }).caches?.default;
 }
 

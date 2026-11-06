@@ -2,9 +2,8 @@ import { describe, test, expect } from "vitest";
 import { buildProposalWriteStatements } from "./proposalSql";
 import type { ProposalDraft } from "./diffEngine";
 
-// Mirrors refresh-ingest.ts's own sqlText() exactly — kept local to this
-// test file rather than imported (that helper is deliberately private to
-// the script, see refresh-ingest.ts's "SQL literal helpers" header).
+// Mirrors scripts/refresh/sql.ts's sqlText() exactly (the quoter
+// refresh-ingest.ts passes in).
 function sqlText(value: string | null | undefined): string {
   if (value === null || value === undefined) return "NULL";
   return `'${value.replace(/'/g, "''")}'`;

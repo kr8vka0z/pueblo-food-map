@@ -13,7 +13,7 @@ import type { EventRow } from "@/lib/events";
 import type { ValidatedEventFields } from "@/lib/adminEventValidation";
 
 /** The public feed's path — every events write purges this edge-cache entry. */
-export const PUBLIC_EVENTS_PATH = "/api/public/events";
+const PUBLIC_EVENTS_PATH = "/api/public/events";
 
 /**
  * SELECT-form so `WHERE EXISTS` can skip the audit row when the event UPDATE

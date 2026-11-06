@@ -23,15 +23,11 @@ describe("haversineMiles", () => {
 });
 
 describe("formatMiles", () => {
-  test("collapses sub-tenth distances to a fixed label", () => {
-    expect(formatMiles(0.04)).toBe("< 0.1 mi");
-  });
-
-  test("shows one decimal under 10 miles", () => {
-    expect(formatMiles(2.347)).toBe("2.3 mi");
-  });
-
-  test("rounds to whole miles at 10+", () => {
-    expect(formatMiles(12.6)).toBe("13 mi");
+  test.each([
+    ["collapses sub-tenth distances to a fixed label", 0.04, "< 0.1 mi"],
+    ["shows one decimal under 10 miles", 2.347, "2.3 mi"],
+    ["rounds to whole miles at 10+", 12.6, "13 mi"],
+  ])("%s", (_name, miles, out) => {
+    expect(formatMiles(miles)).toBe(out);
   });
 });

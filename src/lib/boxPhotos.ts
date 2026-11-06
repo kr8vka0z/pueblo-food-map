@@ -71,9 +71,10 @@ export const MAX_HISTORY_PHOTOS = 24;
  * one row per venue; `id DESC` breaks a same-millisecond tie deterministically,
  * same reasoning box_checkins' own queries use `created_at DESC, id DESC`.
  *
- * ponytail: this shares the check-ins IN(...) helper's same ~100-bound-param
- * SQLite/D1 ceiling (AGENTS.md's D1 notes) — fine at Pueblo's real box count,
- * not revisited here.
+ * ponytail: unchunked, so this hits D1's ~100-bound-param ceiling
+ * (src/lib/d1.ts, D1_MAX_BOUND_PARAMS) past 100 boxes — fine at Pueblo's real
+ * box count, and loadLatestPhotosBestEffort catches the failure; chunk with
+ * chunkArray if the box count gets there.
  */
 function selectLatestApprovedPhotosForVenuesSql(count: number): string {
   const placeholders = Array(count).fill("?").join(", ");

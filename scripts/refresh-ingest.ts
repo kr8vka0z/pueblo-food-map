@@ -71,6 +71,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { setTimeout as sleep } from "node:timers/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -107,6 +108,7 @@ import {
   type SwitchResetRow,
   type SwitchState,
 } from "@/lib/sourceSwitch";
+import { sqlText } from "./refresh/sql";
 import { chunkSqlStatements } from "./refresh/sqlChunks";
 import {
   DISCOVERY_RETRY_DAYS,
@@ -165,7 +167,7 @@ const LINK_HEALTH_DELAY_MS = 500; // politeness — same order of magnitude as s
 // quoted SQL strings apart word-by-word). `process.execPath` is the exact
 // node binary already running this script — resolving wrangler's real bin
 // file directly sidesteps PATH/shell/.cmd entirely, identically on Windows
-// dev machines (this repo's primary environment, AGENTS.md) and Linux CI.
+// and Linux.
 const WRANGLER_BIN = join(REPO_ROOT, "node_modules", "wrangler", "bin", "wrangler.js");
 const PYTHON_CMD = process.platform === "win32" ? "python" : "python3";
 
@@ -296,20 +298,6 @@ function d1ApplyFile(dbMode: DbMode, filePath: string): void {
   });
 }
 
-// ─── SQL literal helpers (deliberately local to this script) ─────────────────
-// Kept here rather than in a shared module that imports
-// `{ groceryOsmVenues } from "@/data/grocery-osm"` at top level — which, under
-// Node's ESM module cache, would lock in whatever grocery-osm.ts contained
-// at THAT import time. This script deliberately imports grocery-osm.ts
-// dynamically, AFTER re-running the OSM scraper below, specifically so it
-// sees the freshly-regenerated file, not a stale cached copy — so nothing
-// in this file's import graph may touch that module earlier.
-
-function sqlText(value: string | null | undefined): string {
-  if (value === null || value === undefined) return "NULL";
-  return `'${value.replace(/'/g, "''")}'`;
-}
-
 // ─── Scraper invocation ─────────────────────────────────────────────────────
 
 function runPython(scriptRelPath: string): void {
@@ -367,6 +355,17 @@ interface UrlRow {
   url: string;
 }
 
+/** Rejection keys of this source's proposals a person (not the pipeline) approved — dropAlreadyReviewed skips them. */
+function humanApprovedKeys(dbMode: DbMode, source: typeof CAS_SOURCE | typeof WEBSITE_SOURCE): Set<string> {
+  return new Set(
+    d1Query<RejectedRow>(
+      dbMode,
+      `SELECT source, target_venue_id, diff_hash FROM change_proposals WHERE source = '${source}' AND status = 'approved' ` +
+        "AND reviewed_by NOT IN ('refresh-pipeline','refresh-pipeline-ai','refresh-pipeline-auto')",
+    ).map((r) => rejectionKey(r.source as RefreshSource, r.target_venue_id, r.diff_hash)),
+  );
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -401,11 +400,6 @@ async function main(): Promise<void> {
   }
 
   // ── 1 + 2: scrape, load current D1 state ──
-  // Sequential, not Promise.all — each scraper shells out via execFileSync,
-  // which blocks Node's single thread until that child process exits, so
-  // the two scrapes were never actually concurrent despite the old
-  // Promise.all wrapping (a misleading-but-harmless read, fixed here to
-  // match what actually runs).
   const plentifulIncoming = singleSource ? [] : await scrapePlentiful();
   const osmIncoming = singleSource ? [] : await scrapeOsm();
   const currentByType: Record<RefreshSource, CurrentVenueRow[]> = {
@@ -441,16 +435,21 @@ async function main(): Promise<void> {
   // than assumed so a database that hasn't had it applied yet still gets a
   // normal, untriaged run instead of a failed one (the promotion checklist
   // applies it first, but a missed step must not break the weekly job).
-  const schemaReady =
-    d1Query<{ name: string }>(dbMode, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'venue_id_aliases'").length > 0;
+  // One probe for every migration-gated table this run checks (each d1Query is its own wrangler process).
+  const tables = new Set(
+    d1Query<{ name: string }>(
+      dbMode,
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('venue_id_aliases','venue_observations','page_fingerprints','source_switch_resets')",
+    ).map((r) => r.name),
+  );
+  const schemaReady = tables.has("venue_id_aliases");
   if (!schemaReady) console.log("\nmigration 0016 not applied to this database — skipping rename pairing and Jev triage.");
 
   // Migration 0021 (venue_observations: fetch rows + venue_direct pins).
   // Probed for the same reason as 0016 above. Without it no pin can exist,
   // so skipping the pin lookup is honest, and date-only rows just skip
   // their observation INSERT.
-  const observationsReady =
-    d1Query<{ name: string }>(dbMode, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'venue_observations'").length > 0;
+  const observationsReady = tables.has("venue_observations");
   if (!observationsReady) console.log("migration 0021 not applied to this database — no pins checked, no fetch observations written.");
   // Newest pin per (venue, field) is the live one.
   const pins = observationsReady
@@ -517,7 +516,7 @@ async function main(): Promise<void> {
     ? null
     : await fetchCareAndShare({
         fetch: (url, init) => fetch(url, init),
-        sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+        sleep,
         log: (m) => console.log(m),
         cacheDir: casCacheDir,
       });
@@ -529,7 +528,7 @@ async function main(): Promise<void> {
     anySourceAborted = true;
     console.error(`\ncare_and_share: ABORTED after ${cas.requests} request(s) (writes nothing for this source): ${cas.reason}`);
   } else {
-    // blessing_box rows are loaded only so buildCareAndShareProposals can strip them (excludeBlessingBoxes).
+    // blessing_box rows are loaded only so buildCareAndShareProposals never proposes an add whose id is a box (boxIds).
     casCurrentRows = d1Query<CurrentVenueRow>(
       dbMode,
       `SELECT ${CURRENT_ROW_COLUMNS} FROM venues WHERE status IN ('draft','published') AND category IN ('pantry','meal_site','blessing_box')`,
@@ -552,13 +551,7 @@ async function main(): Promise<void> {
       ),
       addressPinnedVenueIds: new Set(pins.filter((pin) => pin.field === "address").map((pin) => pin.venue_id)),
     });
-    const approvedCasKeys = new Set(
-      d1Query<RejectedRow>(
-        dbMode,
-        `SELECT source, target_venue_id, diff_hash FROM change_proposals WHERE source = '${CAS_SOURCE}' AND status = 'approved' ` +
-          "AND reviewed_by NOT IN ('refresh-pipeline','refresh-pipeline-ai','refresh-pipeline-auto')",
-      ).map((r) => rejectionKey(r.source as RefreshSource, r.target_venue_id, r.diff_hash)),
-    );
+    const approvedCasKeys = humanApprovedKeys(dbMode, CAS_SOURCE);
     const casProposals = dropAlreadyReviewed(
       built.proposals.filter((p) => !rejectedKeys.has(rejectionKey(p.source, p.targetVenueId, p.diffHash))),
       approvedCasKeys,
@@ -595,8 +588,7 @@ async function main(): Promise<void> {
   let websiteSummary: string | null = null;
   let websiteCurrentRows: CurrentVenueRow[] = [];
   if (onlyWebsite) {
-    const ready0025 =
-      d1Query<{ name: string }>(dbMode, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'page_fingerprints'").length > 0;
+    const ready0025 = tables.has("page_fingerprints");
     if (!ready0025 || !schemaReady || !observationsReady) {
       // Loud, not skipped: without 0025 the Friendly Harbor seed and the
       // page fingerprints are missing, so the reader would show Kyle a
@@ -639,7 +631,7 @@ async function main(): Promise<void> {
           fetchPage: makeFetchPage(),
           gemini: makeGemini(// Flash by default: Argon's quota is small and shared with other work; flash's trial run (48 calls) answered every one.
             process.env.PFM_GEMINI_MODEL || "gemini-3.8-flash-medium", process.env.AGY_BIN || "agy"),
-          sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+          sleep,
           log: (m) => console.log(m),
         },
       });
@@ -651,13 +643,7 @@ async function main(): Promise<void> {
         anySourceAborted = true;
         console.error(`\nwebsite: ABORTED (writes nothing for this source): ${web.reason}`);
       } else {
-        const approvedWebKeys = new Set(
-          d1Query<RejectedRow>(
-            dbMode,
-            `SELECT source, target_venue_id, diff_hash FROM change_proposals WHERE source = '${WEBSITE_SOURCE}' AND status = 'approved' ` +
-              "AND reviewed_by NOT IN ('refresh-pipeline','refresh-pipeline-ai','refresh-pipeline-auto')",
-          ).map((r) => rejectionKey(r.source as RefreshSource, r.target_venue_id, r.diff_hash)),
-        );
+        const approvedWebKeys = humanApprovedKeys(dbMode, WEBSITE_SOURCE);
         const webProposals = dropAlreadyReviewed(web.proposals, approvedWebKeys);
         console.log(`\nwebsite: ${websiteSummary} proposals=${webProposals.length} searched_none=${web.searchedNone.length}`);
         for (const d of st.discovered) console.log(`  discovered ${d}`);
@@ -685,9 +671,7 @@ async function main(): Promise<void> {
 
   // The automatic switch (src/lib/sourceSwitch.ts, migration 0023). Probed
   // like 0016/0021: without the table every pair stays proposal-only.
-  const switchReady =
-    observationsReady &&
-    d1Query<{ name: string }>(dbMode, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'source_switch_resets'").length > 0;
+  const switchReady = observationsReady && tables.has("source_switch_resets");
   const switchStates: SwitchState[] = switchReady
     ? computeSwitchStates(d1Query<SwitchHistoryRow>(dbMode, SWITCH_HISTORY_SQL), d1Query<SwitchResetRow>(dbMode, SWITCH_RESETS_SQL))
     : [];
@@ -710,7 +694,7 @@ async function main(): Promise<void> {
   let deadCount = 0;
   for (let i = 0; i < urlRows.length; i++) {
     const { id, url } = urlRows[i];
-    if (i > 0) await new Promise((r) => setTimeout(r, LINK_HEALTH_DELAY_MS));
+    if (i > 0) await sleep(LINK_HEALTH_DELAY_MS);
     const outcome = await checkUrl(url);
     if (outcome.classification === "dead") {
       deadCount++;
@@ -818,9 +802,6 @@ async function main(): Promise<void> {
 
     statements.push(...aliasStatements, ...websiteStatements);
 
-    // mkdtempSync already creates tmpDir — a following mkdirSync(tmpDir) was
-    // a redundant no-op (recursive:true tolerates an existing dir) removed
-    // here, not a behavior change.
     const tmpDir = mkdtempSync(join(tmpdir(), "pfp-refresh-"));
     const sqlFile = join(tmpDir, "proposals.sql");
     writeFileSync(sqlFile, statements.join("\n") + "\n", "utf-8");

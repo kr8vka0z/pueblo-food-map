@@ -23,10 +23,11 @@
  * `db` getAdminDb() returned.
  */
 
-export const ACTIVITY_TIME_ZONE = "America/Denver";
-export const DEFAULT_RANGE_DAYS = 30;
+import { TIME_ZONE, offsetMinutesAt } from "@/lib/eventTime";
+
+const DEFAULT_RANGE_DAYS = 30;
 /** Rows fetched per source per page; the page offers "Show older" past it. */
-export const ACTIVITY_PAGE_SIZE = 300;
+const ACTIVITY_PAGE_SIZE = 300;
 // D1 caps bound parameters per statement at 100.
 const MAX_IN_PARAMS = 90;
 
@@ -45,7 +46,7 @@ export const ACTIVITY_TYPES: { value: ActivityType; label: string }[] = [
 export interface ActivityFilters {
   person: string;
   type: ActivityType;
-  from: string; // YYYY-MM-DD, local (ACTIVITY_TIME_ZONE)
+  from: string; // YYYY-MM-DD, local (America/Denver)
   to: string; // YYYY-MM-DD, local, inclusive
   q: string;
   /** Inclusive upper bound (ISO) for "Show older" pages; undefined on the first page. */
@@ -92,33 +93,17 @@ export interface AuditActionRow {
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
-function tzOffsetMs(instant: number): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: ACTIVITY_TIME_ZONE,
-    hourCycle: "h23",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).formatToParts(new Date(instant));
-  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
-  const asUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
-  return asUtc - Math.floor(instant / 1000) * 1000;
-}
-
 /** UTC instant (ms) of local midnight at the start of `ymd`. */
-export function localDayStartMs(ymd: string): number {
+function localDayStartMs(ymd: string): number {
   const [y, m, d] = ymd.split("-").map(Number);
   const noonUtc = Date.UTC(y, m - 1, d, 12);
-  return Date.UTC(y, m - 1, d) - tzOffsetMs(noonUtc);
+  return Date.UTC(y, m - 1, d) - offsetMinutesAt(noonUtc) * 60_000;
 }
 
 /** Local calendar date (YYYY-MM-DD) of an instant. */
 export function localYmd(instant: Date | string | number): string {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: ACTIVITY_TIME_ZONE,
+    timeZone: TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -130,7 +115,7 @@ function shiftYmd(ymd: string, days: number): string {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
-export function formatDayLabel(ymd: string): string {
+function formatDayLabel(ymd: string): string {
   const [y, m, d] = ymd.split("-").map(Number);
   return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "long", month: "short", day: "numeric", year: "numeric" }).format(
     new Date(Date.UTC(y, m - 1, d, 12)),
@@ -138,7 +123,7 @@ export function formatDayLabel(ymd: string): string {
 }
 
 export function formatTime(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone: ACTIVITY_TIME_ZONE, hour: "numeric", minute: "2-digit" }).format(new Date(iso));
+  return new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit" }).format(new Date(iso));
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +155,7 @@ export function parseActivityFilters(
 }
 
 /** [lower, upper] ISO bounds, both inclusive. */
-export function activityBounds(filters: ActivityFilters): { lower: string; upper: string } {
+function activityBounds(filters: ActivityFilters): { lower: string; upper: string } {
   const lower = new Date(localDayStartMs(filters.from)).toISOString();
   const rangeUpper = new Date(localDayStartMs(shiftYmd(filters.to, 1)) - 1).toISOString();
   const upper = filters.until && filters.until < rangeUpper ? filters.until : rangeUpper;
@@ -233,7 +218,7 @@ const TYPE_TO_KIND: Partial<Record<ActivityType, ActionKind>> = {
   removals: "removal",
 };
 
-export async function loadActivityActions(db: D1Database, filters: ActivityFilters, limit = ACTIVITY_PAGE_SIZE): Promise<AuditActionRow[]> {
+async function loadActivityActions(db: D1Database, filters: ActivityFilters, limit = ACTIVITY_PAGE_SIZE): Promise<AuditActionRow[]> {
   if (filters.type === "sign_ins" || filters.type === "failed") return [];
   const { lower, upper } = activityBounds(filters);
   const where: string[] = [];
@@ -268,7 +253,7 @@ export async function loadActivityActions(db: D1Database, filters: ActivityFilte
   }
 }
 
-export async function loadActivityAuthEvents(db: D1Database, filters: ActivityFilters, limit = ACTIVITY_PAGE_SIZE): Promise<AuthEventRow[]> {
+async function loadActivityAuthEvents(db: D1Database, filters: ActivityFilters, limit = ACTIVITY_PAGE_SIZE): Promise<AuthEventRow[]> {
   // A place search or an action-only type narrows to actions; automatic
   // changes have no sign-ins.
   if (filters.q || filters.person === "automatic" || TYPE_TO_KIND[filters.type]) return [];
@@ -290,7 +275,7 @@ export async function loadActivityAuthEvents(db: D1Database, filters: ActivityFi
 }
 
 /** The sign-in rows heading sessions whose actions are on this page but whose sign-in isn't (earlier, or filtered out). */
-export async function loadSignInsForSessions(db: D1Database, sessionIds: string[]): Promise<AuthEventRow[]> {
+async function loadSignInsForSessions(db: D1Database, sessionIds: string[]): Promise<AuthEventRow[]> {
   const unique = [...new Set(sessionIds)];
   const rows: AuthEventRow[] = [];
   for (let i = 0; i < unique.length; i += MAX_IN_PARAMS) {
@@ -552,7 +537,7 @@ export function summarizeAction(row: AuditActionRow): ActionSummary {
   return { tag: "Edited", tone: "neutral", ...base };
 }
 
-export function isAutomaticActor(actor: string): boolean {
+function isAutomaticActor(actor: string): boolean {
   return !actor.includes("@");
 }
 

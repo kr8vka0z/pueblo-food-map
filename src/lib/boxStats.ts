@@ -20,8 +20,7 @@
  * response or any network number. (Reversed 2026-09-19 from this file's
  * earlier design, which deliberately widened past that JOIN to keep an
  * archived box's history in the network sum; consistency with every other
- * public query in this repo won out — see AGENTS.md's slice 7 section for
- * the record of that decision.) Every other privacy/scope filter this
+ * public query in this repo won out.) Every other privacy/scope filter this
  * feature enforces (kind != 'problem', category = 'blessing_box',
  * visibility = 'visible') is unchanged.
  *
@@ -291,7 +290,7 @@ export interface NeedLoveBox {
   checkins: readonly CheckinStatusInput[];
 }
 
-export const NEED_LOVE_LIST_SIZE = 5;
+const NEED_LOVE_LIST_SIZE = 5;
 
 /**
  * The limit /box/[id]/history's server component passes to boxPhotos.ts's

@@ -13,7 +13,7 @@
  */
 
 import { t, type Locale } from "@/lib/i18n";
-import { TIME_ZONE, puebloParts } from "@/lib/eventTime";
+import { TIME_ZONE, sameDenverDay } from "@/lib/eventTime";
 import { EVENT_PIN_WINDOW_DAYS, clock } from "@/lib/eventPins";
 import type { PublicEvent, PublicEventDetail } from "@/lib/events";
 import { EVENT_LINK_LABELS, type EventLinkLabel } from "@/lib/adminEventValidation";
@@ -110,18 +110,23 @@ function countdownText(prefix: "startsIn" | "endsIn", remainingMs: number, local
   return t(`events.card.${prefix}.${unit}.${form}`, locale, { n: String(n) });
 }
 
+/** One memoized Pueblo-time formatter per locale for each cache. */
+function denverFormatter(
+  cache: Map<Locale, Intl.DateTimeFormat>,
+  locale: Locale,
+  opts: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+  let f = cache.get(locale);
+  if (!f) {
+    f = new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", { timeZone: TIME_ZONE, ...opts });
+    cache.set(locale, f);
+  }
+  return f;
+}
+
 const startsOnFormatters = new Map<Locale, Intl.DateTimeFormat>();
 function startsOn(startMs: number, locale: Locale): string {
-  let f = startsOnFormatters.get(locale);
-  if (!f) {
-    f = new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
-      timeZone: TIME_ZONE,
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
-    startsOnFormatters.set(locale, f);
-  }
+  const f = denverFormatter(startsOnFormatters, locale, { weekday: "short", month: "short", day: "numeric" });
   return t("events.card.startsOn", locale, { date: f.format(startMs) });
 }
 
@@ -153,23 +158,7 @@ export function eventBadge(
 
 const dayFormatters = new Map<Locale, Intl.DateTimeFormat>();
 function dayLabel(ms: number, locale: Locale): string {
-  let f = dayFormatters.get(locale);
-  if (!f) {
-    f = new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
-      timeZone: TIME_ZONE,
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-    });
-    dayFormatters.set(locale, f);
-  }
-  return f.format(ms);
-}
-
-function sameDenverDay(aMs: number, bMs: number): boolean {
-  const a = puebloParts(aMs);
-  const b = puebloParts(bMs);
-  return a.y === b.y && a.mo === b.mo && a.d === b.d;
+  return denverFormatter(dayFormatters, locale, { weekday: "long", month: "long", day: "numeric" }).format(ms);
 }
 
 /**

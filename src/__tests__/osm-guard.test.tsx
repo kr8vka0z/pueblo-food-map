@@ -70,53 +70,21 @@ function makeVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: nu
 // ─── DesktopVenueWindow guards ────────────────────────────────────────────────
 
 describe("DesktopVenueWindow — OSM notes guard", () => {
-  test("does NOT render notes containing 'OSM'", () => {
-    const venue = makeVenue({
-      notes: "Hours (OSM opening_hours): Mo-Su 08:00-17:00",
-    });
-    render(
-      <DesktopVenueWindow
-        venue={venue}
-        onClose={vi.fn()}
-      />
-    );
-    expect(screen.queryByText(/OSM opening_hours/i)).toBeNull();
+  test.each([
+    ["does NOT render notes containing 'OSM'", "Hours (OSM opening_hours): Mo-Su 08:00-17:00", /OSM opening_hours/i],
+    ["does NOT render notes containing 'osm' (case-insensitive)", "osm_tag_reference", /osm_tag_reference/i],
+  ])("%s", (_name, notes, hidden) => {
+    render(<DesktopVenueWindow venue={makeVenue({ notes })} onClose={vi.fn()} />);
+    expect(screen.queryByText(hidden)).toBeNull();
   });
 
-  test("does NOT render notes containing 'osm' (case-insensitive)", () => {
-    const venue = makeVenue({
-      notes: "osm_tag_reference",
-    });
-    render(
-      <DesktopVenueWindow
-        venue={venue}
-        onClose={vi.fn()}
-      />
-    );
-    expect(screen.queryByText(/osm_tag_reference/i)).toBeNull();
-  });
-
-  test("DOES render clean notes (no OSM)", () => {
-    const venue = makeVenue({ notes: "surcharge for using cards" });
-    render(
-      <DesktopVenueWindow
-        venue={venue}
-        onClose={vi.fn()}
-      />
-    );
-    expect(screen.getByText("surcharge for using cards")).toBeDefined();
-  });
-
-  test("DOES render clean notes (no OSM)", () => {
-    const venue = makeVenue({ notes: "Identifies as Women owned" });
-    render(
-      <DesktopVenueWindow
-        venue={venue}
-        onClose={vi.fn()}
-      />
-    );
-    expect(screen.getByText("Identifies as Women owned")).toBeDefined();
-  });
+  test.each(["surcharge for using cards", "Identifies as Women owned"])(
+    "DOES render clean notes (no OSM): %s",
+    (notes) => {
+      render(<DesktopVenueWindow venue={makeVenue({ notes })} onClose={vi.fn()} />);
+      expect(screen.getByText(notes)).toBeDefined();
+    },
+  );
 });
 
 describe("DesktopVenueWindow — address placeholder guard", () => {

@@ -113,11 +113,6 @@ export function displayStatusOf(
   return hasNonTrivialDiff(row, publishedVenue) ? "live_edits_waiting" : "live";
 }
 
-/** Built once per read from the real published snapshot — the same file the public map serves from. */
-function buildPublishedVenueById(): Map<string, Venue> {
-  return new Map(publishedVenues.map((v) => [v.id, v]));
-}
-
 export interface PublishChangeSummary {
   newDrafts: number;
   editedSincePublish: number;
@@ -158,7 +153,8 @@ export function summarizePublishChanges(rows: AdminVenueRow[]): PublishChangeSum
   let newDrafts = 0;
   let editedSincePublish = 0;
   let archived = 0;
-  const publishedById = buildPublishedVenueById();
+  // Built once per read from the real published snapshot — the same file the public map serves from.
+  const publishedById = new Map(publishedVenues.map((v) => [v.id, v]));
 
   for (const row of rows) {
     // Boxes never publish (Build Plan architecture call #1 — live, not

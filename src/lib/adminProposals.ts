@@ -174,7 +174,7 @@ export function renameMetaOf(diff: ProposedDiff | null): { from_id: string; to_i
 }
 
 /** Listing ids an unconfirmed Care and Share match asks about: `meta.match.upstream_id`, or `upstream_ids` for a listed-twice card. */
-export function matchUpstreamIdsOf(diff: ProposedDiff | null): string[] {
+function matchUpstreamIdsOf(diff: ProposedDiff | null): string[] {
   const m = diff?.meta?.match as { upstream_id?: unknown; upstream_ids?: unknown } | undefined;
   if (!m) return [];
   const ids = Array.isArray(m.upstream_ids) ? m.upstream_ids : [m.upstream_id];

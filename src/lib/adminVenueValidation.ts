@@ -48,7 +48,7 @@ export type TriState = 0 | 1 | null;
  * create/edit routes) can branch on that single field rather than
  * re-checking category themselves.
  */
-export interface ValidatedBoxFields {
+interface ValidatedBoxFields {
   hostName: string | null;
   hostNote: string | null;
   hostContact: string | null;

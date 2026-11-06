@@ -36,6 +36,13 @@ export function puebloParts(instantMs: number): { y: number; mo: number; d: numb
   return { y: get("year"), mo: get("month"), d: get("day"), h: get("hour"), mi: get("minute") };
 }
 
+/** True when two instants fall on the same Pueblo calendar day; read by the pins and the card. */
+export function sameDenverDay(aMs: number, bMs: number): boolean {
+  const a = puebloParts(aMs);
+  const b = puebloParts(bMs);
+  return a.y === b.y && a.mo === b.mo && a.d === b.d;
+}
+
 /** Denver's UTC offset in minutes (negative) at an instant; also read by src/lib/activityLog.ts. */
 export function offsetMinutesAt(instantMs: number): number {
   const p = puebloParts(instantMs);

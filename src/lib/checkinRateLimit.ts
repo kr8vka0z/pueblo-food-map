@@ -71,6 +71,8 @@
  * entire reason this file exists over the in-process limiter above.
  */
 
+import { toHex } from "@/lib/alertTokens";
+
 const MS_PER_HOUR = 60 * 60 * 1000;
 
 /** Exported for src/lib/boxNeedsToken.ts (needs-ask ownership capability, migration 0012) — same HMAC-SHA256-hex primitive, a different message shape, no reason to duplicate the Web Crypto boilerplate. */
@@ -83,9 +85,7 @@ export async function hmacHex(secret: string, message: string): Promise<string> 
     ["sign"],
   );
   const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
-  return Array.from(new Uint8Array(signature))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  return toHex(new Uint8Array(signature));
 }
 
 export interface RateLimitScope {

@@ -290,7 +290,7 @@ export interface NeedLoveBox {
   checkins: readonly CheckinStatusInput[];
 }
 
-export const NEED_LOVE_LIST_SIZE = 5;
+const NEED_LOVE_LIST_SIZE = 5;
 
 /**
  * The limit /box/[id]/history's server component passes to boxPhotos.ts's

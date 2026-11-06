@@ -86,7 +86,7 @@ export const PIN_INSERT_SQL = `INSERT INTO venue_observations
   WHERE EXISTS (SELECT 1 FROM venues WHERE id = ? AND updated_at = ?)`;
 
 /** Hours and contact details a venue can tell us itself (the plan's field list; name/category/location stay with the sources). */
-export const PINNABLE_FIELDS = [
+const PINNABLE_FIELDS = [
   "hours_weekly",
   "hours_irregular",
   "address",

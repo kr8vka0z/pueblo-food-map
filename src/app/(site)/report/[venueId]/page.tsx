@@ -16,6 +16,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { venues } from "@/data/venues";
+import { t } from "@/lib/i18n";
+import { buildPageMetadata } from "@/lib/site";
 import ReportPageContent from "@/components/ReportPageContent";
 
 interface Props {
@@ -31,11 +33,14 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { venueId } = await params;
   const venue = venues.find((v) => v.id === venueId);
-  return {
-    title: venue
-      ? `Report an issue — ${venue.name}`
-      : "Report an issue",
-  };
+  if (!venue) return { title: t("report.title", "en") };
+  // buildPageMetadata, not a bare title (#894): without it the layout's
+  // homepage canonical and og:url made a shared report link preview as "/".
+  return buildPageMetadata({
+    title: `${t("report.title", "en")} — ${venue.name}`,
+    description: t("report.subtitle", "en"),
+    path: `/report/${venue.id}`,
+  });
 }
 
 export default async function ReportPage({ params }: Props) {

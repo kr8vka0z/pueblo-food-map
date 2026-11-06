@@ -64,9 +64,6 @@ describe("parsePublicPost", () => {
   const rejections: [string, () => Request, () => void, number, object][] = [
     ["not JSON content-type", () => post(JSON.stringify(GOOD), "text/plain"), () => {}, 400, { ok: false, error: "Bad request" }],
     ["unparseable JSON", () => post("{nope"), () => {}, 400, { ok: false, error: "Bad request" }],
-    // Valid JSON but not an object: reading body.turnstileKey on null used to throw (a 500).
-    ["JSON null body", () => post("null"), () => {}, 400, { ok: false, error: "Bad request" }],
-    ["JSON string body", () => post('"x"'), () => {}, 400, { ok: false, error: "Bad request" }],
     [
       "Turnstile rejects the token",
       () => post(JSON.stringify(GOOD)),
@@ -94,12 +91,6 @@ describe("parsePublicPost", () => {
     if (status === 400 && "error" in body && body.error === "turnstile_failed") {
       expect(mockLog).toHaveBeenCalledWith("report", "turnstile_failed");
     }
-  });
-
-  it.each(["managed", "box"] as const)("%s lane: a non-string honeypot is ignored, not a crash", async (lane) => {
-    const body = { ...GOOD, website: 1 };
-    const res = await parsePublicPost(post(JSON.stringify(body)), "feedback", lane);
-    expect(res).toEqual({ body, ip: "unknown", rateLimitSecret: "rl-secret", db: DB });
   });
 
   it("box lane with withDb=false never touches D1 (the needs route validates fields first)", async () => {

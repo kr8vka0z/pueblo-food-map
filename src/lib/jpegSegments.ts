@@ -221,8 +221,7 @@ export function readJpegDimensions(input: ArrayBuffer): { width: number; height:
   // SOF payload: 2 length bytes (already consumed by the segment header),
   // 1 precision byte, then height (2 bytes BE), then width (2 bytes BE).
   const payloadStart = sof.start + 4; // marker(2) + length(2)
-  // Bound by the segment's own declared end, not the buffer: a too-short SOF would otherwise read the next segment's bytes.
-  if (payloadStart + 5 > sof.end) throw new InvalidJpegError("Truncated SOF segment");
+  if (payloadStart + 5 > bytes.length) throw new InvalidJpegError("Truncated SOF segment");
   const height = (bytes[payloadStart + 1] << 8) | bytes[payloadStart + 2];
   const width = (bytes[payloadStart + 3] << 8) | bytes[payloadStart + 4];
   return { width, height };

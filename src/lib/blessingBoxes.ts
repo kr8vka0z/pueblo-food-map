@@ -31,7 +31,6 @@ import type { Venue } from "@/types/venue";
 import { loadLatestApprovedPhotosForVenues, type PublicBoxPhoto } from "@/lib/boxPhotos";
 import { loadApprovedAdopterNamesForVenues } from "@/lib/boxAdopters";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
-import { chunkArray, D1_MAX_BOUND_PARAMS } from "@/lib/d1";
 
 // ─── D1 row shapes ──────────────────────────────────────────────────────────
 
@@ -478,14 +477,7 @@ export async function loadVisibleCheckins(db: D1Database, venueId: string): Prom
   return result.results ?? [];
 }
 
-/**
- * Same as loadVisibleCheckins, batched for every id in `venueIds` — what
- * loadLiveBoxes uses so the list endpoint doesn't issue one check-ins query
- * per box. Chunked at D1_MAX_BOUND_PARAMS: this read has no try/catch, so an
- * unchunked IN(...) would 500 the whole box list (every pin gone) the day
- * live boxes pass 100. Each venue_id lands in exactly one chunk, so its
- * newest-first order is kept.
- */
+/** Same as loadVisibleCheckins, batched for every id in `venueIds` in one query — what loadLiveBoxes uses so the list endpoint doesn't issue one check-ins query per box. */
 export async function loadVisibleCheckinsForVenues(
   db: D1Database,
   venueIds: string[],
@@ -493,18 +485,16 @@ export async function loadVisibleCheckinsForVenues(
   const byVenue = new Map<string, CheckinStatusInput[]>();
   if (venueIds.length === 0) return byVenue;
 
-  for (const batch of chunkArray(venueIds, D1_MAX_BOUND_PARAMS)) {
-    const result = await db
-      .prepare(selectVisibleCheckinsForVenuesSql(batch.length))
-      .bind(...batch)
-      .all<VisibleCheckinRow>();
+  const result = await db
+    .prepare(selectVisibleCheckinsForVenuesSql(venueIds.length))
+    .bind(...venueIds)
+    .all<VisibleCheckinRow>();
 
-    for (const row of result.results ?? []) {
-      const existing = byVenue.get(row.venue_id);
-      const entry: CheckinStatusInput = { kind: row.kind, visibility: row.visibility, created_at: row.created_at };
-      if (existing) existing.push(entry);
-      else byVenue.set(row.venue_id, [entry]);
-    }
+  for (const row of result.results ?? []) {
+    const existing = byVenue.get(row.venue_id);
+    const entry: CheckinStatusInput = { kind: row.kind, visibility: row.visibility, created_at: row.created_at };
+    if (existing) existing.push(entry);
+    else byVenue.set(row.venue_id, [entry]);
   }
   return byVenue;
 }

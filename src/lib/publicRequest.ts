@@ -51,8 +51,7 @@ export interface PublicPost<T> {
  * Runs the shared checks in the exact order each route always used, and
  * returns either the parsed request or the response to send back:
  *
- * 1. Content-Type must be JSON, and the body must parse to an object → 400
- *    "Bad request".
+ * 1. Content-Type must be JSON, and the body must parse → 400 "Bad request".
  * 2. Turnstile → 400 "turnstile_failed" (logged, no PII). A missing secret
  *    THROWS: an empty secret makes siteverify accept the always-pass test
  *    key from anyone.
@@ -96,11 +95,6 @@ export async function parsePublicPost<T extends AntiSpamFields>(
   } catch {
     return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
   }
-  // Valid JSON that isn't an object (null, a string, a number) would throw on
-  // the field reads below and answer 500; it's a bad request like any other.
-  if (typeof body !== "object" || body === null) {
-    return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
-  }
 
   // Used only for Turnstile's remoteip and the form routes' rate-limit key —
   // never logged or stored.
@@ -123,7 +117,7 @@ export async function parsePublicPost<T extends AntiSpamFields>(
     return NextResponse.json({ ok: false, error: "turnstile_failed" }, { status: 400 });
   }
 
-  if (typeof body.website === "string" && body.website.trim() !== "") {
+  if (body.website && body.website.trim() !== "") {
     return NextResponse.json({ ok: true }); // bots think it worked
   }
 

@@ -350,12 +350,23 @@ export default function Map({
   const passiveFlownRef = useRef(false);
 
   // ── Selected-venue flyTo — 800ms, zoom 16, reduced-motion guard ───────────
+  //
+  // Once per selection (#894): MapWrapper rebuilds `venues` on every location
+  // refresh (distances change), and re-flying on each new array yanked the
+  // map off a walking turn back to the venue. `venues` stays a dependency so a
+  // deep-linked venue that arrives after the selection still gets its one fly.
+  const flownVenueIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (selectedVenueId === null) return;
+    if (selectedVenueId === null) {
+      flownVenueIdRef.current = null;
+      return;
+    }
+    if (flownVenueIdRef.current === selectedVenueId || !mapRef.current) return;
 
     const venue = venues.find((v) => v.id === selectedVenueId);
     if (!venue) return;
 
+    flownVenueIdRef.current = selectedVenueId;
     moveCamera(mapRef.current, { center: [venue.lng, venue.lat], zoom: 16 }, 800, prefersReducedMotion());
   }, [selectedVenueId, venues]);
 

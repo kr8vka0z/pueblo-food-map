@@ -31,17 +31,11 @@ const FIELD_IDS: Record<ReportField, string> = {
 };
 
 interface ReportFormProps {
+  /** Only the id is sent: the server looks the venue's name and address up from it (#160 1.3). */
   venueId: string;
-  venueName: string;
-  venueAddress: string;
 }
 
-export default function ReportForm({
-  venueId,
-  // venueName and venueAddress are passed by the page (it reads them from the
-  // static venue list) but the form no longer sends them to the server.
-  // The server now re-looks them up from venueId (#160 1.3).
-}: ReportFormProps) {
+export default function ReportForm({ venueId }: ReportFormProps) {
   const [issueType, setIssueType] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [contactEmail, setContactEmail] = useState<string>("");

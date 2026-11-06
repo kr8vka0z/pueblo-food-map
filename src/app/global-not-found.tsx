@@ -24,18 +24,16 @@
 import "./globals.css";
 import RootShell from "@/components/RootShell";
 import NotFoundContent from "@/components/NotFoundContent";
-import { ROOT_METADATA, ROOT_VIEWPORT } from "@/lib/site";
+import { ROOT_METADATA, ROOT_VIEWPORT, pageDocumentTitle } from "@/lib/site";
+import { t } from "@/lib/i18n";
 
 // This file has no parent layout (it bypasses the (site) route group
 // entirely — see the file header above), so OG/twitter/description would
-// otherwise be silently dropped instead of inherited the way they are on
-// every other page. Reusing ROOT_METADATA keeps them identical; only the
-// title is overridden — no template is inherited here, so the brand suffix
-// app/(site)/layout.tsx's title.template would otherwise append is spelled
-// out literally to match today's rendered <title>.
+// otherwise be silently dropped; reusing ROOT_METADATA keeps them identical.
+// No title.template is inherited either, so the brand suffix is added here.
 export const metadata = {
   ...ROOT_METADATA,
-  title: "Page Not Found · Pueblo Food Map",
+  title: pageDocumentTitle(t("notfound.documentTitle", "en")),
 };
 
 export const viewport = ROOT_VIEWPORT;

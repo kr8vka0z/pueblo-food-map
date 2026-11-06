@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * PublicForm + Field — the shared shell of the three public page forms
- * (FeedbackForm, ReportForm, SuggestForm). Each form owns only its own field
- * state, its validate(), and the JSON it sends; everything they had copied
- * three times lives here once:
+ * PublicForm + Field — the shared shell of the public page forms
+ * (FeedbackForm, ReportForm, SuggestForm, ShareEventForm). Each form owns only
+ * its own field state, its validate(), and the JSON it sends; everything they
+ * had copied lives here once:
  *
  * - the Turnstile widget (useTurnstile, managed key) and its <Script>
  * - the honeypot `website` field (hidden from people, caught server-side)

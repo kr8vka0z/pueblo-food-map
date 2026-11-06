@@ -313,7 +313,7 @@ describe("VenueMarker a11y", () => {
       <VenueMarker
         venue={makeAxeVenue("pantry")}
         selected={false}
-        onClick={vi.fn()}
+        onSelect={vi.fn()}
       />,
     );
     const results = await runAxe(container);
@@ -328,7 +328,7 @@ describe("VenueMarker a11y", () => {
       <VenueMarker
         venue={makeAxeVenue("grocery")}
         selected={true}
-        onClick={vi.fn()}
+        onSelect={vi.fn()}
       />,
     );
     const results = await runAxe(container);
@@ -344,7 +344,7 @@ describe("VenueMarker a11y", () => {
         venue={makeAxeVenue("garden")}
         selected={false}
         distanceMiles={1.4}
-        onClick={vi.fn()}
+        onSelect={vi.fn()}
       />,
     );
     const results = await runAxe(container);

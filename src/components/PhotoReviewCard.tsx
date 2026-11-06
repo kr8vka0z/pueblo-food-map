@@ -7,10 +7,7 @@
  * Sponsor requests into the Blessing Boxes tab").
  *
  * Extracted from BoxPhotosReviewView.tsx's inner BoxPhotoCard — same card
- * shell, button classes and reject-reason flow (verbatim, including the
- * fetch call that actually sends `{ reason }`, unlike ProposalCard.tsx's
- * postAction() which drops it — see that file's own header on why not to
- * repeat that bug). Now renders in TWO places: this tab's own review views
+ * shell, button classes and reject-reason flow. Now renders in TWO places: this tab's own review views
  * (until #677 removes them) and, going forward, the box edit page's
  * "Things to review" box (BoxReviewBox.tsx) — a large preview there (this
  * component's own default size already meets both call sites' needs, see
@@ -50,37 +47,27 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
   const reasonFieldId = `photo-reject-reason-${photo.id}`;
   const genericErrorMessage = "Something went wrong. Try again.";
 
-  async function handleApprove() {
+  // Approve sends no body; reject sends `{ reason }`. Anything but a 200
+  // (or a network error) shows the generic error.
+  async function act(path: "approve" | "reject", body?: { reason: string }) {
     setState({ status: "submitting" });
     try {
-      const res = await fetch(`/api/admin/box-photos/${photo.id}/approve`, { method: "POST" });
-      if (res.status === 200) {
-        router.refresh();
-        return;
-      }
-      setState({ status: "error", message: genericErrorMessage });
-    } catch {
-      setState({ status: "error", message: genericErrorMessage });
-    }
-  }
-
-  async function handleConfirmReject() {
-    setState({ status: "submitting" });
-    try {
-      const res = await fetch(`/api/admin/box-photos/${photo.id}/reject`, {
+      const res = await fetch(`/api/admin/box-photos/${photo.id}/${path}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason }),
+        ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
       });
       if (res.status === 200) {
         router.refresh();
         return;
       }
-      setState({ status: "error", message: genericErrorMessage });
     } catch {
-      setState({ status: "error", message: genericErrorMessage });
+      // fall through to the error state
     }
+    setState({ status: "error", message: genericErrorMessage });
   }
+
+  const handleApprove = () => act("approve");
+  const handleConfirmReject = () => act("reject", { reason });
 
   return (
     <div className={cardClass}>

@@ -49,6 +49,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
+import { ADMIN_PRIMARY_BUTTON, errorClass, inputBase, inputBorder, labelClass } from "@/components/formClasses";
 import EventFlyerField from "@/components/EventFlyerField";
 import type { PublicFlyer } from "@/lib/events";
 import type { VenueChoice } from "@/lib/adminEventReads";
@@ -119,26 +120,12 @@ const LINK_LABEL_OPTIONS: [EventLinkLabel, string][] = [
   ["custom", "Custom (type your own)"],
 ];
 
-// text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
-const inputBase =
-  "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
-  "bg-white placeholder:text-[var(--color-ink-400)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-  "focus-visible:border-[var(--color-sage-500)]";
-const inputBorder = (hasError: boolean) => (hasError ? "border-[var(--color-danger)]" : "border-[var(--color-bone-300)]");
-const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
-const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
 const hintClass = "font-normal text-[var(--color-ink-400)]";
 const secondaryButtonClass =
   "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
   "px-4 text-sm font-medium text-[var(--color-sage-600)] bg-transparent transition-colors duration-150 " +
   "hover:bg-[var(--color-sage-50)] focus-visible:outline-none focus-visible:ring-2 " +
   "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
-const primaryButtonClass =
-  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] px-4 " +
-  "text-base font-semibold text-[var(--color-bone-50)] transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-60 disabled:cursor-not-allowed";
 const dangerButtonClass =
   "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] px-4 " +
   "text-sm font-medium text-[var(--color-danger)] bg-transparent transition-colors duration-150 " +
@@ -679,7 +666,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
               {busy ? "Saving…" : "Save draft"}
             </button>
             {!submissionId && (
-              <button type="button" disabled={busy} onClick={() => void send("publish")} className={primaryButtonClass}>
+              <button type="button" disabled={busy} onClick={() => void send("publish")} className={ADMIN_PRIMARY_BUTTON}>
                 Publish
               </button>
             )}
@@ -687,11 +674,11 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         )}
         {isEdit && (
           <>
-            <button type="submit" disabled={busy} className={status === "draft" ? secondaryButtonClass : primaryButtonClass}>
+            <button type="submit" disabled={busy} className={status === "draft" ? secondaryButtonClass : ADMIN_PRIMARY_BUTTON}>
               {busy ? "Saving…" : status === "draft" ? "Save draft" : "Save changes"}
             </button>
             {status === "draft" && (
-              <button type="button" disabled={busy} onClick={() => void send("publish")} className={primaryButtonClass}>
+              <button type="button" disabled={busy} onClick={() => void send("publish")} className={ADMIN_PRIMARY_BUTTON}>
                 Publish
               </button>
             )}

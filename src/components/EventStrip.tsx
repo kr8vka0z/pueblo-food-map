@@ -28,17 +28,12 @@
 import { useState } from "react";
 import { ChevronRight, X } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
-import { clock, denverDayKey, stripAt } from "@/lib/eventPins";
+import { clock, denverDayKey, EVENT_STAR_POINTS, stripAt } from "@/lib/eventPins";
 import { eventWhen, localizeEvent } from "@/lib/eventCard";
 import type { PublicEvent } from "@/lib/events";
 import { dismissEvent, readEventDismissals, type EventDismissals } from "@/lib/eventStripDismissals";
 import { useMinuteClock } from "@/lib/useMinuteClock";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
-
-// Same five-point star the map pin carries (EventMarker.tsx), inlined so this
-// first-screen component does not pull the lazily loaded map chunk in.
-const STAR_POINTS =
-  "12,5.6 13.12,8.46 16.19,8.64 13.81,10.59 14.59,13.56 12,11.9 9.41,13.56 10.19,10.59 7.82,8.64 10.88,8.46";
 
 interface EventStripProps {
   events: readonly PublicEvent[];
@@ -88,7 +83,7 @@ export default function EventStrip({ events, locale, onOpen, onMore, rightInset 
           className={`flex-1 min-w-0 flex items-center gap-2 pl-2.5 pr-1 text-left ${PRESS_FEEDBACK} ${FOCUS}`}
         >
           <svg width="20" height="20" viewBox="6 3.6 12 12" aria-hidden="true" className="shrink-0">
-            <polygon points={STAR_POINTS} fill="var(--color-event-pin)" />
+            <polygon points={EVENT_STAR_POINTS} fill="var(--color-event-pin)" />
           </svg>
           <span className="flex-1 min-w-0 flex flex-col leading-tight">
             <span className="truncate text-[11px] font-semibold text-[var(--color-event-pin)]">{status}</span>

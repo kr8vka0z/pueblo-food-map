@@ -182,7 +182,6 @@ export default function SplashScreen({ onPrimary, pending, onTour }: SplashScree
           {/* Wordmark */}
           <div>
             <Wordmark
-              size="xl"
               className="text-[var(--color-brand-navy)] block splash-text-outline"
             />
           </div>

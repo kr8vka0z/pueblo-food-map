@@ -108,9 +108,6 @@ components:
   desktopVenueWindow:
     backgroundColor: "{colors.bone50}"
     rounded: "{rounded.lg}"
-  wordmarkMapButton:
-    backgroundColor: "{colors.white}"
-    rounded: "{rounded.xl}"
   plentifulLink:
     backgroundColor: "{colors.sage50}"
     textColor: "{colors.sage600}"
@@ -361,7 +358,7 @@ Two fonts with clearly delineated roles, both self-hosted as variable woff2 file
 
 `ui-monospace` appears only in distance readouts where coordinates fall back to raw lat/lng — a single context where fixed-width numerals prevent layout jitter.
 
-The wordmark uses the `.wordmark` CSS utility class: Fraunces + 0.04em letter-spacing. In splash display mode it scales from `text-4xl` (375px mobile) to `text-6xl` (768px+ desktop). In map-reset button mode it drops to `text-sm / text-base` inside a frosted white pill.
+The wordmark uses the `.wordmark` CSS utility class: Fraunces + 0.04em letter-spacing. On the splash it scales from `text-4xl` (375px mobile) to `text-6xl` (768px+ desktop).
 
 Section headers in detail cards (hours, contact, about) are 10–11px uppercase with wider tracking, in `ink-400` — a govtech convention that organizes dense data without adding visual weight.
 
@@ -527,7 +524,7 @@ One ladder for everything that floats. A new floating element joins an existing 
 | 800 | Mobile venue card | `BottomSheet.tsx`, `DirectionButtons.tsx` |
 | 900 | Desktop side panel (venue/box card content); walking-route strip | `DesktopSidePanel.tsx`, `DesktopVenueWindow.tsx`, `RouteStrip.tsx` |
 | 999 | Search popovers — results, no-matches, ViewSuggestion | `SearchResultsPopover.tsx`, `EmptySearchPopover.tsx`, `ViewSuggestion.tsx` |
-| 1000 | Persistent chrome: search bar, wordmark map button, BottomNav at `2xl`+ | `SearchBar.tsx`, `Wordmark.tsx`, `BottomNav.tsx` |
+| 1000 | Persistent chrome: search bar, BottomNav at `2xl`+ | `SearchBar.tsx`, `BottomNav.tsx` |
 | 1001 | Menu backdrop; outside-county notice pill | `HamburgerMenu.tsx`, `MapWrapper.tsx` |
 | 1002 | Menu panel | `HamburgerMenu.tsx` |
 | 1003 | BottomNav below `2xl` — above the Menu so its own button can close it (on mobile the full-sheet Menu unmounts the nav instead, `overlayRegistry.ts`) | `BottomNav.tsx` |

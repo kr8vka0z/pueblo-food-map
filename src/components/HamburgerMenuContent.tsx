@@ -44,7 +44,7 @@ import { categoryColors } from "@/lib/categories";
 import { formatMiles } from "@/lib/distance";
 import type { ViewMode } from "@/lib/useMapUI";
 
-export interface HamburgerMenuContentProps {
+interface HamburgerMenuContentProps {
   locale?: Locale;
   onShowWelcome?: () => void;
   savedVenues?: Array<Venue & { distanceMiles?: number }>;
@@ -372,11 +372,7 @@ export default function HamburgerMenuContent({
                 when the client-side toggle has flipped THIS EN page to
                 Spanish (tree stays "en"; there's no server-side redirect on
                 /, AGENTS.md hard rule). Offers the fully-Spanish /es tree
-                without auto-navigating. Placed here (Menu, below the
-                toggle) rather than floating over the map — a `preview`
-                sign-off with Kyle should confirm this placement before it
-                ships to prod (design-affecting; see this repo's DESIGN.md
-                workflow). */}
+                without auto-navigating. */}
             {tree === "en" && locale === "es" && (
               <div className="px-5 py-3 border-t border-[var(--color-bone-200)]">
                 {/* Link, not <a> (review fix): @next/next/no-html-link-for-pages

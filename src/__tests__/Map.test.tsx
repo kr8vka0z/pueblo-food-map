@@ -117,7 +117,6 @@ function makeProps(overrides: Record<string, unknown> = {}) {
     venues: VENUES_EMPTY,
     selectedVenueId: null,
     userLocation: null,
-    userDistances: new Map<string, number>(),
     onSelectVenue: vi.fn(),
     ...overrides,
   };
@@ -239,13 +238,11 @@ describe("Map — user-location dot", () => {
 // ─── Distance labels in aria ──────────────────────────────────────────────────
 
 describe("Map — distance in marker aria-label", () => {
-  test("marker aria-label includes distance when provided via userDistances", () => {
-    const userDistances = new Map<string, number>([["v1", 0.8]]);
+  test("marker aria-label includes distance when the venue carries distanceMiles", () => {
     render(
       <MapComponent
         {...makeProps({
-          venues: VENUES_ONE,
-          userDistances,
+          venues: VENUES_ONE.map((v) => ({ ...v, distanceMiles: 0.8 })),
         })}
       />,
     );

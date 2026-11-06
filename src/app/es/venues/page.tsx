@@ -4,16 +4,16 @@
  * Thin wrapper: VenuesDirectoryContent is the SAME client component the EN
  * page mounts, already reading useLocale() (#289) — under this tree's
  * locked provider it renders Spanish body copy with no changes needed.
- * groupVenuesByCategory is imported from the EN page rather than
- * re-implemented — it's pure and framework-free (no locale dependency).
+ * groupVenuesByCategory (src/lib/venueGroups.ts) is shared with the EN
+ * page — it's pure and framework-free (no locale dependency).
  */
 
 import type { Metadata } from "next";
 import { t } from "@/lib/i18n";
 import { buildPageMetadata } from "@/lib/site";
 import { venues } from "@/data/venues";
+import { groupVenuesByCategory } from "@/lib/venueGroups";
 import VenuesDirectoryContent from "@/components/VenuesDirectoryContent";
-import { groupVenuesByCategory } from "../../(site)/venues/page";
 
 export const metadata: Metadata = buildPageMetadata({
   title: t("meta.venues.title", "es"),

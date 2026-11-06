@@ -53,7 +53,7 @@ function makeVenue(overrides: Partial<Venue> = {}): Venue {
 const defaultProps = {
   venue: makeVenue(),
   selected: false,
-  onClick: vi.fn(),
+  onSelect: vi.fn(),
 };
 
 beforeEach(() => {
@@ -81,7 +81,7 @@ describe("VenueMarker — category rendering", () => {
         <VenueMarker
           venue={venue}
           selected={false}
-          onClick={vi.fn()}
+          onSelect={vi.fn()}
         />,
       );
       const btn = screen.getByRole("button", {
@@ -94,7 +94,7 @@ describe("VenueMarker — category rendering", () => {
   test("pantry marker SVG fill uses pantry color (#BE2D45)", () => {
     const venue = makeVenue({ category: "pantry", name: "Pantry Venue" });
     const { container } = render(
-      <VenueMarker venue={venue} selected={false} onClick={vi.fn()} />,
+      <VenueMarker venue={venue} selected={false} onSelect={vi.fn()} />,
     );
     // The Lucide MapPin SVG should carry fill="#BE2D45"
     const svgFills = Array.from(container.querySelectorAll("[fill]"))
@@ -106,7 +106,7 @@ describe("VenueMarker — category rendering", () => {
   test("grocery marker SVG fill uses grocery color (#1F4E8C)", () => {
     const venue = makeVenue({ category: "grocery", name: "Grocery Venue" });
     const { container } = render(
-      <VenueMarker venue={venue} selected={false} onClick={vi.fn()} />,
+      <VenueMarker venue={venue} selected={false} onSelect={vi.fn()} />,
     );
     const svgFills = Array.from(container.querySelectorAll("[fill]"))
       .map((el) => (el as Element).getAttribute("fill"))
@@ -157,40 +157,41 @@ describe("VenueMarker — selected state", () => {
 // ─── Click handler ────────────────────────────────────────────────────────────
 
 describe("VenueMarker — click handler", () => {
-  test("clicking the button fires onClick", () => {
-    const onClick = vi.fn();
-    render(<VenueMarker {...defaultProps} onClick={onClick} />);
+  test("clicking the button fires onSelect with the venue id", () => {
+    const onSelect = vi.fn();
+    render(<VenueMarker {...defaultProps} onSelect={onSelect} />);
     const btn = screen.getByRole("button");
     fireEvent.click(btn);
-    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith(defaultProps.venue.id);
   });
 });
 
 // ─── Keyboard interaction ─────────────────────────────────────────────────────
 
 describe("VenueMarker — keyboard interaction", () => {
-  test("pressing Enter fires onClick", () => {
-    const onClick = vi.fn();
-    render(<VenueMarker {...defaultProps} onClick={onClick} />);
+  test("pressing Enter fires onSelect", () => {
+    const onSelect = vi.fn();
+    render(<VenueMarker {...defaultProps} onSelect={onSelect} />);
     const btn = screen.getByRole("button");
     fireEvent.keyDown(btn, { key: "Enter" });
-    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
-  test("pressing Space fires onClick", () => {
-    const onClick = vi.fn();
-    render(<VenueMarker {...defaultProps} onClick={onClick} />);
+  test("pressing Space fires onSelect", () => {
+    const onSelect = vi.fn();
+    render(<VenueMarker {...defaultProps} onSelect={onSelect} />);
     const btn = screen.getByRole("button");
     fireEvent.keyDown(btn, { key: " " });
-    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
-  test("pressing Tab does not fire onClick", () => {
-    const onClick = vi.fn();
-    render(<VenueMarker {...defaultProps} onClick={onClick} />);
+  test("pressing Tab does not fire onSelect", () => {
+    const onSelect = vi.fn();
+    render(<VenueMarker {...defaultProps} onSelect={onSelect} />);
     const btn = screen.getByRole("button");
     fireEvent.keyDown(btn, { key: "Tab" });
-    expect(onClick).not.toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });
 
@@ -199,7 +200,7 @@ describe("VenueMarker — keyboard interaction", () => {
 describe("VenueMarker — aria-label", () => {
   test("without distance: '<name>, <category>'", () => {
     const venue = makeVenue({ name: "La Familia Pantry", category: "pantry" });
-    render(<VenueMarker venue={venue} selected={false} onClick={vi.fn()} />);
+    render(<VenueMarker venue={venue} selected={false} onSelect={vi.fn()} />);
     const btn = screen.getByRole("button", {
       name: "La Familia Pantry, Food pantry",
     });
@@ -213,7 +214,7 @@ describe("VenueMarker — aria-label", () => {
         venue={venue}
         selected={false}
         distanceMiles={1.3}
-        onClick={vi.fn()}
+        onSelect={vi.fn()}
       />,
     );
     const btn = screen.getByRole("button", {
@@ -229,7 +230,7 @@ describe("VenueMarker — aria-label", () => {
         venue={venue}
         selected={false}
         distanceMiles={0.05}
-        onClick={vi.fn()}
+        onSelect={vi.fn()}
       />,
     );
     const btn = screen.getByRole("button", {
@@ -245,7 +246,7 @@ describe("VenueMarker — aria-label", () => {
         venue={venue}
         selected={false}
         locale="es"
-        onClick={vi.fn()}
+        onSelect={vi.fn()}
       />,
     );
     const btn = screen.getByRole("button", {
@@ -265,7 +266,7 @@ describe("VenueMarker — hover/focus callbacks", () => {
       <VenueMarker
         venue={venue}
         selected={false}
-        onClick={vi.fn()}
+        onSelect={vi.fn()}
         onHover={onHover}
       />,
     );
@@ -279,7 +280,7 @@ describe("VenueMarker — hover/focus callbacks", () => {
     render(
       <VenueMarker
         {...defaultProps}
-        onClick={vi.fn()}
+        onSelect={vi.fn()}
         onLeave={onLeave}
       />,
     );
@@ -295,7 +296,7 @@ describe("VenueMarker — hover/focus callbacks", () => {
       <VenueMarker
         venue={venue}
         selected={false}
-        onClick={vi.fn()}
+        onSelect={vi.fn()}
         onHover={onHover}
       />,
     );
@@ -309,7 +310,7 @@ describe("VenueMarker — hover/focus callbacks", () => {
     render(
       <VenueMarker
         {...defaultProps}
-        onClick={vi.fn()}
+        onSelect={vi.fn()}
         onLeave={onLeave}
       />,
     );

@@ -88,11 +88,22 @@ function HubShell({
   );
 }
 
-function PlaceItem({ venue, locale, children }: { venue: Venue; locale: Locale; children?: ReactNode }) {
+/** `href` overrides the venue-page link (the boxes hub links to the box's map card). */
+function PlaceItem({
+  venue,
+  locale,
+  href,
+  children,
+}: {
+  venue: Venue;
+  locale: Locale;
+  href?: string;
+  children?: ReactNode;
+}) {
   const address = hubAddress(venue);
   return (
     <li>
-      <Link href={localizedHref(`/venue/${venue.id}`, locale)} className={PLACE_LINK_CLASS}>
+      <Link href={href ?? localizedHref(`/venue/${venue.id}`, locale)} className={PLACE_LINK_CLASS}>
         {venue.name}
       </Link>
       {address && <p className={DETAIL_CLASS}>{address}</p>}
@@ -198,22 +209,15 @@ export function BlessingBoxesHub({
       <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">{t("hubs.boxes.what", locale)}</p>
       {showList ? (
         <ul className="space-y-4">
-          {sorted.map((b) => {
-            const address = hubAddress(b);
-            return (
-              <li key={b.id}>
-                <Link href={boxDeepLink(b.id, locale)} className={PLACE_LINK_CLASS}>
-                  {b.name}
-                </Link>
-                {address && <p className={DETAIL_CLASS}>{address}</p>}
-                {b.box.status !== "unknown" && (
-                  <p className={DETAIL_CLASS + " mt-0.5"}>
-                    {t("box.status", locale)}: {t(`box.status.${b.box.status}`, locale)}
-                  </p>
-                )}
-              </li>
-            );
-          })}
+          {sorted.map((b) => (
+            <PlaceItem key={b.id} venue={b} locale={locale} href={boxDeepLink(b.id, locale)}>
+              {b.box.status !== "unknown" && (
+                <p className={DETAIL_CLASS + " mt-0.5"}>
+                  {t("box.status", locale)}: {t(`box.status.${b.box.status}`, locale)}
+                </p>
+              )}
+            </PlaceItem>
+          ))}
         </ul>
       ) : (
         <Link href={localizedHref("/", locale)} className={PLACE_LINK_CLASS + " underline"}>

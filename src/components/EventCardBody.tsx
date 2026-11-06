@@ -59,7 +59,7 @@
  * places open now"). Directions never link in a preview: there is no pin yet.
  * Default rendering (preview off) is unchanged.
  *
- * Directions reuse DirectionButtons' googleMapsUrl (one URL builder, no travel
+ * Directions reuse src/lib/googleMapsUrl.ts (one URL builder, no travel
  * mode so the visitor picks); distance reuses haversineMiles/formatMiles.
  * Orange + navy on the button is the same owner approval as the event pin
  * (DESIGN.md) and clears contrast (7.8:1).
@@ -83,7 +83,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
-import { googleMapsUrl } from "@/components/DirectionButtons";
+import { googleMapsUrl } from "@/lib/googleMapsUrl";
 import { formatMiles, haversineMiles } from "@/lib/distance";
 import { EVENT_LINK_LABELS, type EventLinkLabel } from "@/lib/adminEventValidation";
 import { eventAction, eventBadge, eventText, eventWhen, localizeEvent } from "@/lib/eventCard";
@@ -241,11 +241,6 @@ export default function EventCardBody({
       setCopied(false);
       copiedTimer.current = null;
     }, 2000);
-  }
-
-  // ── Add to calendar ────────────────────────────────────────────────────────
-  function handleCalendar() {
-    downloadEventCalendar(event, locale);
   }
 
   // ── Pieces ─────────────────────────────────────────────────────────────────
@@ -492,7 +487,7 @@ export default function EventCardBody({
           {copied ? <Check size={16} aria-hidden /> : <Share2 size={16} aria-hidden />}
           {copied ? t("events.card.shareCopied", locale) : t("events.card.share", locale)}
         </button>
-        <button type="button" onClick={handleCalendar} className={SECONDARY_BUTTON}>
+        <button type="button" onClick={() => downloadEventCalendar(event, locale)} className={SECONDARY_BUTTON}>
           <CalendarPlus size={16} aria-hidden />
           {t("events.card.calendar", locale)}
         </button>

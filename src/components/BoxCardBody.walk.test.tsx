@@ -21,7 +21,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import BoxCardBody from "@/components/BoxCardBody";
-import { googleMapsUrl } from "@/components/DirectionButtons";
+import { googleMapsUrl } from "@/lib/googleMapsUrl";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 import { makeWalk } from "@/__tests__/helpers/walkTestHelpers";
 

@@ -22,6 +22,7 @@ import { memo } from "react";
 import { Marker } from "react-map-gl/mapbox";
 import type { PublicEvent } from "@/lib/events";
 import PinShadow, { PIN_PATH } from "@/components/PinShadow";
+import { EVENT_STAR_POINTS } from "@/lib/eventPins";
 
 // Pin height in px. Place pins are 28 (36 selected), so events read larger.
 const SIZE_UPCOMING = 44;
@@ -32,8 +33,7 @@ const MIN_HIT_SIZE = 48;
 // Lucide MapPin outline (24 box) with a five-point star in the head, drawn in
 // a viewBox cropped to the pin so the tip sits on the bottom edge. The
 // Marker anchor="bottom" then puts that tip exactly on the event's coordinate.
-const STAR_POINTS =
-  "12,5.6 13.12,8.46 16.19,8.64 13.81,10.59 14.59,13.56 12,11.9 9.41,13.56 10.19,10.59 7.82,8.64 10.88,8.46";
+// The star's points are EVENT_STAR_POINTS (src/lib/eventPins.ts).
 const VIEWBOX_W = 20;
 const VIEWBOX_H = 21.5;
 
@@ -90,7 +90,7 @@ function EventMarker({ event, live, selected, label, ariaLabel, onSelect }: Even
               <path d={PIN_PATH} />
             </PinShadow>
             <path d={PIN_PATH} className="pfm-event-pin__shape" />
-            <polygon points={STAR_POINTS} className="pfm-event-pin__star" />
+            <polygon points={EVENT_STAR_POINTS} className="pfm-event-pin__star" />
           </svg>
           <span className="pfm-event-label" aria-hidden="true">{label}</span>
         </span>

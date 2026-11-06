@@ -77,7 +77,6 @@ function makeProps(overrides: Record<string, unknown> = {}) {
     venues: [makeVenue("v1", "Test Pantry")],
     selectedVenueId: null,
     userLocation: null,
-    userDistances: new Map<string, number>(),
     onSelectVenue: vi.fn(),
     ...overrides,
   };

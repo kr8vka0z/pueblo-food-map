@@ -71,11 +71,7 @@ export default function ReportPageContent({ venue }: ReportPageContentProps) {
         </div>
 
         {/* Client form component */}
-        <ReportForm
-          venueId={venue.id}
-          venueName={venue.name}
-          venueAddress={venue.address}
-        />
+        <ReportForm venueId={venue.id} />
 
         {/* Fallback email link */}
         <p className="mt-6 text-xs text-center text-[var(--color-ink-400)]">

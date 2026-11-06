@@ -48,7 +48,7 @@
  * `DirectionButtons.tsx`'s exported `WalkRouteStatus` — extracted from that
  * file's own JSX (not duplicated) specifically so this restore could reuse
  * it byte-for-byte. The address `<a>`/`<button>` both build their href/
- * click target via `DirectionButtons.tsx`'s own exported `googleMapsUrl()`
+ * click target via `googleMapsUrl()` (src/lib/googleMapsUrl.ts)
  * (its `travelmode` param optional since the fix pass, item 4) — one URL
  * builder either way; the inactive/link form still omits travel mode
  * entirely (many visitors walk or ride the bus and Google Maps lets them
@@ -88,7 +88,8 @@ import BoxCheckinPanel from "@/components/BoxCheckinPanel";
 import AdoptBoxForm from "@/components/AdoptBoxForm";
 import BoxAlertSignupForm from "@/components/BoxAlertSignupForm";
 import PhotoViewer from "@/components/PhotoViewer";
-import { googleMapsUrl, WalkRouteStatus } from "@/components/DirectionButtons";
+import { WalkRouteStatus } from "@/components/DirectionButtons";
+import { googleMapsUrl } from "@/lib/googleMapsUrl";
 import type { Walk } from "@/lib/useWalkingRoute";
 import { categoryColors } from "@/lib/categories";
 import {

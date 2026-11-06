@@ -104,7 +104,8 @@ export default function LocationHelpCard({
         // home-indicator phone never tucks the card under the nav.
         "absolute z-[1100] left-3 right-3 " +
         "bottom-[calc(env(safe-area-inset-bottom)+var(--bottom-nav-clearance)+6px)] " +
-        // 2xl: the nav is a floating pill (24px up + 52px tall); clear it by 12px.
+        // 2xl: the nav is a floating pill (24px up + 52px tall); clear it by 12px
+        // (the same 24 + 52 + 12 as MapWrapper's aboveCreditsBottom).
         "2xl:bottom-[88px] " +
         // Phone: full width minus 12px margins (same as the nav). md+: a
         // fixed 420px card centred over the map area, clear of the side panel.

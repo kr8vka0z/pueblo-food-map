@@ -6,17 +6,17 @@
  * Spec: docs/pueblo-food-map-v2-handoff.md §Mobile·375×812·map(located)
  *       and §Desktop·1440×900·map(located)
  *
- * Layout (all viewports):
+ * Layout (all viewports), in DOM order:
  *   <div relative h-full w-full>
- *     <Map />            — fills viewport
- *     <SearchBar />      — absolute top-center, z-index 1000 (Map/List switch inside)
- *     {isMobile && <BottomSheet />}
- *     <BottomNav />      — bar below 2xl, pill floating bottom-centre at 2xl+ (§3, §5); last in DOM
+ *     <Map /> or <ListView /> — fills viewport (ListView holds the map's box until it loads)
+ *     <SearchBar />           — absolute top-center (+ its popovers: results, empty search)
+ *     <EventStrip />          — upcoming special events
+ *     <FilterPanel />         — left side panel from SearchBar's Filters button
+ *     <BottomSheet />         — phone venue/box/event card
+ *     <DesktopSidePanel />    — fixed right-hand shell on desktop (#682)
+ *     <BottomNav />           — bar below 2xl, pill floating bottom-centre at 2xl+ (§3, §5)
+ *     <GuidedTour />
  *   </div>
- *
- * No sidebar. No category rail. No desktop split-pane.
- * Search behavior wired in PR 6: query state + searchVenues filter + EmptySearchPopover.
- * Typeahead dropdown wired in #67: SearchResultsPopover + ARIA combobox.
  */
 
 import {
@@ -816,10 +816,32 @@ export default function MapWrapper({
   // otherwise), which keeps MapWrapper off the minute clock: the strip and the
   // list each subscribe to it themselves.
   // Judged at render time from the wall clock, like eventHereFor below.
-  const upcomingEventCount = () =>
-    // eslint-disable-next-line react-hooks/purity -- wall clock on purpose; see above
-    listOrder(events, Date.now()).length;
-  const filterEventsCount = filterPanelOpen ? upcomingEventCount() : 0;
+  // eslint-disable-next-line react-hooks/purity -- wall clock on purpose; see above
+  const filterEventsCount = filterPanelOpen ? listOrder(events, Date.now()).length : 0;
+
+  // Bottom offset for the map's centred notices (EventsEmptyNotice and the
+  // outside-county toast).
+  // Below 2xl: lifted clear of the bottom nav bar AND the Mapbox
+  // credits row above it (globals.css's `@media (width < 96rem)`
+  // rule lifts that row the same way). Recomputed 2026-09-16 — the
+  // old "+ 52" dated from a taller credits control that no longer
+  // exists:
+  //   BOTTOM_NAV_HEIGHT_PX (76) — the nav bar itself
+  //   + 8                       — nav-to-credits gap (globals.css)
+  //   + 26                      — credits row height: the 20px
+  //                               logo/attrib control (globals.css
+  //                               `.mapboxgl-ctrl-logo`) plus its
+  //                               own 6px bottom margin
+  //                               (`.mapboxgl-ctrl-bottom-right
+  //                               .mapboxgl-ctrl`) — margins don't
+  //                               collapse in a flex row, so both
+  //                               count toward the row's height
+  //   + 12                      — clearance above the credits row
+  // 2xl: above the floating nav pill (24px up + 52px tall + 12px
+  // gap) — credits aren't lifted at 2xl (the pill sits centred,
+  // clear of the bottom-right corner). LocationHelpCard.tsx's
+  // `2xl:bottom-[88px]` is the same 24 + 52 + 12.
+  const aboveCreditsBottom = isBelow2xl ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + 8px + 26px + 12px + env(safe-area-inset-bottom))` : 24 + 52 + 12;
 
   // ── Typeahead popover state (issue #67) ──────────────────────────────────────
   // isPopoverOpen: true when input is focused + query is non-empty + matches exist.
@@ -1071,22 +1093,12 @@ export default function MapWrapper({
     });
   }, [walkingRoute, mapboxMap, isMobile]);
 
-  // Pre-compute distance map for Map.tsx (aria-labels on markers)
-  const userDistances = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const v of venuesWithDistance) {
-      m.set(v.id, v.distanceMiles);
-    }
-    return m;
-  }, [venuesWithDistance]);
-
-  // Selected venue object — used by BottomSheet (mobile) and DesktopVenueWindow (desktop)
+  // Selected venue object — used by BottomSheet (mobile) and DesktopVenueWindow (desktop).
+  // filteredVenues is a subset of venuesWithDistance (same objects), so this
+  // one lookup also finds a selected venue the filters currently hide.
   const selectedVenue = useMemo(
-    () =>
-      filteredVenues.find((v) => v.id === selectedVenueId) ??
-      venuesWithDistance.find((v) => v.id === selectedVenueId) ??
-      null,
-    [filteredVenues, venuesWithDistance, selectedVenueId],
+    () => venuesWithDistance.find((v) => v.id === selectedVenueId) ?? null,
+    [venuesWithDistance, selectedVenueId],
   );
 
   // ── Event card (#759) ────────────────────────────────────────────────────────
@@ -1711,7 +1723,6 @@ export default function MapWrapper({
             venues={filteredVenues}
             selectedVenueId={selectedVenueId}
             userLocation={userLocation}
-            userDistances={userDistances}
             recenterRequestId={recenterRequestId}
             onSelectVenue={selectVenue}
             events={events}
@@ -1883,11 +1894,7 @@ export default function MapWrapper({
           events={events}
           locale={locale}
           onShowPlaces={() => setFilterEvents(false)}
-          bottom={
-            isBelow2xl
-              ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + 8px + 26px + 12px + env(safe-area-inset-bottom))`
-              : 24 + 52 + 12
-          }
+          bottom={aboveCreditsBottom}
         />
       )}
 
@@ -1957,28 +1964,7 @@ export default function MapWrapper({
           aria-live="polite"
           style={{
             position: "absolute",
-            // Below 2xl: lifted clear of the bottom nav bar AND the Mapbox
-            // credits row above it (globals.css's `@media (width < 96rem)`
-            // rule lifts that row the same way). Recomputed 2026-09-16 — the
-            // old "+ 52" dated from a taller credits control that no longer
-            // exists:
-            //   BOTTOM_NAV_HEIGHT_PX (76) — the nav bar itself
-            //   + 8                       — nav-to-credits gap (globals.css)
-            //   + 26                      — credits row height: the 20px
-            //                               logo/attrib control (globals.css
-            //                               `.mapboxgl-ctrl-logo`) plus its
-            //                               own 6px bottom margin
-            //                               (`.mapboxgl-ctrl-bottom-right
-            //                               .mapboxgl-ctrl`) — margins don't
-            //                               collapse in a flex row, so both
-            //                               count toward the row's height
-            //   + 12                      — clearance above the credits row
-            // 2xl: above the floating nav pill (24px up + 52px tall + 12px
-            // gap) — credits aren't lifted at 2xl (the pill sits centred,
-            // clear of the bottom-right corner), so this branch is unchanged.
-            bottom: isBelow2xl
-              ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + 8px + 26px + 12px + env(safe-area-inset-bottom))`
-              : 24 + 52 + 12,
+            bottom: aboveCreditsBottom,
             left: "50%",
             transform: "translateX(-50%)",
             zIndex: 1001,

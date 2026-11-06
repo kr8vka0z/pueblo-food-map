@@ -66,20 +66,14 @@ async function eventRoutes(): Promise<MetadataRoute.Sitemap> {
   try {
     const rows = await loadSitemapEvents(db);
     return rows.flatMap((row) => {
-      const enPath = `/event/${encodeURIComponent(row.id)}`;
-      const alternates = esAlternates(enPath);
       const lastModified = new Date(row.updated_at);
-      const entry = {
-        lastModified: Number.isNaN(lastModified.getTime()) ? undefined : lastModified,
-        // Events are short-lived and change when an admin edits or cancels them.
-        changeFrequency: "daily" as const,
-        priority: 0.6,
-        alternates,
-      };
-      return [
-        { url: `${SITE_URL}${enPath}`, ...entry },
-        { url: `${SITE_URL}/es${enPath}`, ...entry },
-      ];
+      // Events are short-lived and change when an admin edits or cancels them: "daily".
+      return mirrored(
+        `/event/${encodeURIComponent(row.id)}`,
+        "daily",
+        0.6,
+        Number.isNaN(lastModified.getTime()) ? undefined : lastModified,
+      );
     });
   } catch (err) {
     logEventsReadFailure(err instanceof Error ? err.message : "unknown error");
@@ -89,12 +83,18 @@ async function eventRoutes(): Promise<MetadataRoute.Sitemap> {
 
 type ChangeFrequency = MetadataRoute.Sitemap[number]["changeFrequency"];
 
-/** A mirrored route as its [EN, /es] pair, both carrying the same hreflang alternates. */
-function mirrored(enPath: string, changeFrequency: ChangeFrequency, priority: number): MetadataRoute.Sitemap {
+/** A mirrored route as its [EN, /es] pair, both carrying the same hreflang alternates (and lastModified, when known). */
+function mirrored(
+  enPath: string,
+  changeFrequency: ChangeFrequency,
+  priority: number,
+  lastModified?: Date | string,
+): MetadataRoute.Sitemap {
   const alternates = esAlternates(enPath);
+  const dated = lastModified === undefined ? {} : { lastModified };
   return [
-    { url: alternates.languages.en, changeFrequency, priority, alternates },
-    { url: alternates.languages.es, changeFrequency, priority, alternates },
+    { url: alternates.languages.en, ...dated, changeFrequency, priority, alternates },
+    { url: alternates.languages.es, ...dated, changeFrequency, priority, alternates },
   ];
 }
 
@@ -146,29 +146,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  const venueRoutes: MetadataRoute.Sitemap = venues.flatMap((v) => {
-    const enPath = `/venue/${v.id}`;
-    const alternates = esAlternates(enPath);
-    return [
-      {
-        url: `${SITE_URL}${enPath}`,
-        // Unlike the static routes above (no per-page last-modified source),
-        // every venue row already tracks last_verified — a real signal crawlers
-        // can use to prioritize re-crawling changed venues over unchanged ones.
-        lastModified: v.last_verified,
-        changeFrequency: "monthly" as const,
-        priority: 0.7,
-        alternates,
-      },
-      {
-        url: `${SITE_URL}/es${enPath}`,
-        lastModified: v.last_verified,
-        changeFrequency: "monthly" as const,
-        priority: 0.7,
-        alternates,
-      },
-    ];
-  });
+  // Unlike the static routes above (no per-page last-modified source), every
+  // venue row already tracks last_verified — a real signal crawlers can use to
+  // prioritize re-crawling changed venues over unchanged ones.
+  const venueRoutes: MetadataRoute.Sitemap = venues.flatMap((v) =>
+    mirrored(`/venue/${v.id}`, "monthly", 0.7, v.last_verified),
+  );
 
   return [...staticRoutes, ...venueRoutes, ...(await eventRoutes())];
 }

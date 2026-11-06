@@ -4,12 +4,12 @@
  * a real HTTP 403 for this response, EXCEPT under /admin: admin/loading.tsx
  * streams a shell first, so admin pages answer 200 (noindex) and this UI is
  * rendered client-side. See node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/forbidden.md.
- * Currently only src/app/(site)/admin/page.tsx triggers this, on an
- * AccessDeniedError from getAdminDb().
+ * Triggered by handlePageAuthError (src/lib/adminAuthErrors.ts) from every
+ * admin page on an AccessDeniedError other than no_session.
  *
  * Lives inside the (site) route group (#689 PR 1), not at the app root:
  * forbidden() composes with the nearest layout in its route's tree, and the
- * only route that calls it (admin/page.tsx) is under (site).
+ * admin pages that call it are all under (site).
  */
 
 import Link from "next/link";

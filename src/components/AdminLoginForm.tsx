@@ -42,6 +42,7 @@ import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/authClient";
 import { markInternalDevice } from "@/lib/analytics";
 import { EMAIL_RE } from "@/lib/email";
+import { errorClass, inputBase, labelClass } from "@/components/formClasses";
 
 type FormStatus = "idle" | "sending" | "sent" | "error";
 type CodeStatus = "idle" | "verifying" | "error";
@@ -67,16 +68,6 @@ function codeErrorMessage(error: { code?: string; status?: number } | null | und
   }
 }
 
-// text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
-const inputBase =
-  "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
-  // #534: --color-ink-300 undefined — DESIGN.md documents ink-400 as the
-  // placeholder-text token.
-  "bg-white placeholder:text-[var(--color-ink-400)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-  "focus-visible:border-[var(--color-sage-500)]";
-const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
-const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
 const primaryButtonClass =
   "w-full h-12 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
   "text-base font-semibold transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +

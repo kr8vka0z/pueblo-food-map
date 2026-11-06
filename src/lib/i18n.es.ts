@@ -114,8 +114,6 @@ const es: Record<string, string> = {
   "empty.tryCategoryInstead": "Prueba una categoría:",
   "empty.showCategoryAria": "Mostrar lugares de {label}",
 
-  // Sponsor credit (#69)
-
   // Operator attribution (#63)
   "operator.operated_by": "Operado por",
 
@@ -133,9 +131,6 @@ const es: Record<string, string> = {
   "locationCard.failed.body.unavailable": "Tu teléfono no pudo saber dónde estás en este momento.", // [CHECK]
   "locationCard.tapPin": "Toca cualquier punto del mapa para ver horarios y cómo llegar.", // [CHECK]
   "locationCard.retry": "Intentar de nuevo", // [CHECK]
-
-  // Wordmark (#61)
-  "wordmark.ariaLabel": "Mapa de alimentos de Pueblo — restablecer vista",
 
   // Search typeahead (#67)
   "typeahead.matchCount": "{count} lugares coinciden",

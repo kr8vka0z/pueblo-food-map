@@ -770,8 +770,8 @@ header just above); the default (`true`, used by meta/JSON-LD) keeps it.
 - **OSM placeholder guard** (`PLACEHOLDER_ADDRESS`): a venue whose
   `address` is literally "Address not in OpenStreetMap" (an OSM import gap)
   never shows that string in the summary, `<meta description>`, or JSON-LD
-  `streetAddress` — same guard the map card (`VenueCardBody`'s
-  `displayAddress`) applies (their own fallback is raw lat/lng; a sentence falls
+  `streetAddress` — same guard the map card and venue page apply
+  (`displayAddress`, beside the constant; their fallback is raw lat/lng; a sentence falls
   back to the parsed city instead).
 - **`sameAs`** is emitted only when a venue's `url` is unique among
   published venues (`URL_COUNTS`, computed once at module load) — 10
@@ -779,7 +779,7 @@ header just above); the default (`true`, used by meta/JSON-LD) keeps it.
   which is not any single venue's own identity.
 - **Nearby** (`nearbyVenues`): the 3–5 nearest same-category published
   venues by haversine distance (`src/lib/distance.ts`), computed in the
-  server `venue/[id]/page.tsx` (both EN and ES) and passed to `VenueContent`
+  server `src/lib/venuePageData.tsx` (shared by the EN and ES venue pages) and passed to `VenueContent`
   as a prop — adds no client JS.
 
 ---
@@ -1638,7 +1638,7 @@ list it as an event and a shared link previews the flyer.
   `src/lib/eventCalendar.ts` (the same file builder the map card now uses).
   Directions use `googleMapsUrl`, moved to `src/lib/googleMapsUrl.ts` because a
   function imported from the "use client" `DirectionButtons` cannot be called from a
-  server component (DirectionButtons re-exports it).
+  server component; every caller imports it from there.
 - **Visibility.** The read is `loadPublicEventById` (published, including ended, and
   cancelled). Draft, archived, unknown ids, a missing `events` table, a D1 error and
   a missing Cloudflare context all return `null` -> `notFound()` -> HTTP 404, so a

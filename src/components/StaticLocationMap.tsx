@@ -23,7 +23,7 @@
 
 import type { VenueCategory } from "@/types/venue";
 import { categoryColors } from "@/lib/categories";
-import { googleMapsUrl } from "@/components/DirectionButtons";
+import { googleMapsUrl } from "@/lib/googleMapsUrl";
 
 export interface StaticLocationMapProps {
   lat: number | null;

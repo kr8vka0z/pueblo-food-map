@@ -7,8 +7,8 @@
  * http:// and https://.
  *
  * Returns the original URL string if safe, null otherwise.
- * Call sites: BottomSheet.tsx, DesktopVenueWindow.tsx (render),
- * and scripts/ingest-osm-grocery.py (ingest — separate enforcement there).
+ * Used wherever a stored URL is rendered as a link; the OSM ingest
+ * (scripts/ingest-osm-grocery.py) enforces the same rule separately.
  */
 
 export function safeUrl(url: string | undefined | null): string | null {

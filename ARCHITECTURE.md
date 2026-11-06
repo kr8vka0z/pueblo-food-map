@@ -639,8 +639,8 @@ one place it's stated; code comments point here.
 
 The in-scope routes (`/`, `/venues`, `/venue/[id]`, `/resources`,
 `/about`, the four SEO hubs `/food-pantries`, `/snap-wic-stores`,
-`/community-gardens`, `/blessing-boxes`, and `/event/[id]`; `ls src/app/es`
-is the live list) are **mirrored**: each has a full `/es` twin with its own root
+`/community-gardens`, `/blessing-boxes`, `/events/share` and `/event/[id]`;
+`ls src/app/es` is the live list) are **mirrored**: each has a full `/es` twin with its own root
 layout (`src/app/es/layout.tsx`, `lang="es"`, `LocaleProvider
 initialLocale="es"` — which also LOCKS the tree, so a stale `pfm-locale=en`
 cookie can never flip an `/es` page back to English post-hydration).

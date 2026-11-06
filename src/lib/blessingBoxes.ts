@@ -196,10 +196,7 @@ const STATUS_SETTING_KIND: Readonly<Record<string, BoxStatus>> = {
  *   1. `outOfService` (an admin pause or confirmed damage) wins over every
  *      check-in, however recent — the diagram's own annotation: "An admin
  *      pause or confirmed damage sends ANY status to Out of service."
- *      Slice 2 has no admin UI that can set this true yet (that's slice 3's
- *      box_events "paused" lifecycle action) — callers pass `false` today;
- *      the branch exists so slice 3 only has to supply the input, not
- *      redo this function.
+ *      Callers derive it from `removed_on` (see mapRowToPublicBox).
  *   2. Otherwise, find the most recent VISIBLE check-in whose kind sets a
  *      status (filled/low/empty — never 'took' or 'problem', see
  *      STATUS_SETTING_KIND above). A hidden row is skipped even if it's
@@ -675,10 +672,13 @@ export async function loadLiveBoxes(db: D1Database, now: Date = new Date()): Pro
   const result = await db.prepare(SELECT_LIVE_BOXES_SQL).all<BoxJoinRow>();
   const rows = result.results ?? [];
   const venueIds = rows.map((r) => r.id);
-  const checkinsByVenue = await loadVisibleCheckinsForVenues(db, venueIds);
-  const photosByVenue = await loadLatestPhotosBestEffort(db, venueIds);
-  const adoptersByVenue = await loadAdoptersBestEffort(db, venueIds);
-  const neededByVenue = await loadNeededFromVisitorsBestEffort(db, now);
+  // Independent reads, run together; the best-effort three catch their own errors.
+  const [checkinsByVenue, photosByVenue, adoptersByVenue, neededByVenue] = await Promise.all([
+    loadVisibleCheckinsForVenues(db, venueIds),
+    loadLatestPhotosBestEffort(db, venueIds),
+    loadAdoptersBestEffort(db, venueIds),
+    loadNeededFromVisitorsBestEffort(db, now),
+  ]);
   return rows.map((row) =>
     mapRowToPublicBox(
       row,
@@ -794,10 +794,12 @@ export async function loadLiveBoxById(
 ): Promise<PublicBlessingBox | null> {
   const row = await db.prepare(SELECT_LIVE_BOX_BY_ID_SQL).bind(id).first<BoxJoinRow>();
   if (!row) return null;
-  const checkins = await loadVisibleCheckins(db, id);
-  const photosByVenue = await loadLatestPhotosBestEffort(db, [id]);
-  const adoptersByVenue = await loadAdoptersBestEffort(db, [id]);
-  const neededFromVisitors = await loadNeededFromVisitorsForVenueBestEffort(db, id, now);
+  const [checkins, photosByVenue, adoptersByVenue, neededFromVisitors] = await Promise.all([
+    loadVisibleCheckins(db, id),
+    loadLatestPhotosBestEffort(db, [id]),
+    loadAdoptersBestEffort(db, [id]),
+    loadNeededFromVisitorsForVenueBestEffort(db, id, now),
+  ]);
   return mapRowToPublicBox(
     row,
     checkins,

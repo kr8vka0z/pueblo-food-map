@@ -12,7 +12,7 @@
  *
  * Provider: the free US Census Bureau geocoder, not Mapbox. Admin now
  * serves at the apex `/admin` path, which the app's Mapbox public token
- * (AGENTS.md "Mapbox Token Management") does cover — but that token's
+ * (AGENTS.md "Secrets", Mapbox) does cover — but that token's
  * secret counterpart still must never reach a Worker or client bundle just
  * to add a geocoding scope. The Census geocoder needs no key/token/URL
  * allowlist to provision or rotate and covers US street addresses (Pueblo

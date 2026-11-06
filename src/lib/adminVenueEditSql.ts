@@ -10,11 +10,11 @@ import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "@/lib/venu
 import type { Venue } from "@/types/venue";
 import { auditInsertIfExistsSql } from "@/lib/auditLog";
 
-// Every editable column except `status` (see file header for why status is
-// permanently excluded) and the workflow columns an edit never touches:
+// Every editable column except `status` (see the src/app/api/admin/venues/[id]/route.ts header for why
+// status is permanently excluded) and the workflow columns an edit never touches:
 // source_type, created_at, created_by, published_at, published_by.
 // #265: `AND updated_at = ?` is the optimistic-concurrency precondition —
-// see this file's own header. The last bound param is the expected value,
+// see the route file's header. The last bound param is the expected value,
 // NOT the new one (that's already bound as `updated_at = ?` above it).
 // #400: hours_irregular sits right after hours_weekly, matching
 // buildVenueUpdateValues()'s bind order in the route file.
@@ -27,7 +27,7 @@ export const VENUE_UPDATE_SQL = `UPDATE venues SET
 
 // #265: SELECT-form (not VALUES) so the WHERE EXISTS guard can skip the
 // insert entirely when the venue UPDATE above didn't actually apply — see
-// this file's own header for why EXISTS-against-venues, not changes().
+// the route file's header for why EXISTS-against-venues, not changes().
 // Trailing two bind params (id, the NEW updatedAt) are the guard.
 export const AUDIT_INSERT_SQL = auditInsertIfExistsSql(
   "?, ?, ?, ?, ?, ?, ?, ?",
@@ -65,7 +65,7 @@ export const BOX_EVENT_INSERT_SQL_GUARDED = `INSERT INTO box_events (venue_id, k
 
 // ponytail: AND status = 'pending' is a deliberate idempotency ceiling, not
 // an oversight — same shape as public_submissions' own approve statements
-// (see this file's header + ARCHITECTURE.md "Admin panel"). A
+// (see the route file's header + ARCHITECTURE.md "Admin panel"). A
 // double-approve affects 0 rows here and is silently a no-op on the
 // proposal side. #265 adds a second guard (AND EXISTS ...) so a STALE edit
 // can't mark the proposal approved for a fix that was never actually
@@ -86,7 +86,7 @@ export const PIN_INSERT_SQL = `INSERT INTO venue_observations
   WHERE EXISTS (SELECT 1 FROM venues WHERE id = ? AND updated_at = ?)`;
 
 /** Hours and contact details a venue can tell us itself (the plan's field list; name/category/location stay with the sources). */
-export const PINNABLE_FIELDS = [
+const PINNABLE_FIELDS = [
   "hours_weekly",
   "hours_irregular",
   "address",

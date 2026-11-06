@@ -281,8 +281,7 @@ function buildAlertEmail(opts: {
   lang: Locale;
 }): OutboundEmail {
   const copy = ALERT_COPY[opts.kind];
-  const stopApiUrl = `${opts.origin}/api/public/alerts/stop?t=${opts.unsubscribeToken}`;
-  const stopPageUrl = `${opts.origin}/alerts/stop?t=${opts.unsubscribeToken}`;
+  const { stopApiUrl, stopPageUrl } = stopLinks(opts.origin, opts.unsubscribeToken);
   const { subject, text, html } = composeEmail({
     lang: opts.lang,
     subjectKey: copy.subjectKey,
@@ -475,6 +474,14 @@ export async function upsertGiverSubscription(
   }
 }
 
+/** The one-click API stop URL (List-Unsubscribe header) and the human stop page URL for a subscription's unsubscribe token. */
+function stopLinks(origin: string, unsubscribeToken: string): { stopApiUrl: string; stopPageUrl: string } {
+  return {
+    stopApiUrl: `${origin}/api/public/alerts/stop?t=${unsubscribeToken}`,
+    stopPageUrl: `${origin}/alerts/stop?t=${unsubscribeToken}`,
+  };
+}
+
 /** Sends the giver's confirm email — no stop link (nothing to stop until confirmed), per the task's own list of which emails carry one. */
 export async function sendGiverConfirmEmail(opts: { to: string; boxName: string; origin: string; confirmToken: string; lang: Locale }): Promise<void> {
   const url = `${opts.origin}/alerts/confirm?t=${opts.confirmToken}`;
@@ -571,8 +578,7 @@ export function removeHostSubscriptionStatement(
 
 /** Best-effort "you'll now get alerts" email to a newly-added host — no stop-link omission here, this IS a welcome email per the task's own list. */
 export async function sendHostWelcomeEmail(opts: { to: string; boxName: string; origin: string; unsubscribeToken: string; lang: Locale }): Promise<void> {
-  const stopApiUrl = `${opts.origin}/api/public/alerts/stop?t=${opts.unsubscribeToken}`;
-  const stopPageUrl = `${opts.origin}/alerts/stop?t=${opts.unsubscribeToken}`;
+  const { stopApiUrl, stopPageUrl } = stopLinks(opts.origin, opts.unsubscribeToken);
   const { subject, text, html } = composeEmail({
     lang: opts.lang,
     subjectKey: "email.hostWelcome.subject",
@@ -674,8 +680,7 @@ export async function sendAdopterApprovedEmail(opts: {
   /** The adopter's own signup-time locale (BoxAdopterRow.lang). */
   lang: Locale;
 }): Promise<void> {
-  const stopApiUrl = `${opts.origin}/api/public/alerts/stop?t=${opts.unsubscribeToken}`;
-  const stopPageUrl = `${opts.origin}/alerts/stop?t=${opts.unsubscribeToken}`;
+  const { stopApiUrl, stopPageUrl } = stopLinks(opts.origin, opts.unsubscribeToken);
   const { subject, text, html } = composeEmail({
     lang: opts.lang,
     subjectKey: "email.adoptApproved.subject",
@@ -722,26 +727,34 @@ export type StopResult = "stopped" | "not_found" | "rate_limited";
  * secret needed.
  */
 export async function stopSubscriptionByToken(db: D1Database, token: string, rateLimitSecret: string, now: Date = new Date()): Promise<StopResult> {
+  const found = await findByUnsubscribeToken(db, token, rateLimitSecret, now);
+  if (typeof found === "string") return found;
+
+  await db.prepare("UPDATE alert_subscriptions SET unsubscribed_at = ? WHERE id = ?").bind(now.toISOString(), found.id).run();
+  return "stopped";
+}
+
+/** The shared front half of stop and resubscribe: the per-token rate limit, then the token lookup. */
+async function findByUnsubscribeToken(
+  db: D1Database,
+  token: string,
+  rateLimitSecret: string,
+  now: Date,
+): Promise<{ id: number } | "not_found" | "rate_limited"> {
   const allowed = await checkAndIncrement(db, rateLimitSecret, { scope: "alert-token", id: token }, 30, now);
   if (!allowed) return "rate_limited";
 
   const row = await db.prepare("SELECT id FROM alert_subscriptions WHERE unsubscribe_token = ?").bind(token).first<{ id: number }>();
-  if (!row) return "not_found";
-
-  await db.prepare("UPDATE alert_subscriptions SET unsubscribed_at = ? WHERE id = ?").bind(now.toISOString(), row.id).run();
-  return "stopped";
+  return row ?? "not_found";
 }
 
 export type ResubscribeResult = "resubscribed" | "not_found" | "rate_limited";
 
 /** The "that was a mistake" undo on /alerts/stop — clears unsubscribed_at only; does not touch confirmed_at (they already proved the address once). */
 export async function resubscribeByToken(db: D1Database, token: string, rateLimitSecret: string, now: Date = new Date()): Promise<ResubscribeResult> {
-  const allowed = await checkAndIncrement(db, rateLimitSecret, { scope: "alert-token", id: token }, 30, now);
-  if (!allowed) return "rate_limited";
+  const found = await findByUnsubscribeToken(db, token, rateLimitSecret, now);
+  if (typeof found === "string") return found;
 
-  const row = await db.prepare("SELECT id FROM alert_subscriptions WHERE unsubscribe_token = ?").bind(token).first<{ id: number }>();
-  if (!row) return "not_found";
-
-  await db.prepare("UPDATE alert_subscriptions SET unsubscribed_at = NULL WHERE id = ?").bind(row.id).run();
+  await db.prepare("UPDATE alert_subscriptions SET unsubscribed_at = NULL WHERE id = ?").bind(found.id).run();
   return "resubscribed";
 }

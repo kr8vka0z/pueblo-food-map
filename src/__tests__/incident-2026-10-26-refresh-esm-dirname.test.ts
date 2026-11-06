@@ -10,33 +10,37 @@
  * may use either name only after defining it itself, e.g.
  * `const __dirname = dirname(fileURLToPath(import.meta.url))`.
  */
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { globSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import ts from "typescript";
 import { describe, expect, test } from "vitest";
 
 const ROOT = join(import.meta.dirname, "..", "..");
-const CODE = /\.(ts|tsx|mts|mjs|js)$/;
+const NAMES = new Set(["__dirname", "__filename"]);
 
-function codeFiles(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    if (name === "node_modules" || name === "generated") return [];
-    if (statSync(path).isDirectory()) return codeFiles(path);
-    return CODE.test(name) && !/\.test\.tsx?$/.test(name) ? [path] : [];
-  });
+/** Names from NAMES the file reads but never declares; parsed, so comments and strings don't count. */
+function undeclaredUses(file: string): string[] {
+  const src = ts.createSourceFile(file, readFileSync(join(ROOT, file), "utf-8"), ts.ScriptTarget.Latest, true);
+  const used = new Set<string>();
+  const declared = new Set<string>();
+  const visit = (node: ts.Node) => {
+    if (ts.isIdentifier(node) && NAMES.has(node.text)) {
+      if (ts.isVariableDeclaration(node.parent) && node.parent.name === node) declared.add(node.text);
+      else used.add(node.text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(src);
+  return [...used].filter((n) => !declared.has(n));
 }
 
-/** Code with line and block comments removed, so a WHY comment naming `__dirname` doesn't count. */
-const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-
 describe("incident-2026-10-26-refresh-esm-dirname: no bare __dirname/__filename under ESM", () => {
-  test("every file that uses __dirname or __filename defines it", () => {
-    const offenders = ["scripts", "src"].flatMap((d) => codeFiles(join(ROOT, d))).filter((file) => {
-      const code = stripComments(readFileSync(file, "utf-8"));
-      return ["__dirname", "__filename"].some(
-        (name) => new RegExp(`\\b${name}\\b`).test(code) && !new RegExp(`\\b(const|let|var)\\s+${name}\\b`).test(code),
-      );
+  test("every file that uses __dirname or __filename declares it", () => {
+    const files = globSync(["scripts/**/*.{ts,tsx,mts,mjs,js}", "src/**/*.{ts,tsx,mts,mjs,js}"], {
+      cwd: ROOT,
+      exclude: (f) => f.includes("node_modules") || f.includes("/generated/") || /\.test\.tsx?$/.test(f),
     });
-    expect(offenders.map((f) => relative(ROOT, f))).toEqual([]);
+    const offenders = files.filter((f) => undeclaredUses(f).length > 0);
+    expect(offenders).toEqual([]);
   });
 });

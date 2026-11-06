@@ -1770,7 +1770,8 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   through the shared `authorizeAdminWrite()` (`adminDb.ts`: session first,
   then Origin).
   Failures map to a login redirect / 401 (no session) or 403 via
-  `src/lib/adminAuthErrors.ts` (for admin *pages* the status is 200, see
+  `src/lib/adminAuthErrors.ts`, whose `adminWriteAccess()` / `adminReadAccess()`
+  are the one call each route handler makes (for admin *pages* the status is 200, see
   "Admin page speed" below). Cookie, allowlist and rate-limit gotchas:
   AGENTS.md "Admin authentication".
 - **Server Component page owns the gate and the reads; a Client Component

@@ -380,17 +380,19 @@ ul.dscode{list-style:none;padding:0}.dscode code{font-size:13px;background:var(-
 /* BottomNav, below 2xl: NAV_CLASS + ITEM_CLASS + ICON_CLASS */
 .pfm-nav{position:absolute;left:12px;right:12px;bottom:12px;max-width:460px;margin:0 auto;height:64px;padding:0 6px;background:var(--color-bone-50);border:1px solid var(--color-bone-300);border-radius:9999px;box-shadow:0 4px 16px rgba(26,24,23,.14),0 0 0 1px rgba(26,24,23,.04)}
 .pfm-nav ul{display:flex;height:100%;align-items:stretch;margin:0;padding:0;list-style:none}
-.pfm-nav li{display:flex;flex:1}
-.pfm-it{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:100%;min-width:0;border:0;background:none;border-radius:9999px;font-size:12px;line-height:14px;font-weight:700;color:var(--color-ink-500);text-decoration:none;cursor:pointer;padding:0;transition:color .15s,background-color .15s}
+.pfm-nav li{display:flex;flex:1;margin:0}
+.pfm-it{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:100%;min-width:0;border:0;background:none;border-radius:9999px;font-size:12px;line-height:14px;font-weight:700;color:var(--color-ink-500);text-decoration:none;cursor:pointer;padding:0;transition:color .15s,background-color .15s,filter .15s}
 @media (max-width:359.98px){.pfm-it{font-size:11px}}
 /* WHY a container query too: the real rule is "screen under 360 wide"; a demo bar narrower than a real
    360-pixel phone's bar (336 pixels) gets the same 11-pixel words that phone size would. */
 .pfm-map{container-type:inline-size}@container (max-width:335.98px){.pfm-it{font-size:11px}}
 .dsx .pfm-map{height:auto;padding:0;background:none}.dsx .pfm-nav{position:static}
 .pfm-it svg.i{width:24px;height:24px}
-@media (hover:hover){.pfm-it:hover{background:var(--color-bone-100)}}
-.pfm-it.is-hover{background:var(--color-bone-100)}
-.pfm-it:hover{filter:brightness(1.05)}.pfm-it:active{filter:brightness(.95)}
+/* Round 2 proposal: hover is a light sage tint (was bone-100 plus brightness(1.05)). WHY no hover filter: a filter
+   switched on at hover, on top of the fill's fade, made the fade stutter in Kyle's recording. */
+@media (hover:hover){.pfm-it:hover{background:var(--color-sage-50)}}
+.pfm-it.is-hover{background:var(--color-sage-50)}
+.pfm-it:active{filter:brightness(.95)}
 .pfm-it:focus-visible,.pfm-it.is-focus{outline:none;box-shadow:inset 0 0 0 2px var(--color-sage-500)}
 .pfm-it:disabled{cursor:default}
 .pfm-it[aria-current="true"],.pfm-it.on{color:var(--color-brand-navy)}
@@ -399,7 +401,10 @@ ul.dscode{list-style:none;padding:0}.dscode code{font-size:13px;background:var(-
 .pfm-it[aria-busy="true"] svg.i{animation:none}
 @media (prefers-reduced-motion:no-preference){.pfm-it[aria-busy="true"] svg.i.spinme{animation:spin 1s linear infinite}}
 /* One cell on its own, for the states row: the bar's real height, a phone cell's width at 360 pixels. */
-.pfm-cell{display:flex;width:72px;height:64px;padding:0;background:var(--color-bone-50);border:1px solid var(--color-bone-300);border-radius:9999px}
+/* The cell's edge is an outside shadow, not a border, and the item fills the whole cell, so the keyboard ring
+   (drawn inside the item) follows the cell's own shape exactly. */
+.pfm-cell{position:relative;width:72px;height:64px;padding:0;background:var(--color-bone-50);box-shadow:0 0 0 1px var(--color-bone-300);border-radius:9999px}
+.pfm-cell ul,.pfm-cell li{margin:0;padding:0;list-style:none}.pfm-cell .pfm-it{position:absolute;inset:0;height:auto}
 /* 2xl and up: icon and word on one line, 52px pill, 44px items (li 2xl:h-11) */
 .pfm-nav.wide{position:static;display:inline-block;height:52px;padding:0 4px;max-width:none;box-shadow:0 1px 2px rgba(26,24,23,.04),0 0 0 1px rgba(26,24,23,.05)}
 .pfm-nav.wide ul{align-items:center;gap:2px}.pfm-nav.wide li{flex:none;height:44px}
@@ -412,9 +417,11 @@ ul.dscode{list-style:none;padding:0}.dscode code{font-size:13px;background:var(-
 .pfm-card.pfm-pc{padding:16px;border-radius:14px}
 .pfm-namerow{display:flex;align-items:flex-start;gap:16px}
 .pfm-name{flex:1;margin:0;font:400 20px/1.25 'Fraunces',Georgia,serif;color:var(--color-ink-900)}
-.pfm-ib{flex:none;display:flex;align-items:center;justify-content:center;width:48px;height:48px;margin:-4px;border:0;background:none;border-radius:10px;color:var(--color-ink-400);cursor:pointer;transition:background-color .15s,color .15s}
+.pfm-ib{flex:none;display:flex;align-items:center;justify-content:center;width:48px;height:48px;margin:-11.5px -4px;border:0;background:none;border-radius:10px;color:var(--color-ink-400);cursor:pointer;transition:background-color .15s,color .15s,filter .15s}
+/* Round 2 proposal: -11.5px top and bottom (live: -4px all round) puts the 48px button's centre on the middle of
+   the name's first 25px line (12.5 - 24), so the icon sits on that line however many lines the name takes. */
 .pfm-ib svg.i{width:20px;height:20px}.pfm-pc .pfm-ib svg.i{width:18px;height:18px}
-.pfm-ib:hover,.pfm-ib.is-hover{background:var(--color-bone-100);filter:brightness(1.05)}
+.pfm-ib:hover,.pfm-ib.is-hover{background:var(--color-sage-50)}.pfm-ib:active{filter:brightness(.95)}
 .pfm-ib.share:hover,.pfm-ib.share.is-hover{color:var(--color-ink-700)}
 .pfm-ib:focus-visible,.pfm-ib.is-focus{outline:none;box-shadow:0 0 0 2px var(--color-sage-500)}
 .pfm-ib[aria-pressed="true"]{color:var(--color-clay-500)}.pfm-ib[aria-pressed="true"] svg.i{fill:currentColor}
@@ -434,12 +441,12 @@ ul.dscode{list-style:none;padding:0}.dscode code{font-size:13px;background:var(-
 .pfm-pc .pfm-notes{display:block}
 /* DirectionButtons: baseClass + walkInactiveClass / walkActiveClass / externalClass */
 .pfm-dir{display:flex;gap:8px}
-.pfm-db{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;min-height:48px;border-radius:10px;font-size:14px;line-height:20px;font-weight:600;text-decoration:none;cursor:pointer;border:1px solid transparent;transition:color .15s,background-color .15s,border-color .15s;box-sizing:border-box}
-.pfm-db:hover{filter:brightness(1.05)}.pfm-db:active{filter:brightness(.95)}
+.pfm-db{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;min-height:48px;border-radius:10px;font-size:14px;line-height:20px;font-weight:600;text-decoration:none;cursor:pointer;border:1px solid transparent;transition:color .15s,background-color .15s,border-color .15s,filter .15s;box-sizing:border-box}
+.pfm-db:active{filter:brightness(.95)}
 .pfm-db:focus-visible,.pfm-db.is-focus{outline:none;box-shadow:0 0 0 1px #fff,0 0 0 3px var(--color-sage-500)}
 .pfm-db.walk{background:var(--color-sage-600);color:var(--color-bone-50)}.pfm-db.walk:hover,.pfm-db.walk.is-hover{background:var(--color-sage-700)}
 .pfm-db.walk.active{background:var(--color-sage-100);color:var(--color-sage-700);border-color:var(--color-sage-600)}
-.pfm-db.ext{background:var(--color-bone-50);color:var(--color-ink-700);border-color:var(--color-bone-300)}.pfm-db.ext:hover,.pfm-db.ext.is-hover{background:var(--color-bone-100);border-color:var(--color-ink-400)}
+.pfm-db.ext{background:var(--color-bone-50);color:var(--color-ink-700);border-color:var(--color-bone-300)}.pfm-db.ext:hover,.pfm-db.ext.is-hover{background:var(--color-sage-50);border-color:var(--color-ink-400)}
 .pfm-detail{display:flex;flex-direction:column;gap:16px;padding-top:4px}
 .pfm-addr{display:flex;gap:10px}.pfm-pc .pfm-addr{gap:8px}
 .pfm-addr svg.i{width:16px;height:16px;margin-top:2px;color:var(--color-ink-400)}.pfm-pc .pfm-addr svg.i{width:14px;height:14px}
@@ -470,3 +477,26 @@ ul.dscode{list-style:none;padding:0}.dscode code{font-size:13px;background:var(-
 .fpairs{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr));gap:10px}
 .fpairs li{display:flex;gap:12px;align-items:center;font-size:14px}.fpairs b{color:var(--primary)}.fpairs small{display:block;font-size:13px;color:var(--muted)}
 .fpair{flex:none;width:52px;height:40px;border-radius:var(--r-md);display:grid;place-items:center;font-weight:700;font-size:16px;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--shadow) 12%,transparent)}
+
+/* Category label options (round 2). Each option restyles the category label and the SNAP / WIC tags together. */
+.pfm-opts{display:flex;flex-wrap:wrap;gap:12px}
+.pfm-opt{margin:0;flex:1 1 300px;max-width:360px;min-width:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;background:#fff}
+.pfm-opt>h4{margin:0;padding:8px 12px;font-size:15px}
+.pfm-opt figcaption{font-size:13px;color:var(--muted);padding:8px 12px;border-top:1px solid var(--line)}
+.pfm-opt .pfm-card{border-radius:0;box-shadow:none;border-top:1px solid var(--color-bone-200);padding:16px 20px}
+.pfm-top{display:flex;flex-direction:column;gap:8px}
+/* A: section kicker */
+.pfm-kick{margin:0 0 -4px;font-size:11px;line-height:16px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.pfm-kick .and{color:var(--color-ink-400);font-weight:600;margin:0 6px}
+.pfm-kick .ben{color:var(--color-sage-700)}
+/* B: map-pin match */
+.pfm-pinlab{display:inline-flex;align-items:center;gap:4px;font-size:14px;line-height:20px;font-weight:500;color:var(--color-ink-700)}
+.pfm-pinlab svg{width:18px;height:18px;flex:none}
+.pfm-ben{display:inline-flex;align-items:center;gap:4px;font-size:12px;line-height:16px;font-weight:600;color:var(--color-ink-700)}
+.pfm-ben svg{width:14px;height:14px;flex:none;fill:none;stroke:var(--color-sage-700);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+/* C: ledger tab */
+.pfm-tab{display:inline-flex;align-items:center;padding:3px 8px 3px 7px;border-radius:2px;border-left:4px solid var(--c);background:var(--color-bone-100);font-size:13px;line-height:18px;font-weight:600;color:var(--color-ink-700)}
+.pfm-tab.sm{font-size:12px;line-height:16px;padding:2px 6px 2px 5px;border-left-width:3px}
+/* D: plain underline */
+.pfm-ul{font-size:14px;line-height:20px;font-weight:600;color:var(--color-ink-700);text-decoration:underline;text-decoration-color:var(--c);text-decoration-thickness:3px;text-underline-offset:5px;text-decoration-skip-ink:none}
+.pfm-ul.sm{font-size:12px;line-height:16px;text-decoration-thickness:2px;text-underline-offset:4px}

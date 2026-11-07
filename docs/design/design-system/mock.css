@@ -25,6 +25,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* Shell: admin menu on the left, a top bar with ≡ below 1024px */
 .shell{display:flex;min-height:100dvh}
+/* WHY: display:flex above outranks the hidden attribute, so the Phone view showed the computer page above the phone frame. */
+.shell[hidden]{display:none}
 .side{flex:none;width:248px;background:var(--primary);color:#fff;padding:14px 10px;position:sticky;top:0;height:100dvh;overflow:auto;display:flex;flex-direction:column;gap:2px}
 .logo{display:flex;flex-wrap:wrap;align-items:center;gap:6px 9px;padding:4px 8px 12px;font-family:var(--display);font-weight:700;font-size:15px;color:#fff;text-decoration:none}.logo img{width:auto;height:22px}
 .navg{font-size:12px;color:color-mix(in srgb,var(--accent-soft) 75%,transparent);padding:12px 10px 4px;font-weight:600}
@@ -386,12 +388,15 @@ ul.dscode{list-style:none;padding:0}.dscode code{font-size:13px;background:var(-
 /* WHY a container query too: the real rule is "screen under 360 wide"; a demo bar narrower than a real
    360-pixel phone's bar (336 pixels) gets the same 11-pixel words that phone size would. */
 .pfm-map{container-type:inline-size}@container (max-width:335.98px){.pfm-it{font-size:11px}}
-.dsx .pfm-map{height:auto;padding:0;background:none}.dsx .pfm-nav{position:static}
+/* Do and Don't boxes: no map, the bar takes the box's full width like the real bar takes the screen's. */
+.dsx>.pfm{flex:1 1 100%}.dsx:has(.pfm-nav){padding:6px}.dsdo>div:has(.pfm-nav){padding:10px 6px}.dsx .pfm-map{display:block;height:auto;padding:0;background:none}.dsx .pfm-nav{position:static;width:100%;max-width:none;margin:0}
 .pfm-it svg.i{width:24px;height:24px}
-/* Round 2 proposal: hover is a light sage tint (was bone-100 plus brightness(1.05)). WHY no hover filter: a filter
+/* Round 3 proposal: hover is a sage-100 tint (live: bone-100 plus brightness(1.05); round 2's sage-50 read as grey). WHY no hover filter: a filter
    switched on at hover, on top of the fill's fade, made the fade stutter in Kyle's recording. */
-@media (hover:hover){.pfm-it:hover{background:var(--color-sage-50)}}
-.pfm-it.is-hover{background:var(--color-sage-50)}
+@media (hover:hover){.pfm-it:hover{background:var(--color-sage-100)}}
+.pfm-it.is-hover{background:var(--color-sage-100)}
+/* WHY no fill on Boxes while it's on: raspberry words on sage-100 are 3.4 to 1. */
+@media (hover:hover){.pfm-it[aria-pressed="true"]:hover{background:none}}.pfm-it[aria-pressed="true"].is-hover{background:none}
 .pfm-it:active{filter:brightness(.95)}
 .pfm-it:focus-visible,.pfm-it.is-focus{outline:none;box-shadow:inset 0 0 0 2px var(--color-sage-500)}
 .pfm-it:disabled{cursor:default}
@@ -421,7 +426,7 @@ ul.dscode{list-style:none;padding:0}.dscode code{font-size:13px;background:var(-
 /* Round 2 proposal: -11.5px top and bottom (live: -4px all round) puts the 48px button's centre on the middle of
    the name's first 25px line (12.5 - 24), so the icon sits on that line however many lines the name takes. */
 .pfm-ib svg.i{width:20px;height:20px}.pfm-pc .pfm-ib svg.i{width:18px;height:18px}
-.pfm-ib:hover,.pfm-ib.is-hover{background:var(--color-sage-50)}.pfm-ib:active{filter:brightness(.95)}
+.pfm-ib:hover,.pfm-ib.is-hover{background:var(--color-sage-100)}.pfm-ib:active{filter:brightness(.95)}
 .pfm-ib.share:hover,.pfm-ib.share.is-hover{color:var(--color-ink-700)}
 .pfm-ib:focus-visible,.pfm-ib.is-focus{outline:none;box-shadow:0 0 0 2px var(--color-sage-500)}
 .pfm-ib[aria-pressed="true"]{color:var(--color-clay-500)}.pfm-ib[aria-pressed="true"] svg.i{fill:currentColor}
@@ -446,7 +451,7 @@ ul.dscode{list-style:none;padding:0}.dscode code{font-size:13px;background:var(-
 .pfm-db:focus-visible,.pfm-db.is-focus{outline:none;box-shadow:0 0 0 1px #fff,0 0 0 3px var(--color-sage-500)}
 .pfm-db.walk{background:var(--color-sage-600);color:var(--color-bone-50)}.pfm-db.walk:hover,.pfm-db.walk.is-hover{background:var(--color-sage-700)}
 .pfm-db.walk.active{background:var(--color-sage-100);color:var(--color-sage-700);border-color:var(--color-sage-600)}
-.pfm-db.ext{background:var(--color-bone-50);color:var(--color-ink-700);border-color:var(--color-bone-300)}.pfm-db.ext:hover,.pfm-db.ext.is-hover{background:var(--color-sage-50);border-color:var(--color-ink-400)}
+.pfm-db.ext{background:var(--color-bone-50);color:var(--color-ink-700);border-color:var(--color-bone-300)}.pfm-db.ext:hover,.pfm-db.ext.is-hover{background:var(--color-sage-100);border-color:var(--color-ink-400)}
 .pfm-detail{display:flex;flex-direction:column;gap:16px;padding-top:4px}
 .pfm-addr{display:flex;gap:10px}.pfm-pc .pfm-addr{gap:8px}
 .pfm-addr svg.i{width:16px;height:16px;margin-top:2px;color:var(--color-ink-400)}.pfm-pc .pfm-addr svg.i{width:14px;height:14px}
@@ -478,25 +483,15 @@ ul.dscode{list-style:none;padding:0}.dscode code{font-size:13px;background:var(-
 .fpairs li{display:flex;gap:12px;align-items:center;font-size:14px}.fpairs b{color:var(--primary)}.fpairs small{display:block;font-size:13px;color:var(--muted)}
 .fpair{flex:none;width:52px;height:40px;border-radius:var(--r-md);display:grid;place-items:center;font-weight:700;font-size:16px;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--shadow) 12%,transparent)}
 
-/* Category label options (round 2). Each option restyles the category label and the SNAP / WIC tags together. */
-.pfm-opts{display:flex;flex-wrap:wrap;gap:12px}
+/* Category label, chosen in round 3: one line under the name, words only, middle dots between the pieces. */
+.pfm-pair{display:flex;flex-wrap:wrap;gap:12px}
 .pfm-opt{margin:0;flex:1 1 300px;max-width:360px;min-width:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;background:#fff}
 .pfm-opt>h4{margin:0;padding:8px 12px;font-size:15px}
 .pfm-opt figcaption{font-size:13px;color:var(--muted);padding:8px 12px;border-top:1px solid var(--line)}
 .pfm-opt .pfm-card{border-radius:0;box-shadow:none;border-top:1px solid var(--color-bone-200);padding:16px 20px}
 .pfm-top{display:flex;flex-direction:column;gap:8px}
-/* A: section kicker */
-.pfm-kick{margin:0 0 -4px;font-size:11px;line-height:16px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
-.pfm-kick .and{color:var(--color-ink-400);font-weight:600;margin:0 6px}
-.pfm-kick .ben{color:var(--color-sage-700)}
-/* B: map-pin match */
-.pfm-pinlab{display:inline-flex;align-items:center;gap:4px;font-size:14px;line-height:20px;font-weight:500;color:var(--color-ink-700)}
-.pfm-pinlab svg{width:18px;height:18px;flex:none}
-.pfm-ben{display:inline-flex;align-items:center;gap:4px;font-size:12px;line-height:16px;font-weight:600;color:var(--color-ink-700)}
-.pfm-ben svg{width:14px;height:14px;flex:none;fill:none;stroke:var(--color-sage-700);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
-/* C: ledger tab */
-.pfm-tab{display:inline-flex;align-items:center;padding:3px 8px 3px 7px;border-radius:2px;border-left:4px solid var(--c);background:var(--color-bone-100);font-size:13px;line-height:18px;font-weight:600;color:var(--color-ink-700)}
-.pfm-tab.sm{font-size:12px;line-height:16px;padding:2px 6px 2px 5px;border-left-width:3px}
-/* D: plain underline */
-.pfm-ul{font-size:14px;line-height:20px;font-weight:600;color:var(--color-ink-700);text-decoration:underline;text-decoration-color:var(--c);text-decoration-thickness:3px;text-underline-offset:5px;text-decoration-skip-ink:none}
-.pfm-ul.sm{font-size:12px;line-height:16px;text-decoration-thickness:2px;text-underline-offset:4px}
+.pfm-lab{margin:0;font-size:14px;line-height:20px;font-weight:600}
+.pfm-lab.caps{font-size:11px;line-height:16px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.pfm-pc .pfm-lab{font-size:12px;line-height:16px}.pfm-pc .pfm-lab.caps{font-size:10px;line-height:14px}
+.pfm-lab .dot{color:var(--color-ink-400);font-weight:600;margin:0 6px}
+.pfm-lab .ben{color:var(--color-sage-700)}

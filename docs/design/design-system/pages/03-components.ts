@@ -59,14 +59,14 @@ const navItems = (s: NavState = {}, live = false) => {
   const c = (k: string) => (s.cls?.[k] ? ` ${s.cls[k]}` : "");
   // Live version only: tapping updates the bar the way the real one does (Saved and Menu light up while their
   // panel is open, Boxes toggles, Near me shows the spinner while locating).
-  const tap = (js: string, msg: string) => (live ? ` onclick="${q(js)}" data-say="${q(msg)}"` : ` tabindex="-1"`);
+  const tap = (js: string, msg: string) => (live ? ` onclick="${q(js)}" data-say="${q(msg)}"` : ``);
   const section = (key: "saved" | "top", label: string, icon: string) =>
     `<li><button type="button" class="pfm-it${c(key)}"${s.open === key ? ' aria-current="true"' : ""}${tap(`const on=this.getAttribute('aria-current')==='true';this.closest('ul').querySelectorAll('[data-sec]').forEach(b=>b.removeAttribute('aria-current'));if(!on)this.setAttribute('aria-current','true')`, `Mockup: this would ${key === "saved" ? "open your saved places" : "open the menu"}. Tap again to close it.`)} data-sec>${ic(icon)}<span>${label}</span></button></li>`;
   return `<ul>
     <li><button type="button" class="pfm-it${c("near")}"${s.locating ? ' disabled aria-busy="true"' : ""}${tap(`const b=this,s=b.querySelector('svg');b.disabled=true;b.setAttribute('aria-busy','true');s.innerHTML=${q(JSON.stringify(ICONS.loader))};s.classList.add('spinme');setTimeout(()=>{b.disabled=false;b.removeAttribute('aria-busy');s.classList.remove('spinme');s.innerHTML=${q(JSON.stringify(ICONS.locate))}},1600)`, "Mockup: this would ask for your location, then move the map to you.")}>${s.locating ? ic("loader", "spinme") : ic("locate")}<span>Near me</span></button>${s.locating ? '<span class="sr" aria-live="polite">Locating…</span>' : ""}</li>
     ${section("saved", "Saved", "star")}
     <li><button type="button" class="pfm-it${c("boxes")}" aria-pressed="${s.boxes ? "true" : "false"}"${tap(`this.setAttribute('aria-pressed',this.getAttribute('aria-pressed')==='true'?'false':'true')`, "Mockup: this would show only blessing boxes, nearest first.")}>${ic("box")}<span>Boxes</span></button></li>
-    <li><a class="pfm-it${c("help")}" href="#bottom-nav"${live ? ' data-say="Mockup: this would open the Food help programs page."' : ' tabindex="-1"'}>${ic("help")}<span>Help</span></a></li>
+    <li><a class="pfm-it${c("help")}" href="#bottom-nav"${live ? ' data-say="Mockup: this would open the Food help programs page."' : ""}>${ic("help")}<span>Help</span></a></li>
     ${section("top", "Menu", "menu")}
   </ul>`;
 };
@@ -81,7 +81,7 @@ const onMap = (bar: string, label = "The map stands in here") => `<div class="pf
 
 const bottomNav = entry({
   id: "bottom-nav", name: "Bottom bar (BottomNav)", status: "changing",
-  statusNote: "What changes: hover becomes a light green tint; hover no longer flickers. Everything else is the bar as it is live today.",
+  statusNote: "What changes: hover becomes a light green tint (sage 100); hover no longer flickers. Everything else is the bar as it is live today.",
   purpose: "The five ways off the map: Near me, Saved, Boxes, Help and Menu. It floats near the bottom of every map and menu page, under the thumb, so nothing important sits in the top corners. Near me and Boxes act on the map; Saved and Menu open a panel; Help opens the Food help programs page.",
   instead: [
     "It's about one place (directions, save, share): it goes on the place card, not in the bar.",
@@ -93,7 +93,7 @@ const bottomNav = entry({
     wide("Large screens, 1536 pixels and up: icon and word on one line, in the bottom centre. Shown smaller on a phone.", `<div class="pfm-widewrap">${`<nav class="pfm pfm-nav wide" aria-label="Main, large screens">${navItems()}</nav>`}</div>`),
   states:
     demo("Resting", cell("saved", {})) +
-    demo("Pointer over it: a light green tint, fading in with no flicker (mouse only, never sticks on a phone). Live today: a grey fill plus a brightening that flickers.", cell("saved", { cls: { saved: "is-hover" } })) +
+    demo("Pointer over it: a light green tint, fading in with no flicker (mouse only, never sticks on a phone). Point at any item in these pictures to see it. Live today: a grey fill plus a brightening that flickers.", cell("saved", { cls: { saved: "is-hover" } })) +
     demo("Reached by keyboard: a green ring just inside the item's own edge",cell("saved", { cls: { saved: "is-focus" } })) +
     demo("Its panel is open (navy)", cell("saved", { open: "saved" })) +
     demo("Boxes on: raspberry, and the heart fills", cell("boxes", { boxes: true })) +
@@ -104,7 +104,7 @@ const bottomNav = entry({
     swr("Ink 500", "color-ink-500", "Words and icons at rest") +
     swr("Navy", "color-brand-navy", "The item whose panel is open") +
     swr("Blessing box raspberry", "color-cat-blessing", "Boxes while it's on, words, icon and heart") +
-    sw("Sage 50", "color-sage-50", `Fill under the pointer (proposed; live is bone 100). Words on it: ink 500 ${ratio(hex("color-ink-500"), hex("color-sage-50"))}, navy ${ratio(hex("color-brand-navy"), hex("color-sage-50"))}, raspberry ${ratio(hex("color-cat-blessing"), hex("color-sage-50"))} (Boxes on, under the pointer: under 4.5 to 1, as it already is on today's grey at ${contrast(hex("color-cat-blessing"), hex("color-bone-100")).toFixed(1)} to 1; flagged, no color changed)`) +
+    sw("Sage 100", "color-sage-100", `Fill under the pointer (proposed; live is bone 100). Words on it: ink 500 ${ratio(hex("color-ink-500"), hex("color-sage-100"))}, navy ${ratio(hex("color-brand-navy"), hex("color-sage-100"))}. Boxes while it's on keeps the paper under the pointer: raspberry on sage 100 is ${ratio(hex("color-cat-blessing"), hex("color-sage-100"))}, on bone 50 ${ratio(hex("color-cat-blessing"), PAPER)}`) +
     swr("Sage 500", "color-sage-500", "Keyboard ring, drawn inside the item", "color-bone-50", 3),
   sizes: "64 pixels tall, fully round, 12 pixels in from each side and 12 pixels above the bottom of the screen (plus the phone's own safe area). Five equal items: about 64 pixels wide each at 360 pixels, about 57 at 320, all past the 48-pixel floor. 24-pixel icon above a 12-pixel bold word, 3 pixels apart (the word drops to 11 pixels on screens under 360 wide). Stops growing at 460 pixels wide on tablets. Shadow: 0 4 16 ink at 14%. On large screens: 52 pixels tall, 20-pixel icons, items 44 pixels tall.",
   wording: [
@@ -133,27 +133,30 @@ const V = {
   miles: "0.8 mi", notes: "Bring a bag. Fresh produce on the first Saturday of each month while it lasts. No ID needed for your first visit.",
 };
 const hoursRows: [string, string, boolean?][] = [["Mon", "Closed"], ["Tue", "9am – 1pm"], ["Wed", "9am – 1pm"], ["Thu", "2pm – 6pm", true], ["Fri", "9am – 1pm"], ["Sat", "10am – 12pm"], ["Sun", "Closed"]];
-type CardOpt = { panel?: boolean; saved?: boolean; walkActive?: boolean; hours?: "open" | "opens" | "closed" | "unknown"; live?: boolean; peek?: boolean; name?: string };
+type CardOpt = { panel?: boolean; saved?: boolean; walkActive?: boolean; hours?: "open" | "opens" | "closed" | "unknown"; live?: boolean; peek?: boolean; name?: string; caps?: boolean };
+/** Chosen in round 3: the category, then SNAP, then WIC, on one line under the name, separated by middle dots.
+ *  Category word in its category color, SNAP and WIC in sage 700, dots in ink 400. caps = variant (b). */
+const labelLine = (cat: string, label: string, benefits: string[], caps = false) =>
+  `<p class="pfm-lab${caps ? " caps" : ""}"><span style="color:var(--color-cat-${cat})">${label}</span>${benefits.map((t) => `<span class="dot" aria-hidden="true">·</span><span class="sr">, </span><span class="ben">${t}</span>`).join("")}</p>`;
 const hoursLine = (h: CardOpt["hours"] = "open") =>
   h === "unknown" ? `<span class="unk">${ic("unknown")}Hours unknown — call ahead</span>`
   : `<span>${ic("clock")}${{ open: "Open now · Closes 6pm", opens: "Opens at 2pm", closed: "Closed today" }[h]}</span>`;
 const dirButtons = (o: CardOpt = {}) => {
-  const say = (m: string) => (o.live ? ` data-say="${q(m)}"` : ' tabindex="-1"');
+  const say = (m: string) => (o.live ? ` data-say="${q(m)}"` : "");
   return `<div class="pfm-dir">
-    <button type="button" class="pfm-db walk${o.walkActive ? " active" : ""}" aria-label="${o.walkActive ? "Clear walking route" : `Walking directions to ${V.name} (opens on map)`}"${o.live ? ` onclick="${q("const a=this.classList.toggle('active');this.textContent=a?'Clear walking route':'Walk'")}" data-say="Mockup: this would draw the walking route on the map."` : ' tabindex="-1"'}>${o.walkActive ? "Clear walking route" : "Walk"}</button>
+    <button type="button" class="pfm-db walk${o.walkActive ? " active" : ""}" aria-label="${o.walkActive ? "Clear walking route" : `Walking directions to ${V.name} (opens on map)`}"${o.live ? ` onclick="${q("const a=this.classList.toggle('active');this.textContent=a?'Clear walking route':'Walk'")}" data-say="Mockup: this would draw the walking route on the map."` : ""}>${o.walkActive ? "Clear walking route" : "Walk"}</button>
     <a class="pfm-db ext" href="#venue-card" aria-label="Bus directions to ${V.name} (opens in new tab)"${say("Mockup: this would open Google Maps with bus directions.")}>Bus</a>
     <a class="pfm-db ext" href="#venue-card" aria-label="Drive directions to ${V.name} (opens in new tab)"${say("Mockup: this would open Google Maps with driving directions.")}>Drive</a>
   </div>`;
 };
 const card = (o: CardOpt = {}) => {
-  const live = o.live ? "" : ' tabindex="-1"';
-  const say = (m: string) => (o.live ? ` data-say="${q(m)}"` : ' tabindex="-1"');
+  const say = (m: string) => (o.live ? ` data-say="${q(m)}"` : "");
   const name = o.name ?? V.name;
   const body = `<div class="pfm-namerow"><h2 class="pfm-name">${name}</h2>
     <button type="button" class="pfm-ib share" aria-label="Share ${name}"${say("Mockup: this would share the link, or copy it.")}>${ic("share")}</button>
-    <button type="button" class="pfm-ib" aria-pressed="${o.saved ? "true" : "false"}" aria-label="${o.saved ? "Remove" : "Add"} ${name} ${o.saved ? "from" : "to"} saved"${o.live ? ` onclick="${q("this.setAttribute('aria-pressed',this.getAttribute('aria-pressed')==='true'?'false':'true')")}"` : live}>${ic("star")}</button></div>
+    <button type="button" class="pfm-ib" aria-pressed="${o.saved ? "true" : "false"}" aria-label="${o.saved ? "Remove" : "Add"} ${name} ${o.saved ? "from" : "to"} saved"${o.live ? ` onclick="${q("this.setAttribute('aria-pressed',this.getAttribute('aria-pressed')==='true'?'false':'true')")}"` : ""}>${ic("star")}</button></div>
+  ${labelLine("pantry", "Food Pantry", ["SNAP", "WIC"], o.caps)}
   <p class="pfm-op">Operated by <a href="#venue-card"${say("Mockup: this would open pueblofoodproject.org in a new tab.")}>Pueblo Food Project</a></p>
-  <div class="pfm-badges"><span class="pfm-cat" style="background:var(--color-cat-pantry)"><i aria-hidden="true"></i>Food Pantry</span><span class="pfm-pill">SNAP</span><span class="pfm-pill">WIC</span></div>
   <div class="pfm-meta"><span>${ic("pin")}${V.miles} from you</span>${hoursLine(o.hours)}</div>
   <p class="pfm-notes">${V.notes}</p>
   ${dirButtons(o)}
@@ -168,48 +171,40 @@ const card = (o: CardOpt = {}) => {
   return `<div class="pfm pfm-card${o.panel ? " pfm-pc" : ""}${o.peek ? " pfm-peek" : ""}">${body}</div>`;
 };
 
-// ── Category label: four options against today's pill (round 2) ────────────────────────────────────────────────
-// Made-up places, one per category Kyle asked to see. Each option restyles the label and the SNAP / WIC tags.
-type Cat = "pantry" | "grocery" | "garden";
-const CATS: { cat: Cat; label: string; name: string; miles: string; hours: string; benefits: string[] }[] = [
+// ── Category label: chosen in round 3 (D's place under the name, A's colored words and dots) ─────────────────
+// Made-up places: the three categories Kyle asked to see, plus a long name. Two variants settle the case.
+const CATS: { cat: string; label: string; name: string; miles: string; hours: string; benefits: string[] }[] = [
   { cat: "pantry", label: "Food Pantry", name: "Eastside Community Pantry", miles: "0.8 mi", hours: "Open now · Closes 6pm", benefits: [] },
   { cat: "grocery", label: "Grocery / Supermarket", name: "Northgate Grocery Market", miles: "1.4 mi", hours: "Open now · Closes 9pm", benefits: ["SNAP", "WIC"] },
   { cat: "garden", label: "Community Garden", name: "Mesa Street Community Garden", miles: "2.1 mi", hours: "Opens at 8am", benefits: [] },
+  { cat: "pantry", label: "Food Pantry", name: "Saint Joseph Eastside Community Food Pantry", miles: "3.2 mi", hours: "Closed today", benefits: ["SNAP"] },
 ];
-const catVar = (c: Cat | string) => `var(--color-cat-${c})`;
-const catTok = (c: string) => `color-cat-${c}` as Token;
-const ALL_CATS = ["pantry", "grocery", "convenience", "farm", "garden", "landscape", "meal", "blessing"];
-const pinSvg = (c: Cat) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" fill="${catVar(c)}" stroke="#FFFFFF" stroke-width="1.5"/><circle cx="12" cy="10" r="3" fill="none" stroke="#FFFFFF" stroke-width="1.5"/></svg>`;
-const tick = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>`;
-type Opt = "today" | "a" | "b" | "c" | "d";
-const labelRow = (o: Opt, x: (typeof CATS)[number]) => {
-  const b = x.benefits;
-  if (o === "today") return `<div class="pfm-badges"><span class="pfm-cat" style="background:${catVar(x.cat)}"><i aria-hidden="true"></i>${x.label}</span>${b.map((t) => `<span class="pfm-pill">${t}</span>`).join("")}</div>`;
-  if (o === "b") return `<div class="pfm-badges"><span class="pfm-pinlab">${pinSvg(x.cat)}${x.label}</span>${b.map((t) => `<span class="pfm-ben">${tick}${t}</span>`).join("")}</div>`;
-  if (o === "c") return `<div class="pfm-badges"><span class="pfm-tab" style="--c:${catVar(x.cat)}">${x.label}</span>${b.map((t) => `<span class="pfm-tab sm" style="--c:var(--color-sage-600)">${t}</span>`).join("")}</div>`;
-  return `<div class="pfm-badges" style="gap:14px"><span class="pfm-ul" style="--c:${catVar(x.cat)}">${x.label}</span>${b.map((t) => `<span class="pfm-ul sm" style="--c:var(--color-sage-500)">${t}</span>`).join("")}</div>`;
-};
-const cardTop = (o: Opt, x: (typeof CATS)[number]) => {
-  const kicker = o === "a" ? `<p class="pfm-kick"><span style="color:${catVar(x.cat)}">${x.label}</span>${x.benefits.map((t) => `<span class="and">·</span><span class="ben">${t}</span>`).join("")}</p>` : "";
-  return `<div class="pfm pfm-card"><div class="pfm-top">${kicker}<div class="pfm-namerow"><h2 class="pfm-name">${x.name}</h2><button type="button" class="pfm-ib share" tabindex="-1" aria-label="Share ${x.name}">${ic("share")}</button><button type="button" class="pfm-ib" tabindex="-1" aria-pressed="false" aria-label="Add ${x.name} to saved">${ic("star")}</button></div>
-  ${o === "a" ? "" : labelRow(o, x)}<div class="pfm-meta"><span>${ic("pin")}${x.miles} from you</span><span>${ic("clock")}${x.hours}</span></div></div></div>`;
+const ALL_CATS: [string, string][] = [["pantry", "Pantry"], ["grocery", "Grocery"], ["convenience", "Convenience"], ["farm", "Farm"], ["garden", "Garden"], ["landscape", "Edible landscape"], ["meal", "Meal site"], ["blessing", "Blessing box"]];
+type Look = "a" | "b" | "today";
+const topRow = (x: (typeof CATS)[number]) => `<div class="pfm-namerow"><h2 class="pfm-name">${x.name}</h2><button type="button" class="pfm-ib share" aria-label="Share ${x.name}">${ic("share")}</button><button type="button" class="pfm-ib" aria-pressed="false" aria-label="Add ${x.name} to saved">${ic("star")}</button></div>`;
+const cardTop = (l: Look, x: (typeof CATS)[number]) => {
+  const label = l === "today"
+    ? `<div class="pfm-badges"><span class="pfm-cat" style="background:var(--color-cat-${x.cat})"><i aria-hidden="true"></i>${x.label}</span>${x.benefits.map((t) => `<span class="pfm-pill">${t}</span>`).join("")}</div>`
+    : labelLine(x.cat, x.label, x.benefits, l === "b");
+  return `<div class="pfm pfm-card"><div class="pfm-top">${topRow(x)}${label}<div class="pfm-meta"><span>${ic("pin")}${x.miles} from you</span><span>${ic("clock")}${x.hours}</span></div></div></div>`;
 };
 const r = (fg: Token, bg: Token, need: 4.5 | 3 = 4.5) => ratio(hex(fg), hex(bg), need);
-const lowest = (bg: Token) => { const [c, v] = ALL_CATS.map((c) => [c, contrast(hex(catTok(c)), hex(bg))] as const).sort((p, q) => p[1] - q[1])[0]; return `${c} ${v.toFixed(1)} to 1`; };
-const OPTS: [Opt, string, string][] = [
-  ["a", "A. Section kicker", `Small capital letters in the category's own color, no fill, above the name, like the section label over a newspaper story. Fits the Civic Editorial direction in DESIGN.md. Words on the card's bone 50: pantry ${r("color-cat-pantry", "color-bone-50")}, grocery ${r("color-cat-grocery", "color-bone-50")}, garden ${r("color-cat-garden", "color-bone-50")}; all eight categories pass, lowest ${lowest("color-bone-50")}. SNAP and WIC in sage 700 ${r("color-sage-700", "color-bone-50")}. No color failed, so none needed switching to ink.`],
-  ["b", "B. Map-pin match", `The same pin shape and color as on the map, beside the label in ink 700. Ties the card to the pin that was tapped. Words: ink 700 on bone 50 ${r("color-ink-700", "color-bone-50")}. The pin is a shape: pantry ${r("color-cat-pantry", "color-bone-50", 3)}, grocery ${r("color-cat-grocery", "color-bone-50", 3)}, garden ${r("color-cat-garden", "color-bone-50", 3)} (3 to 1 needed). SNAP and WIC get a sage 700 tick, ${r("color-sage-700", "color-bone-50", 3)}.`],
-  ["c", "C. Ledger tab", `A square-cornered tag (2-pixel corners) on bone 100 with a 4-pixel bar in the category color on the left, like a tab in a ledger. Words: ink 700 on bone 100 ${r("color-ink-700", "color-bone-100")}. The bar is decoration, the word carries the meaning. SNAP and WIC are smaller tabs with a sage 600 bar.`],
-  ["d", "D. Plain underline", `The label in ink 700 with a 3-pixel underline in the category color. The quietest option: no shape at all. Words: ink 700 on bone 50 ${r("color-ink-700", "color-bone-50")}. The underline is decoration. SNAP and WIC get a thinner sage 500 underline. Note: an underline usually means a link, and these aren't links.`],
-  ["today", "Today (live)", `The fully round pill in the category color with bone 50 words, for comparison. Words: pantry ${r("color-bone-50", "color-cat-pantry")}, grocery ${r("color-bone-50", "color-cat-grocery")}, garden ${r("color-bone-50", "color-cat-garden")}. SNAP and WIC: sage 700 on sage 100 ${r("color-sage-700", "color-sage-100")}.`],
+const LOOKS: [Look, string, string][] = [
+  ["a", "(a) Sentence case, 14 pixels, semi-bold", "Reads like the rest of the card. Long category names (Grocery / Supermarket) stay easy to read."],
+  ["b", "(b) Small capitals, letter-spaced", "11 pixels, bold, spaced out like a newspaper section label. Quieter, more editorial, a little harder to read at a glance."],
+  ["today", "Today (live), for comparison", "The fully round pill in the category color, with SNAP and WIC as pale green tags."],
 ];
-const catOptions = `<h3 id="category-label">Category label: pick one</h3>
-  <p class="dssz">Kyle: the round pill looks machine-made. Four other ways to show the category, each with the SNAP and WIC tags restyled to match, on three made-up places at phone width. Today's pill is last for comparison. Every ratio is worked out from the real colors when this page builds. On a computer each option is a real 360-pixel card; in the Phone view they're about 300 wide, so lines wrap a little sooner than on a real phone.</p>
-  <div class="pfm-opts">${OPTS.map(([o, title, why]) => `<figure class="pfm-opt"><h4>${title}</h4>${CATS.map((x) => cardTop(o, x)).join("")}<figcaption>${why}</figcaption></figure>`).join("")}</div>`;
+const catOptions = `<h3 id="category-label">Chosen: label under the name</h3>
+  <p class="dssz">The category, then SNAP, then WIC, on one line under the name, separated by middle dots. The category word is in its own category color; SNAP and WIC are in sage 700; the dots in ink 400. No fill, no underline, no pill. Pick (a) or (b) for the case. Made-up places; on a computer each is a real 360-pixel card, in the Phone view about 300 wide.</p>
+  <div class="pfm-pair">${LOOKS.map(([l, title, why]) => `<figure class="pfm-opt"><h4>${title}</h4>${CATS.map((x) => cardTop(l, x)).join("")}<figcaption>${why}</figcaption></figure>`).join("")}</div>
+  <h4 style="margin:14px 0 6px">Every category's word on the card (bone 50)</h4>
+  <ul class="fpairs">${ALL_CATS.map(([c, n]) => `<li><span class="fpair" style="background:${PAPER};color:var(--color-cat-${c})">Aa</span><span><b>${n}</b> ${r(`color-cat-${c}` as Token, "color-bone-50")}</span></li>`).join("")}
+  <li><span class="fpair" style="background:${PAPER};color:var(--color-sage-700)">Aa</span><span><b>SNAP and WIC, sage 700</b> ${r("color-sage-700", "color-bone-50")}</span></li>
+  <li><span class="fpair" style="background:${PAPER};color:var(--color-ink-400)">·</span><span><b>The dots, ink 400</b> ${r("color-ink-400", "color-bone-50")}</span></li></ul>`;
 
 const venueCard = entry({
   id: "venue-card", name: "Place card (VenueCardBody)", status: "changing",
-  statusNote: "What changes: hover becomes a light green tint; hover no longer flickers; share and save line up with the name. The category label may change too: pick one below. Everything else is the card as it is live today, with a made-up place.",
+  statusNote: "What changes: hover becomes a light green tint (sage 100); hover no longer flickers; share and save line up with the name; the category becomes colored words on its own line under the name (Food Pantry · SNAP · WIC) in place of the pill. Everything else is the card as it is live today, with a made-up place.",
   purpose: "Everything about one place, in the order people need it: the name, what kind of place it is, how far and whether it's open, then the way to get there, then the full hours, phone and a way to report a problem. The same body shows in the card that slides up on a phone and in the window on the side of the map on a computer.",
   instead: [
     "It's a blessing box: use the box card (BoxCardBody), which has check-ins and photos.",
@@ -217,39 +212,38 @@ const venueCard = entry({
     "It's a list of several places: use the list rows, and open this card from one of them.",
   ],
   versions:
-    wide("Phone: the card slides up from the bottom. Tap Walk, the star or any link.", card({ live: true })) +
+    wide("Phone: the card slides up from the bottom. Shown with label (a); (b) is below. Tap Walk, the star or any link.", card({ live: true })) +
     wide("Phone, a long name over two lines: share and save stay on the first line.", card({ peek: true, name: "Saint Joseph Eastside Community Food Pantry" })) +
     wide("Phone, as it first opens: everything below the direction buttons sits below the screen edge, with its top showing, until it's pulled up.", `${card({ peek: true })}`) +
     wide("Computer: the window on the side of the map. Smaller words and icons, always the full details.", card({ panel: true })),
   extra: catOptions,
   states:
     demo("Walk, resting", `<div class="pfm" style="width:100%">${dirButtons()}</div>`) +
-    demo("Pointer over it: Walk darkens to sage 700; Bus and Drive take a light green tint (proposed; live is grey). No flicker.", `<div class="pfm" style="width:100%">${dirButtons().replace("pfm-db walk", "pfm-db walk is-hover").replace('class="pfm-db ext"', 'class="pfm-db ext is-hover"')}</div>`) +
+    demo("Pointer over it: Walk darkens to sage 700; Bus and Drive take a light green tint (proposed; live is grey). No flicker. Point at the buttons in any of these pictures to see it.", `<div class="pfm" style="width:100%">${dirButtons().replace("pfm-db walk", "pfm-db walk is-hover").replace('class="pfm-db ext"', 'class="pfm-db ext is-hover"')}</div>`) +
     demo("Reached by keyboard", `<div class="pfm" style="width:100%">${dirButtons().replace("pfm-db walk", "pfm-db walk is-focus")}</div>`) +
     demo("Walking route on the map: Walk turns into Clear walking route", `<div class="pfm" style="width:100%">${dirButtons({ walkActive: true })}</div>`) +
     demo("Open now", `<div class="pfm pfm-meta">${hoursLine("open")}</div>`) +
     demo("Opens later today", `<div class="pfm pfm-meta">${hoursLine("opens")}</div>`) +
     demo("Closed today", `<div class="pfm pfm-meta">${hoursLine("closed")}</div>`) +
     demo("No hours known: a different icon, so it's never read as open", `<div class="pfm pfm-meta">${hoursLine("unknown")}</div>`) +
-    demo("Share and save: resting, pointer over it (light green tint, proposed), keyboard, saved", `<div class="pfm" style="display:flex;gap:16px;padding:8px"><button type="button" class="pfm-ib share" tabindex="-1" aria-label="Share">${ic("share")}</button><button type="button" class="pfm-ib share is-hover" tabindex="-1" aria-label="Share, pointer over it">${ic("share")}</button><button type="button" class="pfm-ib is-focus" aria-pressed="false" tabindex="-1" aria-label="Not saved, keyboard">${ic("star")}</button><button type="button" class="pfm-ib" aria-pressed="true" tabindex="-1" aria-label="Saved">${ic("star")}</button></div>`) +
-    demo("Phone number: resting, pointer over it, keyboard (the browser's own outline: this link has no sage ring)",`<div class="pfm" style="display:flex;flex-direction:column;align-items:flex-start"><a class="pfm-tel" tabindex="-1">${ic("phone")}${V.phone}</a><a class="pfm-tel is-hover" tabindex="-1">${ic("phone")}${V.phone}</a><a class="pfm-tel is-focus" tabindex="-1">${ic("phone")}${V.phone}</a></div>`),
+    demo("Share and save: resting, pointer over it (light green tint, proposed; point at any of them), keyboard, saved", `<div class="pfm" style="display:flex;gap:16px;padding:8px"><button type="button" class="pfm-ib share" aria-label="Share">${ic("share")}</button><button type="button" class="pfm-ib share is-hover" aria-label="Share, pointer over it">${ic("share")}</button><button type="button" class="pfm-ib is-focus" aria-pressed="false" aria-label="Not saved, keyboard">${ic("star")}</button><button type="button" class="pfm-ib" aria-pressed="true" aria-label="Saved">${ic("star")}</button></div>`) +
+    demo("Phone number: resting, pointer over it, keyboard (the browser's own outline: this link has no sage ring)",`<div class="pfm" style="display:flex;flex-direction:column;align-items:flex-start"><a class="pfm-tel" href="#venue-card">${ic("phone")}${V.phone}</a><a class="pfm-tel is-hover" href="#venue-card">${ic("phone")}${V.phone}</a><a class="pfm-tel is-focus" href="#venue-card">${ic("phone")}${V.phone}</a></div>`),
   colors:
     sw("Bone 50", "color-bone-50", "The card, the same paper as the page") +
     swr("Ink 900", "color-ink-900", "The place name") +
     swr("Ink 700", "color-ink-700", "Address, notes, hours, Bus and Drive words") +
     swr("Ink 500", "color-ink-500", "Distance and hours today, the operator line, the report button") +
-    swr("Ink 400", "color-ink-400", "Section labels (HOURS, CONTACT), small icons, the star at rest") +
-    swr("Sage 700", "color-sage-700", "Phone number, today's hours, SNAP and WIC words") +
+    swr("Ink 400", "color-ink-400", "Section labels (HOURS, CONTACT), the middle dots in the category label, small icons, the star at rest") +
+    swr("Sage 700", "color-sage-700", "Phone number, today's hours, SNAP and WIC in the label and the Accepts badges") +
     sw("Sage 600", "color-sage-600", `Walk button fill. Bone 50 words on it ${ratio(PAPER, hex("color-sage-600"))}; with the pointer over it sage 700, ${ratio(PAPER, hex("color-sage-700"))}`) +
-    sw("Sage 100", "color-sage-100", `SNAP and WIC fill, and Walk while a route is on. Sage 700 words on it ${ratio(hex("color-sage-700"), hex("color-sage-100"))}; the sage 600 edge ${ratio(hex("color-sage-600"), hex("color-sage-100"), 3)}`) +
+    sw("Sage 100", "color-sage-100", `Fill under the pointer on share, save, Bus and Drive (proposed; live is bone 100), the Accepts SNAP and WIC badges, and Walk while a route is on. Words on it: ink 700 ${r("color-ink-700", "color-sage-100")}, ink 500 ${r("color-ink-500", "color-sage-100")}, sage 700 ${r("color-sage-700", "color-sage-100")}; the star icon in ink 400 ${r("color-ink-400", "color-sage-100", 3)}; the sage 600 edge ${r("color-sage-600", "color-sage-100", 3)}`) +
     swr("Sage 500", "color-sage-500", "Keyboard ring, today's line, the Plentiful link's edge", "color-bone-50", 3) +
-    sw("Pantry red (each category has its own)", "color-cat-pantry", `Category badge fill. Bone 50 words on it ${ratio(PAPER, hex("color-cat-pantry"))}; every category passes, see Foundations`) +
+    sw("Pantry red (each category has its own)", "color-cat-pantry", `The category word in the label. ${r("color-cat-pantry", "color-bone-50")} on bone 50; every category passes, see Chosen: label under the name`) +
     swr("Clay 500", "color-clay-500", "The star once saved", "color-bone-50", 3) +
-    sw("Sage 50", "color-sage-50", `Fill under the pointer on share, save, Bus and Drive (proposed; live is bone 100). Words on it: ink 700 ${r("color-ink-700", "color-sage-50")}, ink 500 ${r("color-ink-500", "color-sage-50")}; the share icon in ink 700 and the star in ink 400 ${r("color-ink-400", "color-sage-50", 3)}`) +
     sw("Bone 300", "color-bone-300", `Bus, Drive and report button edges. ${contrast(hex("color-bone-300"), PAPER).toFixed(1)} to 1, decoration only: the words carry the buttons`),
   sizes: "Phone: 20 pixels in from the sides, 20 on top, 12 between blocks. Name in Fraunces 20, the rest in Public Sans 14 (labels 11 and the operator line 12). Share, Save, Walk, Bus, Drive and the Plentiful link are all 48 pixels to tap; the phone number is 44 tall with 2 extra pixels above and below to reach 48; the report button looks 36 tall and taps at 48. Corners 10 pixels on buttons, 20 on the top of the phone card, 14 on the computer window. Computer: 16 pixels of padding, words 12, labels 10, icons a size smaller.",
   wording: [
-    "The category is spelled out: Food Pantry, Grocery / Supermarket, Community Garden, never a code.",
+    "The label is the category name, then SNAP, then WIC, separated by a middle dot: Grocery / Supermarket · SNAP · WIC. The category is spelled out, never a code; SNAP or WIC only when the place takes it.",
     "Hours today read as a short sentence: Open now · Closes 6pm, Opens at 2pm, Closed today. Times are lower case, no :00.",
     "Distance is miles to one decimal and from you: 0.8 mi from you.",
     "One word on each direction button: Walk, Bus, Drive. Screen readers hear the full version: Walking directions to Eastside Community Pantry (opens on map).",
@@ -274,20 +268,18 @@ export const pages: Page[] = [{
   slug: "components", route: "DESIGN.md → Components", title: "Design system: Components", area: "Design system", nav: "Components",
   blurb: "The first two pieces, the bottom bar and the place card, so the layout of each entry can be settled.",
   changed: [
-    "Bottom bar: hover becomes a light green tint, and hover no longer flickers. Everything else is what's live.",
-    "Place card: the same hover change on share, save, Bus and Drive; share and save line up with the name. Four options for the category label. Everything else is what's live, with made-up places.",
-    "Keyboard rings now follow each button's own shape in the pictures (a mockup fix; the live site draws them correctly).",
+    "Bottom bar: hover becomes a light green tint (sage 100), and hover no longer flickers. Everything else is what's live.",
+    "Place card: the same hover change on share, save, Bus and Drive; share and save line up with the name; the category becomes colored words under the name. Everything else is what's live, with made-up places.",
+    "Every state picture now also reacts to a real pointer and to the keyboard, on top of its frozen state.",
     "Each entry runs in the same order: what it's for, when to use something else, versions, states, colors and sizes, wording, works for everyone, do and don't, and where the code lives.",
   ],
   kept: ["The map itself isn't drawn: a flat block stands in for it.", "The phone view is 360 pixels wide, the older Android phone the site is built for."],
   check: [
-    "Hover tint: the light green (sage 50) fill on the bar items, share, save, Bus and Drive, in place of the grey.",
-    "Keyboard ring: it now lines up with the button's shape in every picture and on the live bars.",
-    "Hover stutter: the brightening filter is gone, so hover is one clean color fade. The slight dim while pressing stays.",
-    "Icon alignment: share and save sit on the middle of the name's first line, also when the name runs to two lines.",
-    "Category label: pick A, B, C or D (or keep Today).",
+    "Visible green hover: the sage 100 fill on the bar items, share, save, Bus and Drive. Point at any button, in the live pieces or the pictures.",
+    "Do and Don't bars: full width, five equal items, words on one line.",
+    "Category label: pick (a) sentence case or (b) small capitals.",
   ],
   html: `<div class="head"><h1>Components</h1></div>
-  ${toc([...all.map(([id, n]) => [`#${id}`, n] as [string, string]), ["#category-label", "Category label: pick one"], ["foundations.html", "Foundations →"]])}
+  ${toc([...all.map(([id, n]) => [`#${id}`, n] as [string, string]), ["#category-label", "Category label"], ["foundations.html", "Foundations →"]])}
   ${all.map(([, , h]) => h).join("")}`,
 }];

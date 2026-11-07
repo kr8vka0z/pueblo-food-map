@@ -67,3 +67,6 @@ OPS-SECRETS.local.md
 # the touch-target audit PR description for how it was driven.
 /.audit-233/
 .release-prs.md
+
+# design-system review pages: built output of docs/design/design-system/build.ts
+docs/design/design-system/dist/

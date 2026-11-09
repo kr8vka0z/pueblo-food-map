@@ -291,6 +291,7 @@ const motion = dsSec({
   <div class="dsrow fi-demo">
     ${mdemo("0.15 s", "Color change on a button: point at it", `<button type="button" class="fi-fill">Get directions</button>`)}
     ${mdemo("0.15 s", "The hover fill fading in: point at it", `<button type="button" class="fi-hov">Browse all places</button>`)}
+    ${mdemo("0.25 s", "A switch turning on: the knob slides and the fill changes together. Tap it", cx("sw", "Open now", { cls: "fi-sw" }))}
     ${mdemo("0.5 s", "The bottom card sliding up: tap Open", `<div class="fmphone fi-sheet"><div class="fmlist"><button type="button" class="fi-fill" onclick="this.closest('.fmphone').classList.add('open')">Open a place</button></div><div class="fmscrim" onclick="this.closest('.fmphone').classList.remove('open')"></div><div class="fmsheet"><span class="grab"></span><b>Eastside Community Pantry</b><small>Food Pantry · 0.4 mi</small><button type="button" class="fi-hov" onclick="this.closest('.fmphone').classList.remove('open')">Close</button></div></div>`)}
     ${mdemo("2 s, repeating", "You are here: the dot breathes", `<span class="fi-dot" aria-hidden="true"></span>`)}
     ${mdemo("2.4 s, repeating", "An event going on now: two rings spread from the pin. With motion off, a still halo.", `<span class="fi-evt" aria-hidden="true"><span class="fi-ring"></span><span class="fi-ring late"></span><svg width="44" height="44" viewBox="2 1 20 21.5" style="overflow:visible;position:relative"><path d="${PIN}" fill="${hex("color-brand-orange")}" stroke="${hex("color-brand-navy")}" stroke-width="1.6" stroke-linejoin="round"/><polygon points="12,5.6 13.12,8.46 16.19,8.64 13.81,10.59 14.59,13.56 12,11.9 9.41,13.56 10.19,10.59 7.82,8.64 10.88,8.46" fill="${hex("color-brand-navy")}"/></svg></span>`)}
@@ -299,6 +300,7 @@ const motion = dsSec({
   ${h3("The tokens")}${ul([
     "<code>--ease-out-circ</code> cubic-bezier(0.32, 0.72, 0, 1): quick to start, gentle to stop. It's the curve the bottom card's drawer library uses for its own 0.5-second slide.",
     "<code>--duration-fast</code> 150 ms, <code>--duration-default</code> 250 ms, <code>--duration-slow</code> 400 ms.",
+    "<b>Switches use the default: 250 ms on the default curve</b>, for the knob's slide and the fill's color together (Kyle, round 6: at 150 ms it snapped on too fast to see it move). That's every switch: Filters, and the motion switch at the top of this section. Live is 150 ms (FilterPanel.tsx:136 and :145).",
     "<b>Known drift:</b> the code uses none of the four by name (globals.css:96-99), and <code>duration-fast</code> isn't a class Tailwind makes. Live, color changes are <code>duration-150</code> (most), 100 on a few, 300 for the bottom bar sliding sideways when the side panel opens, all on Tailwind's default curve, cubic-bezier(0.4, 0, 0.2, 1). The map flies to an event in 0.8 seconds.",
   ])}
   ${h3("Reduced motion")}${ul([
@@ -355,6 +357,7 @@ export const pages: Page[] = [{
   changed: [
     "Hover becomes a sage 100 fill everywhere, never a grey, and the hover brightening goes (decided, Kyle).",
     "The category becomes colored words under the name, so the category colors are now checked as words: all pass.",
+    "Switches slide on in 250 ms with the default curve, knob and fill together (Kyle, round 6; live: 150 ms). The motion switch on this page now moves too: before, turning it on stopped its own slide.",
     "Everything else is the site as it is live today, written down from the code.",
   ],
   kept: [

@@ -1315,6 +1315,51 @@ textarea.pa-in{resize:vertical}
 .pfm-ibdemo.tr .pfm-acts{justify-content:flex-end}
 /* The computer window is 380 wide (DesktopSidePanel); the kit's figure rule would stretch it to the figure. */
 .dsd>div>.pfm-side.w380{max-width:min(380px,100%)}
+/* Round 6. Call and Website (links), and a missing one: a button with aria-disabled, grey icon, no tint. Only the
+   icon is faded, so the keyboard ring on a missing one stays full strength. */
+a.pfm-ib{text-decoration:none}
+.pfm-ib{position:relative}
+.pfm-ib.call:hover,.pfm-ib.call.is-hover,.pfm-ib.web:hover,.pfm-ib.web.is-hover{color:var(--color-ink-700)}
+.pfm-ib.off{cursor:default}.pfm-ib.off svg.i{opacity:.4}
+.pfm-ib.off:hover,.pfm-ib.off.is-hover{background:none}
+/* Computer: the label under Call (its number) or a missing one (why). Left-aligned with the button so the first
+   button's label never runs off the card's left edge. */
+.pfm-ib .tt{display:none;position:absolute;left:0;top:calc(100% + 4px);z-index:5;padding:4px 8px;border-radius:6px;background:var(--color-ink-900);color:var(--color-bone-50);font:500 12px/16px 'Public Sans',system-ui,sans-serif;white-space:nowrap;pointer-events:none}
+.pfm-ib:hover .tt,.pfm-ib:focus-visible .tt,.pfm-ib.is-hover .tt,.pfm-ib.is-focus .tt{display:block}
+/* The computer's × closes the action row at the right (no bar of its own). */
+.pfm-acts .pfm-x{margin:-4px -4px -4px auto;color:var(--color-ink-500)}
+.pfm-acts .pfm-x svg.i{width:18px;height:18px}
+/* With ← Saved (or a box's History): that link and the × share one line above the card, no rule under it. */
+.pfm-tl{display:flex;align-items:center;gap:8px;padding:12px 16px}
+.pfm-tl .pfm-x{margin:-4px -4px -4px auto;color:var(--color-ink-500)}.pfm-tl .pfm-x svg.i{width:18px;height:18px}
+.pfm-tl+.sb .pfm-card.pfm-pc{padding-top:0}
+.pfm-tl .bk2,.pfm-tl .hist{display:inline-flex;align-items:center;min-height:40px;margin:-4px -8px;padding:0 8px;border:0;border-radius:10px;background:none;font:500 14px/20px 'Public Sans',system-ui,sans-serif;color:var(--color-sage-700);text-decoration:none;cursor:pointer;transition:color .15s}
+.pfm-tl .bk2:hover,.pfm-tl .bk2.is-hover,.pfm-tl .hist:hover{color:var(--color-sage-600)}
+.pfm-tl .bk2:focus-visible,.pfm-tl .bk2.is-focus,.pfm-tl .hist:focus-visible{outline:none;box-shadow:0 0 0 2px var(--color-sage-500)}
+.pfm-side.flat .pfm-tl+.pfm-tl{border-top:1px dashed var(--color-bone-200)}
+/* Scrolled still: the top stays put and gets its one hairline; the card shows from the hours down. */
+.pfm-side.scr .pin{position:relative;z-index:1;padding:16px;border-bottom:1px solid var(--color-bone-200);background:var(--color-bone-50)}
+.pfm-side.scr .sb{flex:1;min-height:0;overflow:hidden}
+.pfm-side.scr .sb .pfm-card{margin-top:-400px}
+/* State pictures */
+.pfm-ibs .pfm-acts .pfm-ib{margin:-4px}
+.pfm-ibs.col{flex-direction:column;align-items:flex-start;gap:16px}
+.pfm-ibs.tall{padding-bottom:40px}
+.pfm-side.flat .pfm-card.pfm-pc{border-radius:0;box-shadow:none}
+/* Filters: a kind of place is a switch row; its color dot sits where the Show only icons do. */
+.pfm-fp .swr .dt{flex:none;width:10px;height:10px;margin:0 2px;border-radius:50%}
+/* Switch motion (Kyle, round 6): 250ms on the default curve, knob and fill together (live and kit: 150 / 300ms).
+   The Motion section's own switch kept snapping because .fmoff killed its transition the moment it turned on; it's
+   the control, not a demo, so it keeps moving. Device-level reduced motion still makes every switch instant. */
+.pfm-fp .tg,.pfm-fp .tg span,.cx-sw .bx,.cx-sw .bx::after{transition-duration:.25s;transition-timing-function:cubic-bezier(.32,.72,0,1)}
+.fmoff .fmoff-sw .bx{transition:background .25s cubic-bezier(.32,.72,0,1)!important}
+.fmoff .fmoff-sw .bx::after{transition:transform .25s cubic-bezier(.32,.72,0,1),background .25s cubic-bezier(.32,.72,0,1)!important}
+@media (prefers-reduced-motion:reduce){.pfm-fp .tg,.pfm-fp .tg span,.cx-sw .bx,.cx-sw .bx::after,.fmoff .fmoff-sw .bx,.fmoff .fmoff-sw .bx::after{transition:none!important}}
+/* The map's stand-in label sits behind the panel, not over its top line (← Saved). */
+.pfm-ma.sde .pfm-side{position:relative;z-index:1}
+/* Narrow screens: the computer panel's action row (four icons and the ×) needs 296px, so the map stand-in gives
+   up its side margins there rather than squeezing the × off the card. */
+@media (max-width:520px){.pfm-ma.sde{padding:12px 0}}
 /* === end card-actions === */
 /* === patterns-brand === */
 /* Patterns and Brand pages (pages/05-patterns.ts, pages/01-brand.ts). Small flat pictures in the site's own tokens
@@ -1534,4 +1579,5 @@ textarea.pa-in{resize:vertical}
 .lo-ic .paper{background:var(--color-bone-50);border:1px solid var(--color-bone-200)}.lo-ic .tile{background:var(--color-bone-200)}
 /* Phone: two columns, the small pictures paired up, so one option is about one screen tall. */
 @media (max-width:600px){.lo-f.og{grid-column:span 1}.lo-f.big img{width:min(110px,100%)}.lo-f>div{padding:10px}.lo-hi .lo-wm{font-size:23px}.lo-f.mono .lo-wm{font-size:13px}.lo-f.mono img{width:32px;height:32px}}
+.lo-part{margin:28px 0 4px;font-size:24px;color:var(--color-ink-900)}.lo-partp{margin:0 0 14px;font-size:14.5px;color:var(--muted)}
 /* === end logo === */

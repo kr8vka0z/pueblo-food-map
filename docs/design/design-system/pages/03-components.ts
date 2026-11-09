@@ -134,7 +134,8 @@ const V = {
   miles: "0.8 mi", notes: "Bring a bag. Fresh produce on the first Saturday of each month while it lasts. No ID needed for your first visit.",
 };
 const hoursRows: [string, string, boolean?][] = [["Mon", "Closed"], ["Tue", "9am – 1pm"], ["Wed", "9am – 1pm"], ["Thu", "2pm – 6pm", true], ["Fri", "9am – 1pm"], ["Sat", "10am – 12pm"], ["Sun", "Closed"]];
-type CardOpt = { panel?: boolean; saved?: boolean; walkActive?: boolean; hours?: "open" | "opens" | "closed" | "unknown"; live?: boolean; peek?: boolean; name?: string };
+type CardOpt = { panel?: boolean; saved?: boolean; walkActive?: boolean; hours?: "open" | "opens" | "closed" | "unknown"; live?: boolean; peek?: boolean; name?: string;
+  phone?: boolean; web?: boolean; x?: boolean };
 /** Decided (Kyle, 2026-11-08): the category, then SNAP, then WIC, on one line under the name, separated by middle
  *  dots. Category word in its category color, SNAP and WIC in sage 700, dots in ink 400. */
 const labelLine = (cat: string, label: string, benefits: string[]) =>
@@ -150,13 +151,54 @@ const dirButtons = (o: CardOpt = {}) => {
     <a class="pfm-db ext" href="#venue-card" aria-label="Drive directions to ${V.name} (opens in new tab)"${say("Mockup: this would open Google Maps with driving directions.")}>Drive</a>
   </div>`;
 };
+// ── Card action row (Kyle, 2026-11-08, and round 6) ───────────────────────────────────────────────────────────
+// Call, Website, Share, Save at the card's top left, above the name; on a computer the × closes the row at the right.
+// Call is a tel: link; Website is the place's own site. A missing one stays in its place, greyed, as a button with
+// aria-disabled (not a link), so the row never shifts and a screen reader still hears why it's grey.
+// Lucide Phone and Globe: the Icons page names Globe "Website"; ExternalLink stays on the Plentiful line.
+Object.assign(ICONS, {
+  globe: `<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>`,
+  x: `<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`,
+  check: `<path d="M20 6 9 17l-5-5"/>`,
+  dots: `<circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>`,
+});
+type Acts = {
+  name?: string; phone?: boolean; web?: boolean; saved?: boolean; live?: boolean; pc?: boolean; x?: boolean;
+  share?: boolean; extra?: number; dots?: boolean; cls?: Record<string, string>;
+};
+const actRow = (o: Acts = {}) => {
+  const name = o.name ?? V.name;
+  const c = (k: string) => (o.cls?.[k] ? ` ${o.cls[k]}` : "");
+  const s = (m: string) => (o.live ? ` data-say="${q(m)}"` : "");
+  // A computer can't dial: Call draws its number in a label under the pointer and keyboard focus (a title tooltip
+  // is slow and never shows on focus). The label is aria-hidden: the button's own name already says the number.
+  const tip = (t: string) => (o.pc ? `<span class="tt" aria-hidden="true">${t}</span>` : "");
+  const off = (icon: string, label: string, k: string) =>
+    `<button type="button" class="pfm-ib off${c(k)}" aria-disabled="true" aria-label="${label}"${s(`Mockup: ${label}.`)}>${ic(icon)}${tip(label)}</button>`;
+  const call = o.phone === false ? off("phone", "No phone number listed", "call")
+    : `<a class="pfm-ib call${c("call")}" href="#icon-buttons" aria-label="Call ${V.phone}"${s(o.pc ? `Mockup: this would open the computer's calling app for ${V.phone}.` : `Mockup: this would call ${V.phone}.`)}>${ic("phone")}${tip(V.phone)}</a>`;
+  const webLabel = `Visit ${name}'s website (opens in a new tab)`;
+  const web = o.web === false ? off("globe", "No website listed", "web")
+    : `<a class="pfm-ib web${c("web")}" href="#icon-buttons" aria-label="${webLabel}" title="${webLabel}"${s("Mockup: this would open the place's own website in a new tab.")}>${ic("globe")}</a>`;
+  const shareL = `Share ${name}`;
+  const share = `<button type="button" class="pfm-ib share${c("share")}" aria-label="${shareL}" title="${shareL}"${o.live ? ` onclick="${q("const b=this,v=b.querySelector('svg');v.innerHTML=" + JSON.stringify(ICONS.check) + ";v.classList.add('ok');b.dataset.say='Mockup: Link copied.';setTimeout(()=>{v.innerHTML=" + JSON.stringify(ICONS.share) + ";v.classList.remove('ok')},2000)")}"` : ""}>${ic("share")}</button>`;
+  const saveL = `${o.saved ? "Remove" : "Add"} ${name} ${o.saved ? "from" : "to"} saved`;
+  const save = `<button type="button" class="pfm-ib${c("save")}" aria-pressed="${!!o.saved}" aria-label="${saveL}" title="${saveL}"${o.live ? ` onclick="${q("this.setAttribute('aria-pressed',this.getAttribute('aria-pressed')==='true'?'false':'true')")}"` : ""}>${ic("star")}</button>`;
+  const slots = '<span class="slot" aria-hidden="true"></span>'.repeat(o.extra ?? 0);
+  const dots = o.dots ? `<button type="button" class="pfm-ib" aria-label="More actions" aria-haspopup="menu" aria-expanded="false">${ic("dots")}</button>` : "";
+  const x = o.x ? `<button type="button" class="pfm-ib pfm-x${c("x")}" aria-label="Close"${s("Mockup: this would close the card. Escape and a click on the map close it too.")}>${ic("x")}</button>` : "";
+  return `<div class="pfm-acts">${o.share === false ? "" : call + web}${share}${save}${slots}${dots}${x}</div>`;
+};
+/** Computer, a card opened from the Saved list (or a box's History): that link on the left, the × on the right,
+ *  one line, no rule under it. The card's own action row then starts the card without its ×. */
+const topLine = (left: string, xcls = "") => `<div class="pfm-tl">${left}<button type="button" class="pfm-ib pfm-x${xcls ? ` ${xcls}` : ""}" aria-label="Close">${ic("x")}</button></div>`;
+const backLink = (cls = "") => `<button type="button" class="bk2${cls ? ` ${cls}` : ""}">← Saved</button>`;
+
 const card = (o: CardOpt = {}) => {
   const say = (m: string) => (o.live ? ` data-say="${q(m)}"` : "");
   const name = o.name ?? V.name;
-  // Card top (Kyle, 2026-11-08): share and save in a row of their own at the top left, then the name at full width.
-  const body = `<div class="pfm-acts">
-    <button type="button" class="pfm-ib share" aria-label="Share ${name}"${say("Mockup: this would share the link, or copy it.")}>${ic("share")}</button>
-    <button type="button" class="pfm-ib" aria-pressed="${o.saved ? "true" : "false"}" aria-label="${o.saved ? "Remove" : "Add"} ${name} ${o.saved ? "from" : "to"} saved"${o.live ? ` onclick="${q("this.setAttribute('aria-pressed',this.getAttribute('aria-pressed')==='true'?'false':'true')")}"` : ""}>${ic("star")}</button></div>
+  // Card top: the action row (Call, Website, Share, Save; on a computer the × at its right), then the name at full width.
+  const body = `${actRow({ name, phone: o.phone, web: o.web, saved: o.saved, live: o.live, pc: o.panel, x: o.x })}
   <h2 class="pfm-name">${name}</h2>
   ${labelLine("pantry", "Food Pantry", ["SNAP", "WIC"])}
   <p class="pfm-op">Operated by <a href="#venue-card"${say("Mockup: this would open pueblofoodproject.org in a new tab.")}>Pueblo Food Project</a></p>
@@ -167,8 +209,7 @@ const card = (o: CardOpt = {}) => {
     <div class="pfm-addr">${ic("pin")}<div><p>${V.address}</p><p class="mono">${V.miles} from you</p></div></div>
     <div class="pfm-badges"><span class="pfm-pill big">Accepts SNAP</span><span class="pfm-pill big">Accepts WIC</span></div>
     <section class="pfm-sec" aria-label="Hours"><h3>Hours</h3><dl class="pfm-hours">${hoursRows.map(([d, t, today]) => `<div${today ? ' class="today" aria-current="date"' : ""}><dt>${d}${today ? '<span class="sr">, Today</span>' : ""}</dt><dd>${t}</dd></div>`).join("")}</dl></section>
-    <section class="pfm-sec" aria-label="Contact"><h3>Contact</h3><a class="pfm-tel" href="#venue-card"${say(`Mockup: this would call ${V.phone}.`)}>${ic("phone")}${V.phone}</a></section>
-    <a class="pfm-plen" href="#venue-card"${say("Mockup: this would open the place's Plentiful page in a new tab.")}><span>See hours, eligibility &amp; what to bring on Plentiful</span>${ic("ext")}</a>
+    ${o.web === false ? `<a class="pfm-plen" href="#venue-card"${say("Mockup: this would open the place's Plentiful page in a new tab.")}><span>See hours, eligibility &amp; what to bring on Plentiful</span>${ic("ext")}</a>` : ""}
     <a class="pfm-report" href="#venue-card"${say("Mockup: this would open the Report a problem form for this place.")}>${ic("flag")}Report an issue with this place</a>
   </div>`;
   return `<div class="pfm pfm-card${o.panel ? " pfm-pc" : ""}${o.peek ? " pfm-peek" : ""}">${body}</div>`;
@@ -183,7 +224,7 @@ const CATS: { cat: string; label: string; name: string; miles: string; hours: st
   { cat: "pantry", label: "Food Pantry", name: "Saint Joseph Eastside Community Food Pantry", miles: "3.2 mi", hours: "Closed today", benefits: ["SNAP"] },
 ];
 const ALL_CATS: [string, string][] = [["pantry", "Pantry"], ["grocery", "Grocery"], ["convenience", "Convenience"], ["farm", "Farm"], ["garden", "Garden"], ["landscape", "Edible landscape"], ["meal", "Meal site"], ["blessing", "Blessing box"]];
-const topRow = (x: (typeof CATS)[number]) => `<div class="pfm-acts"><button type="button" class="pfm-ib share" aria-label="Share ${x.name}">${ic("share")}</button><button type="button" class="pfm-ib" aria-pressed="false" aria-label="Add ${x.name} to saved">${ic("star")}</button></div><h2 class="pfm-name">${x.name}</h2>`;
+const topRow = (x: (typeof CATS)[number]) => `${actRow({ name: x.name })}<h2 class="pfm-name">${x.name}</h2>`;
 const cardTop = (x: (typeof CATS)[number]) =>
   `<div class="pfm pfm-card"><div class="pfm-top">${topRow(x)}${labelLine(x.cat, x.label, x.benefits)}<div class="pfm-meta"><span>${ic("pin")}${x.miles} from you</span><span>${ic("clock")}${x.hours}</span></div></div></div>`;
 const r = (fg: Token, bg: Token, need: 4.5 | 3 = 4.5) => ratio(hex(fg), hex(bg), need);
@@ -198,18 +239,19 @@ const catOptions = `<h3 id="category-label">Category label</h3>
 
 const venueCard = entry({
   id: "venue-card", name: "Place card (VenueCardBody)", status: "changing",
-  statusNote: "What changes: hover becomes a light green tint (sage 100); hover no longer flickers; share and save move to a row of their own at the top left of the card, so the name below runs the card's full width (Kyle, 2026-11-08; see Share and save); the category becomes colored words on its own line under the name (Food Pantry · SNAP · WIC) in place of the pill. Everything else is the card as it is live today, with a made-up place.",
-  purpose: "Everything about one place, in the order people need it: the name, what kind of place it is, how far and whether it's open, then the way to get there, then the full hours, phone and a way to report a problem. The same body shows in the card that slides up on a phone and in the window on the side of the map on a computer.",
+  statusNote: "What changes: hover becomes a light green tint (sage 100); hover no longer flickers; share and save move to a row of their own at the top left of the card, so the name below runs the card's full width (Kyle, 2026-11-08; see Card action row); the category becomes colored words on its own line under the name (Food Pantry · SNAP · WIC) in place of the pill. Call and Website join that row, first (Kyle, round 6), and the phone number line lower in the card goes (live: a CONTACT section with the number; no website at all); on a computer the × moves from its own bar into the row. Everything else is the card as it is live today, with a made-up place.",
+  purpose: "Everything about one place, in the order people need it: the name, what kind of place it is, how far and whether it's open, then the way to get there, then the full hours and a way to report a problem. The same body shows in the card that slides up on a phone and in the window on the side of the map on a computer.",
   instead: [
     "It's a blessing box: use the box card (BoxCardBody), which has check-ins and photos.",
     "It's an event: use the event card (EventCardBody).",
     "It's a list of several places: use the list rows, and open this card from one of them.",
   ],
   versions:
-    wide("Phone: the card slides up from the bottom. Tap Walk, the star or any link.", card({ live: true })) +
-    wide("Phone, a long name: with share and save above it, the name uses the card's full width, so it breaks later and takes fewer lines.", card({ peek: true, name: "Saint Joseph Eastside Community Food Pantry" })) +
+    wide("Phone: the card slides up from the bottom. Call, Website, Share and Save start it. Tap Walk, the star or any link.", card({ live: true })) +
+    wide("Phone, a place from Plentiful with no number: Call and Website grey; its Plentiful page keeps its own line lower down.", card({ live: true, phone: false, web: false })) +
+    wide("Phone, a long name: with the action row above it, the name uses the card's full width, so it breaks later and takes fewer lines.", card({ peek: true, name: "Saint Joseph Eastside Community Food Pantry" })) +
     wide("Phone, as it first opens: everything below the direction buttons sits below the screen edge, with its top showing, until it's pulled up.", `${card({ peek: true })}`) +
-    wide("Computer: the window on the side of the map. Smaller words and icons, always the full details.", card({ panel: true })),
+    wide("Computer: the window on the side of the map. Smaller words and icons, always the full details; the × ends the action row. Point at Call to see the number.", card({ panel: true, live: true, x: true })),
   extra: catOptions,
   states:
     demo("Walk, resting", `<div class="pfm" style="width:100%">${dirButtons()}</div>`) +
@@ -221,31 +263,31 @@ const venueCard = entry({
     demo("Closed today", `<div class="pfm pfm-meta">${hoursLine("closed")}</div>`) +
     demo("No hours known: a different icon, so it's never read as open", `<div class="pfm pfm-meta">${hoursLine("unknown")}</div>`) +
     demo("Share and save: resting, pointer over it (light green tint, proposed; point at any of them), keyboard, saved", `<div class="pfm" style="display:flex;gap:16px;padding:8px"><button type="button" class="pfm-ib share" aria-label="Share">${ic("share")}</button><button type="button" class="pfm-ib share is-hover" aria-label="Share, pointer over it">${ic("share")}</button><button type="button" class="pfm-ib is-focus" aria-pressed="false" aria-label="Not saved, keyboard">${ic("star")}</button><button type="button" class="pfm-ib" aria-pressed="true" aria-label="Saved">${ic("star")}</button></div>`) +
-    demo("Phone number: resting, pointer over it, keyboard (the browser's own outline: this link has no sage ring)",`<div class="pfm" style="display:flex;flex-direction:column;align-items:flex-start"><a class="pfm-tel" href="#venue-card">${ic("phone")}${V.phone}</a><a class="pfm-tel is-hover" href="#venue-card">${ic("phone")}${V.phone}</a><a class="pfm-tel is-focus" href="#venue-card">${ic("phone")}${V.phone}</a></div>`),
+    demo("Call, Website, Share and Save: see the Card action row for every state; resting, then grey when missing", `<div class="pfm pfm-ibs col">${actRow()}${actRow({ phone: false, web: false })}</div>`),
   colors:
     sw("Bone 50", "color-bone-50", "The card, the same paper as the page") +
     swr("Ink 900", "color-ink-900", "The place name") +
     swr("Ink 700", "color-ink-700", "Address, notes, hours, Bus and Drive words") +
     swr("Ink 500", "color-ink-500", "Distance and hours today, the operator line, the report button") +
-    swr("Ink 400", "color-ink-400", "Section labels (HOURS, CONTACT), the middle dots in the category label, small icons, the star at rest") +
-    swr("Sage 700", "color-sage-700", "Phone number, today's hours, SNAP and WIC in the label and the Accepts badges") +
+    swr("Ink 400", "color-ink-400", "Section labels (HOURS), the middle dots in the category label, small icons, the star at rest") +
+    swr("Sage 700", "color-sage-700", "Today's hours, SNAP and WIC in the label and the Accepts badges") +
     sw("Sage 600", "color-sage-600", `Walk button fill. Bone 50 words on it ${ratio(PAPER, hex("color-sage-600"))}; with the pointer over it sage 700, ${ratio(PAPER, hex("color-sage-700"))}`) +
-    sw("Sage 100", "color-sage-100", `Fill under the pointer on share, save, Bus and Drive (proposed; live is bone 100), the Accepts SNAP and WIC badges, and Walk while a route is on. Words on it: ink 700 ${r("color-ink-700", "color-sage-100")}, ink 500 ${r("color-ink-500", "color-sage-100")}, sage 700 ${r("color-sage-700", "color-sage-100")}; the star icon in ink 400 ${r("color-ink-400", "color-sage-100", 3)}; the sage 600 edge ${r("color-sage-600", "color-sage-100", 3)}`) +
+    sw("Sage 100", "color-sage-100", `Fill under the pointer on Call, Website, share, save, Bus and Drive (proposed; live is bone 100), the Accepts SNAP and WIC badges, and Walk while a route is on. Words on it: ink 700 ${r("color-ink-700", "color-sage-100")}, ink 500 ${r("color-ink-500", "color-sage-100")}, sage 700 ${r("color-sage-700", "color-sage-100")}; the star icon in ink 400 ${r("color-ink-400", "color-sage-100", 3)}; the sage 600 edge ${r("color-sage-600", "color-sage-100", 3)}`) +
     swr("Sage 500", "color-sage-500", "Keyboard ring, today's line, the Plentiful link's edge", "color-bone-50", 3) +
     sw("Pantry red (each category has its own)", "color-cat-pantry", `The category word in the label. ${r("color-cat-pantry", "color-bone-50")} on bone 50; every category passes, see Category label`) +
     swr("Clay 500", "color-clay-500", "The star once saved", "color-bone-50", 3) +
     sw("Bone 300", "color-bone-300", `Bus, Drive and report button edges. ${contrast(hex("color-bone-300"), PAPER).toFixed(1)} to 1, decoration only: the words carry the buttons`),
-  sizes: "Phone: 24 pixels in from the sides, 24 on top, 12 between blocks. Name in Fraunces 20, the rest in Public Sans 14 (labels 11 and the operator line 12). Share, Save, Walk, Bus, Drive and the Plentiful link are all 48 pixels to tap; the phone number is 44 tall with 2 extra pixels above and below to reach 48; the report button looks 36 tall and taps at 48. Corners 10 pixels on buttons, 20 on the top of the phone card, 14 on the computer window. Computer: 16 pixels of padding, words 12, labels 10, icons a size smaller.",
+  sizes: "Phone: 24 pixels in from the sides, 24 on top, 12 between blocks. Name in Fraunces 20, the rest in Public Sans 14 (labels 11 and the operator line 12). Call, Website, Share, Save, Walk, Bus, Drive and the Plentiful link are all 48 pixels to tap; the report button looks 36 tall and taps at 48. Corners 10 pixels on buttons, 20 on the top of the phone card, 14 on the computer window. Computer: 16 pixels of padding, words 12, labels 10, icons a size smaller.",
   wording: [
     "The label is the category name, then SNAP, then WIC, separated by a middle dot: Grocery / Supermarket · SNAP · WIC. The category is spelled out, never a code; SNAP or WIC only when the place takes it.",
     "Hours today read as a short sentence: Open now · Closes 6pm, Opens at 2pm, Closed today. Times are lower case, no :00.",
     "Distance is miles to one decimal and from you: 0.8 mi from you.",
     "One word on each direction button: Walk, Bus, Drive. Screen readers hear the full version: Walking directions to Eastside Community Pantry (opens on map).",
-    "Section labels are capitals: HOURS, CONTACT. The report button says what it does: Report an issue with this place.",
+    "Call and Website have no words: they're heard as Call (719) 555-0142 and Visit Eastside Community Pantry's website (opens in a new tab), or No phone number listed and No website listed when missing. Section labels are capitals: HOURS. The report button says what it does: Report an issue with this place.",
   ],
   everyone: [
     "Keyboard: the order on the page is the order on the screen. On the phone a Close button shows when the keyboard reaches it; on screen it's hidden because the card closes by swiping down. While the phone card is pulled down, the half-shown details can't be reached by Tab.",
-    "Screen reader: the name is the card's heading; Hours and Contact are labelled sections; today's row is marked as today, not just by color; Bus and Drive say they open a new tab; the star says Add to saved or Remove from saved and whether it's pressed.",
+    "Screen reader: the name is the card's heading; Hours is a labelled section; today's row is marked as today, not just by color; Bus and Drive say they open a new tab; the star says Add to saved or Remove from saved and whether it's pressed.",
     "Touch: every control is at least 48 pixels, with at least 8 pixels between neighbours. Links that look small keep a 48-pixel tap area.",
     "Color is never the only sign: open or closed is written out, today's hours row has a line and bold, a saved star fills in.",
   ],
@@ -253,7 +295,7 @@ const venueCard = entry({
     [`<div class="pfm" style="width:100%">${dirButtons()}</div>`, "One filled button for the route that stays in the map; the two that leave for Google Maps are outlines."],
     [`<div class="pfm" style="width:100%">${dirButtons().replaceAll("pfm-db ext", "pfm-db walk")}</div>`, "Three filled buttons: nobody can tell which one stays on the map."],
   ),
-  code: ["src/components/VenueCardBody.tsx:169-198. Proposed change: Share and Save leave the name row (flex items-start gap-4, beside the h2) for a row of their own above it; the h2 then has the full width", "src/components/DirectionButtons.tsx. Known live issue for the site fix: baseClass uses PRESS_FEEDBACK from src/lib/interactionStyles.ts (hover:brightness-105, active:brightness-95), the hover filter that makes the fade stutter; Bus and Drive hover to bone-100", "FavoriteButton.tsx and ShareButton.tsx use the same PRESS_FEEDBACK and a bone-100 hover","src/components/HoursList.tsx", "src/components/FavoriteButton.tsx, ShareButton.tsx, ReportVenueButton.tsx", "Shown inside src/components/BottomSheet.tsx (phone) and DesktopVenueWindow.tsx (computer)"],
+  code: ["src/components/VenueCardBody.tsx:169-198. Proposed change: the name row (flex items-start gap-4, beside the h2) becomes the action row above it: Call (tel:), Website (venue.url when it isn't a Plentiful page), Share, Save, and on a computer the ×; the h2 then has the full width", "src/components/VenueCardBody.tsx:118-132. Proposed change: the Contact section and its phone number line go; the tel: link and its CALL_CLICKED tracking move to Call", "src/components/DirectionButtons.tsx. Known live issue for the site fix: baseClass uses PRESS_FEEDBACK from src/lib/interactionStyles.ts (hover:brightness-105, active:brightness-95), the hover filter that makes the fade stutter; Bus and Drive hover to bone-100", "FavoriteButton.tsx and ShareButton.tsx use the same PRESS_FEEDBACK and a bone-100 hover","src/components/HoursList.tsx", "src/components/FavoriteButton.tsx, ShareButton.tsx, ReportVenueButton.tsx", "Shown inside src/components/BottomSheet.tsx (phone) and DesktopVenueWindow.tsx (computer)"],
 });
 
 // ════ Map screen and its cards (round 4) ════════════════════════════════════════════════════════════════════
@@ -380,68 +422,70 @@ const searchBar = entry({
 // ── Filters panel ────────────────────────────────────────────────────────────────────────────────────────────
 const fpSwitch = (icon: string, label: string, n: number, on = false, cls = "", live = false) =>
   `<div class="swr">${icon}<span class="l">${label}</span><span class="n">${n}</span><button type="button" role="switch" class="tg${cls ? ` ${cls}` : ""}" aria-checked="${on}" aria-label="${label}"${live ? ` onclick="${q("this.setAttribute('aria-checked',this.getAttribute('aria-checked')==='true'?'false':'true')")}"` : ""}><span></span></button></div>`;
-const fpCat = (c: string, n: string, on = false, cls = "") =>
-  `<label class="ck${cls ? ` ${cls}` : ""}"><input type="checkbox"${on ? " checked" : ""}><i style="background:var(--color-cat-${c})" aria-hidden="true"></i><span>${n}</span></label>`;
+// Round 6 (Kyle): a kind of place is a switch row like Show only's (dot, name, count, switch), no tick boxes.
+// Made-up counts.
+const KIND_N: Record<string, number> = { pantry: 22, grocery: 11, convenience: 30, farm: 4, garden: 6, landscape: 3, meal: 2, blessing: 7 };
+const fpKind = (c: string, n: string, on = false, cls = "", live = false) =>
+  fpSwitch(`<i class="dt" style="background:var(--color-cat-${c})" aria-hidden="true"></i>`, n, KIND_N[c] ?? 0, on, cls, live);
 const evStarSmall = `<svg class="i ev" viewBox="0 0 24 24" aria-hidden="true">${ICONS.star}</svg>`;
 const filterPanel = (live = false) => `<div class="pfm pfm-fp" role="dialog" aria-label="Filters">
   <div class="hd"><h2>Filters</h2><button type="button" class="clr"${live ? say2("Mockup: this would clear the kinds of place and the switches, never the search words.") : ""}>Clear all</button><button type="button" class="x" aria-label="Close filters"${live ? say2("Mockup: this would close Filters.") : ""}>${ic("x")}</button></div>
   <div class="bd"><div class="lab">Show only</div>
   ${fpSwitch(evStarSmall, "Events", 3, false, "", live)}${fpSwitch(ic("clock"), "Open now", 18, true, "", live)}${fpSwitch(ic("card"), "Accepts SNAP", 41, false, "", live)}${fpSwitch(ic("apple"), "Accepts WIC", 12, false, "", live)}
   <div class="rule" aria-hidden="true"></div><div class="lab">Kind of place</div>
-  ${FULL.map(([c, n], i) => fpCat(c, n, i === 0)).join("")}</div>
+  ${FULL.map(([c, n], i) => fpKind(c, n, i === 0, "", live)).join("")}</div>
   <div class="ft"><button type="button" class="pfm-or"${live ? say2("Mockup: this would close Filters. The map has already changed behind it.") : ""}>Show 24 places</button></div></div>`;
 
 const filtersPanel = entry({
   id: "filters-panel", name: "Filters panel (FilterPanel)", status: "changing",
-  statusNote: "What changes: the pointer tint on the kinds of place and on the × becomes sage 100 (live: bone 100, grey); Clear all, the × and Show 24 places no longer brighten under the pointer (a filter). The rulings give the orange button nothing in its place. Everything else is live.",
-  purpose: "Narrows what the map shows. It slides in from the left, over a dimmed map, when Filters in the search bar is tapped. Every switch and tick applies at once, so the map changes behind it; the orange button only closes the panel and says how many places are left.",
+  statusNote: "What changes: each kind of place becomes a switch row like the Show only rows, a color dot and the name on the left, a count and the same switch on the right (Kyle, round 6; live: a tick box, a dot and the name, no count, a grey tint under the pointer); every switch slides in 250 ms with the default curve (live: 150 ms); the × takes a sage 100 tint under the pointer (live: bone 100); Clear all, the × and Show 24 places no longer brighten under the pointer (a filter). The rulings give the orange button nothing in its place. Everything else is live.",
+  purpose: "Narrows what the map shows. It slides in from the left, over a dimmed map, when Filters in the search bar is tapped. Every switch applies at once, so the map changes behind it; the orange button only closes the panel and says how many places are left.",
   instead: [
     "You want one place by name: type it in the search bar.",
     "You only want blessing boxes: Boxes in the bottom bar is the one-tap shortcut.",
-    "It's a picking job where nothing should change until you finish (choosing rows in the admin): that ends on Done. Here every tick applies at once, so the button only closes.",
+    "It's a picking job where nothing should change until you finish (choosing rows in the admin): that ends on Done. Here every switch applies at once, so the button only closes.",
   ],
-  versions: wide("The panel. Flip the switches and tick the kinds of place; the buttons say what they'd do. On a phone it's 85% of the screen wide; on a computer 360.", filterPanel(true)),
+  versions: wide("The panel. Flip any switch, in either list; the buttons say what they'd do. On a phone it's 85% of the screen wide; on a computer 360.", filterPanel(true)),
   states:
-    demo("Switch: off, then on, then reached by keyboard (a green ring with a gap)", `<div class="pfm pfm-fp mini">${fpSwitch(ic("clock"), "Open now", 18)}${fpSwitch(ic("clock"), "Open now", 18, true)}${fpSwitch(ic("clock"), "Open now", 18, true, "is-focus")}</div>`) +
-    demo("Kind of place: resting, ticked, pointer over it (light green; live: bone 100)", `<div class="pfm pfm-fp mini">${fpCat("grocery", "Grocery / Supermarket")}${fpCat("grocery", "Grocery / Supermarket", true)}${fpCat("grocery", "Grocery / Supermarket", false, "is-hover")}</div>`) +
+    demo("Switch: off, then on, then reached by keyboard (a green ring with a gap). Tap one: the knob slides and the fill changes in 250 ms with the default curve (live: 150 ms); with motion turned off on the device, at once.", `<div class="pfm pfm-fp mini">${fpSwitch(ic("clock"), "Open now", 18, false, "", true)}${fpSwitch(ic("clock"), "Open now", 18, true, "", true)}${fpSwitch(ic("clock"), "Open now", 18, true, "is-focus")}</div>`) +
+    demo("Kind of place, the same row: off, on, reached by keyboard. No tint under the pointer, like Show only.", `<div class="pfm pfm-fp mini">${fpKind("grocery", "Grocery / Supermarket", false, "", true)}${fpKind("grocery", "Grocery / Supermarket", true, "", true)}${fpKind("grocery", "Grocery / Supermarket", true, "is-focus")}</div>`) +
     demo("Clear all under the pointer (darker green words), and the × under the pointer (light green; live: bone 100)", `<div class="pfm pfm-fp mini"><div class="hd"><h2>Filters</h2><button type="button" class="clr is-hover">Clear all</button><button type="button" class="x is-hover" aria-label="Close filters">${ic("x")}</button></div></div>`) +
     demo("Show 24 places: resting, then reached by keyboard (an orange ring with a gap; it fails the 3 to 1 edge rule, see colors). Under the pointer nothing changes once the filter goes.", `<div class="pfm pfm-fp mini"><div class="ft"><button type="button" class="pfm-or">Show 24 places</button></div><div class="ft"><button type="button" class="pfm-or is-focus">Show 24 places</button></div></div>`),
   colors:
     sw("Bone 50", "color-bone-50", "The panel") +
     sw("Bone 200", "color-bone-200", "The lines under the title, between the two lists and above the button") +
-    swr("Ink 700", "color-ink-700", "Title, switch names and kinds of place") +
-    swr("Ink 400", "color-ink-400", "SHOW ONLY and KIND OF PLACE, and the counts") +
+    swr("Ink 700", "color-ink-700", "Title and every row's name") +
+    swr("Ink 400", "color-ink-400", "SHOW ONLY and KIND OF PLACE, and the counts on every row") +
     swr("Ink 500", "color-ink-500", "The switch icons and the × at rest", "color-bone-50", 3) +
-    swr("Sage 600", "color-sage-600", "Clear all, a switch that's on, a tick") +
+    swr("Sage 600", "color-sage-600", "Clear all, a switch that's on") +
     sw("Bone 300", "color-bone-300", `A switch that's off. ${r3("color-bone-300", "color-bone-50")} against the panel: under the 3 to 1 a switch needs to be seen. Its name and the white knob's position carry it today`) +
     sw("White", "white", `The switch knob. On sage 600 ${ratio("#FFFFFF", hex("color-sage-600"), 3)}; on bone 300 ${ratio("#FFFFFF", hex("color-bone-300"), 3)}`) +
     sw("Brand orange", "color-brand-orange", `Show 24 places. Navy words on it ${r("color-brand-navy", "color-brand-orange")}. Its keyboard ring is orange too: ${r3("color-brand-orange", "color-bone-50")} on the panel`) +
-    sw("Sage 100", "color-sage-100", `Fill under the pointer (redesign; live is bone 100). Ink 700 on it ${r("color-ink-700", "color-sage-100")}`) +
-    swr("Sage 500", "color-sage-500", "Keyboard ring on switches, ticks, Clear all and ×", "color-bone-50", 3),
-  sizes: "85% of the screen wide, up to 360, full height, from the left; the map behind is dimmed with ink at 40%. Title row 16 pixels top and bottom, 24 at the sides. Every row is at least 48 tall with 24-pixel sides; the switch is drawn 36 by 24, but its whole row is the tap area. Ticks 16 pixels, category dots 10. The × is 48 round. The button is the full width, 48 tall, corners 10, 14-pixel bold words.",
+    sw("Sage 100", "color-sage-100", `Fill under the × under the pointer (redesign; live is bone 100; the kind rows lose theirs). Ink 700 on it ${r("color-ink-700", "color-sage-100")}`) +
+    swr("Sage 500", "color-sage-500", "Keyboard ring on switches, Clear all and ×", "color-bone-50", 3),
+  sizes: "85% of the screen wide, up to 360, full height, from the left; the map behind is dimmed with ink at 40%. Title row 16 pixels top and bottom, 24 at the sides. Every row is at least 48 tall with 24-pixel sides; the switch is drawn 36 by 24, but its whole row is the tap area, in both lists. Category dots 10, in the place the Show only icons take. Switch motion: 250 ms, cubic-bezier(0.32, 0.72, 0, 1), for the knob and the fill. The × is 48 round. The button is the full width, 48 tall, corners 10, 14-pixel bold words.",
   wording: [
     "Title Filters (Filtros). Clear all (Borrar todo) clears the kinds of place and the switches, never the search words.",
-    "Two lists: SHOW ONLY (Mostrar solo) with Events, Open now, Accepts SNAP, Accepts WIC; KIND OF PLACE (Tipo de lugar) with the eight full category names.",
+    "Two lists, one look: SHOW ONLY (Mostrar solo) with Events, Open now, Accepts SNAP, Accepts WIC; KIND OF PLACE (Tipo de lugar) with the eight full category names. Every row ends in how many places it would show.",
     "The button counts what's left: Show 24 places (Mostrar 24 lugares). With Events on: Show 3 events.",
     "Events only shows when there are events coming up.",
   ],
   everyone: [
     "Keyboard: focus moves into the panel and stays there; Tab goes round it. Escape, the ×, a tap on the dimmed map or a swipe to the left closes it, and focus goes back to Filters.",
-    "Screen reader: it's a dialog named Filters. Each switch is heard as a switch, on or off, with its name; each kind of place is a real tick box.",
-    "Touch: every row is 48 tall, and the whole switch row flips the switch.",
-    "Color is never the only sign: a switch's knob moves across, a tick shows, and every kind of place is named beside its dot.",
+    "Screen reader: it's a dialog named Filters. Every row, in both lists, is one switch (role=\"switch\" on a button, or a tick box styled as a switch): it's heard by its name, Food Pantry, switch, on or off, and the new state is announced when it flips. The count is plain words beside it.",
+    "Touch: every row is 48 tall, and the whole row flips its switch.",
+    "Color is never the only sign: a switch's knob moves across, and every kind of place is named beside its dot.",
   ],
   dd: dodont(
     [`<div class="pfm pfm-fp mini">${fpSwitch(ic("clock"), "Open now", 18, true)}<div class="ft"><button type="button" class="pfm-or">Show 18 places</button></div></div>`, "Changes apply at once, and the button says how many places are left."],
     [`<div class="pfm pfm-fp mini">${fpSwitch(ic("clock"), "Open now", 18, true)}<div class="ft"><button type="button" class="pfm-or">Apply</button></div></div>`, "An Apply button that holds the changes. People close the panel and lose them, and nothing says what's left."],
   ),
   code: [
-    "src/components/FilterPanel.tsx",
+    "src/components/FilterPanel.tsx. Proposed change: :409-439, each kind of place renders as a SwitchRow (:102-152) with its dot in the icon slot and a per-kind count (FilterPanel gets no per-kind count today); :136 and :145, duration-150 becomes 250 ms with the default curve",
     "Opened by the Filters icon in src/components/SearchBar.tsx; the filters themselves live in MapWrapper's useMapFilters",
     ...knownIssues([
       "FilterPanel.tsx:326, Clear all uses PRESS_FEEDBACK (hover:brightness-105)",
       "FilterPanel.tsx:337-338, the × hovers to bone-100 and uses PRESS_FEEDBACK",
-      "FilterPanel.tsx:416, kinds of place hover to bone-100",
       "FilterPanel.tsx:452, Show N places brightens on hover (hover:brightness-105)",
       "FilterPanel.tsx:453, the keyboard ring is brand orange, 2.2 to 1 on bone-50, under 3 to 1",
       "FilterPanel.tsx:139, a switch that's off is bone-300 on bone-50, 1.5 to 1, under 3 to 1",
@@ -586,12 +630,14 @@ const mapPins = entry({
 // ── Phone card sheet and computer side panel ────────────────────────────────────────────────────────────────
 const grab = (cls = "", live = false) => `<div class="pfm pfm-grab"><button type="button" class="${cls}" aria-expanded="false" aria-label="Show details"${live ? ` onclick="${q("const c=this.closest('.pfm-sheet').querySelector('.pfm-card');const open=c.classList.toggle('pfm-peek')===false;this.setAttribute('aria-expanded',open);this.setAttribute('aria-label',open?'Hide details':'Show details')")}"` : ""}><span aria-hidden="true"></span></button></div>`;
 const phoneSheet = (live = false) => `<div class="pfm pfm-ma tall"><span class="pfm-mal">The map stands in here</span><div class="pfm-sheet">${grab("", live)}${card({ peek: true, live })}</div></div>`;
-const popHeader = (cls = "", history = false) => `<div class="pfm-ph">${history ? `<a class="hist" href="#card-shells">History</a>` : ""}<span class="sp"></span><button type="button" class="x${cls ? ` ${cls}` : ""}" aria-label="Close">${ic("x")}</button></div>`;
-const sidePanel = (back = false) => `<div class="pfm pfm-ma sde"><span class="pfm-mal">The map stands in here</span><div class="pfm-side">${back ? `<button type="button" class="bk">← Saved</button>` : ""}${popHeader()}<div class="sb">${card({ panel: true })}</div></div></div>`;
+// Round 6 (Kyle: "I don't like the double separator lines. Do we even need the × to close?"): no separate × bar.
+// Without a back link the × closes the card's own action row at the right; with one, ← Saved and the × share one
+// line above the row. No rule under either. The top stays put while the card scrolls; scrolled: one hairline.
+const sidePanel = (back = false, scrolled = false) => `<div class="pfm pfm-ma sde"><span class="pfm-mal">The map stands in here</span><div class="pfm-side${scrolled ? " scr" : ""}">${back ? topLine(backLink()) : ""}${scrolled ? `<div class="pin pfm-pc">${actRow({ pc: true, x: !back })}</div>` : ""}<div class="sb">${card({ panel: true, x: !back })}</div></div></div>`;
 
 const cardShells = entry({
   id: "card-shells", name: "Phone card sheet and computer side panel (BottomSheet, DesktopSidePanel)", status: "changing",
-  statusNote: "What changes: the × on the computer panel and the phone's keyboard-only Close take a sage 100 tint under the pointer (live: bone 100, grey), and neither the × nor the grab bar brightens under the pointer any more (a filter). Share and save now start the card inside, in a row at its top left (see Share and save); the grab bar, Close and × stay where they are. Everything else is live.",
+  statusNote: "What changes: on a computer the × leaves its own bar and closes the card's action row, at the right (Kyle, round 6); ← Saved, when there is one, shares one line with the × instead of a row of its own, and neither has a line under it (live: two rows, two lines). The × and the phone's keyboard-only Close take a sage 100 tint under the pointer (live: bone 100, grey), and neither the × nor the grab bar brightens under the pointer any more (a filter). The phone sheet's top has no lines and doesn't change. Everything else is live.",
   purpose: "The two containers every card sits in: a place, a blessing box, an event, and on a computer the Saved list and the Menu too. On a phone it's a sheet that slides up from the bottom and follows the finger between two heights. On a computer it's one fixed panel on the right, and the map moves the chosen pin clear of it.",
   instead: [
     "It covers the whole screen and has to be closed before anything else (a photo, the route steps): use a full dialog.",
@@ -599,31 +645,33 @@ const cardShells = entry({
   ],
   versions:
     wide("Phone, as it first opens: the summary, with the top of the details showing at the screen edge. Tap the grab bar to pull it up or down; swipe down to close.", phoneSheet(true)) +
-    wide("Computer: the panel on the right of the map, always the full details, with the × in a bar along its top.", sidePanel()) +
-    wide("Computer, opened from the Saved list: a ← Saved row above the bar takes you back.", sidePanel(true)),
+    wide("Computer: the panel on the right of the map, always the full details. No bar on top: the × closes the card's action row, at the right.", sidePanel()) +
+    wide("Computer, opened from the Saved list: ← Saved on the left and the × on the right share one line above the action row. No line under it.", sidePanel(true)) +
+    wide("Computer, scrolled down to the hours: the top stays put, and one hairline shows under it only now, while something is under it.", sidePanel(false, true)),
   states:
     demo("Grab bar: resting", grab()) +
     demo("Grab bar reached by keyboard: a green ring. Under the pointer nothing changes (live: it brightens, a filter, which goes).", grab("is-focus")) +
-    demo("Computer ×: resting, pointer over it (light green; live: bone 100), keyboard", `<div class="pfm pfm-side flat">${popHeader()}${popHeader("is-hover")}${popHeader("is-focus")}</div>`) +
+    demo("Computer ×, at the end of the action row: resting, pointer over it (light green; live: bone 100), keyboard", `<div class="pfm pfm-side flat">${["", "is-hover", "is-focus"].map((k) => `<div class="pfm-card pfm-pc">${actRow({ pc: true, x: true, cls: { x: k } })}</div>`).join("")}</div>`) +
     demo("Phone Close: hidden until the keyboard reaches it, then a 48-pixel button in the top corner", `<div class="pfm pfm-sheet still"><button type="button" class="pfm-hclose is-focus" aria-label="Close">${ic("x")}</button>${grab()}</div>`) +
-    demo("← Saved: resting, then pointer over it (lighter green words)", `<div class="pfm pfm-side flat"><button type="button" class="bk">← Saved</button><button type="button" class="bk is-hover">← Saved</button></div>`),
+    demo("← Saved: resting, pointer over it (lighter green words), keyboard", `<div class="pfm pfm-side flat">${topLine(backLink())}${topLine(backLink("is-hover"))}${topLine(backLink("is-focus"))}</div>`),
   colors:
     sw("Bone 50", "color-bone-50", "Both containers, the same paper as the page") +
     sw("Bone 300", "color-bone-300", `The grab bar. ${contrast(hex("color-bone-300"), PAPER).toFixed(1)} to 1: faint for a control. It also has a name (Show details), and the sheet opens by tapping its peek or dragging anywhere`) +
-    sw("Bone 200", "color-bone-200", `The computer panel's edge and the line under its bar. ${contrast(hex("color-bone-200"), PAPER).toFixed(1)} to 1, decoration: a heavy shadow lifts it off the map`) +
+    sw("Bone 200", "color-bone-200", `The computer panel's edge, and the one hairline under its top while the card is scrolled. ${contrast(hex("color-bone-200"), PAPER).toFixed(1)} to 1, decoration: a heavy shadow lifts the panel off the map`) +
     swr("Ink 500", "color-ink-500", "The ×", "color-bone-50", 3) +
     sw("Sage 100", "color-sage-100", `Fill under the pointer on the × (redesign; live is bone 100). The × in ink 500 on it ${r3("color-ink-500", "color-sage-100")}`) +
     swr("Sage 700", "color-sage-700", "← Saved and History; sage 600 under the pointer") +
     swr("Sage 500", "color-sage-500", "Keyboard rings", "color-bone-50", 3),
-  sizes: "Phone sheet: the full width, top corners 20, soft shadow; fully open it leaves 100 pixels of map showing at the top. Grab bar 64 by 5 inside a 48 by 48 button, so the bar is wider than its button. As it first opens, everything below the direction buttons sits under the screen edge with 64 pixels showing. Computer panel: 380 wide, 12 pixels from the top, right and bottom, corners 14, shadow 0 8 32 black at 18%. Its top bar is 44 tall with a 44-pixel × that taps at 48. The card's share and save row starts below both tops: on a phone 24 pixels under the grab bar's band (12 on a box card) (the keyboard-only Close shows in that band, at its right); on a computer 8 pixels under the ×'s tap area.",
+  sizes: "Phone sheet: the full width, top corners 20, soft shadow; fully open it leaves 100 pixels of map showing at the top. Grab bar 64 by 5 inside a 48 by 48 button, so the bar is wider than its button. As it first opens, everything below the direction buttons sits under the screen edge with 64 pixels showing. Computer panel: 380 wide, 12 pixels from the top, right and bottom, corners 14, shadow 0 8 32 black at 18%. No top bar: the × is a 48-pixel button at the right end of the card's action row, 16 pixels in from the top and the right like the rest of the card. With ← Saved, that line is 48 tall (the link's tap height), and the action row follows 12 pixels below. On a phone the action row starts 24 pixels under the grab bar's band (12 on a box card), and the keyboard-only Close shows in that band, at its right.",
   wording: [
     "The grab bar is heard as Show details or Hide details (Ver detalles, Ocultar detalles).",
     "The × is heard as Close (Cerrar). ← Saved (← Guardados) only shows when the card was opened from the Saved list.",
-    "A blessing box card has History (Historial) on the left of the computer bar.",
+    "A blessing box card has History (Historial) on the left of the computer's top line, where ← Saved would go.",
+    "Why keep a visible × when Escape and a click on the map already close the card: keyboard and screen-reader users need a button they can find, and people who don't know a click on the map closes it need one they can see.",
   ],
   everyone: [
     "Phone: drag the sheet or tap the grab bar; swipe down to close; Escape closes it too. Close is hidden until the keyboard reaches it. While the sheet is down, the half-shown details can't be reached by Tab.",
-    "Computer: when a card opens, focus moves to its name; Escape closes it and focus goes back to the pin. It isn't a trap: the map stays usable beside it.",
+    "Computer: when a card opens, focus moves to its name; Escape, the × or a click on the map closes it, and focus goes back to the pin. It isn't a trap: the map stays usable beside it. The × is now the last button in the action row (live: the first thing in the panel), so Tab reaches Call, Website, Share, Save, then Close.",
     "Screen reader: the phone sheet is named after the place (Eastside Community Pantry place details); the grab bar says whether the details are open.",
     "Touch: the grab bar, Close and the × all tap at 48.",
   ],
@@ -634,7 +682,8 @@ const cardShells = entry({
   code: [
     "src/components/BottomSheet.tsx (phone sheet, grab bar, the two heights)",
     "src/components/DesktopSidePanel.tsx (computer panel shell: size, place, Escape and focus)",
-    "src/components/DesktopVenueWindow.tsx (what the computer panel shows; ← Saved) and src/components/VenuePopupHeader.tsx (its top bar)",
+    "src/components/DesktopVenueWindow.tsx (what the computer panel shows). Proposed change: :151-169, ← Saved loses its border-b and shares a line with the ×; :171-175, VenuePopupHeader goes, its × passed into the card's action row (VenueCardBody) or onto that line",
+    "src/components/VenuePopupHeader.tsx (today's top bar: h-11 with border-b; History on the left for a box)",
     "src/lib/interactionStyles.ts (HIDDEN_UNTIL_FOCUS, the phone's keyboard-only Close)",
     ...knownIssues([
       "BottomSheet.tsx:829, the grab bar uses PRESS_FEEDBACK (hover:brightness-105)",
@@ -717,82 +766,88 @@ const directions = entry({
   ],
 });
 
-// ── Icon buttons: share and save ────────────────────────────────────────────────────────────────────────────
+// ── Card action row: call, website, share, save ─────────────────────────────────────────────────────────────
 // Kyle, 2026-11-08: "move icons to the top left of the card, so we could put more icons up there over time and
-// then we'd have the whole length of the card for the title." The row's capacity is measured, not guessed: see
-// the sizes line and the "Room for more" picture (a true 360-pixel card).
-Object.assign(ICONS, { dots: `<circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>` });
+// then we'd have the whole length of the card for the title." Round 6: Call and Website join it (the phone number
+// line leaves the card body), and on a computer the × closes it at the right. The row's capacity is measured: see
+// the sizes line and the "Room for more" picture (a true 360-pixel card). actRow() itself sits above card().
 const shareBtn = (cls = "", copied = false, label = `Share ${V.name}`) => `<button type="button" class="pfm-ib share${cls ? ` ${cls}` : ""}" aria-label="${label}" title="${label}">${copied ? `<svg class="i ok" viewBox="0 0 24 24" aria-hidden="true">${ICONS.check}</svg><span class="sr" role="status">Link copied</span>` : ic("share")}</button>`;
 const saveBtn = (cls = "", on = false) => `<button type="button" class="pfm-ib${cls ? ` ${cls}` : ""}" aria-pressed="${on}" aria-label="${on ? "Remove" : "Add"} ${V.name} ${on ? "from" : "to"} saved" title="${on ? "Remove" : "Add"} ${V.name} ${on ? "from" : "to"} saved">${ic("star")}</button>`;
-const ibPair = (live = false) => {
-  const tog = live ? ` onclick="${q("this.setAttribute('aria-pressed',this.getAttribute('aria-pressed')==='true'?'false':'true')")}"` : "";
-  const cp = live ? ` onclick="${q("const b=this,s=b.querySelector('svg');s.innerHTML=" + JSON.stringify(ICONS.check) + ";s.classList.add('ok');b.dataset.say='Mockup: Link copied.';setTimeout(()=>{s.innerHTML=" + JSON.stringify(ICONS.share) + ";s.classList.remove('ok')},2000)")}"` : "";
-  return shareBtn().replace("<button ", `<button${cp} `) + saveBtn().replace("<button ", `<button${tog} `);
-};
-/** The icon row (pfm-acts). `extra` adds empty, unclickable slots: room for later icons, not buttons. */
-const actsRow = (live = false, extra = 0, dots = false) =>
-  `<div class="pfm-acts">${ibPair(live)}${'<span class="slot" aria-hidden="true"></span>'.repeat(extra)}${dots ? `<button type="button" class="pfm-ib" aria-label="More actions" aria-haspopup="menu" aria-expanded="false">${ic("dots")}</button>` : ""}</div>`;
-/** The top of a place card: the icon row, the name at the card's full width, the label. */
-const cardHead = (name: string, o: { live?: boolean; pc?: boolean; extra?: number; dots?: boolean; cls?: string } = {}) =>
-  `<div class="pfm-card${o.pc ? " pfm-pc" : ""} pfm-ibdemo${o.cls ? ` ${o.cls}` : ""}">${actsRow(o.live, o.extra, o.dots)}<h2 class="pfm-name">${name}</h2>${labelLine("pantry", "Food Pantry", ["SNAP", "WIC"])}</div>`;
+/** The top of a place card: the action row, the name at the card's full width, the label. */
+const cardHead = (name: string, o: Acts & { cls2?: string } = {}) =>
+  `<div class="pfm-card${o.pc ? " pfm-pc" : ""} pfm-ibdemo${o.cls2 ? ` ${o.cls2}` : ""}">${actRow({ ...o, name })}<h2 class="pfm-name">${name}</h2>${labelLine("pantry", "Food Pantry", ["SNAP", "WIC"])}</div>`;
 /** Phone: the sheet's grab bar, then the card top. close: the keyboard-only Close, shown as reached by Tab. */
-const sheetHead = (name: string, o: { live?: boolean; close?: boolean; extra?: number; dots?: boolean; cls?: string } = {}) =>
+const sheetHead = (name: string, o: Acts & { close?: boolean } = {}) =>
   `<div class="pfm pfm-sheet">${o.close ? `<button type="button" class="pfm-hclose is-focus" aria-label="Close">${ic("x")}</button>` : ""}${grab()}${cardHead(name, o)}</div>`;
-/** Computer: the side window's bar with the ×, then the card top. */
-const sideHead = (name: string, live = false, cls = "") =>
-  `<div class="pfm pfm-side w380">${popHeader()}<div class="sb">${cardHead(name, { live, pc: true, cls })}</div></div>`;
+/** Computer: the side window, no bar; the × ends the action row. */
+const sideHead = (name: string, o: Acts & { cls2?: string } = {}) =>
+  `<div class="pfm pfm-side w380"><div class="sb">${cardHead(name, { ...o, pc: true, x: o.x ?? true })}</div></div>`;
 const LONG = "Saint Joseph Eastside Community Food Pantry";
+/** Ink 400 at 40% opacity over bone 50, as the eye sees a missing Call or Website. */
+const GREY40 = "#" + [0, 2, 4].map((i) => Math.round(0.4 * parseInt(hex("color-ink-400").slice(1 + i, 3 + i), 16) + 0.6 * parseInt(PAPER.slice(1 + i, 3 + i), 16)).toString(16).padStart(2, "0")).join("");
+const ibs = (html: string) => `<div class="pfm pfm-ibs">${html}</div>`;
 
 const iconButtons = entry({
-  id: "icon-buttons", name: "Icon buttons: share and save (ShareButton, FavoriteButton)", status: "changing",
-  statusNote: "What changes: share and save leave the name's line for a row of their own at the top left of the card, above the name, so the name runs the card's full width and the row has room for more icons later (Kyle, 2026-11-08; live: beside the name on a place card, at the top right beside the pill on a box card). A sage 100 tint under the pointer (live: bone 100, grey), and no brightening under the pointer (a filter). Everything else is live.",
-  purpose: "A row of small square buttons at the top left of a card, above its name: share the link to it, and save it to Saved. The same row on place cards and blessing box cards, on a phone and a computer, and the place any later card action goes.",
+  id: "icon-buttons", name: "Card action row: call, website, share, save (ShareButton, FavoriteButton)", status: "changing",
+  statusNote: "What changes: the place card's actions become one row of icons at the top left, above the name, so the name runs the card's full width (Kyle, 2026-11-08). Call and Website join share and save in it (Kyle, round 6; live: the phone number is a line lower in the card, and no website shows at all). On a computer the × closes the row at the right, in place of its own bar. A sage 100 tint under the pointer (live: bone 100, grey), and no brightening under the pointer (a filter). Share and save themselves work as live.",
+  purpose: "The row of small square buttons at the top left of a card, above its name: call the place, open its website, share the link to it, and save it to Saved. Most useful first: calling ahead is what people do before they go (hours change, food runs out), the website has the details we don't, and sharing and saving are for later. A blessing box card has share and save only: boxes have no phone or website in our data.",
   instead: [
     "The action needs words to be understood (Get directions, Add to calendar): use a button with words. The event card keeps its own Share, with its word, beside Add to calendar, and has no save, so it doesn't get this row.",
-    "More than five actions: at 360 wide the row holds five. A sixth means four icons and a three-dot menu in the fifth place, holding the rest (owner's ruling: extra actions go in one three-dot menu).",
+    "More than five actions: at 360 wide the row holds five. Four are used, so one more fits; a sixth means four icons and a three-dot menu in the fifth place, holding the rest (owner's ruling: extra actions go in one three-dot menu).",
+    "The place's own website isn't known but its Plentiful page is: Website stays grey, and the See hours on Plentiful line lower in the card keeps that link.",
   ],
   versions:
-    wide("Phone: the grab bar, then the row at the top left, then the name. Tap share (it says Link copied with a tick where the phone has no share sheet) and the star.", sheetHead(V.name, { live: true })) +
-    wide("Phone, a long name: it runs the card's full width, under the row, so it breaks later.", sheetHead(LONG, { live: true })) +
-    wide("Computer: the side window. The × stays alone in the bar at the top right; the row starts the card below it, icons a size smaller (18 pixels).", sideHead(V.name, true)) +
-    wide("Computer, a long name.", sideHead(LONG, true)) +
-    wide("Room for more, on a true 360-pixel phone card: share, save and three empty places. Five fit; there's no room for a sixth. On a narrow screen this picture is shown at three quarters size.", `<div class="pfm-capw"><div class="pfm-cap">${sheetHead(V.name, { extra: 3 })}</div></div>`) +
-    wide("Six or more actions: four icons, then a three-dot menu holding the rest.", `<div class="pfm-capw"><div class="pfm-cap">${sheetHead(V.name, { extra: 2, dots: true })}</div></div>`),
+    wide("Phone, all four: Call, Website, Share, Save. Tap any of them.", sheetHead(V.name, { live: true })) +
+    wide("Phone, no phone number: Call stays in its place, grey.", sheetHead(V.name, { live: true, phone: false })) +
+    wide("Phone, no website: Website grey.", sheetHead(V.name, { live: true, web: false })) +
+    wide("Phone, neither: both grey; share and save never move.", sheetHead(V.name, { live: true, phone: false, web: false })) +
+    wide("Phone, a long name: it runs the card's full width, under the row.", sheetHead(LONG, { live: true })) +
+    wide("Computer: no bar on top; the × closes the row at the right. Icons a size smaller (18 pixels). Point at Call, or Tab to it: its number shows under it.", sideHead(V.name, { live: true })) +
+    wide("Computer, neither phone nor website, with a long name.", sideHead(LONG, { live: true, phone: false, web: false })) +
+    wide("Room for more, on a true 360-pixel phone card: the four, and one empty place. Five fit; there's no room for a sixth. On a narrow screen this picture is shown at three quarters size.", `<div class="pfm-capw"><div class="pfm-cap">${sheetHead(V.name, { extra: 1 })}</div></div>`) +
+    wide("Six or more actions: the four icons, then a three-dot menu in the fifth place holding the rest.", `<div class="pfm-capw"><div class="pfm-cap">${sheetHead(V.name, { dots: true })}</div></div>`),
   states:
-    demo("Resting", `<div class="pfm pfm-ibs">${shareBtn()}${saveBtn()}</div>`) +
-    demo("Pointer over it: light green; the share icon darkens. Point at any of them.", `<div class="pfm pfm-ibs">${shareBtn("is-hover")}${saveBtn("is-hover")}</div>`) +
-    demo("Reached by keyboard: a green ring", `<div class="pfm pfm-ibs">${shareBtn("is-focus")}${saveBtn("is-focus")}</div>`) +
-    demo("Saved: the star fills in clay", `<div class="pfm pfm-ibs">${saveBtn("", true)}</div>`) +
-    demo("Link copied: a green tick for 2 seconds, and Link copied is read out", `<div class="pfm pfm-ibs">${shareBtn("", true)}</div>`) +
+    demo("Resting", ibs(actRow({ share: true }))) +
+    demo("Pointer over it: light green; the share icon darkens. Point at any of them.", ibs(actRow({ cls: { call: "is-hover", web: "is-hover", share: "is-hover", save: "is-hover" } }))) +
+    demo("Reached by keyboard: a green ring", ibs(actRow({ cls: { call: "is-focus", web: "is-focus", share: "is-focus", save: "is-focus" } }))) +
+    demo("Computer, Call under the pointer or keyboard: the number in a dark label under it", `<div class="pfm pfm-ibs tall">${actRow({ pc: true, share: true, cls: { call: "is-focus" } })}</div>`) +
+    demo("Missing: grey, no tint under the pointer, still reached by keyboard (the ring shows) so a screen reader hears No phone number listed", ibs(actRow({ phone: false, web: false, cls: { call: "is-focus" } }))) +
+    demo("Computer, missing, under the pointer: the label says why", `<div class="pfm pfm-ibs tall">${actRow({ pc: true, phone: false, web: false, cls: { web: "is-hover" } })}</div>`) +
+    demo("Saved: the star fills in clay", ibs(saveBtn("", true))) +
+    demo("Link copied: a green tick for 2 seconds, and Link copied is read out", ibs(shareBtn("", true))) +
     wide("Phone, Close reached by keyboard: it shows at the top right, level with the grab bar, clear of the row.", sheetHead(V.name, { close: true })),
   colors:
-    swr("Ink 400", "color-ink-400", "Both icons at rest", "color-bone-50", 3) +
-    swr("Ink 700", "color-ink-700", "The share icon under the pointer", "color-bone-50", 3) +
+    swr("Ink 400", "color-ink-400", "Every icon at rest", "color-bone-50", 3) +
+    swr("Ink 700", "color-ink-700", "Call, Website and Share under the pointer", "color-bone-50", 3) +
+    `<li><span class="sw" style="--c:${GREY40}"></span><span><b>Ink 400 at 40%</b> as seen on bone 50, ${GREY40}<small>A missing Call or Website. ${contrast(GREY40, PAPER).toFixed(1)} to 1 on bone 50: faint on purpose, it can't be pressed (controls that can't be used are exempt from the 3 to 1 rule), and its name and label say why</small></span></li>` +
+    sw("Ink 900", "color-ink-900", `The computer's label under Call. Bone 50 words on it ${r("color-bone-50", "color-ink-900")}`) +
     swr("Clay 500", "color-clay-500", "The star once saved, filled", "color-bone-50", 3) +
     swr("Sage 600", "color-sage-600", "The tick after Link copied", "color-bone-50", 3) +
     sw("Sage 100", "color-sage-100", `Fill under the pointer (redesign; live is bone 100). Icons on it: ink 400 ${r3("color-ink-400", "color-sage-100")}, ink 700 ${r3("color-ink-700", "color-sage-100")}, clay 500 ${r3("color-clay-500", "color-sage-100")}`) +
     swr("Sage 500", "color-sage-500", "Keyboard ring", "color-bone-50", 3),
-  sizes: "Each 48 by 48 to tap, corners 10, icon 20 pixels (18 on a computer), 8 pixels between neighbours, and the first one's tap area reaches 4 pixels into the card's padding, so its icon starts 10 pixels in from the name's left edge. The row is the card's first line, 12 pixels above the name. Room: a phone place card has 312 pixels inside its padding at 360 wide, so five icons fit (272 pixels) and a sixth doesn't (328); a box card and the computer window are wider and fit six, so the phone place card sets the limit at five. Clear of the top: on a phone the grab bar and the keyboard-only Close sit in their own 60-pixel band above the card, with 24 pixels to the row's tap area on a place card and 12 on a box card; on a computer the × sits in the 44-pixel bar, 8 pixels above the row's tap area.",
+  sizes: "Each 48 by 48 to tap, corners 10, icon 20 pixels (18 on a computer), 8 pixels between neighbours, and the first one's tap area reaches 4 pixels into the card's padding, so its icon starts 10 pixels in from the name's left edge. The row is the card's first line, 12 pixels above the name. Room: a phone place card has 312 pixels inside its padding at 360 wide, so five icons fit (272 pixels) and a sixth doesn't (328). With four used there's one spare. On a computer the × takes the far right of the same row, and five icons still fit beside it in the 380-pixel window. The label under Call on a computer: 12-pixel words, 4 pixels under the button, corners 6, above everything else. Clear of the top: on a phone the grab bar and the keyboard-only Close sit in their own 60-pixel band above the card, with 24 pixels to the row's tap area on a place card and 12 on a box card.",
   wording: [
-    "No visible words. Screen readers and the pointer's tip say Share Eastside Community Pantry (Compartir …), Add Eastside Community Pantry to saved, Remove … from saved (Agregar … a guardados).",
-    "After a copy: Link copied (Enlace copiado).",
-    "A three-dot menu, when one is needed, is heard as More actions.",
+    "No visible words. Screen readers and the pointer's tip say Call (719) 555-0142, Visit Eastside Community Pantry's website (opens in a new tab), Share Eastside Community Pantry, Add Eastside Community Pantry to saved, Remove … from saved (Llamar, Visitar el sitio web de …, Compartir, Agregar … a guardados).",
+    "Missing ones: No phone number listed, No website listed (Sin número de teléfono, Sin sitio web).",
+    "On a computer, Call's label is the number itself, (719) 555-0142.",
+    "After a copy: Link copied (Enlace copiado). A three-dot menu, when one is needed, is heard as More actions.",
   ],
   everyone: [
-    "Keyboard: real buttons, share then save, before the name, the same order as on screen. On a computer the card opens with the focus on the name, so the row is one Shift and Tab back; from the × it comes before everything in the card.",
-    "Screen reader: save says pressed or not pressed; Link copied is read out once.",
-    "Touch: 48 by 48 each, with 8 pixels between them, and clear of the grab bar, the phone's Close and the computer's ×.",
-    "Color is never the only sign: a saved star fills in, a copy shows a tick.",
+    "Keyboard: real links and buttons, Call, Website, Share, Save, then the computer's Close, before the name, the same order as on screen. On a computer the card opens with the focus on the name, so the row is one Shift and Tab back.",
+    "Screen reader: Call says the number, Website says it opens a new tab, save says pressed or not pressed, and Link copied is read out once. A missing one is a button marked unavailable (aria-disabled), still in the Tab order, so it's heard as No phone number listed, unavailable, rather than silently skipped.",
+    "Touch: 48 by 48 each, with 8 pixels between them, and clear of the grab bar, the phone's Close and the computer's ×. A missing one does nothing when tapped.",
+    "Color is never the only sign: a missing one is also named, and on a computer labelled under the pointer; a saved star fills in, a copy shows a tick.",
   ],
   dd: dodont(
-    [sideHead(LONG), "The row at the top left, the × alone on the right of the bar: the name gets the full width."],
-    [sideHead(LONG, false, "tr"), "Icons at the top right, under the ×: three icons stacked in one corner, and a slip closes the card instead of saving it."],
+    [sheetHead(V.name, { phone: false }), "A missing phone stays in its place, grey: the row never shifts, and Website is always second."],
+    [`<div class="pfm pfm-sheet">${grab()}<div class="pfm-card pfm-ibdemo">${actRow({ share: false }).replace('<div class="pfm-acts">', `<div class="pfm-acts"><a class="pfm-ib web" href="#icon-buttons" aria-label="Visit ${V.name}'s website (opens in a new tab)">${ic("globe")}</a>`)}<h2 class="pfm-name">${V.name}</h2></div></div>`, "Dropping the missing one: everything slides left, and the globe sits where people learned to find the phone."],
   ),
   code: [
-    "src/components/ShareButton.tsx and src/lib/share.ts (the phone's share sheet, or copy)",
-    "src/components/FavoriteButton.tsx",
-    "Proposed change, place card: src/components/VenueCardBody.tsx:169-198, Share and Save leave the name row for a row of their own above the h2 (the phone's keyboard-only Close can stay in it: it's drawn at the sheet's top right, not in the row)",
-    "Proposed change, box card: src/components/BoxCardBody.tsx:319-338 (nameBlock), the row above the name keeps its gap-4 but moves to the left once the pill leaves for the label under the name; the actions come from BottomSheet.tsx:926-946 and DesktopVenueWindow.tsx:127-131",
+    "Proposed change, place card: src/components/VenueCardBody.tsx:169-198, the name row becomes the action row above the h2: a tel: link (Phone icon) and a Website link (Globe, venue.url when it isn't a Plentiful page) before ShareButton and FavoriteButton, and on a computer the × after them",
+    "Proposed change: src/components/VenueCardBody.tsx:118-132, the Contact section (the phone number line) goes; the tel: link and its CALL_CLICKED tracking move to Call. :134-157, the Plentiful line stays for Plentiful places",
+    "Data: 39 of the 107 published places have a phone; 30 have their own website, 31 more have only a Plentiful page, 46 have no link (src/data/published-venues.ts, 2026-10-28)",
+    "src/components/ShareButton.tsx and src/lib/share.ts (the phone's share sheet, or copy); src/components/FavoriteButton.tsx",
+    "Box card: src/components/BoxCardBody.tsx:319-338 (nameBlock), share and save on the left in the redesign; boxes have no phone or website (BoxVenueRow in src/lib/blessingBoxes.ts:39 selects neither)",
     ...knownIssues([
       "ShareButton.tsx:75-77 and FavoriteButton.tsx:51-52, hover to bone-100 and PRESS_FEEDBACK (hover:brightness-105)",
     ]),
@@ -969,13 +1024,13 @@ const boxCard = (o: { photo?: boolean; live?: boolean; first?: boolean; pc?: boo
   const below = `${photo(false)}<div class="in">${sponsor}<div class="ft"><a href="#box-card"${tap("Mockup: this would open the box's history page.")}>History</a></div></div>`;
   return `<div class="pfm-bx">${top}${o.first ? `<div class="pk" inert>${below}</div>` : below}</div>`;
 };
-/** Phone: the sheet's grab bar above the box card; computer: the side window with History and the × in its bar. */
+/** Phone: the sheet's grab bar above the box card; computer: the side window, History and the × on one line above the photo. */
 const boxSheet = (o: Parameters<typeof boxCard>[0] = {}) => `<div class="pfm pfm-sheet">${grab()}${boxCard(o)}</div>`;
-const boxSide = (o: Parameters<typeof boxCard>[0] = {}) => `<div class="pfm pfm-side w380">${popHeader("", true)}<div class="sb">${boxCard({ ...o, pc: true })}</div></div>`;
+const boxSide = (o: Parameters<typeof boxCard>[0] = {}) => `<div class="pfm pfm-side w380">${topLine(`<a class="hist" href="#box-card">History</a>`)}<div class="sb">${boxCard({ ...o, pc: true })}</div></div>`;
 
 const boxCardEntry = entry({
   id: "box-card", name: "Blessing box card (BoxCardBody)", status: "changing",
-  statusNote: "What changes: the category becomes the decided label, Blessing Box in raspberry words on its own line under the name (live: a raspberry pill above the name, with share and save to its right); share and save stay in their row above the name but move to its left, the same row as on a place card (Kyle, 2026-11-08), so the name keeps the full width; the check-in buttons and Cancel take a sage 100 tint under the pointer (live: bone 100, grey). Everything else is live, with a made-up box.",
+  statusNote: "What changes: the category becomes the decided label, Blessing Box in raspberry words on its own line under the name (live: a raspberry pill above the name, with share and save to its right); share and save stay in their row above the name but move to its left, the same row as on a place card (Kyle, 2026-11-08), so the name keeps the full width; on a computer History and the × share one line above the photo with no rule under it (live: a bar with a line under it); boxes get no Call or Website, they have no phone or site in our data; the check-in buttons and Cancel take a sage 100 tint under the pointer (live: bone 100, grey). Everything else is live, with a made-up box.",
   purpose: "A little free pantry on a post: how full it is, what it needs, and a one-tap way for anyone to say they filled it, took something or found it empty. Everything happens on the card, never on a separate page. On a computer the latest photo leads the card, with the box's status on it; on a phone the status comes first and the photo sits below the fold.",
   instead: [
     "It's a staffed place with hours: use the place card.",
@@ -984,7 +1039,7 @@ const boxCardEntry = entry({
   versions:
     wide("Phone, first view: the grab bar, the share and save row at the top left, then the name, label and status. The photo peeks at the bottom until the sheet is pulled up. Tap the address (it draws the walking route) or Report a problem.", boxSheet({ photo: true, live: true, first: true })) +
     wide("Phone, pulled up: the photo, the sponsor band and History follow the check-ins.", boxSheet({ photo: true, live: true })) +
-    wide("Computer: History and the × in the window's bar, then the photo with the status on it, the sponsor band, and the row above the name.", boxSide({ photo: true, live: true })) +
+    wide("Computer: History on the left and the × on the right of one line, no rule under it, then the photo with the status on it, the sponsor band, and the row above the name.", boxSide({ photo: true, live: true })) +
     wide("Computer, no photo yet: the status leads instead, never a placeholder picture.", boxSide({ live: true })),
   states:
     demo("Status: Stocked, Running low, Empty, Unknown, Out of service. On a photo the pill is bone 50; without one, bone 100.", `<div class="pfm pfm-bxps">${(["stocked", "low", "empty", "unknown", "out"] as BoxStatus[]).map((s) => boxPill(s)).join("")}${boxPill("stocked", true).replace(" ov", " ovs")}</div>`) +
@@ -1003,7 +1058,7 @@ const boxCardEntry = entry({
     sw("Bone 100", "color-bone-100", `Most needed tags, and the status pill without a photo. Ink 700 on it ${r("color-ink-700", "color-bone-100")}`) +
     sw("Clay 100", "color-clay-100", `This box needs a sponsor, in clay 700: ${r("color-clay-700", "color-clay-100")}. Once sponsored: sage 700 on sage 50, ${r("color-sage-700", "color-sage-50")}`) +
     sw("Sage 100", "color-sage-100", `Fill under the pointer on the check-in buttons (redesign; live is bone 100). Ink 700 on it ${r("color-ink-700", "color-sage-100")}`),
-  sizes: "Photo 170 pixels tall, edge to edge, with the status pill 12 pixels in at its bottom left and the photo's age at its top right, both fully round. 16 pixels in from the sides, 12 between blocks. The share and save row is the first line of the name block, at its top left, 12 pixels above the name (see Share and save). Name in Fraunces 20; the label 14 semi-bold. Check-in buttons at least 48 tall, corners 10, three to a row then two, 8 apart. The address, Report a problem, History and Apply to sponsor are links 44 tall with 2 extra pixels above and below to tap at 48. The full-size photo's × is 48 round.",
+  sizes: "Photo 170 pixels tall, edge to edge, with the status pill 12 pixels in at its bottom left and the photo's age at its top right, both fully round. 16 pixels in from the sides, 12 between blocks. The share and save row is the first line of the name block, at its top left, 12 pixels above the name (see Card action row). Name in Fraunces 20; the label 14 semi-bold. Check-in buttons at least 48 tall, corners 10, three to a row then two, 8 apart. The address, Report a problem, History and Apply to sponsor are links 44 tall with 2 extra pixels above and below to tap at 48. The full-size photo's × is 48 round.",
   wording: [
     "Statuses: Stocked, Running low, Empty, Unknown, Out of service (Surtida, Quedan pocas cosas, Vacía, Desconocido, Fuera de servicio), then · filled 2 hours ago or · no recent check-ins.",
     "Heading Please update this box. Buttons: I filled it, Running low, It's empty, I used this box, Add a photo, and a quiet Report a problem (La surtí, Quedan pocas cosas, Está vacía, Usé esta caja, Agregar una foto, Reportar un problema).",
@@ -1162,7 +1217,7 @@ const all: [string, string, string][] = [
   ["bottom-nav", "Bottom bar", bottomNav], ["venue-card", "Place card", venueCard],
   ["search-bar", "Search bar", searchBar], ["filters-panel", "Filters", filtersPanel], ["view-switch", "Map / list switch", viewSwitch],
   ["map-pins", "Pins and tooltip", mapPins], ["card-shells", "Card sheet and side panel", cardShells], ["directions", "Directions and route strip", directions],
-  ["icon-buttons", "Share and save", iconButtons], ["hours-list", "Hours list", hoursList], ["event-card", "Event card", eventCardEntry],
+  ["icon-buttons", "Card action row", iconButtons], ["hours-list", "Hours list", hoursList], ["event-card", "Event card", eventCardEntry],
   ["box-card", "Blessing box card", boxCardEntry], ["menu-panel", "Menu panel", menuPanelEntry], ["location-help", "Location help and orange button", locationHelp],
 ];
 
@@ -1174,6 +1229,7 @@ export const pages: Page[] = [{
     "Place card: the same hover change on share, save, Bus and Drive; share and save move to a row at the top left of the card, so the name gets the full width; the category becomes colored words under the name. Everything else is what's live, with made-up places.",
     "Decided and written in: the category label is colored words under the name (Kyle, 2026-11-08), and Boxes while it's on gets no hover fill (Kyle).",
     "Share and save (your note): moved to a row at the top left of the place and box cards, above the name, on a phone and a computer. The name now has the card's full width. The row holds five icons at 360 wide; past that, four icons and a three-dot menu. The event card keeps its Share with words.",
+    "Round 6, your notes: Call and Website join the row, first, and the phone number line leaves the card; a missing one stays in its place, grey. Four of the five places are used. On a computer the × moves into that row and its separate bar goes, so there are no double lines; ← Saved shares one line with the ×. In Filters every kind of place is a switch row like Show only, no tick boxes, and every switch slides in 250 ms.",
     "Twelve new entries, in the order a visitor meets them: search bar, filters, the map / list switch, pins and the tooltip, the phone sheet and computer side panel, directions and the route strip, share and save, the hours list, the event card, the blessing box card, the menu, and the location card with the orange button.",
     "Across them, only your rulings change anything: every grey hover becomes sage 100, nothing brightens under the pointer, share and save sit in a row at the top left of place and box cards, and every category shown on a place uses the decided label. Everything else is what's live.",
     "Each entry lists, under Lives in, what's live today that breaks a ruling or the 48-pixel floor, for the site fix.",

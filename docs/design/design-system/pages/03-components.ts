@@ -153,9 +153,11 @@ const dirButtons = (o: CardOpt = {}) => {
 const card = (o: CardOpt = {}) => {
   const say = (m: string) => (o.live ? ` data-say="${q(m)}"` : "");
   const name = o.name ?? V.name;
-  const body = `<div class="pfm-namerow"><h2 class="pfm-name">${name}</h2>
+  // Card top (Kyle, 2026-11-08): share and save in a row of their own at the top left, then the name at full width.
+  const body = `<div class="pfm-acts">
     <button type="button" class="pfm-ib share" aria-label="Share ${name}"${say("Mockup: this would share the link, or copy it.")}>${ic("share")}</button>
     <button type="button" class="pfm-ib" aria-pressed="${o.saved ? "true" : "false"}" aria-label="${o.saved ? "Remove" : "Add"} ${name} ${o.saved ? "from" : "to"} saved"${o.live ? ` onclick="${q("this.setAttribute('aria-pressed',this.getAttribute('aria-pressed')==='true'?'false':'true')")}"` : ""}>${ic("star")}</button></div>
+  <h2 class="pfm-name">${name}</h2>
   ${labelLine("pantry", "Food Pantry", ["SNAP", "WIC"])}
   <p class="pfm-op">Operated by <a href="#venue-card"${say("Mockup: this would open pueblofoodproject.org in a new tab.")}>Pueblo Food Project</a></p>
   <div class="pfm-meta"><span>${ic("pin")}${V.miles} from you</span>${hoursLine(o.hours)}</div>
@@ -181,7 +183,7 @@ const CATS: { cat: string; label: string; name: string; miles: string; hours: st
   { cat: "pantry", label: "Food Pantry", name: "Saint Joseph Eastside Community Food Pantry", miles: "3.2 mi", hours: "Closed today", benefits: ["SNAP"] },
 ];
 const ALL_CATS: [string, string][] = [["pantry", "Pantry"], ["grocery", "Grocery"], ["convenience", "Convenience"], ["farm", "Farm"], ["garden", "Garden"], ["landscape", "Edible landscape"], ["meal", "Meal site"], ["blessing", "Blessing box"]];
-const topRow = (x: (typeof CATS)[number]) => `<div class="pfm-namerow"><h2 class="pfm-name">${x.name}</h2><button type="button" class="pfm-ib share" aria-label="Share ${x.name}">${ic("share")}</button><button type="button" class="pfm-ib" aria-pressed="false" aria-label="Add ${x.name} to saved">${ic("star")}</button></div>`;
+const topRow = (x: (typeof CATS)[number]) => `<div class="pfm-acts"><button type="button" class="pfm-ib share" aria-label="Share ${x.name}">${ic("share")}</button><button type="button" class="pfm-ib" aria-pressed="false" aria-label="Add ${x.name} to saved">${ic("star")}</button></div><h2 class="pfm-name">${x.name}</h2>`;
 const cardTop = (x: (typeof CATS)[number]) =>
   `<div class="pfm pfm-card"><div class="pfm-top">${topRow(x)}${labelLine(x.cat, x.label, x.benefits)}<div class="pfm-meta"><span>${ic("pin")}${x.miles} from you</span><span>${ic("clock")}${x.hours}</span></div></div></div>`;
 const r = (fg: Token, bg: Token, need: 4.5 | 3 = 4.5) => ratio(hex(fg), hex(bg), need);
@@ -196,7 +198,7 @@ const catOptions = `<h3 id="category-label">Category label</h3>
 
 const venueCard = entry({
   id: "venue-card", name: "Place card (VenueCardBody)", status: "changing",
-  statusNote: "What changes: hover becomes a light green tint (sage 100); hover no longer flickers; share and save line up with the name; the category becomes colored words on its own line under the name (Food Pantry · SNAP · WIC) in place of the pill. Everything else is the card as it is live today, with a made-up place.",
+  statusNote: "What changes: hover becomes a light green tint (sage 100); hover no longer flickers; share and save move to a row of their own at the top left of the card, so the name below runs the card's full width (Kyle, 2026-11-08; see Share and save); the category becomes colored words on its own line under the name (Food Pantry · SNAP · WIC) in place of the pill. Everything else is the card as it is live today, with a made-up place.",
   purpose: "Everything about one place, in the order people need it: the name, what kind of place it is, how far and whether it's open, then the way to get there, then the full hours, phone and a way to report a problem. The same body shows in the card that slides up on a phone and in the window on the side of the map on a computer.",
   instead: [
     "It's a blessing box: use the box card (BoxCardBody), which has check-ins and photos.",
@@ -205,7 +207,7 @@ const venueCard = entry({
   ],
   versions:
     wide("Phone: the card slides up from the bottom. Tap Walk, the star or any link.", card({ live: true })) +
-    wide("Phone, a long name over two lines: share and save stay on the first line.", card({ peek: true, name: "Saint Joseph Eastside Community Food Pantry" })) +
+    wide("Phone, a long name: with share and save above it, the name uses the card's full width, so it breaks later and takes fewer lines.", card({ peek: true, name: "Saint Joseph Eastside Community Food Pantry" })) +
     wide("Phone, as it first opens: everything below the direction buttons sits below the screen edge, with its top showing, until it's pulled up.", `${card({ peek: true })}`) +
     wide("Computer: the window on the side of the map. Smaller words and icons, always the full details.", card({ panel: true })),
   extra: catOptions,
@@ -251,7 +253,7 @@ const venueCard = entry({
     [`<div class="pfm" style="width:100%">${dirButtons()}</div>`, "One filled button for the route that stays in the map; the two that leave for Google Maps are outlines."],
     [`<div class="pfm" style="width:100%">${dirButtons().replaceAll("pfm-db ext", "pfm-db walk")}</div>`, "Three filled buttons: nobody can tell which one stays on the map."],
   ),
-  code: ["src/components/VenueCardBody.tsx. Proposed change: the name row is items-start and Share / Save use -m-1, so their icons sit about 7 pixels below the middle of the name's first line; the mockup uses a -11.5px top and bottom margin instead", "src/components/DirectionButtons.tsx. Known live issue for the site fix: baseClass uses PRESS_FEEDBACK from src/lib/interactionStyles.ts (hover:brightness-105, active:brightness-95), the hover filter that makes the fade stutter; Bus and Drive hover to bone-100", "FavoriteButton.tsx and ShareButton.tsx use the same PRESS_FEEDBACK and a bone-100 hover","src/components/HoursList.tsx", "src/components/FavoriteButton.tsx, ShareButton.tsx, ReportVenueButton.tsx", "Shown inside src/components/BottomSheet.tsx (phone) and DesktopVenueWindow.tsx (computer)"],
+  code: ["src/components/VenueCardBody.tsx:169-198. Proposed change: Share and Save leave the name row (flex items-start gap-4, beside the h2) for a row of their own above it; the h2 then has the full width", "src/components/DirectionButtons.tsx. Known live issue for the site fix: baseClass uses PRESS_FEEDBACK from src/lib/interactionStyles.ts (hover:brightness-105, active:brightness-95), the hover filter that makes the fade stutter; Bus and Drive hover to bone-100", "FavoriteButton.tsx and ShareButton.tsx use the same PRESS_FEEDBACK and a bone-100 hover","src/components/HoursList.tsx", "src/components/FavoriteButton.tsx, ShareButton.tsx, ReportVenueButton.tsx", "Shown inside src/components/BottomSheet.tsx (phone) and DesktopVenueWindow.tsx (computer)"],
 });
 
 // ════ Map screen and its cards (round 4) ════════════════════════════════════════════════════════════════════
@@ -589,7 +591,7 @@ const sidePanel = (back = false) => `<div class="pfm pfm-ma sde"><span class="pf
 
 const cardShells = entry({
   id: "card-shells", name: "Phone card sheet and computer side panel (BottomSheet, DesktopSidePanel)", status: "changing",
-  statusNote: "What changes: the × on the computer panel and the phone's keyboard-only Close take a sage 100 tint under the pointer (live: bone 100, grey), and neither the × nor the grab bar brightens under the pointer any more (a filter). Everything else is live.",
+  statusNote: "What changes: the × on the computer panel and the phone's keyboard-only Close take a sage 100 tint under the pointer (live: bone 100, grey), and neither the × nor the grab bar brightens under the pointer any more (a filter). Share and save now start the card inside, in a row at its top left (see Share and save); the grab bar, Close and × stay where they are. Everything else is live.",
   purpose: "The two containers every card sits in: a place, a blessing box, an event, and on a computer the Saved list and the Menu too. On a phone it's a sheet that slides up from the bottom and follows the finger between two heights. On a computer it's one fixed panel on the right, and the map moves the chosen pin clear of it.",
   instead: [
     "It covers the whole screen and has to be closed before anything else (a photo, the route steps): use a full dialog.",
@@ -613,7 +615,7 @@ const cardShells = entry({
     sw("Sage 100", "color-sage-100", `Fill under the pointer on the × (redesign; live is bone 100). The × in ink 500 on it ${r3("color-ink-500", "color-sage-100")}`) +
     swr("Sage 700", "color-sage-700", "← Saved and History; sage 600 under the pointer") +
     swr("Sage 500", "color-sage-500", "Keyboard rings", "color-bone-50", 3),
-  sizes: "Phone sheet: the full width, top corners 20, soft shadow; fully open it leaves 100 pixels of map showing at the top. Grab bar 64 by 5 inside a 48 by 48 button, so the bar is wider than its button. As it first opens, everything below the direction buttons sits under the screen edge with 64 pixels showing. Computer panel: 380 wide, 12 pixels from the top, right and bottom, corners 14, shadow 0 8 32 black at 18%. Its top bar is 44 tall with a 44-pixel × that taps at 48.",
+  sizes: "Phone sheet: the full width, top corners 20, soft shadow; fully open it leaves 100 pixels of map showing at the top. Grab bar 64 by 5 inside a 48 by 48 button, so the bar is wider than its button. As it first opens, everything below the direction buttons sits under the screen edge with 64 pixels showing. Computer panel: 380 wide, 12 pixels from the top, right and bottom, corners 14, shadow 0 8 32 black at 18%. Its top bar is 44 tall with a 44-pixel × that taps at 48. The card's share and save row starts below both tops: on a phone 24 pixels under the grab bar's band (12 on a box card) (the keyboard-only Close shows in that band, at its right); on a computer 8 pixels under the ×'s tap area.",
   wording: [
     "The grab bar is heard as Show details or Hide details (Ver detalles, Ocultar detalles).",
     "The × is heard as Close (Cerrar). ← Saved (← Guardados) only shows when the card was opened from the Saved list.",
@@ -716,6 +718,10 @@ const directions = entry({
 });
 
 // ── Icon buttons: share and save ────────────────────────────────────────────────────────────────────────────
+// Kyle, 2026-11-08: "move icons to the top left of the card, so we could put more icons up there over time and
+// then we'd have the whole length of the card for the title." The row's capacity is measured, not guessed: see
+// the sizes line and the "Room for more" picture (a true 360-pixel card).
+Object.assign(ICONS, { dots: `<circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>` });
 const shareBtn = (cls = "", copied = false, label = `Share ${V.name}`) => `<button type="button" class="pfm-ib share${cls ? ` ${cls}` : ""}" aria-label="${label}" title="${label}">${copied ? `<svg class="i ok" viewBox="0 0 24 24" aria-hidden="true">${ICONS.check}</svg><span class="sr" role="status">Link copied</span>` : ic("share")}</button>`;
 const saveBtn = (cls = "", on = false) => `<button type="button" class="pfm-ib${cls ? ` ${cls}` : ""}" aria-pressed="${on}" aria-label="${on ? "Remove" : "Add"} ${V.name} ${on ? "from" : "to"} saved" title="${on ? "Remove" : "Add"} ${V.name} ${on ? "from" : "to"} saved">${ic("star")}</button>`;
 const ibPair = (live = false) => {
@@ -723,26 +729,42 @@ const ibPair = (live = false) => {
   const cp = live ? ` onclick="${q("const b=this,s=b.querySelector('svg');s.innerHTML=" + JSON.stringify(ICONS.check) + ";s.classList.add('ok');b.dataset.say='Mockup: Link copied.';setTimeout(()=>{s.innerHTML=" + JSON.stringify(ICONS.share) + ";s.classList.remove('ok')},2000)")}"` : "";
   return shareBtn().replace("<button ", `<button${cp} `) + saveBtn().replace("<button ", `<button${tog} `);
 };
-const nameRow = (name: string, live = false, pc = false) => `<div class="pfm pfm-card${pc ? " pfm-pc" : ""} pfm-ibdemo"><div class="pfm-namerow"><h2 class="pfm-name">${name}</h2>${ibPair(live)}</div></div>`;
+/** The icon row (pfm-acts). `extra` adds empty, unclickable slots: room for later icons, not buttons. */
+const actsRow = (live = false, extra = 0, dots = false) =>
+  `<div class="pfm-acts">${ibPair(live)}${'<span class="slot" aria-hidden="true"></span>'.repeat(extra)}${dots ? `<button type="button" class="pfm-ib" aria-label="More actions" aria-haspopup="menu" aria-expanded="false">${ic("dots")}</button>` : ""}</div>`;
+/** The top of a place card: the icon row, the name at the card's full width, the label. */
+const cardHead = (name: string, o: { live?: boolean; pc?: boolean; extra?: number; dots?: boolean; cls?: string } = {}) =>
+  `<div class="pfm-card${o.pc ? " pfm-pc" : ""} pfm-ibdemo${o.cls ? ` ${o.cls}` : ""}">${actsRow(o.live, o.extra, o.dots)}<h2 class="pfm-name">${name}</h2>${labelLine("pantry", "Food Pantry", ["SNAP", "WIC"])}</div>`;
+/** Phone: the sheet's grab bar, then the card top. close: the keyboard-only Close, shown as reached by Tab. */
+const sheetHead = (name: string, o: { live?: boolean; close?: boolean; extra?: number; dots?: boolean; cls?: string } = {}) =>
+  `<div class="pfm pfm-sheet">${o.close ? `<button type="button" class="pfm-hclose is-focus" aria-label="Close">${ic("x")}</button>` : ""}${grab()}${cardHead(name, o)}</div>`;
+/** Computer: the side window's bar with the ×, then the card top. */
+const sideHead = (name: string, live = false, cls = "") =>
+  `<div class="pfm pfm-side w380">${popHeader()}<div class="sb">${cardHead(name, { live, pc: true, cls })}</div></div>`;
+const LONG = "Saint Joseph Eastside Community Food Pantry";
 
 const iconButtons = entry({
   id: "icon-buttons", name: "Icon buttons: share and save (ShareButton, FavoriteButton)", status: "changing",
-  statusNote: "What changes: a sage 100 tint under the pointer (live: bone 100, grey), no brightening under the pointer (a filter), and the pair centers on the first line of the name beside it, however many lines the name takes (live: about 7 pixels low). Everything else is live.",
-  purpose: "Two small square buttons beside a card's name: share the link to it, and save it to Saved. They're the same on place cards and blessing box cards, on a phone and a computer.",
+  statusNote: "What changes: share and save leave the name's line for a row of their own at the top left of the card, above the name, so the name runs the card's full width and the row has room for more icons later (Kyle, 2026-11-08; live: beside the name on a place card, at the top right beside the pill on a box card). A sage 100 tint under the pointer (live: bone 100, grey), and no brightening under the pointer (a filter). Everything else is live.",
+  purpose: "A row of small square buttons at the top left of a card, above its name: share the link to it, and save it to Saved. The same row on place cards and blessing box cards, on a phone and a computer, and the place any later card action goes.",
   instead: [
-    "The action needs words to be understood (Get directions, Add to calendar): use a button with words. The event card's own Share has words for that reason.",
-    "It's a third or fourth action for one row: put them all in one three-dot menu (owner's ruling), not more icons.",
+    "The action needs words to be understood (Get directions, Add to calendar): use a button with words. The event card keeps its own Share, with its word, beside Add to calendar, and has no save, so it doesn't get this row.",
+    "More than five actions: at 360 wide the row holds five. A sixth means four icons and a three-dot menu in the fifth place, holding the rest (owner's ruling: extra actions go in one three-dot menu).",
   ],
   versions:
-    wide("Beside a one-line name. Tap share (it says Link copied with a tick where the phone has no share sheet) and the star.", nameRow(V.name, true)) +
-    wide("Beside a long name: both stay on its first line.", nameRow("Saint Joseph Eastside Community Food Pantry", true)) +
-    wide("Computer: icons a size smaller (18 pixels).", nameRow(V.name, true, true)),
+    wide("Phone: the grab bar, then the row at the top left, then the name. Tap share (it says Link copied with a tick where the phone has no share sheet) and the star.", sheetHead(V.name, { live: true })) +
+    wide("Phone, a long name: it runs the card's full width, under the row, so it breaks later.", sheetHead(LONG, { live: true })) +
+    wide("Computer: the side window. The × stays alone in the bar at the top right; the row starts the card below it, icons a size smaller (18 pixels).", sideHead(V.name, true)) +
+    wide("Computer, a long name.", sideHead(LONG, true)) +
+    wide("Room for more, on a true 360-pixel phone card: share, save and three empty places. Five fit; there's no room for a sixth. On a narrow screen this picture is shown at three quarters size.", `<div class="pfm-capw"><div class="pfm-cap">${sheetHead(V.name, { extra: 3 })}</div></div>`) +
+    wide("Six or more actions: four icons, then a three-dot menu holding the rest.", `<div class="pfm-capw"><div class="pfm-cap">${sheetHead(V.name, { extra: 2, dots: true })}</div></div>`),
   states:
     demo("Resting", `<div class="pfm pfm-ibs">${shareBtn()}${saveBtn()}</div>`) +
     demo("Pointer over it: light green; the share icon darkens. Point at any of them.", `<div class="pfm pfm-ibs">${shareBtn("is-hover")}${saveBtn("is-hover")}</div>`) +
     demo("Reached by keyboard: a green ring", `<div class="pfm pfm-ibs">${shareBtn("is-focus")}${saveBtn("is-focus")}</div>`) +
     demo("Saved: the star fills in clay", `<div class="pfm pfm-ibs">${saveBtn("", true)}</div>`) +
-    demo("Link copied: a green tick for 2 seconds, and Link copied is read out", `<div class="pfm pfm-ibs">${shareBtn("", true)}</div>`),
+    demo("Link copied: a green tick for 2 seconds, and Link copied is read out", `<div class="pfm pfm-ibs">${shareBtn("", true)}</div>`) +
+    wide("Phone, Close reached by keyboard: it shows at the top right, level with the grab bar, clear of the row.", sheetHead(V.name, { close: true })),
   colors:
     swr("Ink 400", "color-ink-400", "Both icons at rest", "color-bone-50", 3) +
     swr("Ink 700", "color-ink-700", "The share icon under the pointer", "color-bone-50", 3) +
@@ -750,25 +772,27 @@ const iconButtons = entry({
     swr("Sage 600", "color-sage-600", "The tick after Link copied", "color-bone-50", 3) +
     sw("Sage 100", "color-sage-100", `Fill under the pointer (redesign; live is bone 100). Icons on it: ink 400 ${r3("color-ink-400", "color-sage-100")}, ink 700 ${r3("color-ink-700", "color-sage-100")}, clay 500 ${r3("color-clay-500", "color-sage-100")}`) +
     swr("Sage 500", "color-sage-500", "Keyboard ring", "color-bone-50", 3),
-  sizes: "48 by 48 to tap, corners 10, icon 20 pixels (18 on a computer). Each overlaps the card's padding by 4 pixels at the sides so the icons line up with the edge. Beside a title the pair centers on the title's first line (the button's middle on the middle of that 25-pixel line).",
+  sizes: "Each 48 by 48 to tap, corners 10, icon 20 pixels (18 on a computer), 8 pixels between neighbours, and the first one's tap area reaches 4 pixels into the card's padding, so its icon starts 10 pixels in from the name's left edge. The row is the card's first line, 12 pixels above the name. Room: a phone place card has 312 pixels inside its padding at 360 wide, so five icons fit (272 pixels) and a sixth doesn't (328); a box card and the computer window are wider and fit six, so the phone place card sets the limit at five. Clear of the top: on a phone the grab bar and the keyboard-only Close sit in their own 60-pixel band above the card, with 24 pixels to the row's tap area on a place card and 12 on a box card; on a computer the × sits in the 44-pixel bar, 8 pixels above the row's tap area.",
   wording: [
     "No visible words. Screen readers and the pointer's tip say Share Eastside Community Pantry (Compartir …), Add Eastside Community Pantry to saved, Remove … from saved (Agregar … a guardados).",
     "After a copy: Link copied (Enlace copiado).",
+    "A three-dot menu, when one is needed, is heard as More actions.",
   ],
   everyone: [
-    "Keyboard: real buttons, in the order share then save.",
+    "Keyboard: real buttons, share then save, before the name, the same order as on screen. On a computer the card opens with the focus on the name, so the row is one Shift and Tab back; from the × it comes before everything in the card.",
     "Screen reader: save says pressed or not pressed; Link copied is read out once.",
-    "Touch: 48 by 48 each, side by side with no gap to miss.",
+    "Touch: 48 by 48 each, with 8 pixels between them, and clear of the grab bar, the phone's Close and the computer's ×.",
     "Color is never the only sign: a saved star fills in, a copy shows a tick.",
   ],
   dd: dodont(
-    [nameRow("Saint Joseph Eastside Community Food Pantry"), "Centered on the name's first line."],
-    [nameRow("Saint Joseph Eastside Community Food Pantry").replace("pfm-ibdemo", "pfm-ibdemo mid"), "Centered on the whole two-line name: the icons float between the lines and look lost."],
+    [sideHead(LONG), "The row at the top left, the × alone on the right of the bar: the name gets the full width."],
+    [sideHead(LONG, false, "tr"), "Icons at the top right, under the ×: three icons stacked in one corner, and a slip closes the card instead of saving it."],
   ),
   code: [
     "src/components/ShareButton.tsx and src/lib/share.ts (the phone's share sheet, or copy)",
     "src/components/FavoriteButton.tsx",
-    "Used in src/components/VenueCardBody.tsx and, through BottomSheet.tsx and DesktopVenueWindow.tsx, src/components/BoxCardBody.tsx",
+    "Proposed change, place card: src/components/VenueCardBody.tsx:169-198, Share and Save leave the name row for a row of their own above the h2 (the phone's keyboard-only Close can stay in it: it's drawn at the sheet's top right, not in the row)",
+    "Proposed change, box card: src/components/BoxCardBody.tsx:319-338 (nameBlock), the row above the name keeps its gap-4 but moves to the left once the pill leaves for the label under the name; the actions come from BottomSheet.tsx:926-946 and DesktopVenueWindow.tsx:127-131",
     ...knownIssues([
       "ShareButton.tsx:75-77 and FavoriteButton.tsx:51-52, hover to bone-100 and PRESS_FEEDBACK (hover:brightness-105)",
     ]),
@@ -852,7 +876,7 @@ const evEmpty = (live = false) => `<div class="pfm-eve"><a class="sh" href="#eve
 
 const eventCardEntry = entry({
   id: "event-card", name: "Event card (EventCardBody)", status: "changing",
-  statusNote: "What changes: Share, Add to calendar and the computer's × take a sage 100 tint under the pointer (live: bone 100, grey), and nothing brightens under the pointer any more (a filter; live on the action button, Get directions, the Event here line and the strip). The rulings give the orange Get directions nothing in its place. Everything else is live.",
+  statusNote: "What changes: Share, Add to calendar and the computer's × take a sage 100 tint under the pointer (live: bone 100, grey), and nothing brightens under the pointer any more (a filter; live on the action button, Get directions, the Event here line and the strip). The rulings give the orange Get directions nothing in its place. The share and save row that place and box cards get at the top doesn't come here: the event's Share keeps its word beside Add to calendar, there's no save, and the top already holds the badge and, on a computer, the ×. Everything else is live.",
   purpose: "Everything about one special event, from its pin or the strip at the top of the map, in the same sheet and panel as a place card. A badge says when, then the name and host, When, About, the event's own link as a green button, Where, What to bring, Share and Add to calendar, and the orange Get directions last.",
   instead: [
     "It's a place that's open on a weekly or monthly pattern: that's a place card with its hours.",
@@ -921,34 +945,47 @@ const BOX_ST: Record<BoxStatus, [string, string]> = { stocked: ["Stocked", "fill
 const boxPill = (s: BoxStatus, overlay = false) => `<div class="pfm-bxp ${s}${overlay ? " ov" : ""}"><i aria-hidden="true"></i><span class="w">${BOX_ST[s][0]}</span><span class="d">· ${BOX_ST[s][1]}</span></div>`;
 const ckBtn = (label: string, dot = "", cls = "", dis = false) => `<button type="button" class="pfm-ck${cls ? ` ${cls}` : ""}"${dis ? " disabled" : ""}>${dot ? `<i class="${dot}" aria-hidden="true"></i>` : ""}${label}</button>`;
 const BOX = { name: "Elm Street Blessing Box", addr: "300 Example Ln, Pueblo, CO 81001" };
-const boxCard = (o: { photo?: boolean; live?: boolean; first?: boolean } = {}) => {
+// Two layouts, as BoxCardBody draws them. Phone (layout "sheet", #667): the icon row, name, label and status
+// first, the photo, sponsor band and History below the fold (96 pixels of it peek). Computer (the default
+// layout): the photo first with the status on it, then the sponsor band, then the icon row and name.
+const boxCard = (o: { photo?: boolean; live?: boolean; first?: boolean; pc?: boolean } = {}) => {
   const tap = (m: string) => (o.live ? say2(m) : "");
-  const photo = o.photo ? `<div class="phw"><button type="button" class="img" aria-label="View photo full size"${tap("Mockup: this would open the photo full size.")}><span>Photo of the box</span></button>${boxPill("stocked", true)}<span class="cap">Photo · 2 hours ago</span></div>` : "";
-  const top = `${photo}<div class="in"><div class="pfm-namerow"><h2 class="pfm-name">${BOX.name}</h2>${shareBtn("", false, `Share ${BOX.name}`)}${saveBtn().replaceAll(V.name, BOX.name)}</div>
-    ${labelLine("blessing", "Blessing Box", [])}
-    ${o.photo ? "" : boxPill("stocked")}
-    <button type="button" class="pfm-bxa" aria-label="${BOX.addr}, walking directions to ${BOX.name} (opens on map)"${tap("Mockup: this would draw the walking route on the map.")}>${BOX.addr}</button>
+  const photo = (overlay: boolean) => o.photo ? `<div class="phw"><button type="button" class="img" aria-label="View photo full size"${tap("Mockup: this would open the photo full size.")}><span>Photo of the box</span></button>${overlay ? boxPill("stocked", true) : ""}<span class="cap">Photo · 2 hours ago</span></div>` : "";
+  const sponsor = `<div class="pfm-bxs"><p>This box needs a sponsor.</p><p class="sm">Want to help too? <button type="button"${tap("Mockup: this would open the sponsor form.")}>Apply to sponsor this box</button></p></div>`;
+  const head = `<div class="pfm-acts">${shareBtn("", false, `Share ${BOX.name}`)}${saveBtn().replaceAll(V.name, BOX.name)}</div><h2 class="pfm-name">${BOX.name}</h2>
+    ${labelLine("blessing", "Blessing Box", [])}`;
+  const body = `<button type="button" class="pfm-bxa" aria-label="${BOX.addr}, walking directions to ${BOX.name} (opens on map)"${tap("Mockup: this would draw the walking route on the map.")}>${BOX.addr}</button>
     <section><h3>Most needed</h3><div class="pfm-bxn"><span>Canned food</span><span>Diapers</span><span>Pet food</span></div></section>
     <p class="hn">Kept by the Elm Street neighbors. Please leave food in sealed packages.</p>
     <section class="pfm-bxc" aria-label="Please update this box"><h3 class="hh">Please update this box</h3>
       <div class="g3">${ckBtn("I filled it", "ok")}${ckBtn("Running low", "wn")}${ckBtn("It's empty", "bd")}</div>
       <div class="g2">${ckBtn("I used this box")}${ckBtn("Add a photo")}</div>
-      <button type="button" class="rp"${tap("Mockup: this would open a short note to report a problem.")}>Report a problem</button></section></div>`;
-  const rest = `<div class="in"><div class="pfm-bxs"><p>This box needs a sponsor.</p><p class="sm">Want to help too? <button type="button"${tap("Mockup: this would open the sponsor form.")}>Apply to sponsor this box</button></p></div><div class="ft"><a href="#box-card"${tap("Mockup: this would open the box's history page.")}>History</a></div></div>`;
-  return `<div class="pfm pfm-bx">${o.first ? top : `${top}${rest}`}</div>`;
+      <button type="button" class="rp"${tap("Mockup: this would open a short note to report a problem.")}>Report a problem</button></section>`;
+  if (o.pc) {
+    const lead = o.photo ? photo(true) : `<div class="in">${boxPill("stocked")}</div>`;
+    return `<div class="pfm-bx pc">${lead}<div class="in">${sponsor}${head}${body}</div></div>`;
+  }
+  const top = `<div class="in">${head}${boxPill("stocked")}${body}</div>`;
+  const below = `${photo(false)}<div class="in">${sponsor}<div class="ft"><a href="#box-card"${tap("Mockup: this would open the box's history page.")}>History</a></div></div>`;
+  return `<div class="pfm-bx">${top}${o.first ? `<div class="pk" inert>${below}</div>` : below}</div>`;
 };
+/** Phone: the sheet's grab bar above the box card; computer: the side window with History and the × in its bar. */
+const boxSheet = (o: Parameters<typeof boxCard>[0] = {}) => `<div class="pfm pfm-sheet">${grab()}${boxCard(o)}</div>`;
+const boxSide = (o: Parameters<typeof boxCard>[0] = {}) => `<div class="pfm pfm-side w380">${popHeader("", true)}<div class="sb">${boxCard({ ...o, pc: true })}</div></div>`;
 
 const boxCardEntry = entry({
   id: "box-card", name: "Blessing box card (BoxCardBody)", status: "changing",
-  statusNote: "What changes: the category becomes the decided label, Blessing Box in raspberry words on its own line under the name (live: a raspberry pill above the name, with share and save beside it); share and save move beside the name, centered on its first line; the check-in buttons and Cancel take a sage 100 tint under the pointer (live: bone 100, grey). Everything else is live, with a made-up box.",
-  purpose: "A little free pantry on a post: how full it is, what it needs, and a one-tap way for anyone to say they filled it, took something or found it empty. Everything happens on the card, never on a separate page. The latest photo leads the card, with the box's status on it.",
+  statusNote: "What changes: the category becomes the decided label, Blessing Box in raspberry words on its own line under the name (live: a raspberry pill above the name, with share and save to its right); share and save stay in their row above the name but move to its left, the same row as on a place card (Kyle, 2026-11-08), so the name keeps the full width; the check-in buttons and Cancel take a sage 100 tint under the pointer (live: bone 100, grey). Everything else is live, with a made-up box.",
+  purpose: "A little free pantry on a post: how full it is, what it needs, and a one-tap way for anyone to say they filled it, took something or found it empty. Everything happens on the card, never on a separate page. On a computer the latest photo leads the card, with the box's status on it; on a phone the status comes first and the photo sits below the fold.",
   instead: [
     "It's a staffed place with hours: use the place card.",
     "You want the box's whole past: History opens its own page.",
   ],
   versions:
-    wide("Phone, with a photo, first view. Tap the photo, the address (it draws the walking route) or Report a problem.", boxCard({ photo: true, live: true, first: true })) +
-    wide("No photo yet: the status sits under the label. Shown whole, with the sponsor band and History at the end.", boxCard({ live: true })),
+    wide("Phone, first view: the grab bar, the share and save row at the top left, then the name, label and status. The photo peeks at the bottom until the sheet is pulled up. Tap the address (it draws the walking route) or Report a problem.", boxSheet({ photo: true, live: true, first: true })) +
+    wide("Phone, pulled up: the photo, the sponsor band and History follow the check-ins.", boxSheet({ photo: true, live: true })) +
+    wide("Computer: History and the × in the window's bar, then the photo with the status on it, the sponsor band, and the row above the name.", boxSide({ photo: true, live: true })) +
+    wide("Computer, no photo yet: the status leads instead, never a placeholder picture.", boxSide({ live: true })),
   states:
     demo("Status: Stocked, Running low, Empty, Unknown, Out of service. On a photo the pill is bone 50; without one, bone 100.", `<div class="pfm pfm-bxps">${(["stocked", "low", "empty", "unknown", "out"] as BoxStatus[]).map((s) => boxPill(s)).join("")}${boxPill("stocked", true).replace(" ov", " ovs")}</div>`) +
     demo("Check-in button: resting, pointer over it (light green; live: bone 100), keyboard, and Sending… while a tap goes through", `<div class="pfm pfm-bxc only"><div class="g2">${ckBtn("I filled it", "ok")}${ckBtn("I filled it", "ok", "is-hover")}${ckBtn("I filled it", "ok", "is-focus")}${ckBtn("Sending…", "ok", "", true)}</div></div>`) +
@@ -966,7 +1003,7 @@ const boxCardEntry = entry({
     sw("Bone 100", "color-bone-100", `Most needed tags, and the status pill without a photo. Ink 700 on it ${r("color-ink-700", "color-bone-100")}`) +
     sw("Clay 100", "color-clay-100", `This box needs a sponsor, in clay 700: ${r("color-clay-700", "color-clay-100")}. Once sponsored: sage 700 on sage 50, ${r("color-sage-700", "color-sage-50")}`) +
     sw("Sage 100", "color-sage-100", `Fill under the pointer on the check-in buttons (redesign; live is bone 100). Ink 700 on it ${r("color-ink-700", "color-sage-100")}`),
-  sizes: "Photo 170 pixels tall, edge to edge, with the status pill 12 pixels in at its bottom left and the photo's age at its top right, both fully round. 16 pixels in from the sides, 12 between blocks. Name in Fraunces 20; the label 14 semi-bold. Check-in buttons at least 48 tall, corners 10, three to a row then two, 8 apart. The address, Report a problem, History and Apply to sponsor are links 44 tall with 2 extra pixels above and below to tap at 48. The full-size photo's × is 48 round.",
+  sizes: "Photo 170 pixels tall, edge to edge, with the status pill 12 pixels in at its bottom left and the photo's age at its top right, both fully round. 16 pixels in from the sides, 12 between blocks. The share and save row is the first line of the name block, at its top left, 12 pixels above the name (see Share and save). Name in Fraunces 20; the label 14 semi-bold. Check-in buttons at least 48 tall, corners 10, three to a row then two, 8 apart. The address, Report a problem, History and Apply to sponsor are links 44 tall with 2 extra pixels above and below to tap at 48. The full-size photo's × is 48 round.",
   wording: [
     "Statuses: Stocked, Running low, Empty, Unknown, Out of service (Surtida, Quedan pocas cosas, Vacía, Desconocido, Fuera de servicio), then · filled 2 hours ago or · no recent check-ins.",
     "Heading Please update this box. Buttons: I filled it, Running low, It's empty, I used this box, Add a photo, and a quiet Report a problem (La surtí, Quedan pocas cosas, Está vacía, Usé esta caja, Agregar una foto, Reportar un problema).",
@@ -985,7 +1022,7 @@ const boxCardEntry = entry({
     [`<div class="pfm pfm-bxps"><div class="pfm-bxp low"><i aria-hidden="true"></i></div></div>`, "A colored dot on its own. Nobody can tell amber from red, and a screen reader hears nothing."],
   ),
   code: [
-    "src/components/BoxCardBody.tsx (the card; BoxCardBody.tsx:323, the category pill that becomes the label)",
+    "src/components/BoxCardBody.tsx (the card; BoxCardBody.tsx:323, the category pill that becomes the label; :319-338, nameBlock, whose top row holds share and save on the right today and on the left in the redesign)",
     "src/components/BoxCheckinPanel.tsx (check-ins and photos), src/components/PhotoViewer.tsx (full-size photo)",
     "src/lib/blessingBoxes.ts:421-436 (the status colors); AdoptBoxForm.tsx and BoxAlertSignupForm.tsx (the sponsor and alert forms, not drawn here)",
     ...knownIssues([
@@ -1134,10 +1171,11 @@ export const pages: Page[] = [{
   blurb: "The map screen and its cards: the bottom bar, the place card, search, filters, pins, the card containers, directions, events, blessing boxes, the menu and the orange button.",
   changed: [
     "Bottom bar: hover becomes a light green tint (sage 100), and hover no longer flickers. Everything else is what's live.",
-    "Place card: the same hover change on share, save, Bus and Drive; share and save line up with the name; the category becomes colored words under the name. Everything else is what's live, with made-up places.",
+    "Place card: the same hover change on share, save, Bus and Drive; share and save move to a row at the top left of the card, so the name gets the full width; the category becomes colored words under the name. Everything else is what's live, with made-up places.",
     "Decided and written in: the category label is colored words under the name (Kyle, 2026-11-08), and Boxes while it's on gets no hover fill (Kyle).",
+    "Share and save (your note): moved to a row at the top left of the place and box cards, above the name, on a phone and a computer. The name now has the card's full width. The row holds five icons at 360 wide; past that, four icons and a three-dot menu. The event card keeps its Share with words.",
     "Twelve new entries, in the order a visitor meets them: search bar, filters, the map / list switch, pins and the tooltip, the phone sheet and computer side panel, directions and the route strip, share and save, the hours list, the event card, the blessing box card, the menu, and the location card with the orange button.",
-    "Across them, only your rulings change anything: every grey hover becomes sage 100, nothing brightens under the pointer, share and save sit on the name's first line, and every category shown on a place uses the decided label. Everything else is what's live.",
+    "Across them, only your rulings change anything: every grey hover becomes sage 100, nothing brightens under the pointer, share and save sit in a row at the top left of place and box cards, and every category shown on a place uses the decided label. Everything else is what's live.",
     "Each entry lists, under Lives in, what's live today that breaks a ruling or the 48-pixel floor, for the site fix.",
   ],
   kept: ["The map itself isn't drawn: a flat block stands in for it.", "The phone view is 360 pixels wide, the older Android phone the site is built for."],

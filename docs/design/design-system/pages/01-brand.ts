@@ -48,6 +48,7 @@ const reference = dsSec({
 
 const logo = dsSec({
   id: "logo", name: "Logo",
+  note: `A logo is being chosen: see <a href="logo.html">Logo options</a>.`,
   purpose: "The logo is the name itself, set in Fraunces. It is live text, not a picture, so it is sharp on every screen and costs no data. The app icon is the brand's pin.",
   body: `<div class="pb-logos">
     <figure><div class="pb-lg map">${wm("lg navy outline")}</div><figcaption><b>On the welcome screen</b> Navy, bold, with a thin white outline because the live map shows through behind it. 36 pixels on phones, 60 from 768 pixels wide. Navy on the cream paper: ${r("color-brand-navy", "color-bone-50")}.</figcaption></figure>

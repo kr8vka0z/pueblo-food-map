@@ -1501,3 +1501,37 @@ textarea.pa-in{resize:vertical}
 .fi-word{display:inline-flex;align-items:center;gap:6px;margin-right:12px;font-size:14px;color:var(--color-ink-700)}
 .fi-lic{margin:10px 0 0;padding:12px;max-height:320px;overflow:auto;border-radius:var(--r-md);background:var(--surface);font:11.5px/1.45 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
 /* === end foundations-icons === */
+/* === logo === */
+/* Logo options page (pages/06-logo.ts). Prefix lo-. Every mark is an <img> of a file in assets/logo-options/, so its
+   size here is the size the browser draws it at. Backdrops are site tokens; the flyer is plain white paper. */
+.lo-catch{margin:8px 0 0;font-size:14.5px;color:var(--color-ink-700);max-width:70ch}
+.lo-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(140px,100%),1fr));grid-auto-flow:dense;gap:10px;margin-top:12px}
+.lo-f{margin:0;display:flex;flex-direction:column;min-width:0;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+.lo-f>div{flex:1;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px 18px;padding:12px;background:var(--color-bone-50);min-width:0}
+.lo-f figcaption{font-size:12.5px;line-height:1.35;color:var(--muted);padding:5px 9px;border-top:1px solid var(--line)}
+.lo-f.lock,.lo-f.app,.lo-f.hello,.lo-f.og{grid-column:span 2}
+.lo-f img{display:block;flex:none}
+.lo-f.big img{width:min(150px,100%);height:auto}
+.lo-wm{font-family:'Fraunces',Georgia,serif;font-weight:700;letter-spacing:.04em;line-height:1.1;color:var(--color-brand-navy);font-size:20px}
+.lo-h{display:inline-flex;align-items:center;gap:10px;min-width:0}
+.lo-s{display:inline-flex;flex-direction:column;align-items:center;gap:6px;text-align:center}.lo-s .lo-wm{font-size:18px}
+.lo-f.app>div{background:var(--color-bone-200)}.lo-rr{border-radius:22%}.lo-round{border-radius:50%}
+.lo-f.tab>div{flex-direction:column;background:var(--color-bone-300);gap:10px}
+.lo-tab{display:inline-flex;align-items:center;gap:7px;max-width:100%;background:#fff;border-radius:8px 8px 0 0;padding:7px 10px;font-size:12.5px;color:var(--color-ink-700)}
+.lo-tab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lo-tabs{display:inline-flex;align-items:center;gap:12px}
+.lo-f.mono>div{background:#fff}.lo-f.mono .lo-wm{color:#000;font-size:15px}.lo-f.mono .lo-h{gap:7px}
+.lo-f.hello>div{background:var(--color-bone-200)}
+.lo-hi{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.lo-hi .lo-wm{font-size:26px;text-shadow:-1px -1px 0 #fff,0 -1px 0 #fff,1px -1px 0 #fff,-1px 0 0 #fff,1px 0 0 #fff,-1px 1px 0 #fff,0 1px 0 #fff,1px 1px 0 #fff}
+.lo-hi small{font-size:13px;font-weight:600;color:var(--color-brand-navy);max-width:30ch}
+.lo-f.og>div{padding:10px;container-type:inline-size}
+.lo-og{width:100%;aspect-ratio:1200/630;display:flex;flex-wrap:wrap;align-items:center;align-content:center;column-gap:4cqw;row-gap:2cqw;padding:0 7cqw;background:var(--color-bone-50);border:1px solid var(--color-bone-200);border-radius:6px}
+.lo-og img{width:13cqw;height:auto}.lo-og .lo-wm{font-size:7cqw}.lo-og small{flex-basis:100%;font-size:3.6cqw;font-weight:700;color:var(--color-sage-700)}
+.lo-sheet{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:8px;margin-top:12px}
+.lo-row{display:flex;flex-direction:column;gap:6px;min-width:0;border:1px solid var(--line);border-radius:var(--r-md);padding:8px 9px}.lo-row b{font-size:14px}
+.lo-ic{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.lo-ic>span{display:inline-flex;align-items:center;gap:6px;padding:6px;border-radius:8px}
+.lo-ic .paper{background:var(--color-bone-50);border:1px solid var(--color-bone-200)}.lo-ic .tile{background:var(--color-bone-200)}
+/* Phone: two columns, the small pictures paired up, so one option is about one screen tall. */
+@media (max-width:600px){.lo-f.og{grid-column:span 1}.lo-f.big img{width:min(110px,100%)}.lo-f>div{padding:10px}.lo-hi .lo-wm{font-size:23px}.lo-f.mono .lo-wm{font-size:13px}.lo-f.mono img{width:32px;height:32px}}
+/* === end logo === */

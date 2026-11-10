@@ -149,9 +149,9 @@ describe("FilterPanel", () => {
 
   test("every Kind-of-place row is at least 48px tall", () => {
     render(<FilterPanel {...filterProps} />);
-    const boxes = screen.getAllByRole("checkbox");
-    expect(boxes.length).toBeGreaterThan(0);
-    for (const cb of boxes) expect(classes(cb.closest("label"))).toContain("min-h-12");
+    // #917: kind-of-place rows are switch rows now (no tick boxes).
+    const rows = ["Food Pantry", "Blessing Box"].map((n) => screen.getByRole("switch", { name: n }).parentElement);
+    for (const row of rows) expect(classes(row)).toContain("min-h-12");
   });
 
   test("the Show N places footer button is 48px tall", () => {
@@ -161,7 +161,7 @@ describe("FilterPanel", () => {
 
   test("the scroll container doesn't reserve py-2 (#233: growing every row to 48px made the panel ~16px taller than its available height; keeping py-2 here clipped the last Kind-of-place row's bottom 8px against the footer)", () => {
     render(<FilterPanel {...filterProps} />);
-    const scroller = screen.getByRole("checkbox", { name: /Food Pantry/ }).closest("label")?.parentElement;
+    const scroller = screen.getByRole("switch", { name: /Food Pantry/ }).parentElement?.parentElement;
     expect(classes(scroller)).toContain("pt-2");
     expect(classes(scroller)).not.toContain("py-2");
   });

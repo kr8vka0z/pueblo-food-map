@@ -209,12 +209,12 @@ function openFilterPanel() {
   fireEvent.click(filtersButton);
 }
 
-/** Open the Filters panel and check the category checkbox with this label. */
+/** Open the Filters panel and turn on the kind-of-place switch with this label (#917: switches, no tick boxes). */
 async function selectCategory(labelSubstring: string) {
   openFilterPanel();
-  const checkbox = screen.getByRole("checkbox", { name: new RegExp(labelSubstring, "i") });
+  const toggle = screen.getByRole("switch", { name: new RegExp(labelSubstring, "i") });
   await act(async () => {
-    fireEvent.click(checkbox);
+    fireEvent.click(toggle);
   });
 }
 

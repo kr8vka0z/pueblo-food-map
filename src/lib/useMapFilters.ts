@@ -107,6 +107,13 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = [], initial
     () => venuesWithDistance.filter((v) => v.accepts_wic).length,
     [venuesWithDistance],
   );
+  // Places of each kind (#917), for the Filters panel's kind-of-place switch
+  // rows: a total like snapCount, not narrowed by the other filters.
+  const categoryCounts = useMemo(() => {
+    const counts: Partial<Record<VenueCategory, number>> = {};
+    for (const v of venuesWithDistance) counts[v.category] = (counts[v.category] ?? 0) + 1;
+    return counts;
+  }, [venuesWithDistance]);
 
   // ── Main filter pipeline ─────────────────────────────────────────────────────
   //
@@ -290,6 +297,7 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = [], initial
     openNowCount,
     snapCount,
     wicCount,
+    categoryCounts,
     // Handlers
     toggleCategory,
     clearFilters,

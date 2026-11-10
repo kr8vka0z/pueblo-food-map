@@ -745,6 +745,7 @@ export default function MapWrapper({
     openNowCount,
     snapCount,
     wicCount,
+    categoryCounts,
     toggleCategory,
     clearFilters,
     handleClearAllFilters,
@@ -1916,6 +1917,7 @@ export default function MapWrapper({
         wicCount={wicCount}
         selectedCategories={selectedCategories}
         onToggleCategory={toggleCategory}
+        categoryCounts={categoryCounts}
         onClearAll={clearFilters}
         filterEvents={filterEvents}
         onToggleEvents={() => setFilterEvents((v) => !v)}

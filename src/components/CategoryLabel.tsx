@@ -22,7 +22,7 @@ interface CategoryLabelProps {
   label: string;
   /** Translated benefit words, only those the place takes, e.g. ["SNAP", "WIC"]. */
   benefits?: string[];
-  /** Size classes: `text-sm` (14 px) on a phone card and pages, `text-xs` on the computer panel. */
+  /** Size and spacing classes; R3 is 14 px (`text-sm`) everywhere. */
   className?: string;
 }
 

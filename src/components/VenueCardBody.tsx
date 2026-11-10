@@ -194,7 +194,6 @@ export default function VenueCardBody({
           ...(venue.accepts_snap ? [t("badge.snap", locale)] : []),
           ...(venue.accepts_wic ? [t("badge.wic", locale)] : []),
         ]}
-        className={sheet ? "text-sm" : "text-xs"}
       />
 
       {eventHere && <EventHereLine {...eventHere} />}

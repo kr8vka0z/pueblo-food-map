@@ -900,7 +900,7 @@ const eventCard = (o: { phase?: Phase; panel?: boolean; live?: boolean; first?: 
   const where = `<section><h3>Where</h3><div class="wh">${ic("pin")}<div><p class="vn">${EV.venue}</p><p>${EV.addr}</p><p class="mono">1.1 mi from you</p></div></div></section>`;
   const bring = `<section class="br"><h3>What to bring</h3><p>${EV.bring}</p></section>`;
   const endNote = p === "cancelled" ? `<p class="cn">Rain has closed the hall. We hope to see you next month.</p>` : p === "ended" ? `<p class="en">Looking for food today? See what is open right now.</p><a class="seeopen" href="#event-card">See places open now</a>` : "";
-  const top = `${head}${p === "cancelled" || p === "ended" ? endNote : ""}${when}${about}${evAction("", o.live)}`;
+  const top = `${head}${p === "cancelled" || p === "ended" ? endNote : ""}${when}${about}${active ? evAction("", o.live) : ""}`;
   const rest = `${where}${bring}${active ? `${evSecondary("", o.live)}${evDirections("", o.live)}` : ""}`;
   return `<div class="pfm pfm-ev${o.panel ? " pc" : ""}">${o.first ? top : `${top}${rest}`}</div>`;
 };

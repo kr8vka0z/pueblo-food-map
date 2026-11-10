@@ -333,7 +333,7 @@ Every hex here is copied from `@theme`. Ratios are measured against the real bac
 **Bone is the paper.** Warm cream, never grey.
 
 - `bone-50` `#FBFAF6`: the paper every page sits on.
-- `bone-100` `#F4F1EA`: resting chips, the loading block, the location help card, the status pill without a photo. It is no longer the hover fill on the public site (that is sage 100, R1); a few admin hovers still use it (Known drift).
+- `bone-100` `#F4F1EA`: resting chips, the loading block, the location help card, the status pill without a photo. It is no longer a hover fill on the public site (that is sage 100, R1); a few admin hovers still use it (Known drift).
 - `bone-200` `#E8E3D6`: card borders, dividers, the ended event badge.
 - `bone-300` `#D4CDB8`: edges of the search bar, bottom bar and outline buttons at rest (1.5 to 1, decoration only: the words carry the control). It is also the text-box edge, which fails (see Known drift).
 
@@ -469,7 +469,7 @@ One compact entry per shared part, in the order a visitor meets them, then the i
 
 ### The redesign rulings (apply to every entry below)
 
-These five rulings apply to the whole site. All five are live on the public site (#917); the admin entries that still say Approved, not built have yet to take R1.
+These five rulings apply to the whole site. All five are live on the public site (#917); the admin entries that still say Approved, not built have yet to take R1. Every public grey hover is now sage 100, including the place card's Report an issue (its mockup picture still shows bone 100).
 
 - **R1, the hover fill is sage 100.** Under the pointer, anything you can press that isn't a filled button takes a `sage-100` (`#D1DDD3`) fill, fading in over 150 ms. It replaces every grey hover (`bone-100`, `bone-200`, and `sage-50` on sign-in). Words on it stay ink 500 or darker. Filled sage buttons darken to sage 700. A Boxes-on item gets no hover fill. Orange buttons get no hover change at all.
 - **R2, nothing brightens on hover.** No `filter: brightness()` under the pointer, anywhere: on top of the color fade it made hover stutter. The press dim stays: a slight `brightness(0.95)` while pressed shows a tap landed, and the approved pages keep it. So `PRESS_FEEDBACK = "hover:brightness-105 active:brightness-95"` in `src/lib/interactionStyles.ts` loses its `hover:brightness-105` half and keeps `active:brightness-95`. Hover animates color, opacity or transform only.
@@ -1359,7 +1359,7 @@ Where the live code differs from the rules above. Fix an item when you're in its
 
 **The spacing trap, live:** `size-6` 32 (`src/components/bottomNavShared.tsx:86`); `h-5 w-5` 24 for route step icons and arrows (`src/components/DirectionButtons.tsx:227`, `:357`); `w-8 h-8` 48 for the Donate heart's circle (`src/components/HamburgerMenuContent.tsx:238`); `h-10` 64 for the thank-you's Back to map (`src/components/PublicForm.tsx:233`); `px-5 pt-5` 24 for the place card's padding (`src/components/VenueCardBody.tsx`).
 
-**Grey hover fills (break R1):** the admin: `bone-100` in `src/lib/adminCardStyles.ts` (secondary buttons); `src/components/VenueListView.tsx` (rows, `filterChipClass`); `src/components/AllBoxesTable.tsx` (filters); `src/components/DashboardNeedsStrip.tsx`; `src/components/AddVenueForm.tsx` (Reload); `bone-200` in `src/components/AdminNav.tsx` (`navLinkInactive`); `sage-50` in `src/components/AdminLoginForm.tsx` (`secondaryButtonClass`). Public surfaces not on the design pages, untouched by #917: `bone-100` in `src/components/ReportVenueButton.tsx` (the place card's Report an issue; the mockup keeps it bone 100), `src/components/VenueCard.tsx` (list rows), `src/components/EventListSection.tsx`, `src/components/ResourcesContent.tsx`, `src/components/GuidedTour.tsx`; `sage-50` in `src/components/VenueContent.tsx` and `src/components/ShareEventForm.tsx`.
+**Grey hover fills (break R1):** the admin: `bone-100` in `src/lib/adminCardStyles.ts` (secondary buttons); `src/components/VenueListView.tsx` (rows, `filterChipClass`); `src/components/AllBoxesTable.tsx` (filters); `src/components/DashboardNeedsStrip.tsx`; `src/components/AddVenueForm.tsx` (Reload); `bone-200` in `src/components/AdminNav.tsx` (`navLinkInactive`); `sage-50` in `src/components/AdminLoginForm.tsx` (`secondaryButtonClass`).
 
 **Under the 48-pixel floor:**
 

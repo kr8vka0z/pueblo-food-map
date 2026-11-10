@@ -302,7 +302,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
             className={
               "inline-flex items-center justify-center px-4 py-2 rounded " +
               "border border-[var(--color-sage-500)] text-[var(--color-sage-700)] text-sm font-medium " +
-              "hover:bg-[var(--color-sage-50)] transition-colors " +
+              "hover:bg-[var(--color-sage-100)] transition-colors duration-150 " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
             }
           >

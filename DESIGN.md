@@ -481,7 +481,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/BottomNav.tsx`, `src/components/bottomNavShared.tsx` (classes and the Boxes icon), `src/app/globals.css` (`[data-bottom-nav]`, `--bottom-nav-clearance`), `docs/bottom-nav-spec.md` (geometry and stacking history).
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 (live hover is `bone-100`) and R2 (`ITEM_CLASS` uses `PRESS_FEEDBACK`). Open, not decided: the icon size. The spec and the code's own comment say 24 on phones and 20 on large screens, with the large-screen bar 24 up; live they measure 32, 24 and 32 because of the spacing trap. The owner has been asked to bring them to 24 or keep 32 (Known drift); either way, use exact pixel classes.
+- **Status:** Live, changing in the redesign. Approved, not built: R1 (live hover is `bone-100`) and R2 (`ITEM_CLASS` uses `PRESS_FEEDBACK`). Approved, not built: the spec sizes. Icons are 24 on phones and 20 on large screens, with the large-screen bar 24 up (the spec and the code's own comment). Live they measure 32, 24 and 32 because of the spacing trap (Known drift). Use exact pixel classes in the fix.
 - **For:** the five ways off the map: Near me, Saved, Boxes, Help, Menu. Near me and Boxes act on the map; Saved and Menu open a panel; Help opens the Food help programs page (`/resources`). It floats near the bottom of every map and inside page, under the thumb.
 - **Use something else when:** it's about one place (the card); it narrows the map (Filters; Boxes is the one agreed shortcut); it's a new destination (the Menu). A sixth item narrows every cell and needs a mockup first.
 - **States:** resting `ink-500`; panel open `brand-navy`; Boxes on: raspberry words and icon, and only the heart in the box icon fills (the shape changes too); working: Near me shows `Loader2` spinning and can't be pressed again; keyboard: a sage 500 ring inside the item.
@@ -632,7 +632,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/LocationHelpCard.tsx`, `src/components/SplashScreen.tsx`, `src/components/Wordmark.tsx`. The same orange button is Show N places in `src/components/FilterPanel.tsx`.
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 on the card's × and See all places as a list, and on the welcome screen's Take a tour (live: `bone-200`, `sage-50`, `bone-100`); R2 on every orange button and the card's buttons. Orange keeps no hover change (open: the owner may still pick a look).
+- **Status:** Live, changing in the redesign. Approved, not built: R1 on the card's × and See all places as a list, and on the welcome screen's Take a tour (live: `bone-200`, `sage-50`, `bone-100`); R2 on every orange button and the card's buttons. Orange buttons get no hover change (owner, approved on review).
 - **Welcome screen:** a full-screen layer (`z-[9000]`) over the live map on a frosted scrim (see Map chrome). A centred column up to 820 wide: the wordmark, a navy purpose line (`text-2xl md:text-3xl font-semibold`), `ink-500` small print, then the orange buttons: full width, about 50 tall (18-pixel words, 16 above and below, 32 at the sides; 16 for the Spanish one below 640), corners 10, 12 apart. Take a tour: 48 tall, a 2-pixel sage edge, `sage-700` words.
 - **Location help card:** shown when the phone won't share its location: a `bone-100` card above the bottom bar, 12 in from the sides, 6 above the bar (420 wide on a computer), corners 14, a 4-pixel `sage-600` band along its top, level 2, a `sage-600` `MapPin`, a Fraunces 18 navy title, 14-pixel `ink-700` words, a 48-pixel round × , fully round 48-tall buttons. Location is off (refused): an outlined See all places as a list and a settings hint, no Try again. We couldn't find you (timeout): the orange Try again first. `role="status"`, no focus steal; it hides while any panel is open.
 - **Wording:** Find food near me / Encuentra comida cerca de mí (tapping one also picks the language); We only use your location to show food nearby. Nothing is saved.; the card titles and lines are in the Finding food near me pattern.
@@ -688,7 +688,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/PublicForm.tsx` (`Field`, `INPUT_BASE`, the send and Try again buttons, the thank-you, the error box), used by `SuggestForm.tsx`, `ReportForm.tsx`, `FeedbackForm.tsx`, `ShareEventForm.tsx` (all `src/components/`).
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 on Try again (live `hover:bg-bone-100`, `PublicForm.tsx:323`). Open: whether the form pages keep the line under the title (the no-subtitle ruling was made for the admin; kept for now).
+- **Status:** Live, changing in the redesign. Approved, not built: R1 on Try again (live `hover:bg-bone-100`, `PublicForm.tsx:323`). Public form pages keep the line under the title (owner, approved on review); the no-subtitle ruling is for the admin only.
 - **For:** every public page form. One shell checks the fields, waits for Cloudflare's Turnstile check, sends, then shows a thank-you or a plain error with Try again, keeping what was typed. The box card forms (`AdoptBoxForm.tsx`, `BoxAlertSignupForm.tsx`) use their own copy of these styles, `PRIMARY_BTN` and `SECONDARY_BTN` from `BoxCheckinPanel.tsx`, and `CardFormTurnstile.tsx`.
 - **Field:** a real `<label htmlFor>` (14 medium `ink-700`, 4 above); the box white, `radius-md`, 1-pixel `bone-300` edge, 12 by 8 padding, `ink-900` words, `ink-400` placeholder, 16 on a phone and 14 from 768; focus: `sage-500` edge and ring. Fields 24 apart (`space-y-5`). Required: a `danger` star (`aria-hidden`; the field says required). Error: `danger` edge and a 12-pixel `danger` line under it, `role="alert"`, wired with `aria-invalid` and `aria-describedby`.
 - **Send and Try again:** full width, 48 tall, `sage-600`, `bone-50` semibold 16-pixel words, `sage-700` under the pointer, a `sage-500` ring 2 out. While waiting: `opacity-60`, `cursor-not-allowed`, Verifying… then Sending….
@@ -796,7 +796,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/ArchiveVenueButton.tsx`, in the Danger zone of `src/app/(site)/admin/venues/[id]/edit/page.tsx`.
 
-- **Status:** Live, changing in the redesign. Approved, not built: the browser's `window.confirm` (`ArchiveVenueButton.tsx:58`) becomes a box on the page, right under the button: a 1-pixel `danger` edge, corners 10, 16 padding, the question naming the place in `ink-900` and what happens in `ink-700`, then Cancel first and Remove from map, half the row each, 48 tall. The red button itself stays. Open: the other `window.confirm` sites (Known drift) are not decided.
+- **Status:** Live, changing in the redesign. Approved, not built: the browser's `window.confirm` (`ArchiveVenueButton.tsx:58`) becomes a box on the page, right under the button: a 1-pixel `danger` edge, corners 10, 16 padding, the question naming the place in `ink-900` and what happens in `ink-700`, then Cancel first and Remove from map, half the row each, 48 tall. The red button itself stays. The other `window.confirm` sites stay as they are for now and are listed in Known drift.
 - **For:** taking a place off the public map without deleting it. The red outline button (`danger` words and edge, `danger` fill under the pointer) sits alone under Danger zone at the foot of a place's edit page.
 - **Wording:** the button says what it does to the public: Remove from map, never Archive or Delete. Working: Removing…. See the Confirming a risky action pattern.
 
@@ -862,7 +862,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 Eight icons are flagged as one icon with two meanings or two icons for one: the star (saved, and events in orange), `map-pin` (a place, your own location, the arrive step), `hand-helping` (Help and Volunteer), `calendar-plus` (Add to calendar and Share an event), Website drawn two ways (`external-link` on places and Resources, `globe` on events), and two near twins (`message-square` and `message-square-text`; `circle-check` and `check`). Listed for the owner, not changed.
 
-**Sizes in use today:** 11, 12, 13, 14 (the most used), 15, 16, 18, 20, 24, 28 and 32 pixels; map pins have their own scale (28 and 36 places, 44 and 52 events). A proposed set of five (14, 16, 20, 24, 28) is on the Icons page, waiting on the owner; it is not a rule yet. Write an icon size as a number (`size={20}`), never a size class: `size-5` and `size-6` are 24 and 32 here.
+**Sizes in use today:** 11, 12, 13, 14 (the most used), 15, 16, 18, 20, 24, 28 and 32 pixels; map pins have their own scale (28 and 36 places, 44 and 52 events). The set for new work is five sizes: 14, 16, 20, 24 and 28 (owner, approved on review). The other sizes in use today are drift to move onto the set when that code is touched. Write an icon size as a number (`size={20}`), never a size class: `size-5` and `size-6` are 24 and 32 here.
 
 **How to use them:** always beside words or named (an icon-only button has a translated `aria-label`; icons beside words are `aria-hidden`); the color of the words next to it (`currentColor`: `ink-400` for quiet ones, `sage-600` or `sage-700` inside links, `clay-500` for the saved star, raspberry for Boxes on); the tap area is the button, 48 even when the icon is 16; no emoji as icons, anywhere. A new one: search this list first, ask whether words alone would do, and take it from Lucide.
 
@@ -870,7 +870,7 @@ Eight icons are flagged as one icon with two meanings or two icons for one: the 
 
 Movement only shows what changed: a color fades, a card slides up, the map flies to a place, a live event pulses. Nothing bounces or moves for decoration.
 
-**The tokens** (`src/app/globals.css` `@theme`): `--ease-out-circ` `cubic-bezier(0.32, 0.72, 0, 1)` (quick to start, gentle to stop; the curve vaul uses for its 0.5 s slide), `--duration-fast` 150 ms, `--duration-default` 250 ms, `--duration-slow` 400 ms. The code uses none of them by name yet (see Known drift). Open, not decided: whether to keep them as the standard for new work or drop them.
+**The tokens** (`src/app/globals.css` `@theme`): `--ease-out-circ` `cubic-bezier(0.32, 0.72, 0, 1)` (quick to start, gentle to stop; the curve vaul uses for its 0.5 s slide), `--duration-fast` 150 ms, `--duration-default` 250 ms, `--duration-slow` 400 ms. The code uses none of them by name yet (see Known drift). They are the standard for new work: switches use 250 ms with `--ease-out-circ` (owner, approved on review).
 
 **What moves:**
 
@@ -1070,7 +1070,7 @@ A pattern is a job that comes up on many pages and uses several components. Word
 ### Confirming a risky action
 
 - **When:** the action changes what the public sees or can't easily be undone (taking a place off the map, publishing, hiding a photo). Live, changing in the redesign: Approved, not built: Remove from map asks on the page, Cancel first.
-- **Screens:** admin Remove from map (the ruling applies here). Still the browser's pop-up, not decided: Archive this venue on a change card, Publish, Approve all date-only updates, Archive event, Remove this flyer, and on the public site a box photo's report.
+- **Screens:** admin Remove from map (the ruling applies here). Still the browser's pop-up, listed in Known drift: Archive this venue on a change card, Publish, Approve all date-only updates, Archive event, Remove this flyer, and on the public site a box photo's report.
 - **Steps:**
   1. The first tap opens the confirm right where the button was, on the page. Never the browser's pop-up.
   2. It names the thing and says exactly what happens and what doesn't.

@@ -212,7 +212,7 @@ const rules = `<section class="ds" id="rules">
   <ul>
     <li><b>Always beside words, or named.</b> An icon-only button (Close, Share, Save) has a translated name a screen reader says, in English and Spanish. Icons beside words are hidden from screen readers.</li>
     <li><b>The color of the words next to it.</b> Ink 400 for quiet ones (search, chevrons, share), sage 600 or 700 inside links, clay 500 for the saved star, raspberry for Boxes on. Never the only sign of a state.</li>
-    <li><b>The tap area is the button, not the drawing:</b> 48 pixels even when the icon is 16. Today the place pins tap at 44 (VenueMarker.tsx:41), under the floor.</li>
+    <li><b>The tap area is the button, not the drawing:</b> 48 pixels even when the icon is 16. Today the place pins tap at 44 (VenueMarker.tsx:42), under the floor.</li>
     <li><b>No emoji as icons,</b> anywhere.</li>
     <li><b>A new one:</b> search this page first, ask whether words alone would do, check it can't be mistaken for one already here, and take it from Lucide so there's still one set.</li>
   </ul>

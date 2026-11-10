@@ -281,7 +281,7 @@ This file **mirrors** the theme. It is not the source of it.
 - **The drift check:** `npm run design:drift` (`scripts/check-design-drift.mjs`) compares every `--color-*`, `--spacing-*` and `--radius-*` value in `@theme` with the `colors`, `spacing` and `rounded` lists above, and fails on a mismatch. It also fails when code under `src/` names a `var(--color-...)` that `@theme` does not define. It does not check `typography`, `components` or `elevation` above: the type sizes are Tailwind's own (there is no type scale in `@theme`), copied here from what the code uses, so keep them in step by hand.
 - **The format check:** `npm run design:lint` runs `designmd lint` on this file (Google's DESIGN.md format, alpha).
 - **Where the parts live in code:** the public site's components are in `src/components/`, one file each (no shared `ui/` folder yet). Shared class strings live in `src/lib/interactionStyles.ts`, `src/lib/adminCardStyles.ts`, `src/components/formClasses.ts` and `src/components/PublicForm.tsx`. Each component entry below names its file.
-- **The approved design pages:** Brand, Foundations, Components (three pages: map and cards, pages and forms, admin), Icons and Patterns. Their source is in this repo at `docs/design/design-system/` (`pages/*.ts`). Build them with `cd docs/design/design-system && MOCK_DIST=<a folder whose path contains /scratch/> bun build.ts` (see that folder's `README.md`). A temporary review copy is at https://pueblo-food-map-mocks.kyle-boyd.workers.dev; the repo is the lasting source. This file is written from those pages, which the owner reviewed. Anything the owner did not object to is approved.
+- **The approved design pages:** Brand, Foundations, Components (three pages: map and cards, pages and forms, admin), Icons and Patterns. Their source is in this repo at `docs/design/design-system/` (`pages/*.ts`). Build them with `cd docs/design/design-system && MOCK_DIST=<a folder whose path contains /scratch/> bun build.ts` (see that folder's `README.md`). This file is written from those pages, which the owner reviewed. Anything the owner did not object to is approved.
 - **Status words:** `Live as is` means the code matches the entry. `Live, changing in the redesign` means the entry is live but the owner approved changes that are not in the code yet; each change is written as **Approved, not built** with exactly what changes. A change gets its code file and drops the tag the day it ships.
 
 Read this file before touching anything visual. Update it in the same change as the component, never later.
@@ -481,7 +481,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/BottomNav.tsx`, `src/components/bottomNavShared.tsx` (classes and the Boxes icon), `src/app/globals.css` (`[data-bottom-nav]`, `--bottom-nav-clearance`), `docs/bottom-nav-spec.md` (geometry and stacking history).
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 (live hover is `bone-100`) and R2 (`ITEM_CLASS` uses `PRESS_FEEDBACK`). Approved, not built: the spec sizes. Icons are 24 on phones and 20 on large screens, with the large-screen bar 24 up (the spec and the code's own comment). Live they measure 32, 24 and 32 because of the spacing trap (Known drift). Use exact pixel classes in the fix.
+- **Status:** Live, changing in the redesign. Approved, not built: R1 (live hover is `bone-100`) and R2 (`ITEM_CLASS` uses `PRESS_FEEDBACK`). The standing spec (and the code's own comment): icons 24 on phones and 20 on large screens, the large-screen bar 24 up. Live they measure 32, 24 and 32 because of the spacing trap (Known drift). Open: the owner may keep 32. Either way, use exact pixel classes.
 - **For:** the five ways off the map: Near me, Saved, Boxes, Help, Menu. Near me and Boxes act on the map; Saved and Menu open a panel; Help opens the Food help programs page (`/resources`). It floats near the bottom of every map and inside page, under the thumb.
 - **Use something else when:** it's about one place (the card); it narrows the map (Filters; Boxes is the one agreed shortcut); it's a new destination (the Menu). A sixth item narrows every cell and needs a mockup first.
 - **States:** resting `ink-500`; panel open `brand-navy`; Boxes on: raspberry words and icon, and only the heart in the box icon fills (the shape changes too); working: Near me shows `Loader2` spinning and can't be pressed again; keyboard: a sage 500 ring inside the item.
@@ -826,7 +826,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 - Don't use Fraunces for running text at 16 pixels or smaller, buttons, badges, labels or form boxes.
 - Don't use a CSS drop-shadow filter on anything drawn on the map; the pin shadow lives in the SVG.
 - Don't add decorative pictures, a gradient, a card inside a card, a dark mode (`color-scheme: light` is set) or a sidebar beside the map.
-- Don't add a new colored edge stripe. The two live ones (today's line in the hours, the location help card's top band) are approved as they are.
+- Don't add colored edge stripes. Two live ones break this rule and are listed in Known drift: today's line in the hours and the location help card's top band.
 - Don't put a long dash in anything a person reads (see Wording).
 - Don't treat clay as unused: it is the warm attention color (the saved star, needs a sponsor, Waiting to publish, the outside-the-county note), never a third action color.
 
@@ -862,7 +862,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 Eight icons are flagged as one icon with two meanings or two icons for one: the star (saved, and events in orange), `map-pin` (a place, your own location, the arrive step), `hand-helping` (Help and Volunteer), `calendar-plus` (Add to calendar and Share an event), Website drawn two ways (`external-link` on places and Resources, `globe` on events), and two near twins (`message-square` and `message-square-text`; `circle-check` and `check`). Listed for the owner, not changed.
 
-**Sizes in use today:** 11, 12, 13, 14 (the most used), 15, 16, 18, 20, 24, 28 and 32 pixels; map pins have their own scale (28 and 36 places, 44 and 52 events). The set for new work is five sizes: 14, 16, 20, 24 and 28 (owner, approved on review). The other sizes in use today are drift to move onto the set when that code is touched. Write an icon size as a number (`size={20}`), never a size class: `size-5` and `size-6` are 24 and 32 here.
+**Sizes in use today:** 11, 12, 13, 14 (the most used), 15, 16, 18, 20, 24, 28 and 32 pixels; map pins have their own scale (28 and 36 places, 44 and 52 events). A proposed set of five (14, 16, 20, 24, 28) is on the Icons page, waiting on the owner; it is not a rule yet. Write an icon size as a number (`size={20}`), never a size class: `size-5` and `size-6` are 24 and 32 here.
 
 **How to use them:** always beside words or named (an icon-only button has a translated `aria-label`; icons beside words are `aria-hidden`); the color of the words next to it (`currentColor`: `ink-400` for quiet ones, `sage-600` or `sage-700` inside links, `clay-500` for the saved star, raspberry for Boxes on); the tap area is the button, 48 even when the icon is 16; no emoji as icons, anywhere. A new one: search this list first, ask whether words alone would do, and take it from Lucide.
 
@@ -870,7 +870,7 @@ Eight icons are flagged as one icon with two meanings or two icons for one: the 
 
 Movement only shows what changed: a color fades, a card slides up, the map flies to a place, a live event pulses. Nothing bounces or moves for decoration.
 
-**The tokens** (`src/app/globals.css` `@theme`): `--ease-out-circ` `cubic-bezier(0.32, 0.72, 0, 1)` (quick to start, gentle to stop; the curve vaul uses for its 0.5 s slide), `--duration-fast` 150 ms, `--duration-default` 250 ms, `--duration-slow` 400 ms. The code uses none of them by name yet (see Known drift). They are the standard for new work: switches use 250 ms with `--ease-out-circ` (owner, approved on review).
+**The tokens** (`src/app/globals.css` `@theme`): `--ease-out-circ` `cubic-bezier(0.32, 0.72, 0, 1)` (quick to start, gentle to stop; the curve vaul uses for its 0.5 s slide), `--duration-fast` 150 ms, `--duration-default` 250 ms, `--duration-slow` 400 ms. The code uses none of them by name yet (see Known drift). Only the switch timing is an owner ruling: switches slide in 250 ms on `cubic-bezier(0.32, 0.72, 0, 1)`. Open, not decided: whether the named tokens become the standard for new work.
 
 **What moves:**
 
@@ -1355,7 +1355,7 @@ Where the live code differs from the rules above. Fix an item when you're in its
 - There is not one field style: there are four copies of the same look: `INPUT_BASE` in `src/components/PublicForm.tsx:33-42`, `inputBase` in `src/components/formClasses.ts:8`, `SELECT_CLASS` in `src/components/BoxNumbersPanel.tsx:37`, and the inline field classes in `src/components/AdoptBoxForm.tsx:177` and `src/components/BoxAlertSignupForm.tsx:162`.
 - The bottom bar's icons are not 24 and 20: `ICON_CLASS = "shrink-0 size-6 2xl:size-5"` (`src/components/bottomNavShared.tsx:86`) measures 32 on phones and 24 on large screens (the spacing trap; its own comment says 24), and the large-screen bar sits 32 up (`2xl:bottom-6`) where the spec says 24.
 - Hover is not "brightness 105, active 95" by design: `PRESS_FEEDBACK = "hover:brightness-105 active:brightness-95"` (`src/lib/interactionStyles.ts:17`) breaks R2.
-- The old "Known deviations" called the hours list's today line and monospace times mistakes; the approved Hours list entry keeps both.
+- Two colored edge stripes break the no-stripes rule: today's line in the hours (`src/components/HoursList.tsx`) and the location help card's top band (`src/components/LocationHelpCard.tsx`). The Hours list entry shows them as live; whether to keep them is not decided. The monospace times in the hours list stay.
 - Code comments that point to parts of this file that are gone: "DESIGN.md Forms > Submit" (now Public form fields and buttons) in `src/components/PublishPanel.tsx:23` and `scripts/check-banned.mjs:27`; the `filtersButton` component token (now `buttonPrimary` and `switchOn`) in `src/components/RouteStrip.tsx:50`.
 
 **The spacing trap, live:** `size-6` 32 (`src/components/bottomNavShared.tsx:86`); `h-5 w-5` 24 for route step icons and arrows (`src/components/DirectionButtons.tsx:227`, `:357`); `w-8 h-8` 48 for the Donate heart's circle (`src/components/HamburgerMenuContent.tsx:238`); `h-10` 64 for the thank-you's Back to map (`src/components/PublicForm.tsx:233`); `px-5 pt-5` 24 for the place card's padding (`src/components/VenueCardBody.tsx`).

@@ -292,7 +292,7 @@ const search = pat({
   when: "Finding a place by name or narrowing the map, from the bar at the top of the map and the list.",
   screens: ["The map screen and the list view"],
   steps: [
-    "<b>One search bar</b> at the top: Filters on the left, then the words box. There is no Search button.",
+    "<b>One search bar</b> at the top: the words box, then Filters at its right end. There is no Search button.",
     "<b>Matches show under the box as you type</b>, with a count. The row under them shows every match as a list.",
     "<b>Filters</b> narrow by kind of place, open now, SNAP and WIC (the Picking several pattern above).",
     "<b>Map or list:</b> a row under the search box (See all places as a list, Back to the map) and a line at the top of the Menu. Kept as is.",

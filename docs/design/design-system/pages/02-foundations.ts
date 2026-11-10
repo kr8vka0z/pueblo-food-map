@@ -125,8 +125,8 @@ const colors = dsSec({
 const D = "var(--display)", S = "var(--body)";
 // [px, class, use, sample, font, weight, line height]
 const sizes: [number, string, string, string, string, number, string][] = [
-  [60, "text-6xl", "The wordmark on the splash, 768 pixels wide and up", "Pueblo", D, 400, "1"],
-  [36, "text-4xl", "The wordmark on phones", "Pueblo Food Map", D, 400, "40px"],
+  [60, "text-6xl", "The wordmark on the splash, 768 pixels wide and up", "Pueblo", D, 700, "1"],
+  [36, "text-4xl", "The wordmark on phones", "Pueblo Food Map", D, 700, "40px"],
   [30, "text-3xl", "Page titles on content pages: About, the help pages, Not found, a box's history", "About this map", D, 400, "36px"],
   [24, "text-2xl", "Page titles on form pages and a place's own page; an event's name on its card; admin page titles", "Share an event", D, 400, "32px"],
   [20, "text-xl", "A place's name on its card (leading tight); a thank-you title (semibold); admin section titles", "Eastside Community Pantry", D, 400, "1.25"],

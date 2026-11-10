@@ -36,6 +36,7 @@ import LocationHelpCard from "@/components/LocationHelpCard";
 import AdoptBoxForm from "@/components/AdoptBoxForm";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { makeWalk } from "@/__tests__/helpers/walkTestHelpers";
+import { t } from "@/lib/i18n";
 
 // Box cards mount BoxCheckinPanel's Turnstile widget — same stub as the
 // BoxCardBody/DesktopVenueWindow tests.
@@ -148,9 +149,12 @@ describe("FilterPanel", () => {
 
   test("every Kind-of-place row is at least 48px tall", () => {
     render(<FilterPanel {...filterProps} />);
-    // #917: kind-of-place rows are switch rows now (no tick boxes).
-    const rows = ["Food Pantry", "Blessing Box"].map((n) => screen.getByRole("switch", { name: n }).parentElement);
-    for (const row of rows) expect(classes(row)).toContain("min-h-12");
+    // #917: kind-of-place rows are switch rows now (no tick boxes); check all eight.
+    const kinds = ["pantry", "grocery", "convenience", "farm", "garden", "edible_landscape", "meal_site", "blessing_box"];
+    for (const kind of kinds) {
+      const row = screen.getByRole("switch", { name: t(`category.full.${kind}`, "en") }).parentElement;
+      expect(classes(row)).toContain("min-h-12");
+    }
   });
 
   test("the Show N places footer button is 48px tall", () => {

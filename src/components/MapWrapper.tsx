@@ -766,7 +766,7 @@ export default function MapWrapper({
   // render needs to reflect. Left null (the default, no override) for:
   // turning Boxes OFF, turning it on with no known location (never triggers
   // the geolocation prompt — Near me already owns that), or the Filters
-  // panel's own checkbox (which calls toggleCategory directly, bypassing
+  // panel's own Blessing Box switch (which calls toggleCategory directly, bypassing
   // this handler, so it keeps today's fit-all).
   const pendingBoxesFitBoundsRef = useRef<
     [[number, number], [number, number]] | null

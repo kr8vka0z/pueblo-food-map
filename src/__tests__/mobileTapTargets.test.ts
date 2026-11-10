@@ -80,7 +80,10 @@ describe("mobile review #14 — shared press-feedback style is defined once", ()
     // HamburgerMenu.tsx itself is now pure shell (position/focus/Escape),
     // with nothing left that needs the press-feedback style.
     "src/components/HamburgerMenuContent.tsx",
-    "src/components/VenuePopupHeader.tsx",
+    // VenuePopupHeader.tsx removed by #917 (its bar is gone; the × lives in
+    // DesktopVenueWindow's pinned top) — dropped, not left to 404.
+    "src/components/DesktopVenueWindow.tsx",
+    "src/components/VenueActionRow.tsx",
     "src/components/LocationHelpCard.tsx",
     "src/components/FavoriteButton.tsx",
     "src/components/ShareButton.tsx",

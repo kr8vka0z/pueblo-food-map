@@ -5,6 +5,7 @@
  * selectedCategories, the filtered list, and the per-kind count on the row.
  */
 
+import { useEffect } from "react";
 import { describe, test, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import FilterPanel from "@/components/FilterPanel";
@@ -17,11 +18,15 @@ vi.mock("@/lib/analytics", async (importOriginal) => ({
 }));
 
 const PUEBLO_CENTER = { lat: 38.2667, lng: -104.6167 };
-let latest: ReturnType<typeof useMapFilters>;
+type Filters = ReturnType<typeof useMapFilters>;
+let latest: Filters;
+const report = (f: Filters) => {
+  latest = f;
+};
 
 function Harness() {
   const f = useMapFilters(PUEBLO_CENTER);
-  latest = f;
+  useEffect(() => report(f));
   return (
     <FilterPanel
       open

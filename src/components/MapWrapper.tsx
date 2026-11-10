@@ -97,7 +97,7 @@ const MapCanvas = dynamic(() => import("./Map"), {
 // viewMode === "map" && selectedVenue` (see its JSX below) — on the mobile
 // viewport this whole app targets first, that condition is never true, so a
 // plain top-level import still shipped ~800 lines of desktop-only markup
-// (DesktopVenueWindow.tsx + VenuePopupHeader.tsx) into every mobile visitor's
+// (DesktopVenueWindow.tsx and, then, its VenuePopupHeader.tsx) into every mobile visitor's
 // synchronous MapWrapper chunk for code that never mounts. Same next/dynamic
 // pattern as MapCanvas above, minus a loading fallback (see the
 // desktopWindowPrefetched effect below, near `isMobile`, for why): the JSX is

@@ -6,7 +6,7 @@
  */
 
 import { describe, test, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { BlessingBoxesHub, CommunityGardensHub, FoodPantriesHub, SnapWicHub } from "@/components/HubPages";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 import ResourcesContent from "@/components/ResourcesContent";

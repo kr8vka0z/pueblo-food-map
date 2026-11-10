@@ -320,6 +320,12 @@ const enClient: Record<string, string> = {
   "share.labelGeneric": "Share this place",
   "share.copied": "Link copied",
 
+  // Card action row (#917): Call and Website, and why one is greyed.
+  "action.call": "Call {phone}",
+  "action.noPhone": "No phone number listed",
+  "action.website": "Visit {name}'s website (opens in a new tab)",
+  "action.noWebsite": "No website listed",
+
   // View switch — search-bar suggestion row + Menu line (#514). Replaces the
   // old in-bar ViewToggle (#129/#191, removed): switching map/list now goes
   // through one line under an empty, focused search bar, a "See all N

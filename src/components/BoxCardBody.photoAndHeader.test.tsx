@@ -99,18 +99,21 @@ describe("BoxCardBody — photo opens PhotoViewer full size (#508)", () => {
 
 // #515 — badge + actions share row 1; the name is its own full-width row 2.
 describe("BoxCardBody — header row split (#515)", () => {
-  test("badge and actions render together in one row, ahead of the name in DOM order", () => {
+  // #917 (DESIGN.md R3/R4): "Box cards: Share and Save on the left" in the
+  // action row above the name, and "Blessing Box in raspberry words on its
+  // own line under the name" (no pill above it any more).
+  test("the actions row sits above the name, and the Blessing Box label is its own line under it", () => {
     renderCard({}, <button type="button">Close</button>);
-    const badge = screen.getByText("Blessing Box");
     const actionButton = screen.getByRole("button", { name: "Close" });
     const name = screen.getByText("Practice Blessing Box #1 (TEST DATA)");
+    const label = screen.getByText("Blessing Box").closest("p");
 
-    // Badge and the caller's action share a common row ancestor...
-    const badgeRow = badge.parentElement;
-    expect(badgeRow?.contains(actionButton)).toBe(true);
-    // ...and that row is the name's previous sibling, not its ancestor —
-    // i.e. the name is a sibling row, not squeezed into the same flex row.
-    expect(badgeRow?.nextElementSibling).toBe(name);
+    // The actions get their own row, the name's previous sibling — the name is
+    // not squeezed into the same flex row.
+    const actionsRow = actionButton.parentElement;
+    expect(actionsRow?.nextElementSibling).toBe(name);
+    expect(name.nextElementSibling).toBe(label);
+    expect(label?.contains(actionButton)).toBe(false);
   });
 
   test("the name is still the labelled heading (nameId) with no actions", () => {

@@ -41,6 +41,7 @@ import type { Venue } from "@/types/venue";
 import PageNav, { PAGE_NAV_CLEARANCE } from "@/components/PageNav";
 import SiteFooter from "@/components/SiteFooter";
 import FaqSection from "@/components/FaqSection";
+import CategoryLabel from "@/components/CategoryLabel";
 import { faqItemsFor } from "@/lib/faqItems";
 
 const PLACE_LINK_CLASS =
@@ -160,15 +161,20 @@ export function SnapWicHub({ locale, venues }: { locale: Locale; venues: Venue[]
       <ul className="space-y-4">
         {places.map((v) => {
           // `=== true` again at render (not just in the filter): a place is
-          // badged only for the benefit it is confirmed to take.
-          const badges = [
-            v.accepts_snap === true && t("hubs.snapWic.badgeSnap", locale),
-            v.accepts_wic === true && t("hubs.snapWic.badgeWic", locale),
-          ].filter(Boolean);
+          // labelled only for the benefit it is confirmed to take.
+          const benefits = [
+            ...(v.accepts_snap === true ? [t("badge.snap", locale)] : []),
+            ...(v.accepts_wic === true ? [t("badge.wic", locale)] : []),
+          ];
           return (
             <PlaceItem key={v.id} venue={v} locale={locale}>
-              <p className={DETAIL_CLASS + " mt-0.5"}>{t(`category.full.${v.category}`, locale)}</p>
-              <p className="mt-0.5 text-sm font-semibold text-[var(--color-ink-700)]">{badges.join(" · ")}</p>
+              {/* #917, R3: the category and SNAP/WIC as one colored label under the address. */}
+              <CategoryLabel
+                category={v.category}
+                label={t(`category.full.${v.category}`, locale)}
+                benefits={benefits}
+                className="mt-0.5 text-sm"
+              />
             </PlaceItem>
           );
         })}

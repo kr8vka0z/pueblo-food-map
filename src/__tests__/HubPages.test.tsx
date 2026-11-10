@@ -123,12 +123,16 @@ describe("SnapWicHub", () => {
     expect(screen.queryByText("String Store")).toBeNull();
   });
 
-  test("badges match each place's own fields", () => {
+  // #917 (DESIGN.md R3, "SNAP and WIC page label"): the category, then SNAP,
+  // then WIC, as one colored label; a benefit shows only when confirmed.
+  test("each place's label names only the benefits it takes", () => {
     render(<SnapWicHub locale="en" venues={list} />);
-    const item = (name: string) => screen.getByRole("link", { name }).closest("li") as HTMLElement;
-    expect(within(item("Snap Store")).getByText("Accepts SNAP/EBT")).toBeDefined();
-    expect(within(item("Both Store")).getByText("Accepts SNAP/EBT · Accepts WIC")).toBeDefined();
-    expect(within(item("Wic Store")).getByText("Accepts WIC")).toBeDefined();
+    const label = (name: string) =>
+      (screen.getByRole("link", { name }).closest("li") as HTMLElement).querySelector("p.font-semibold")!.textContent;
+    expect(label("Snap Store")).toMatch(/·, SNAP$/);
+    expect(label("Both Store")).toMatch(/·, SNAP·, WIC$/);
+    expect(label("Wic Store")).toMatch(/·, WIC$/);
+    expect(label("Wic Store")).not.toContain("SNAP");
   });
 
   test("never calls these places free; links to /resources in its own tree", () => {
@@ -139,12 +143,14 @@ describe("SnapWicHub", () => {
     expect(hrefs).toContain("/resources");
   });
 
-  test("ES: /es venue + resources links, Spanish badges", () => {
+  test("ES: /es venue + resources links, Spanish category label", () => {
     render(<SnapWicHub locale="es" venues={list} />);
     expect(screen.getByRole("link", { name: "Snap Store" }).getAttribute("href")).toBe("/es/venue/snap");
     const esHrefs = screen.getAllByRole("link", { name: t("resources.heading", "es") }).map((a) => a.getAttribute("href"));
     expect(esHrefs).toContain("/es/resources");
-    expect(screen.getAllByText(/Acepta/).length).toBeGreaterThan(0);
+    // #917: the label's category word is Spanish (SNAP and WIC read the same in both).
+    const cat = list.find((v) => v.name === "Snap Store")!.category;
+    expect(screen.getAllByText(t(`category.full.${cat}`, "es")).length).toBeGreaterThan(0);
   });
 
   test("ItemList JSON-LD lists each place once", () => {

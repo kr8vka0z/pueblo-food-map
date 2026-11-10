@@ -18,7 +18,6 @@
 
 import { X, MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
 import type { Venue } from "@/types/venue";
-import { categoryColors } from "@/lib/categories";
 import { formatMiles } from "@/lib/distance";
 import { computeVenueOpenStatus, nextIrregularOccurrence, formatIrregularOccurrence } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
@@ -34,6 +33,7 @@ import ShareButton from "@/components/ShareButton";
 import HoursList from "@/components/HoursList";
 import DirectionButtons from "@/components/DirectionButtons";
 import EventHereLine, { type EventHere } from "@/components/EventHereLine";
+import CategoryLabel from "@/components/CategoryLabel";
 
 interface VenueCardBodyProps {
   venue: Venue & { distanceMiles?: number };
@@ -197,6 +197,17 @@ export default function VenueCardBody({
         )}
       </div>
 
+      {/* Category label (#917, R3): colored words on their own line under the name. */}
+      <CategoryLabel
+        category={venue.category}
+        label={t(`category.full.${venue.category}`, locale)}
+        benefits={[
+          ...(venue.accepts_snap ? [t("badge.snap", locale)] : []),
+          ...(venue.accepts_wic ? [t("badge.wic", locale)] : []),
+        ]}
+        className={sheet ? "text-sm" : "text-xs"}
+      />
+
       {eventHere && <EventHereLine {...eventHere} />}
 
       {/* Operator attribution */}
@@ -213,27 +224,6 @@ export default function VenueCardBody({
           </a>
         </p>
       )}
-
-      {/* Category badge + SNAP/WIC pills */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span
-          className={`inline-flex items-center gap-1.5 ${sheet ? "px-2.5 py-1 text-sm" : "px-2 py-0.5 text-xs"} rounded-full font-medium text-[var(--color-bone-50)]`}
-          style={{ backgroundColor: categoryColors[venue.category] }}
-        >
-          <span className={`${sheet ? "w-2 h-2" : "w-1.5 h-1.5"} rounded-full bg-white/40 shrink-0`} aria-hidden />
-          {t(`category.full.${venue.category}`, locale)}
-        </span>
-        {venue.accepts_snap && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-            {t("badge.snap", locale)}
-          </span>
-        )}
-        {venue.accepts_wic && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-            {t("badge.wic", locale)}
-          </span>
-        )}
-      </div>
 
       {/* Distance + hours today */}
       <div className={`flex ${sheet ? "items-center gap-4 text-sm" : "flex-wrap items-center gap-3 text-xs"} text-[var(--color-ink-500)]`}>

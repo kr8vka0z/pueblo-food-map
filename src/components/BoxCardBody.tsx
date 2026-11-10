@@ -91,7 +91,7 @@ import PhotoViewer from "@/components/PhotoViewer";
 import { WalkRouteStatus } from "@/components/DirectionButtons";
 import { googleMapsUrl } from "@/lib/googleMapsUrl";
 import type { Walk } from "@/lib/useWalkingRoute";
-import { categoryColors } from "@/lib/categories";
+import CategoryLabel from "@/components/CategoryLabel";
 import {
   STATUS_DOT_CLASS,
   STATUS_TEXT_CLASS,
@@ -313,20 +313,14 @@ export default function BoxCardBody({
   // ── Blocks — each defined once, ordered per layout below ────────────────
   // (#725: the two layouts used to be two full copies of the same markup.)
 
-  // Badge + actions, then name (#515 fix pass, 2026-09-19): the name gets its
-  // own row so it can run the card's full width instead of the column left
-  // beside the actions. gap-4 keeps 8px between the actions' 48px hit areas (#233).
+  // Action row, then name, then label (#917, DESIGN.md R3/R4): Share and Save
+  // sit at the row's left, 12px above the name, the same row as on a place
+  // card, so the name runs the card's full width. gap-4 keeps 8px between the
+  // actions' 48px hit areas (#233). The label is raspberry words under the
+  // name, 4px below it, no pill.
   const nameBlock = (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2">
-        <span
-          className="inline-block rounded-full px-2.5 py-1 text-[11px] font-semibold text-[var(--color-bone-50)]"
-          style={{ backgroundColor: categoryColors[box.category] }}
-        >
-          {t("category.full.blessing_box", locale)}
-        </span>
-        {actions && <div className="flex shrink-0 items-center gap-4">{actions}</div>}
-      </div>
+    <div className="flex flex-col">
+      {actions && <div className="mb-3 flex items-center gap-4">{actions}</div>}
       <h2
         id={nameId}
         className="text-xl font-normal leading-tight text-[var(--color-ink-900)]"
@@ -334,6 +328,7 @@ export default function BoxCardBody({
       >
         {box.name}
       </h2>
+      <CategoryLabel category={box.category} label={t("category.full.blessing_box", locale)} className="mt-1 text-sm" />
     </div>
   );
 

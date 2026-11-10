@@ -45,8 +45,10 @@ function renderSplash(locale: "en" | "es" = "en") {
 
 // Baseline className, byte-for-byte, from SplashScreen.tsx before #600 (the
 // English button is not part of the reported bug and must not change).
+// #917: orange buttons get no hover change (DESIGN.md R1/R2), so the
+// hover:brightness-105 half is gone; the press dim stays.
 const EN_BASELINE_CLASSNAME =
-  "w-full rounded-[var(--radius-md)] px-6 py-4 md:py-5 text-lg md:text-xl font-semibold leading-none bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)] hover:brightness-105 active:brightness-95 transition-[filter] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-brand-orange)]";
+  "w-full rounded-[var(--radius-md)] px-6 py-4 md:py-5 text-lg md:text-xl font-semibold leading-none bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)] active:brightness-95 transition-[filter] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-brand-orange)]";
 
 describe("Spanish CTA wrap fix (#600)", () => {
   test("English CTA classes are unchanged (button must look the same)", () => {

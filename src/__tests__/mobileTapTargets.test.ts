@@ -66,7 +66,8 @@ describe("mobile review #13 — VenueMarker invisible hit-area floor", () => {
 describe("mobile review #14 — shared press-feedback style is defined once", () => {
   test("PRESS_FEEDBACK is exported from the shared module, not pasted per-component", () => {
     const src = readSource("src/lib/interactionStyles.ts");
-    expect(src).toMatch(/export const PRESS_FEEDBACK = "hover:brightness-105 active:brightness-95";/);
+    // #917 R2: the hover half (hover:brightness-105) is gone; the press dim stays.
+    expect(src).toMatch(/export const PRESS_FEEDBACK = "active:brightness-95";/);
   });
 
   test.each([

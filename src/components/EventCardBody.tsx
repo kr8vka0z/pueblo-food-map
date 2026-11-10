@@ -122,7 +122,7 @@ export interface EventCardBodyProps {
 const SECONDARY_BUTTON =
   "inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-[var(--radius-md)] " +
   "border border-[var(--color-bone-300)] bg-[var(--color-bone-50)] px-3 text-sm font-semibold " +
-  "text-[var(--color-ink-700)] transition-colors hover:bg-[var(--color-bone-100)] touch-manipulation " +
+  "text-[var(--color-ink-700)] transition-colors hover:bg-[var(--color-sage-100)] touch-manipulation " +
   PRESS_FEEDBACK +
   " focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
 
@@ -275,7 +275,7 @@ export default function EventCardBody({
             // closes by swiping down); the desktop panel keeps the visible ×.
             (isSheet ? HIDDEN_UNTIL_FOCUS + " " : "-mr-3 -mt-2 ") +
             "flex h-12 w-12 shrink-0 items-center justify-center rounded-md " +
-            "text-[var(--color-ink-500)] transition-colors hover:bg-[var(--color-bone-100)] touch-manipulation " +
+            "text-[var(--color-ink-500)] transition-colors hover:bg-[var(--color-sage-100)] touch-manipulation " +
             PRESS_FEEDBACK +
             " focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
           }

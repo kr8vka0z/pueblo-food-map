@@ -74,7 +74,9 @@ export const ITEM_CLASS =
   // in this file cleared it), which devtools' touch emulation reproduces
   // faithfully. Suppressed below rather than here, since it's unrelated to
   // this Tailwind hover rule.
-  "hover:bg-[var(--color-bone-100)] " +
+  // #917 R1: sage 100 under the pointer; a Boxes item that is on gets no
+  // fill (raspberry words on sage 100 are 3.4 to 1, DESIGN.md Bottom bar).
+  "hover:bg-[var(--color-sage-100)] aria-pressed:hover:bg-transparent " +
   "disabled:cursor-default " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
   // #670 — the actual fix for the grey-circle symptom above: disables the

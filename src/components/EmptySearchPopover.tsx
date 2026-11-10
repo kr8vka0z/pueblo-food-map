@@ -85,7 +85,7 @@ export default function EmptySearchPopover({
                 "rounded-[var(--radius-full)] " +
                 "text-xs font-medium " +
                 "bg-[var(--color-bone-100)] text-[var(--color-ink-700)] " +
-                "hover:bg-[var(--color-bone-200)] " +
+                "hover:bg-[var(--color-sage-100)] " +
                 "transition-colors duration-150 " +
                 "focus-visible:outline-none focus-visible:ring-2 " +
                 "focus-visible:ring-[var(--color-sage-500)]"

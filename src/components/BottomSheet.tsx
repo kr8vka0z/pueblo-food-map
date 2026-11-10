@@ -935,7 +935,7 @@ export default function BottomSheet({
                             // #882: hidden on the phone (the sheet closes by swiping
                             // down), shown on keyboard focus; same as the venue header's.
                             HIDDEN_UNTIL_FOCUS + " flex items-center justify-center w-12 h-12 rounded-md " +
-                            "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
+                            "text-[var(--color-ink-500)] hover:bg-[var(--color-sage-100)] transition-colors " +
                             PRESS_FEEDBACK + " " +
                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
                           }

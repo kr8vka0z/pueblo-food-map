@@ -334,10 +334,10 @@ export default function FilterPanel({
             onClick={close}
             className={
               "flex items-center justify-center w-12 h-12 -m-2 rounded-full " +
-              "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-700)] " +
+              "text-[var(--color-ink-500)] hover:bg-[var(--color-sage-100)] hover:text-[var(--color-ink-700)] " +
               PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-              "transition-colors duration-100"
+              "transition-colors duration-150"
             }
           >
             <X size={16} aria-hidden />
@@ -449,7 +449,7 @@ export default function FilterPanel({
               // #529: --color-orange/--color-navy don't exist — DESIGN.md's
               // orange exception is --color-brand-orange/--color-brand-navy.
               "bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)] " +
-              "hover:brightness-105 active:brightness-95 " +
+              "active:brightness-95 " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-brand-orange)]"
             }
           >

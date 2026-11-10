@@ -72,7 +72,7 @@ export default function ShareButton({
         // FavoriteButton (mobile review #12). Callers space these with gap-4
         // so the -m-1 overlap still leaves 8px between neighbouring hit areas.
         "shrink-0 flex items-center justify-center w-12 h-12 -m-1 rounded-md transition-colors " +
-        "hover:bg-[var(--color-bone-100)] " +
+        "hover:bg-[var(--color-sage-100)] " +
         "text-[var(--color-ink-400)] hover:text-[var(--color-ink-700)] " +
         PRESS_FEEDBACK + " " +
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"

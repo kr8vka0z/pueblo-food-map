@@ -333,7 +333,7 @@ Every hex here is copied from `@theme`. Ratios are measured against the real bac
 **Bone is the paper.** Warm cream, never grey.
 
 - `bone-50` `#FBFAF6`: the paper every page sits on.
-- `bone-100` `#F4F1EA`: resting chips, the loading block, the location help card, the status pill without a photo. Live today it is also the hover fill; that moves to sage 100 (Approved, not built, see Components).
+- `bone-100` `#F4F1EA`: resting chips, the loading block, the location help card, the status pill without a photo. It is no longer the hover fill on the public site (that is sage 100, R1); a few admin hovers still use it (Known drift).
 - `bone-200` `#E8E3D6`: card borders, dividers, the ended event badge.
 - `bone-300` `#D4CDB8`: edges of the search bar, bottom bar and outline buttons at rest (1.5 to 1, decoration only: the words carry the control). It is also the text-box edge, which fails (see Known drift).
 
@@ -347,7 +347,7 @@ Every hex here is copied from `@theme`. Ratios are measured against the real bac
 **Sage is everything you can press.** Every link, focus ring, selected state and filled button. Never blue.
 
 - `sage-50` `#EAF0EC`: the Plentiful link fill, the good-news tag, What to bring, the sponsored band, the row the arrow keys reach in search results.
-- `sage-100` `#D1DDD3`: SNAP and WIC badges, calm admin tags, the sponsor card, and **the hover fill** on anything you can point at that isn't a filled button (Approved, not built). Words on it stay ink 500 or darker (ink 500 4.9 to 1, ink 700 10 to 1, navy 13 to 1); ink 400 is 4.2 to 1 and is never words on it.
+- `sage-100` `#D1DDD3`: SNAP and WIC badges, calm admin tags, the sponsor card, and **the hover fill** on anything you can point at that isn't a filled button (R1; the admin still has grey hovers, see its entries). Words on it stay ink 500 or darker (ink 500 4.9 to 1, ink 700 10 to 1, navy 13 to 1); ink 400 is 4.2 to 1 and is never words on it.
 - `sage-500` `#4A8466`: the keyboard ring, the selected pin ring, today's line in the hours, the Plentiful link's edge. 4.2 to 1 on bone 50, 4.4 on white: an edge color only, never words, and never a fill behind words (`npm run lint` refuses `bg-[var(--color-sage-500)]` outside the two non-text marks).
 - `sage-600` `#2C5F4F` (`primary`): the main color. Filled buttons (bone 50 words 7.0 to 1, white 7.4 to 1), Walk, the switch that's on, link hovers.
 - `sage-700` `#1F4639`: link and phone words, SNAP and WIC words, a filled button under the pointer (bone 50 words 10 to 1).
@@ -469,7 +469,7 @@ One compact entry per shared part, in the order a visitor meets them, then the i
 
 ### The redesign rulings (apply to every entry below)
 
-These five changes are approved for the whole site and not built yet. Each entry says which apply.
+These five rulings apply to the whole site. All five are live on the public site (#917); the admin entries that still say Approved, not built have yet to take R1.
 
 - **R1, the hover fill is sage 100.** Under the pointer, anything you can press that isn't a filled button takes a `sage-100` (`#D1DDD3`) fill, fading in over 150 ms. It replaces every grey hover (`bone-100`, `bone-200`, and `sage-50` on sign-in). Words on it stay ink 500 or darker. Filled sage buttons darken to sage 700. A Boxes-on item gets no hover fill. Orange buttons get no hover change at all.
 - **R2, nothing brightens on hover.** No `filter: brightness()` under the pointer, anywhere: on top of the color fade it made hover stutter. The press dim stays: a slight `brightness(0.95)` while pressed shows a tap landed, and the approved pages keep it. So `PRESS_FEEDBACK = "hover:brightness-105 active:brightness-95"` in `src/lib/interactionStyles.ts` loses its `hover:brightness-105` half and keeps `active:brightness-95`. Hover animates color, opacity or transform only.
@@ -481,7 +481,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/BottomNav.tsx`, `src/components/bottomNavShared.tsx` (classes and the Boxes icon), `src/app/globals.css` (`[data-bottom-nav]`, `--bottom-nav-clearance`), `docs/bottom-nav-spec.md` (geometry and stacking history).
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 (live hover is `bone-100`) and R2 (`ITEM_CLASS` uses `PRESS_FEEDBACK`). The standing spec (and the code's own comment): icons 24 on phones and 20 on large screens, the large-screen bar 24 up. Live they measure 32, 24 and 32 because of the spacing trap (Known drift). Open: the owner may keep 32. Either way, use exact pixel classes.
+- **Status:** Live as is. R1 and R2 are in (`ITEM_CLASS`: a sage 100 hover, none on Boxes while it's on, the press dim only). The standing spec (and the code's own comment): icons 24 on phones and 20 on large screens, the large-screen bar 24 up. Live they measure 32, 24 and 32 because of the spacing trap (Known drift). Open: the owner may keep 32. Either way, use exact pixel classes.
 - **For:** the five ways off the map: Near me, Saved, Boxes, Help, Menu. Near me and Boxes act on the map; Saved and Menu open a panel; Help opens the Food help programs page (`/resources`). It floats near the bottom of every map and inside page, under the thumb.
 - **Use something else when:** it's about one place (the card); it narrows the map (Filters; Boxes is the one agreed shortcut); it's a new destination (the Menu). A sixth item narrows every cell and needs a mockup first.
 - **States:** resting `ink-500`; panel open `brand-navy`; Boxes on: raspberry words and icon, and only the heart in the box icon fills (the shape changes too); working: Near me shows `Loader2` spinning and can't be pressed again; keyboard: a sage 500 ring inside the item.
@@ -494,8 +494,8 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/VenueCardBody.tsx`, shown inside `src/components/BottomSheet.tsx` (phone) and `src/components/DesktopVenueWindow.tsx` (computer, variant "panel"); `src/components/HoursList.tsx`, `src/components/DirectionButtons.tsx`, `src/components/ReportVenueButton.tsx`.
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1, R2, R3 (live: a filled category pill), R4 (live: share and save sit beside the name, `VenueCardBody.tsx:169-198`); the CONTACT section with the phone number line goes, its `tel:` link and `CALL_CLICKED` tracking move to Call (`VenueCardBody.tsx:118-132`); on a computer the × moves into the action row. The Plentiful line stays for Plentiful places.
-- **For:** everything about one place, in the order people need it: the action row, the name, the category label, how far and whether it's open, the operator, notes, Walk, Bus and Drive, then the address, Accepts SNAP and WIC badges, the week's hours, the Plentiful link and Report an issue with this place. The same body on the phone and the computer.
+- **Status:** Live as is. R1 to R4 are in: the card starts with the action row (`src/components/VenueActionRow.tsx`), the category is the colored label (`src/components/CategoryLabel.tsx`), the phone number is the Call button (its `tel:` link and `CALL_CLICKED` tracking moved there; no CONTACT section), and on a computer the × ends the action row. The Plentiful line stays for Plentiful places.
+- **For:** everything about one place, in the order people need it: the action row, the name, the category label, the Event here line, the operator, how far and whether it's open, notes, Walk, Bus and Drive, then the address, Accepts SNAP and WIC badges, the week's hours, the Plentiful link and Report an issue with this place. The same body on the phone and the computer.
 - **Use something else when:** it's a blessing box (Box card), an event (Event card), or several places (the list).
 - **States:** hours line Open now · Closes 6pm, Opens at 2pm, Closed today, or Hours unknown with its own icon (`circle-question-mark`), so no hours is never read as open. On the phone, everything below the direction buttons starts below the screen edge with its top showing.
 - **Sizes:** phone: 24 pixels in from the sides and the top (`px-5 pt-5`, the trap), 12 between blocks, name Fraunces 20, the rest 14 (labels 11, operator line 12). Every control taps at 48. Computer: 16 padding, words 12, labels 10, icons a size smaller, notes in full.
@@ -506,7 +506,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/SearchBar.tsx` (the bar and the Filters icon), `src/components/SearchResultsPopover.tsx`, `src/components/EmptySearchPopover.tsx`.
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 on result rows, See all and the No matches category buttons (live: `bone-100` and `bone-200`); R2 on the Filters icon (`SearchBar.tsx:244`); R3 under each result's name (live: 12-pixel grey words). Open: R3's colored words on a row under the pointer (sage 100) or the arrow keys (sage 50) fall under 4.5 to 1 for some categories (pantry and farm 4.1, landscape 3.7, raspberry 3.4 on sage 100; landscape 4.4 and raspberry 4.1 on sage 50), which collides with "category words never sit on the hover fill". Not decided.
+- **Status:** Live, changing in the redesign. R1 (result rows, See all and the No matches category buttons take sage 100; a row's `ink-400` words darken to `ink-500` under the pointer, so they stay 4.5 to 1) and R2 are in. Approved, not built: R3 under each result's name (live: 12-pixel grey words). Open: R3's colored words on a row under the pointer (sage 100) or the arrow keys (sage 50) fall under 4.5 to 1 for some categories (pantry and farm 4.1, landscape 3.7, raspberry 3.4 on sage 100; landscape 4.4 and raspberry 4.1 on sage 50), which collides with "category words never sit on the hover fill". Not decided.
 - **For:** finding a place by name or kind. It floats at the top of the map: the magnifier at the left, the words box, and Filters inside its right end. Results drop down as you type, nearest first; with no match it offers the eight kinds of place.
 - **Use something else when:** narrowing the map (Filters); seeing every place as a list (the map / list switch).
 - **States:** typing edge `sage-500`; Filters icon `ink-500` with nothing on, `sage-600` with filters on, plus an orange count pill beside the icon (never over it); the row the arrow keys reach is `sage-50`.
@@ -518,10 +518,10 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/FilterPanel.tsx`, opened by the Filters icon in `src/components/SearchBar.tsx`; the filters live in `MapWrapper`'s `useMapFilters`.
 
-- **Status:** Live, changing in the redesign. Approved, not built: every kind of place becomes a switch row like the Show only rows (a 10-pixel color dot in the icon slot, the name, a count of places it would show, and the same switch), with no tick boxes (`FilterPanel.tsx:409-439` renders each as a `SwitchRow`, `:102-152`; it needs a per-kind count); R5 (`:136`, `:145`, live `duration-150`); R1 on the × (live `bone-100`); R2 on Clear all, the × and Show N places.
+- **Status:** Live as is. Every kind of place is a switch row like the Show only rows (a 10-pixel color dot in the icon slot, the name, how many places of that kind there are, `useMapFilters`' `categoryCounts`, and the same switch), with no tick boxes; switches slide in 250 ms (R5); R1 on the ×; R2 everywhere (the orange Show N places gets no hover change).
 - **For:** narrowing what the map shows. It slides in from the left over a dimmed map. Every switch applies at once; the orange button only closes the panel and says how many places are left.
 - **Use something else when:** one place by name (search); only blessing boxes (Boxes in the bottom bar).
-- **Rows:** SHOW ONLY: Events (first, with a star in the event colors and the count of events still to come; shown only while there are events, or while it is on; on, it shows only events and pins every upcoming event beyond the usual 7-day window), Open now, Accepts SNAP, Accepts WIC. KIND OF PLACE: the eight full category names.
+- **Rows:** SHOW ONLY: Events (first, with a star in the event colors and the count of events still to come; shown only while there are events, or while it is on; on, it shows only events and pins every upcoming event beyond the usual 7-day window), Open now, Accepts SNAP, Accepts WIC. KIND OF PLACE: the eight full category names, each a switch row with its count. The guided tour's Filters step highlights the Show only rows only.
 - **Sizes:** 85% of the screen wide, up to 360, full height, from the left, over ink at 40%. Title row 16 top and bottom, 24 at the sides. Every row at least 48 tall with 24-pixel sides; the switch is drawn 36 by 24 and the whole row is its tap area. Switch on `sage-600`, off `bone-300`, white knob. The × is 48 round. The button is full width, 48 tall, corners 10, 14-pixel bold words.
 - **Wording:** Filters (Filtros); Clear all (Borrar todo) clears the switches, never the search words; Show 24 places (Mostrar 24 lugares), or Show 3 events with Events on.
 - **Everyone:** a dialog named Filters; focus moves in and stays; Escape, the ×, a tap on the dimmed map or a swipe left closes it, and focus returns to Filters. Every row is one `role="switch"`, heard by name and state. Same layout at every width.
@@ -530,7 +530,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/ViewSuggestion.tsx`; the list it opens is `src/components/ListView.tsx`; also See all N matches as a list (`src/components/SearchResultsPopover.tsx`) and the Menu's first line (`src/components/HamburgerMenuContent.tsx`).
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 (live `bone-100`, `ViewSuggestion.tsx:103`).
+- **Status:** Live as is (R1: sage 100 under the pointer).
 - **For:** the way from the map to a list of every place, and back. Not a standing control: tapping into the empty search bar drops one row offering the other view. On the list with the map turned off (#165) it renders nothing rather than a dead row.
 - **Use something else when:** two or three views that both stay on screen (a slider of real radios); narrowing the map (Filters).
 - **Sizes:** one row 52 tall, as wide as the search bar, 8 under it, corners 14, level 2. A `sage-600` 18-pixel icon, `sage-700` 14-pixel bold words over a 12-pixel `ink-500` count, an `ink-400` chevron.
@@ -550,20 +550,20 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 ### Phone sheet and computer side panel (BottomSheet, DesktopSidePanel)
 
-`src/components/BottomSheet.tsx`, `src/components/DesktopSidePanel.tsx` (size, place, Escape, focus), `src/components/DesktopVenueWindow.tsx` (what the panel shows), `src/components/VenuePopupHeader.tsx` (today's top bar), `src/lib/interactionStyles.ts` (`HIDDEN_UNTIL_FOCUS`).
+`src/components/BottomSheet.tsx`, `src/components/DesktopSidePanel.tsx` (size, place, Escape, focus), `src/components/DesktopVenueWindow.tsx` (what the panel shows, and its pinned top), `src/lib/interactionStyles.ts` (`HIDDEN_UNTIL_FOCUS`).
 
-- **Status:** Live, changing in the redesign. Approved, not built: on a computer the × leaves its own bar (`VenuePopupHeader` goes, `DesktopVenueWindow.tsx:171-175`) and ends the card's action row at the right; ← Saved, when shown, shares one line with the ×, with no line under either (live: two rows, two lines, `:151-169`); R1 on the × and the phone's keyboard-only Close; R2 on the × and the grab bar. The phone sheet's top does not change.
+- **Status:** Live as is. On a computer the × ends the card's action row at the right (the old `VenuePopupHeader` bar is gone); ← Saved, when shown, shares one line with the ×, and a box's History does the same, with no line under either; R1 on the × and the phone's keyboard-only Close; R2 on the × and the grab bar. The phone sheet's top did not change.
 - **For:** the two containers every card sits in (a place, a box, an event; on a computer also the Saved list and the Menu).
 - **Phone sheet:** a vaul drawer, `bone-50`, top corners `radius-xl`, level 2, height `calc(100dvh - 100px - env(safe-area-inset-bottom))` (vaul's snap points measure from `window.innerHeight`, so the height tracks it; fully open it leaves 100 pixels of map). A `bone-300` grab bar (64 by 5, `h-[5px] w-10`, wider than its button because `w-10` is 64 here) inside a real 48 by 48 button, named Show details or Hide details, with `aria-expanded`. Two resting heights plus closed: collapsed shows the top of the details at the screen edge (the peek: 64 pixels for a place, 96 for a box or event), no fade. The sheet follows the finger anywhere between the two heights and settles to the nearer, with vaul's 0.5 s ease; it scrolls only when fully open; a swipe down from collapsed closes it. No visible × on the phone: the Close button stays in the Tab order, hidden until keyboard focus (then a 48-pixel button top right). Escape closes. Tapping the map behind it does not close it.
 - **Route strip:** while a walking route is on, the sheet collapses to `RouteStrip` (see Direction buttons); the bottom bar hides for as long as the strip or the full card is on screen.
-- **Computer panel:** fixed to the right, 12 in from the top, right and bottom, 380 wide, `bone-50`, `bone-200` edge, `radius-lg`, one view at a time (`MapWrapper`'s `sidePanelView`). The search bar and bottom bar shift left by `DESKTOP_PANEL_RIGHT_CLEARANCE_PX` while it's open, and the map pans (`panBy`) so the chosen pin clears it; `fitBounds` adds the same right padding. Not a trap (`aria-modal="false"`): the map stays usable.
-- **Everyone:** on open, focus moves to the card's name; Escape, the × or a click on the map closes it and focus returns to the pin or bar item (not when the view changed from inside the panel). In the redesign Tab order runs Call, Website, Share, Save, Close.
+- **Computer panel:** fixed to the right, 12 in from the top, right and bottom, 380 wide, `bone-50`, `bone-200` edge, `radius-lg`, one view at a time (`MapWrapper`'s `sidePanelView`). The search bar and bottom bar shift left by `DESKTOP_PANEL_RIGHT_CLEARANCE_PX` while it's open, and the map pans (`panBy`) so the chosen pin clears it; `fitBounds` adds the same right padding. Not a trap (`aria-modal="false"`): the map stays usable. Its top (the action row, or ← Saved or History with the ×) stays put while the card scrolls under it, with no line under it until something has scrolled beneath, then one `bone-200` hairline.
+- **Everyone:** on open, focus moves to the card's name; Escape, the × or a click on the map closes it and focus returns to the pin or bar item (not when the view changed from inside the panel). In the panel's action row Tab runs Call, Website, Share, Save, Close.
 
 ### Direction buttons and the route strip (DirectionButtons, RouteStrip)
 
 `src/components/DirectionButtons.tsx` (Walk, Bus, Drive, the route readout, `WalkStepper`), `src/components/RouteStrip.tsx` (the phone strip and the steps sheet).
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 on Bus, Drive and the steps sheet's × (live `bone-100`); R2 on Walk, Bus, Drive, the turn arrows, Steps and the text links.
+- **Status:** Live as is (R1 on Bus, Drive and the steps sheet's ×; R2 everywhere).
 - **For:** getting to a place. **Walk** draws the walking route on our map, so it is the one filled button (`sage-600`, `sage-700` under the pointer; while a route is on it reads Clear walking route on a `sage-100` fill with a `sage-600` edge). **Bus** and **Drive** open Google Maps in a new tab, so they are outlines (`bone-50`, `ink-700` words, `bone-300` edge).
 - **Use something else when:** a blessing box (its address is the walking-route link); an event (one orange Get directions).
 - **Route strip (phone):** 112 tall, flush at the screen edge (`env(safe-area-inset-bottom)`): the place name (Fraunces 16), distance and time, Clear walking route, a filled `sage-600` Steps button (or "No turn-by-turn steps for this route" when there are none), Show card. Steps opens a bottom sheet (up to 70% of the screen, top corners 20, over a 40% black dim) with one turn at a time: Step N of M, 48 by 48 Back and Next, the distance to the turn, a "Then:" peek, All turns for the whole list, and Open in Google Maps.
@@ -573,9 +573,9 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 ### Card action row (ShareButton, FavoriteButton)
 
-`src/components/ShareButton.tsx` and `src/lib/share.ts`, `src/components/FavoriteButton.tsx`; placed by `src/components/VenueCardBody.tsx` and `src/components/BoxCardBody.tsx` (`nameBlock`, `:319-338`).
+`src/components/ShareButton.tsx` and `src/lib/share.ts`, `src/components/FavoriteButton.tsx`; Call and Website in `src/components/VenueActionRow.tsx` (`ownWebsite` skips Plentiful pages); placed by `src/components/VenueCardBody.tsx` (phone), `src/components/DesktopVenueWindow.tsx` (computer) and `src/components/BoxCardBody.tsx` (`nameBlock`).
 
-- **Status:** Live, changing in the redesign (this is R4). Approved, not built: one row of icon buttons as the card's first line, at the top left, 12 above the name: **Call** (a `tel:` link, Lucide `Phone`), **Website** (the place's own `venue.url` when it isn't a Plentiful page, Lucide `Globe`), **Share**, **Save**, and on a computer the **×** at the far right. A missing phone or website stays in its place, greyed (ink 400 at 40%), as a `<button>` with `aria-disabled="true"`, never a link, so the row never shifts and a screen reader hears why. On a computer, Call shows its number in a small `ink-900` label under the pointer and keyboard focus (a computer can't dial). A box card gets Share and Save only, on the left (boxes have no phone or website: `BoxVenueRow` in `src/lib/blessingBoxes.ts` selects neither). The event card does not get this row. Plus R1 and R2 (live: `bone-100` hover and `PRESS_FEEDBACK`).
+- **Status:** Live as is (R4, `src/components/VenueActionRow.tsx`). One row of icon buttons as the card's first line, at the top left, 12 above the name: **Call** (a `tel:` link, Lucide `Phone`), **Website** (the place's own `venue.url` when it isn't a Plentiful page, Lucide `Globe`), **Share**, **Save**, and on a computer the **×** at the far right. A missing phone or website stays in its place, greyed (ink 400 at 40%), as a `<button>` with `aria-disabled="true"`, never a link, so the row never shifts and a screen reader hears why. On a computer, Call shows its number in a small `ink-900` label under the pointer and keyboard focus (a computer can't dial). A box card gets Share and Save only, on the left (boxes have no phone or website: `BoxVenueRow` in `src/lib/blessingBoxes.ts` selects neither). The event card does not get this row. R1 and R2 apply; a missing one gets no hover fill. On a computer the row sits in the panel's pinned top (Side panel and sheet).
 - **For:** call the place, open its website, share the link to it, save it. Most useful first: calling ahead is what people do before they go.
 - **Use something else when:** the action needs words (Get directions, Add to calendar). More than five actions: at 360 wide the row holds five (four used); a sixth means four icons and a three-dot menu in the fifth place.
 - **States:** icons `ink-400` at rest, `ink-700` under the pointer; save: outline, filled `clay-500` when saved (`aria-pressed`); share: the native share sheet, or copy the link and swap to a `sage-600` `Check` for 2 seconds.
@@ -597,7 +597,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/EventCardBody.tsx`, rendered by `BottomSheet` on a phone and by `src/components/EventPanel.tsx` in the side panel; `src/components/EventFlyer.tsx`, `src/components/EventHereLine.tsx`, `src/components/EventStrip.tsx`, `src/components/EventsEmptyNotice.tsx`, `src/components/EventListSection.tsx`; `src/lib/eventCard.ts` (badge, When words, the action button's label).
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 on Share, Add to calendar and the computer's × (live `bone-100`); R2 on the action button, Get directions, the Event here line and the strip. It does not get the card action row.
+- **Status:** Live as is (R1 on Share, Add to calendar and the computer's ×; R2 everywhere). It does not get the card action row.
 - **For:** one special event, from its pin or the strip. Top to bottom: the flyer, a badge, the name (Fraunces 24, the card's `<h2>`), Hosted by, When, About (cut to 3 lines, Read more only when cut), the action button, Where, What to bring, Share and Add to calendar, and the orange Get directions last.
 - **Flyer:** the admin's picture in a `bone-100` box with a `bone-200` edge and `radius-md`, sized by its stored shape, at most `min(55vh, 28rem)` tall, never cropped (`object-contain`), a link to the full file. None, or it fails to load: nothing, no placeholder. On a phone it sits at the top of the below-the-fold part.
 - **Badge:** coming up `bone-50` with a 2-pixel navy edge and words; live: navy fill, bone 50 bold words, an orange dot; ended `bone-200` / `ink-700`; cancelled `clay-100` / `clay-700` with a `clay-500` edge. Always words; it counts down once a minute and is not a live region.
@@ -611,7 +611,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/BoxCardBody.tsx`, `src/components/BoxCheckinPanel.tsx` (check-ins and photos), `src/components/PhotoViewer.tsx`, `src/lib/blessingBoxes.ts` (status colors), `src/components/AdoptBoxForm.tsx`, `src/components/BoxAlertSignupForm.tsx`.
 
-- **Status:** Live, changing in the redesign. Approved, not built: R3, Blessing Box in raspberry words on its own line under the name (live: a raspberry pill above the name, `BoxCardBody.tsx:323`); R4 with Share and Save on the left of their row (live: on the right), no Call or Website; on a computer, History and the × share one line above the photo with no rule under it (live: a bar with a line); R1 on the check-in buttons, Cancel and the needs tags (live `bone-100`).
+- **Status:** Live as is. R3: Blessing Box in raspberry words on its own line under the name; R4: Share and Save on the left of their own row above the name, no Call or Website; on a computer, History and the × share one line above the photo with no rule under it; R1 on the check-in buttons, Cancel and the needs tags.
 - **For:** a little free pantry on a post: how full it is, what it needs, and a one-tap way to say you filled it, took something or found it empty. Everything happens on the card, never on a separate page.
 - **Layout:** computer (`layout="default"`): the photo first (170 tall, edge to edge) with the status pill on it, then the sponsor band, the label, name, address, most needed, host note, check-in, footer. Phone (`layout="sheet"`): action row, name, label, the status pill inline under the name, address, most needed, host note and the check-in panel all above the fold; the photo, sponsor band and History / Email me footer below it.
 - **Parts:** status pill: a colored dot and the status word in its color, then "· filled 2 hours ago" in `ink-500` (`bone-50` chip on the photo, `bone-100` without one). The address is the walking-route link (`sage-600` underlined, no icon). Most needed as `bone-100` chips. The check-in question in Fraunces 18. Sponsor band: `clay-100` / `clay-700` "This box needs a sponsor", or `sage-50` / `sage-700` "Sponsored by …", both with Want to help too? Check-in buttons white with a `bone-300` edge, at least 48 tall, corners 10.
@@ -622,7 +622,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/HamburgerMenu.tsx` (the phone shell: place, dim, focus trap, Escape, scroll lock), `src/components/HamburgerMenuContent.tsx` (the lines, Saved, the sponsor and donate cards), `src/components/HamburgerMenuItem.tsx`, `src/components/LanguageToggle.tsx`, `src/components/StyxCredit.tsx`; on a computer the same content shows in `src/components/DesktopSidePanel.tsx`.
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 on menu lines, saved rows and the × (live `bone-100`); R2 on the ×, the sponsor card and the donate card.
+- **Status:** Live as is (R1 on menu lines, saved rows and the ×; R2 on the ×, the sponsor card and the donate card).
 - **For:** everything that isn't on the map. Menu opens it; Saved opens the same panel with only saved places. On a phone it slides in from the right (80% wide, up to 384, full height, over ink at 40%, the bottom bar unmounted); on inside pages from 768 wide it's a 280-pixel dropdown; on the map from 768 it's the side panel.
 - **Parts:** first the sponsor card (`sage-100`, `sage-500` edge, `radius-lg`, SPONSORED BY in 11-pixel `ink-500` over Pueblo Food Project in `sage-700`, new tab); then the Donate card (white, `bone-300` edge, `radius-lg`, a `Heart` in a `clay-100` circle, Donate over a small line, `ExternalLink`, opens the Pueblo Food Project's donation page). Never "sponsor" for money: on this site sponsor means looking after a blessing box. Lines at least 48 tall, 24-pixel sides, 14-pixel medium `ink-700`, a trailing 14-pixel `ink-400` icon. A place opened from Saved on a computer shows a `sage-700` "← Saved" button.
 - **Wording:** List view (or Map view), Learn how to use this map, Show welcome screen, Suggest a place, Share an event, Send us feedback, About this map, Browse all places, Blessing box activity, Food help programs, Roadmap; Saved places; No saved places yet; Language / Idioma.
@@ -632,7 +632,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/LocationHelpCard.tsx`, `src/components/SplashScreen.tsx`, `src/components/Wordmark.tsx`. The same orange button is Show N places in `src/components/FilterPanel.tsx`.
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 on the card's × and See all places as a list, and on the welcome screen's Take a tour (live: `bone-200`, `sage-50`, `bone-100`); R2 on every orange button and the card's buttons. Orange buttons get no hover change (owner, approved on review).
+- **Status:** Live as is (R1 on the card's ×, See all places as a list and the welcome screen's Take a tour; R2 everywhere). Orange buttons get no hover change (owner, approved on review).
 - **Welcome screen:** a full-screen layer (`z-[9000]`) over the live map on a frosted scrim (see Map chrome). A centred column up to 820 wide: the wordmark, a navy purpose line (`text-2xl md:text-3xl font-semibold`), `ink-500` small print, then the orange buttons: full width, about 50 tall (18-pixel words, 16 above and below, 32 at the sides; 16 for the Spanish one below 640), corners 10, 12 apart. Take a tour: 48 tall, a 2-pixel sage edge, `sage-700` words.
 - **Location help card:** shown when the phone won't share its location: a `bone-100` card above the bottom bar, 12 in from the sides, 6 above the bar (420 wide on a computer), corners 14, a 4-pixel `sage-600` band along its top, level 2, a `sage-600` `MapPin`, a Fraunces 18 navy title, 14-pixel `ink-700` words, a 48-pixel round × , fully round 48-tall buttons. Location is off (refused): an outlined See all places as a list and a settings hint, no Try again. We couldn't find you (timeout): the orange Try again first. `role="status"`, no focus steal; it hides while any panel is open.
 - **Wording:** Find food near me / Encuentra comida cerca de mí (tapping one also picks the language); We only use your location to show food nearby. Nothing is saved.; the card titles and lines are in the Finding food near me pattern.
@@ -660,7 +660,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/LanguageToggle.tsx`, placed on the Menu's Language / Idioma row (`src/components/HamburgerMenuContent.tsx`).
 
-- **Status:** Live, changing in the redesign. Approved, not built: R2 (`SEGMENT_CLASS` adds `PRESS_FEEDBACK`, `LanguageToggle.tsx:61`). The other part keeps darkening its words under the pointer.
+- **Status:** Live as is (R2: `SEGMENT_CLASS`'s `PRESS_FEEDBACK` is the press dim only). The other part keeps darkening its words under the pointer.
 - **For:** English and Spanish. A two-part pill: `bone-100` fill, `bone-300` edge, fully round, 28 tall; each part 12-pixel bold capitals; the part you're reading is `ink-700` with `bone-50` words, the other `ink-500`. It lives in the Menu, never on the map.
 - **Use something else when:** two or three choices inside a form (a slider); the event page (one link to the other language).
 - **Sizes:** each part taps at 48 by 48 (the tap area reaches 11 above and below and 10 outward).
@@ -670,7 +670,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/HubPages.tsx` (`PLACE_LINK_CLASS`, `DETAIL_CLASS`, `PlaceItem`), `src/components/VenuesDirectoryContent.tsx`, `src/lib/hubPages.ts` (which places show and in what order).
 
-- **Status:** Live, changing in the redesign. Approved, not built: on the SNAP and WIC stores page only, the category and the SNAP and WIC words join as the R3 label under the address (`HubPages.tsx:170-171`). The other hub pages and All places stay as they are.
+- **Status:** Live as is. On the SNAP and WIC stores page only, the category and SNAP and WIC join as the R3 label under the address (`CategoryLabel`, in `SnapWicHub`). The other hub pages and All places stay as they are.
 - **For:** a plain list of places: the name as a big `sage-600` link to the place's page (`sage-700` under the pointer), its address, then one line of hours or what it takes, all `ink-500` 14-pixel. No pictures, no map, so it loads fast. Food pantries, SNAP and WIC stores, Community gardens, Blessing boxes and All places use it; blessing box names open the box's card on the map.
 - **Sizes:** rows 16 apart; the name Public Sans 16 semibold, at least 48 tall to tap on the hub pages; section headings 18 semibold.
 - **Wording:** hours as a sentence on hub pages (`Hours: Tuesday to Wednesday, 9am – 1pm`); the short form on All places; with no hours, "Hours not listed. Check before you go." Never guess hours. SNAP or WIC only when confirmed. Blessing boxes never say free.
@@ -688,7 +688,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/PublicForm.tsx` (`Field`, `INPUT_BASE`, the send and Try again buttons, the thank-you, the error box), used by `SuggestForm.tsx`, `ReportForm.tsx`, `FeedbackForm.tsx`, `ShareEventForm.tsx` (all `src/components/`).
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 on Try again (live `hover:bg-bone-100`, `PublicForm.tsx:323`). Public form pages keep the line under the title (owner, approved on review); the no-subtitle ruling is for the admin only.
+- **Status:** Live as is (R1 on Try again). Public form pages keep the line under the title (owner, approved on review); the no-subtitle ruling is for the admin only.
 - **For:** every public page form. One shell checks the fields, waits for Cloudflare's Turnstile check, sends, then shows a thank-you or a plain error with Try again, keeping what was typed. The box card forms (`AdoptBoxForm.tsx`, `BoxAlertSignupForm.tsx`) use their own copy of these styles, `PRIMARY_BTN` and `SECONDARY_BTN` from `BoxCheckinPanel.tsx`, and `CardFormTurnstile.tsx`.
 - **Field:** a real `<label htmlFor>` (14 medium `ink-700`, 4 above); the box white, `radius-md`, 1-pixel `bone-300` edge, 12 by 8 padding, `ink-900` words, `ink-400` placeholder, 16 on a phone and 14 from 768; focus: `sage-500` edge and ring. Fields 24 apart (`space-y-5`). Required: a `danger` star (`aria-hidden`; the field says required). Error: `danger` edge and a 12-pixel `danger` line under it, `role="alert"`, wired with `aria-invalid` and `aria-describedby`.
 - **Send and Try again:** full width, 48 tall, `sage-600`, `bone-50` semibold 16-pixel words, `sage-700` under the pointer, a `sage-500` ring 2 out. While waiting: `opacity-60`, `cursor-not-allowed`, Verifying… then Sending….
@@ -700,7 +700,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/BoxNumbersPanel.tsx` (`Row`, `FIELD_LABEL`, `SELECT_CLASS`), `src/components/BoxActivityList.tsx`, `src/components/BoxMilestones.tsx`; shown on `src/components/BoxesActivityContent.tsx` (`/boxes/activity`) and `src/components/BoxHistoryContent.tsx` (`/box/<id>/history`).
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 on Previous and Next (live `hover:bg-bone-100`, `BoxActivityList.tsx:192`, `:200`).
+- **Status:** Live as is (R1 on Previous and Next).
 - **For:** how the boxes are doing in words and plain numbers: counts for a picked period, the latest activity a page at a time, and one or two milestone lines. No charts on purpose.
 - **Sizes:** rows 14-pixel label left, 14-pixel medium number right, a `bone-200` line between; activity lines 14 with 12-pixel details, photos 64 square; Previous and Next 48 tall at the two ends of their row; Milestones heading Fraunces 18.
 - **Wording:** plain past tense ("Elm Street Blessing Box was filled"), never who, except a sponsor by the name they chose; relative times within a week, then a short date; Previous and Next (Anterior, Siguiente), never Load more.
@@ -718,7 +718,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 
 `src/components/EventPage.tsx` (`/event/[id]`, `/es/event/[id]`), `src/components/EventAddToCalendar.tsx`, `src/components/EventFlyer.tsx`.
 
-- **Status:** Live, changing in the redesign. Approved, not built: R2 on Get directions, Open on the map and Find food on the map (`EventPage.tsx:220`, `:233`, `:248`); R1 on Add to calendar and Find food on the map (live `hover:bg-bone-100`, `:248`, `EventAddToCalendar.tsx:25-26`).
+- **Status:** Live as is (R2 on Get directions, Open on the map and Find food on the map; R1 on Add to calendar and Find food on the map).
 - **For:** the page one event gets, so it can be shared and found by search engines. Its own top bar: a breadcrumb (Map › name, a long name cut with …) and the same event in the other language (Ver en español / View in English). Then the flyer (at most `min(70vh, 32rem)`, loaded at once), the status pill (words only: Coming up, Happening now, This event has ended, Cancelled), the name (`<h1>`, Fraunces 24), Hosted by, the cancel note or ended line, When (with the zone, "Pueblo time"), Where, About, What to bring, then stacked full-width buttons: the orange Get directions (upcoming and live only, 56 tall), the `sage-600` Open on the map, Add to calendar; or, ended or cancelled, a Find food on the map link. Every control at least 48 tall. It reads fine with scripts off; only Add to calendar needs them.
 
 ### Admin menu (AdminNav)
@@ -809,7 +809,7 @@ These five changes are approved for the whole site and not built yet. Each entry
 - Keep one orange action per screen, with navy words. The event pin and its few named uses are the only exception.
 - Use `bone-50` as the page everywhere, ink for words, sage for everything you can press.
 - Use the sage 500 keyboard ring: 2 pixels, 2 pixels out from the edge.
-- Use the sage 100 hover fill (Approved, not built: see R1).
+- Use the sage 100 hover fill (R1).
 - Line up an icon button beside a title with the title's first line, so a two-line title never pushes it to the middle.
 - Show the category as colored words under the name (R3).
 - Ship every word in English and Spanish, screen-reader names too.
@@ -870,12 +870,12 @@ Eight icons are flagged as one icon with two meanings or two icons for one: the 
 
 Movement only shows what changed: a color fades, a card slides up, the map flies to a place, a live event pulses. Nothing bounces or moves for decoration.
 
-**The tokens** (`src/app/globals.css` `@theme`): `--ease-out-circ` `cubic-bezier(0.32, 0.72, 0, 1)` (quick to start, gentle to stop; the curve vaul uses for its 0.5 s slide), `--duration-fast` 150 ms, `--duration-default` 250 ms, `--duration-slow` 400 ms. The code uses none of them by name yet (see Known drift). Only the switch timing is an owner ruling: switches slide in 250 ms on `cubic-bezier(0.32, 0.72, 0, 1)`. Open, not decided: whether the named tokens become the standard for new work.
+**The tokens** (`src/app/globals.css` `@theme`): `--ease-out-circ` `cubic-bezier(0.32, 0.72, 0, 1)` (quick to start, gentle to stop; the curve vaul uses for its 0.5 s slide), `--duration-fast` 150 ms, `--duration-default` 250 ms, `--duration-slow` 400 ms. The switches use `--ease-out-circ` by name (the `ease-out-circ` class); the rest of the code uses none of them yet (see Known drift). Only the switch timing is an owner ruling: switches slide in 250 ms on `cubic-bezier(0.32, 0.72, 0, 1)`. Open, not decided: whether the named tokens become the standard for new work.
 
 **What moves:**
 
 - Color changes on buttons and the hover fill: 150 ms.
-- Switches (R5): 250 ms on `--ease-out-circ`, knob and fill together. Approved, not built (live 150 ms).
+- Switches (R5): 250 ms on `--ease-out-circ`, knob and fill together (`duration-250 ease-out-circ`, `src/components/FilterPanel.tsx`).
 - The phone sheet: vaul's own drag physics and 0.5 s ease, open and close.
 - The bottom bar sliding sideways when the side panel opens: 300 ms.
 - The map flying to an event: 0.8 s.
@@ -1090,7 +1090,7 @@ A pattern is a job that comes up on many pages and uses several components. Word
 
 ### Picking several
 
-- **When:** narrowing the map to several kinds of place, or to open now, SNAP or WIC. The Filters panel is the one place on the site that picks several; no list ticks rows to act on them together. Live as is (the switch rows are Approved, not built: see Filters panel).
+- **When:** narrowing the map to several kinds of place, or to open now, SNAP or WIC. The Filters panel is the one place on the site that picks several; no list ticks rows to act on them together. Live as is (every row is a switch, see Filters panel).
 - **Steps:**
   1. Filters opens a panel from the left over the dimmed map.
   2. Each switch applies at once; the map changes beside the panel; no Apply step.
@@ -1354,15 +1354,12 @@ Where the live code differs from the rules above. Fix an item when you're in its
 - Submit buttons are not `h-11`: public send buttons are 48 tall; the admin's short button set is about 36 (below).
 - There is not one field style: there are four copies of the same look: `INPUT_BASE` in `src/components/PublicForm.tsx:33-42`, `inputBase` in `src/components/formClasses.ts:8`, `SELECT_CLASS` in `src/components/BoxNumbersPanel.tsx:37`, and the inline field classes in `src/components/AdoptBoxForm.tsx:177` and `src/components/BoxAlertSignupForm.tsx:162`.
 - The bottom bar's icons are not 24 and 20: `ICON_CLASS = "shrink-0 size-6 2xl:size-5"` (`src/components/bottomNavShared.tsx:86`) measures 32 on phones and 24 on large screens (the spacing trap; its own comment says 24), and the large-screen bar sits 32 up (`2xl:bottom-6`) where the spec says 24.
-- Hover brightens: the `hover:brightness-105` half of `PRESS_FEEDBACK` (`src/lib/interactionStyles.ts:17`) breaks R2. Its `active:brightness-95` press dim stays.
 - Two colored edge stripes break the no-stripes rule: today's line in the hours (`src/components/HoursList.tsx`) and the location help card's top band (`src/components/LocationHelpCard.tsx`). The Hours list entry shows them as live; whether to keep them is not decided. The monospace times in the hours list stay.
 - Code comments that point to parts of this file that are gone: "DESIGN.md Forms > Submit" (now Public form fields and buttons) in `src/components/PublishPanel.tsx:23` and `scripts/check-banned.mjs:27`; the `filtersButton` component token (now `buttonPrimary` and `switchOn`) in `src/components/RouteStrip.tsx:50`. Also `src/components/EventCardBody.tsx:39` says the action button shows on ended or cancelled cards; the code at `:412` hides it there.
 
 **The spacing trap, live:** `size-6` 32 (`src/components/bottomNavShared.tsx:86`); `h-5 w-5` 24 for route step icons and arrows (`src/components/DirectionButtons.tsx:227`, `:357`); `w-8 h-8` 48 for the Donate heart's circle (`src/components/HamburgerMenuContent.tsx:238`); `h-10` 64 for the thank-you's Back to map (`src/components/PublicForm.tsx:233`); `px-5 pt-5` 24 for the place card's padding (`src/components/VenueCardBody.tsx`).
 
-**Hover brightening (`PRESS_FEEDBACK`, breaks R2):** `src/components/bottomNavShared.tsx` (`ITEM_CLASS`); `src/components/SearchBar.tsx:244`; `src/components/FilterPanel.tsx:326`, `:337-338`, `:452`; `src/components/BottomSheet.tsx:829`, `:938-939`; `src/components/VenuePopupHeader.tsx:40-41`, `:71-72`; `src/components/DirectionButtons.tsx:247`, `:381`, `:563`, `:597`, `:619`; `src/components/RouteStrip.tsx:122`, `:306-308`; `src/components/ShareButton.tsx:75-77`; `src/components/FavoriteButton.tsx:51-52`; `src/components/EventCardBody.tsx:125-126`, `:278-279`, `:422`, `:474`; `src/components/EventHereLine.tsx:26`; `src/components/EventStrip.tsx:83`, `:100`, `:113`; `src/components/HamburgerMenuContent.tsx:124-125`, `:205`, `:235`; `src/components/SplashScreen.tsx:215`, `:240`; `src/components/LocationHelpCard.tsx:130-132`, `:167`, `:182-184`; `src/components/LanguageToggle.tsx:61`; `src/components/EventPage.tsx:220`, `:233`, `:248`; `src/components/EventAddToCalendar.tsx:25-26`.
-
-**Grey hover fills (break R1):** `bone-100` in `src/components/SearchResultsPopover.tsx:180`, `:245`; `src/components/ViewSuggestion.tsx:103`; `src/components/FilterPanel.tsx:337-338`; `src/components/DirectionButtons.tsx:642`; `src/components/ShareButton.tsx`, `src/components/FavoriteButton.tsx`; `src/components/BoxCheckinPanel.tsx:182`, `:634`, `:838`; `src/components/HamburgerMenuItem.tsx:56`; `src/components/HamburgerMenuContent.tsx:124-125`, `:152`; `src/components/SplashScreen.tsx:261`; `src/components/PublicForm.tsx:323`; `src/components/BoxActivityList.tsx:192`, `:200`; `src/components/EventPage.tsx:248`; `src/components/EventAddToCalendar.tsx:25-26`; `src/components/EventCardBody.tsx:125-126`, `:278-279`; `src/components/RouteStrip.tsx:306-308`; `src/components/VenuePopupHeader.tsx:40-41`, `:71-72`; `src/components/BottomSheet.tsx:938-939`; `src/lib/adminCardStyles.ts` (secondary buttons); `src/components/VenueListView.tsx` (rows, `filterChipClass`); `src/components/AllBoxesTable.tsx` (filters); `src/components/DashboardNeedsStrip.tsx`; `src/components/AddVenueForm.tsx` (Reload). `bone-200` in `src/components/EmptySearchPopover.tsx:88`, `src/components/LocationHelpCard.tsx:130-132`, `src/components/AdminNav.tsx` (`navLinkInactive`). `sage-50` in `src/components/LocationHelpCard.tsx:182-184` and `src/components/AdminLoginForm.tsx` (`secondaryButtonClass`).
+**Grey hover fills (break R1):** the admin: `bone-100` in `src/lib/adminCardStyles.ts` (secondary buttons); `src/components/VenueListView.tsx` (rows, `filterChipClass`); `src/components/AllBoxesTable.tsx` (filters); `src/components/DashboardNeedsStrip.tsx`; `src/components/AddVenueForm.tsx` (Reload); `bone-200` in `src/components/AdminNav.tsx` (`navLinkInactive`); `sage-50` in `src/components/AdminLoginForm.tsx` (`secondaryButtonClass`). Public surfaces not on the design pages, untouched by #917: `bone-100` in `src/components/ReportVenueButton.tsx` (the place card's Report an issue; the mockup keeps it bone 100), `src/components/VenueCard.tsx` (list rows), `src/components/EventListSection.tsx`, `src/components/ResourcesContent.tsx`, `src/components/GuidedTour.tsx`; `sage-50` in `src/components/VenueContent.tsx` and `src/components/ShareEventForm.tsx`.
 
 **Under the 48-pixel floor:**
 
@@ -1389,7 +1386,7 @@ Where the live code differs from the rules above. Fix an item when you're in its
 - Type: 13, 15 and 18 pixels written by hand on the location help card (`src/components/LocationHelpCard.tsx:154-193`); two title sizes for one job (`text-3xl` in `src/components/AboutContent.tsx:70`, `text-2xl` in `src/components/SuggestPageContent.tsx:33` and `src/components/VenueContent.tsx:121`); the box card forms' 12-pixel labels (`src/components/AdoptBoxForm.tsx:166`) and the period box's 12-pixel label.
 - Corners: plain `rounded` (4 pixels) on 46 small things (tick boxes, count tags, thumbnails, focus outlines); `rounded-[14px]` by hand; `rounded-t-[20px]` on the share preview sheet (`src/components/ShareEventForm.tsx:552`).
 - Shadows: black-based shadows by hand on the side panel (`0 8px 32px rgba(0,0,0,0.18)`, `src/components/DesktopSidePanel.tsx:175`), the Menu (22% and 18%, `src/components/HamburgerMenu.tsx:290`, `:315`) and Filters (22%, `src/components/FilterPanel.tsx:304`); the share preview backdrop at 45% (`src/components/ShareEventForm.tsx:548`). The Menu panel is also `white` and, as a dropdown, an 8-pixel radius.
-- Motion: none of the four motion tokens is used by name (`src/app/globals.css:96-99`); live color changes are `duration-150` (some 100, the side-panel shift 300) on Tailwind's default curve `cubic-bezier(0.4, 0, 0.2, 1)`; switches 150 (`src/components/FilterPanel.tsx:136`, `:145`).
+- Motion: of the four motion tokens only `--ease-out-circ` is used by name, by the switches (`src/app/globals.css:96-99`); live color changes are `duration-150` (some 100, the side-panel shift 300) on Tailwind's default curve `cubic-bezier(0.4, 0, 0.2, 1)`.
 
 **Other:**
 

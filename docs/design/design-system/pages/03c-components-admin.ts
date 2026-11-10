@@ -4,27 +4,8 @@
 // shared colors (with contrast ratios) and sizes; wording; works for everyone; one live Do and one live Don't; the
 // code file. Replicas copy the real classes, words and sizes from src/components/ (CSS in mock.css, block
 // "admin", classes prefixed pa-). Every person, email, place and number here is made up.
-import { contrast, dodont, hex, ratio, STATUS, sw, toc, type Page, type Status, type Token } from "../lib";
+import { contrast, dodont, entry, hex, ratio, sw, toc, type Page, type Token } from "../lib";
 
-function entry(o: {
-  id: string; name: string; status: Status; statusNote?: string; purpose: string; instead: string[];
-  versions: string; states: string; colors: string; sizes: string; wording: string[]; everyone: string[];
-  dd: string; code: string[]; extra?: string;
-}) {
-  return `<section class="ds" id="${o.id}">
-  <div class="dsh"><h2>${o.name}</h2><span class="st ${o.status}">${STATUS[o.status]}</span></div>
-  ${o.statusNote ? `<p class="dsnote">${o.statusNote}</p>` : ""}
-  <p class="dsp">${o.purpose}</p>
-  <h3>Use something else when</h3><ul>${o.instead.map((i) => `<li>${i}</li>`).join("")}</ul>
-  <h3>Versions</h3><div class="dsrow">${o.versions}</div>${o.extra ?? ""}
-  <h3>States</h3><div class="dsrow">${o.states}</div>
-  <h3>Shared colors and sizes</h3><ul class="sws">${o.colors}</ul><p class="dssz">${o.sizes}</p>
-  <h3>Wording</h3><ul>${o.wording.map((i) => `<li>${i}</li>`).join("")}</ul>
-  <h3>Works for everyone</h3><ul>${o.everyone.map((i) => `<li>${i}</li>`).join("")}</ul>
-  <h3>Do and don't</h3>${o.dd}
-  <h3>Lives in</h3><ul class="dscode">${o.code.map((c) => `<li><code>${c}</code></li>`).join("")}</ul>
-</section>`;
-}
 
 type T = Token | "white";
 const H = (t: T) => (t === "white" ? "#FFFFFF" : hex(t));

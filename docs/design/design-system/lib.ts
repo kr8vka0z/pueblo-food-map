@@ -206,3 +206,25 @@ export const dsSec = (o: { id: string; name: string; status?: Status; note?: str
   ${o.note ? `<p class="dsnote">${o.note}</p>` : ""}${o.purpose ? `<p class="dsp">${o.purpose}</p>` : ""}${o.body}</section>`;
 /** "On this page" pills. */
 export const toc = (items: [string, string][]) => `<nav class="dstoc" aria-label="On this page">${items.map(([h, n]) => `<a href="${h}">${n}</a>`).join("")}</nav>`;
+
+/** One design-system component entry, in the skill's template order (Components pages 03, 03b, 03c). */
+export function entry(o: {
+  id: string; name: string; status: Status; statusNote?: string; purpose: string; instead: string[];
+  versions: string; states: string; colors: string; sizes: string; wording: string[]; everyone: string[];
+  dd: string; code: string[]; extra?: string; // extra: a pick-one section shown right after Versions
+  colorsExtra?: string; // more contrast pairs, shown under the swatches
+}) {
+  return `<section class="ds" id="${o.id}">
+  <div class="dsh"><h2>${o.name}</h2><span class="st ${o.status}">${STATUS[o.status]}</span></div>
+  ${o.statusNote ? `<p class="dsnote">${o.statusNote}</p>` : ""}
+  <p class="dsp">${o.purpose}</p>
+  <h3>Use something else when</h3><ul>${o.instead.map((i) => `<li>${i}</li>`).join("")}</ul>
+  <h3>Versions</h3><div class="dsrow">${o.versions}</div>${o.extra ?? ""}
+  <h3>States</h3><div class="dsrow">${o.states}</div>
+  <h3>Shared colors and sizes</h3><ul class="sws">${o.colors}</ul>${o.colorsExtra ?? ""}<p class="dssz">${o.sizes}</p>
+  <h3>Wording</h3><ul>${o.wording.map((i) => `<li>${i}</li>`).join("")}</ul>
+  <h3>Works for everyone</h3><ul>${o.everyone.map((i) => `<li>${i}</li>`).join("")}</ul>
+  <h3>Do and don't</h3>${o.dd}
+  <h3>Lives in</h3><ul class="dscode">${o.code.map((c) => `<li><code>${c}</code></li>`).join("")}</ul>
+</section>`;
+}

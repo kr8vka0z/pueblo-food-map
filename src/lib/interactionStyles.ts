@@ -11,10 +11,14 @@
  * and composites over the enlarged-but-invisible hit boxes added alongside it
  * (Priority 3 tap-target fixes, same review) without any transform-origin
  * interaction to reason about.
+ *
+ * WHY press only, no hover half (#917, DESIGN.md R2): the old
+ * `hover:brightness-105` ran a filter on top of the hover color fade, which
+ * made hover stutter. Hover now animates color only (the sage 100 fill, R1).
  */
 
-/** Append to a control's className: dims 5% on press, brightens 5% on hover. */
-export const PRESS_FEEDBACK = "hover:brightness-105 active:brightness-95";
+/** Append to a control's className: dims 5% while pressed, so a tap visibly lands. */
+export const PRESS_FEEDBACK = "active:brightness-95";
 
 /**
  * The phone sheet's close button (#882, Kyle: no visible × on the phone, the

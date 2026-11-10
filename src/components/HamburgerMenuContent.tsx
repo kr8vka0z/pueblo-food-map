@@ -121,11 +121,11 @@ export default function HamburgerMenuContent({
             // row's layout and the icon's position don't move.
             "flex items-center justify-center w-12 h-12 -m-2 rounded-full " +
             "text-[var(--color-ink-500)] " +
-            "hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-700)] " +
+            "hover:bg-[var(--color-sage-100)] hover:text-[var(--color-ink-700)] " +
             PRESS_FEEDBACK + " " +
             "focus-visible:outline-none focus-visible:ring-2 " +
             "focus-visible:ring-[var(--color-sage-500)] " +
-            "transition-colors duration-100"
+            "transition-colors duration-150"
           }
         >
           <X size={16} aria-hidden />
@@ -149,9 +149,9 @@ export default function HamburgerMenuContent({
                     onClick={() => onSelectVenue?.(v.id)}
                     className={
                       "flex items-center gap-2.5 w-full min-h-12 text-left px-5 py-2.5 text-sm font-medium " +
-                      "text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-900)] " +
+                      "text-[var(--color-ink-700)] hover:bg-[var(--color-sage-100)] hover:text-[var(--color-ink-900)] " +
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
-                      "transition-colors duration-100"
+                      "transition-colors duration-150"
                     }
                   >
                     <span

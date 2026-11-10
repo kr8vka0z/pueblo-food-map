@@ -320,7 +320,7 @@ export default function PublicForm<K extends string>({
               // search bar border at rest").
               "border border-[var(--color-bone-300)] text-[var(--color-ink-700)] " +
               "text-base font-medium transition-colors duration-150 " +
-              "hover:bg-[var(--color-bone-100)] " +
+              "hover:bg-[var(--color-sage-100)] " +
               "focus-visible:outline-none focus-visible:ring-2 " +
               "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
             }

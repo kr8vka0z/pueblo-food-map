@@ -54,8 +54,9 @@ const TITLE_ID = "filter-panel-title";
 const SWIPE_CLOSE_THRESHOLD_PX = 50;
 // All focusable elements inside the panel for the Tab trap — same selector
 // shape as HamburgerMenu.tsx's FOCUSABLE, narrowed to what this panel
-// actually renders (buttons incl. role="switch", and the category checkboxes).
-const FOCUSABLE = 'button:not([disabled]), input[type="checkbox"]';
+// actually renders: buttons, including every row's role="switch" (#917: the
+// kind-of-place rows are switches now, no tick boxes).
+const FOCUSABLE = "button:not([disabled])";
 
 interface FilterPanelProps {
   open: boolean;
@@ -77,6 +78,8 @@ interface FilterPanelProps {
   /** Multi-select category filter — null/empty means "no category filter." */
   selectedCategories: Set<VenueCategory> | null;
   onToggleCategory: (cat: VenueCategory) => void;
+  /** Places of each kind (#917), shown on its row like the Show only counts. */
+  categoryCounts?: Partial<Record<VenueCategory, number>>;
 
   /**
    * "Events" switch (#761): show only special events. Optional so the panel is
@@ -98,7 +101,7 @@ interface FilterPanelProps {
   trapFocus?: boolean;
 }
 
-/** One "Show only" toggle row: label (+ optional count) and a switch control. */
+/** One toggle row (Show only, or a kind of place): icon, label (+ optional count) and a switch control. */
 function SwitchRow({
   icon,
   label,
@@ -106,6 +109,7 @@ function SwitchRow({
   checked,
   onClick,
   testId,
+  tourTarget = true,
 }: {
   testId?: string;
   icon: React.ReactNode;
@@ -113,13 +117,15 @@ function SwitchRow({
   count?: number;
   checked: boolean;
   onClick: () => void;
+  /** False for the kind-of-place rows: the tour highlights the union of matches, and its step is the Show only rows. */
+  tourTarget?: boolean;
 }) {
   return (
     // #233: the row is the switch's hit area — `relative` here (not on the
     // switch) makes the switch's `before:inset-0` overlay span the full
-    // 48px row, so a thumb on the label toggles it like the checkbox rows.
+    // 48px row, so a thumb on the label toggles it.
     // data-tour: the guided tour's Filters step highlights these rows (#159).
-    <div data-tour="filter-switch-row" className="relative flex items-center gap-3 px-5 py-2.5 min-h-12">
+    <div data-tour={tourTarget ? "filter-switch-row" : undefined} className="relative flex items-center gap-3 px-5 py-2.5 min-h-12">
       {icon}
       <span className="flex-1 text-sm font-medium text-[var(--color-ink-700)]">{label}</span>
       {count !== undefined && (
@@ -133,7 +139,9 @@ function SwitchRow({
         data-testid={testId}
         onClick={onClick}
         className={
-          "inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-150 " +
+          // #917 R5: knob and fill slide together in 250 ms on --ease-out-circ
+          // (live 150 ms was too fast to see).
+          "inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-250 ease-out-circ " +
           "before:absolute before:inset-0 " +
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
           (checked ? "bg-[var(--color-sage-600)]" : "bg-[var(--color-bone-300)]")
@@ -142,7 +150,7 @@ function SwitchRow({
         <span
           aria-hidden
           className={
-            "inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-150 " +
+            "inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-250 ease-out-circ " +
             (checked ? "translate-x-[18px]" : "translate-x-0.5")
           }
         />
@@ -167,6 +175,7 @@ export default function FilterPanel({
   wicCount,
   selectedCategories,
   onToggleCategory,
+  categoryCounts,
   onClearAll,
   filterEvents = false,
   onToggleEvents,
@@ -334,17 +343,17 @@ export default function FilterPanel({
             onClick={close}
             className={
               "flex items-center justify-center w-12 h-12 -m-2 rounded-full " +
-              "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-700)] " +
+              "text-[var(--color-ink-500)] hover:bg-[var(--color-sage-100)] hover:text-[var(--color-ink-700)] " +
               PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-              "transition-colors duration-100"
+              "transition-colors duration-150"
             }
           >
             <X size={16} aria-hidden />
           </button>
         </div>
 
-        {/* Scrollable middle — Show only switches, Kind of place checkboxes */}
+        {/* Scrollable middle — Show only switches, Kind of place switches */}
         {/* pt-2 only (#233): growing every row to the 48px floor made this
             content ~16px taller than the panel's available height, and the
             old py-2 + divider's my-2 clipped the last "Kind of place" row's
@@ -406,35 +415,30 @@ export default function FilterPanel({
           <div className="px-5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
             {t("filters.panel.kindOfPlace", locale)}
           </div>
+          {/* #917: each kind of place is a switch row like Show only (no tick
+              boxes); its color dot sits in the icon slot, 10 px plus 2 px each
+              side so it lines up with the 14 px icons above. */}
           {CATEGORIES.map((cat) => {
             const checked = selectedCategories?.has(cat) ?? false;
             return (
-              <label
+              <SwitchRow
                 key={cat}
-                className={
-                  "flex items-center gap-3 px-5 py-2.5 min-h-12 cursor-pointer text-sm font-medium " +
-                  "text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] transition-colors duration-100"
+                tourTarget={false}
+                icon={
+                  <span
+                    aria-hidden="true"
+                    className="inline-block size-[10px] mx-[2px] rounded-full shrink-0"
+                    style={{ backgroundColor: categoryColors[cat] }}
+                  />
                 }
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => {
-                    void track(EVENTS.FILTER_TOGGLED, { filter: cat, on: !checked });
-                    onToggleCategory(cat);
-                  }}
-                  className={
-                    "h-4 w-4 rounded border-[var(--color-bone-300)] text-[var(--color-sage-600)] " +
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-                  }
-                />
-                <span
-                  aria-hidden="true"
-                  className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: categoryColors[cat] }}
-                />
-                <span>{t(`category.full.${cat}`, locale)}</span>
-              </label>
+                label={t(`category.full.${cat}`, locale)}
+                count={categoryCounts ? (categoryCounts[cat] ?? 0) : undefined}
+                checked={checked}
+                onClick={() => {
+                  void track(EVENTS.FILTER_TOGGLED, { filter: cat, on: !checked });
+                  onToggleCategory(cat);
+                }}
+              />
             );
           })}
         </div>
@@ -449,7 +453,7 @@ export default function FilterPanel({
               // #529: --color-orange/--color-navy don't exist — DESIGN.md's
               // orange exception is --color-brand-orange/--color-brand-navy.
               "bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)] " +
-              "hover:brightness-105 active:brightness-95 " +
+              "active:brightness-95 " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-brand-orange)]"
             }
           >

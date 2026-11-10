@@ -662,14 +662,9 @@ const cardShells = entry({
   code: [
     "src/components/BottomSheet.tsx (phone sheet, grab bar, the two heights)",
     "src/components/DesktopSidePanel.tsx (computer panel shell: size, place, Escape and focus)",
-    "src/components/DesktopVenueWindow.tsx (what the computer panel shows). Proposed change: :151-169, ← Saved loses its border-b and shares a line with the ×; :171-175, VenuePopupHeader goes, its × passed into the card's action row (VenueCardBody) or onto that line",
-    "src/components/VenuePopupHeader.tsx (today's top bar: h-11 with border-b; History on the left for a box)",
+    "src/components/DesktopVenueWindow.tsx (what the computer panel shows, and its pinned top: the action row with the × at its right end, or ← Saved or a box's History on one line with the ×; a hairline only once the card scrolls)",
+    "src/components/VenueActionRow.tsx (the action row the computer panel pins). VenuePopupHeader.tsx, the old top bar, was removed in #917",
     "src/lib/interactionStyles.ts (HIDDEN_UNTIL_FOCUS, the phone's keyboard-only Close)",
-    ...knownIssues([
-      "BottomSheet.tsx:829, the grab bar uses PRESS_FEEDBACK (hover:brightness-105)",
-      "BottomSheet.tsx:938-939, the box card's Close hovers to bone-100 and uses PRESS_FEEDBACK",
-      "VenuePopupHeader.tsx:40-41 and :71-72, History and the × hover to bone-100 and use PRESS_FEEDBACK",
-    ]),
   ],
 });
 

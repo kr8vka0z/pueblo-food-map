@@ -188,25 +188,26 @@ describe("BottomSheet — grab bar collapsed state (#666)", () => {
 });
 
 describe("BottomSheet — grab bar expand / collapse toggle (#666)", () => {
-  test("tapping the grab bar reveals phone number and flips aria-expanded", async () => {
+  test("tapping the grab bar reveals the details and flips aria-expanded", async () => {
     const user = userEvent.setup();
     render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
     const bar = screen.getByRole("button", { name: /show details/i });
     await user.click(bar);
     expect(bar.getAttribute("aria-expanded")).toBe("true");
     expect(bar.getAttribute("aria-label")).toMatch(/hide details/i);
-    expect(screen.getByText("(719) 555-0122")).toBeDefined();
+    // #917: the phone line left the details; the address is still in them.
+    expect(screen.getByText("123 Main St, Pueblo, CO 81003")).toBeDefined();
   });
 
-  test("revealed phone number is an underlined, green, 44px tel: link (option A, 2026-09-23)", async () => {
-    const user = userEvent.setup();
+  // #917 R4: the number moved from a line in CONTACT to the Call button at
+  // the top of the card, so it can be called without opening the details.
+  test("the phone number is the Call button in the action row, a tel: link above the fold", () => {
     render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
-    await user.click(screen.getByRole("button", { name: /show details/i }));
-    const link = screen.getByRole("link", { name: /555-0122/ });
+    const link = screen.getByRole("link", { name: "Call (719) 555-0122" });
     expect(link.getAttribute("href")).toBe("tel:(719) 555-0122");
-    expect(link.className.split(/\s+/)).toEqual(
-      expect.arrayContaining(["underline", "text-[var(--color-sage-700)]", "min-h-11"]),
-    );
+    const bar = screen.getByRole("button", { name: /show details/i });
+    const details = document.getElementById(bar.getAttribute("aria-controls")!)!;
+    expect(details.contains(link)).toBe(false);
   });
 
   test("collapsed detail content is inert (not tabbable or announced) until expanded (#683 review)", async () => {

@@ -97,7 +97,7 @@ const MapCanvas = dynamic(() => import("./Map"), {
 // viewMode === "map" && selectedVenue` (see its JSX below) — on the mobile
 // viewport this whole app targets first, that condition is never true, so a
 // plain top-level import still shipped ~800 lines of desktop-only markup
-// (DesktopVenueWindow.tsx + VenuePopupHeader.tsx) into every mobile visitor's
+// (DesktopVenueWindow.tsx and, then, its VenuePopupHeader.tsx) into every mobile visitor's
 // synchronous MapWrapper chunk for code that never mounts. Same next/dynamic
 // pattern as MapCanvas above, minus a loading fallback (see the
 // desktopWindowPrefetched effect below, near `isMobile`, for why): the JSX is
@@ -745,6 +745,7 @@ export default function MapWrapper({
     openNowCount,
     snapCount,
     wicCount,
+    categoryCounts,
     toggleCategory,
     clearFilters,
     handleClearAllFilters,
@@ -765,7 +766,7 @@ export default function MapWrapper({
   // render needs to reflect. Left null (the default, no override) for:
   // turning Boxes OFF, turning it on with no known location (never triggers
   // the geolocation prompt — Near me already owns that), or the Filters
-  // panel's own checkbox (which calls toggleCategory directly, bypassing
+  // panel's own Blessing Box switch (which calls toggleCategory directly, bypassing
   // this handler, so it keeps today's fit-all).
   const pendingBoxesFitBoundsRef = useRef<
     [[number, number], [number, number]] | null
@@ -1916,6 +1917,7 @@ export default function MapWrapper({
         wicCount={wicCount}
         selectedCategories={selectedCategories}
         onToggleCategory={toggleCategory}
+        categoryCounts={categoryCounts}
         onClearAll={clearFilters}
         filterEvents={filterEvents}
         onToggleEvents={() => setFilterEvents((v) => !v)}

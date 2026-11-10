@@ -125,14 +125,14 @@ describe("DesktopVenueWindow — X-close interaction", () => {
   });
 });
 
-describe("DesktopVenueWindow — phone link looks tappable (option A, 2026-09-23)", () => {
-  test("phone number is an underlined, green tel: link", () => {
+// #917 R4: the phone line in CONTACT is gone; the number is the Call button,
+// and a computer shows the number in a label under the pointer and focus.
+describe("DesktopVenueWindow — Call button", () => {
+  test("Call is a tel: link named and labelled with the number", () => {
     renderWindow({ venue: makeVenue({ phone: "(719) 555-0164" }) });
-    const link = screen.getByRole("link", { name: /555-0164/ });
+    const link = screen.getByRole("link", { name: "Call (719) 555-0164" });
     expect(link.getAttribute("href")).toBe("tel:(719) 555-0164");
-    expect(link.className.split(/\s+/)).toEqual(
-      expect.arrayContaining(["underline", "text-[var(--color-sage-700)]"]),
-    );
+    expect(link.textContent).toContain("(719) 555-0164");
   });
 });
 
@@ -259,7 +259,9 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
     expect(screen.queryByTestId("box-status-badge")).toBeNull();
   });
 
-  test("the header's History link navigates to /box/<id>/history for a box (VenuePopupHeader's own header)", () => {
+  // #917: "On a computer, History and the × share one line above the photo
+  // with no rule under it" (DESIGN.md Blessing box card); VenuePopupHeader is gone.
+  test("the top line's History link navigates to /box/<id>/history for a box, beside the ×", () => {
     render(
       <DesktopVenueWindow
         venue={makeBoxVenue()}
@@ -270,8 +272,8 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
     );
     const link = screen.getByRole("link", { name: "History" });
     expect(link.getAttribute("href")).toBe("/box/test-box-1/history");
-    // order-1: visually leftmost, while X-close stays first in tab order.
-    expect(link.className).toContain("order-1");
+    // History on the left, the × at the right end of the same line.
+    expect(screen.getByRole("button", { name: "Close" }).parentElement).toBe(link.parentElement);
   });
 
   // #682 8b: Escape handling moved to DesktopSidePanel (coordinator: "Lift

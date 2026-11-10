@@ -388,7 +388,7 @@ export default function ShareEventForm() {
                         className={
                           "w-full min-h-12 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white " +
                           "px-3 py-2 text-left text-sm text-[var(--color-ink-700)] " +
-                          "transition-colors duration-150 hover:bg-[var(--color-sage-50)] hover:border-[var(--color-sage-500)] " +
+                          "transition-colors duration-150 hover:bg-[var(--color-sage-100)] hover:border-[var(--color-sage-500)] " +
                           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
                         }
                       >

@@ -304,7 +304,7 @@ export default function RouteStrip({
                   aria-label={t("detail.close", locale)}
                   className={
                     "flex h-9 w-9 shrink-0 items-center justify-center rounded-md " +
-                    "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
+                    "text-[var(--color-ink-500)] hover:bg-[var(--color-sage-100)] transition-colors " +
                     PRESS_FEEDBACK + " " +
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
                   }

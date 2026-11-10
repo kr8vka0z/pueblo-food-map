@@ -461,7 +461,7 @@ export default function GuidedTour({
               onClick={finish}
               className={
                 "min-h-12 px-3 -my-2 rounded-[var(--radius-md)] text-base font-medium text-[var(--color-ink-700)] underline underline-offset-2 " +
-                "hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-900)] " +
+                "transition-colors duration-150 hover:bg-[var(--color-sage-100)] hover:text-[var(--color-ink-900)] " +
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
                 PRESS_FEEDBACK
               }
@@ -481,7 +481,7 @@ export default function GuidedTour({
               onClick={() => go("back")}
               className={
                 "min-h-12 px-4 rounded-[var(--radius-md)] text-base font-semibold text-[var(--color-sage-700)] " +
-                "hover:bg-[var(--color-bone-100)] " +
+                "transition-colors duration-150 hover:bg-[var(--color-sage-100)] " +
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
                 PRESS_FEEDBACK
               }

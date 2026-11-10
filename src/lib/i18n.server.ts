@@ -97,8 +97,6 @@ export const serverEn: Record<string, string> = {
   "hubs.pantries.faq.a4": "Hours can change, and some places have not shared theirs. Call ahead, or call 2-1-1 or the Food Resource Hotline at 855-855-4626 and ask about pantries open today.",
   "hubs.snapWic.heading": "Places that accept SNAP and WIC",
   "hubs.snapWic.intro": "{snap} places on the map accept SNAP/EBT and {wic} accept WIC. Each one is listed below with its address.",
-  "hubs.snapWic.badgeSnap": "Accepts SNAP/EBT",
-  "hubs.snapWic.badgeWic": "Accepts WIC",
   "hubs.snapWic.note": "What a place accepts can change. Check with the place before you go.",
   "hubs.snapWic.apply": "Want to apply for SNAP or WIC?",
   // /blessing-boxes (#709 PR B). Deliberately no "free" wording: blessing_box is not in FREE_CATEGORIES.
@@ -195,8 +193,6 @@ export const serverEs: Record<string, string> = {
   "hubs.pantries.faq.a4": "Los horarios pueden cambiar, y algunos lugares no han compartido el suyo. Llama antes, o llama al 2-1-1 o a la Línea de Recursos Alimentarios al 855-855-4626 y pregunta por las despensas abiertas hoy.", // [CHECK]
   "hubs.snapWic.heading": "Lugares que aceptan SNAP y WIC", // [CHECK]
   "hubs.snapWic.intro": "{snap} lugares en el mapa aceptan SNAP/EBT y {wic} aceptan WIC. Cada uno aparece abajo con su dirección.", // [CHECK]
-  "hubs.snapWic.badgeSnap": "Acepta SNAP/EBT", // [CHECK]
-  "hubs.snapWic.badgeWic": "Acepta WIC", // [CHECK]
   "hubs.snapWic.note": "Lo que acepta un lugar puede cambiar. Confirma con el lugar antes de ir.", // [CHECK]
   "hubs.snapWic.apply": "¿Quieres solicitar SNAP o WIC?", // [CHECK]
   "meta.boxes.title": "Cajas de bendiciones en Pueblo, CO", // [CHECK]

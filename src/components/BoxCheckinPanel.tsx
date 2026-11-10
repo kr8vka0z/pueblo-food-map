@@ -179,7 +179,7 @@ export const PRIMARY_BTN =
   "text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
 export const SECONDARY_BTN =
-  "min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]";
+  "min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] transition-colors duration-150 hover:bg-[var(--color-sage-100)]";
 
 interface BoxCheckinPanelProps {
   boxId: string;
@@ -631,7 +631,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
   const buttonBase =
     "min-h-12 px-3 py-2 rounded-[var(--radius-md)] text-sm font-medium text-center " +
     "transition-colors duration-150 border border-[var(--color-bone-300)] text-[var(--color-ink-700)] bg-white " +
-    "hover:bg-[var(--color-bone-100)] focus-visible:outline-none focus-visible:ring-2 " +
+    "hover:bg-[var(--color-sage-100)] focus-visible:outline-none focus-visible:ring-2 " +
     "focus-visible:ring-[var(--color-sage-500)] disabled:opacity-60 disabled:cursor-not-allowed";
 
   // One action at a time: busy while an actual submit is in flight OR one is
@@ -835,7 +835,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
                     "disabled:opacity-60 disabled:cursor-not-allowed " +
                     (selected
                       ? "border-[var(--color-sage-600)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)]"
-                      : "border-[var(--color-bone-300)] bg-white text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]")
+                      : "border-[var(--color-bone-300)] bg-white text-[var(--color-ink-700)] hover:bg-[var(--color-sage-100)]")
                   }
                 >
                   {t(`box.needs.${key}`, locale)}

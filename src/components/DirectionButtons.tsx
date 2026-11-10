@@ -634,12 +634,12 @@ const walkInactiveClass =
 // #534: --color-bone-400 undefined — the bone scale stops at bone-300, so a
 // hover-darkened border steps into the ink family instead, reusing the same
 // hover:border-ink-400 darken-on-hover pattern ReportVenueButton.tsx already
-// uses for an identical rest-bone/hover-darker border (5.2:1 against the
-// bone-100 hover fill, DESIGN.md's own measured number for ink-400).
+// uses for an identical rest-bone/hover-darker border. #917 R1: the hover
+// fill is sage 100; ink-400 on it is 4.2:1, past the 3:1 an edge needs.
 const externalClass =
   baseClass +
   " bg-[var(--color-bone-50)] text-[var(--color-ink-700)] border border-[var(--color-bone-300)] " +
-  "hover:bg-[var(--color-bone-100)] hover:border-[var(--color-ink-400)]";
+  "hover:bg-[var(--color-sage-100)] hover:border-[var(--color-ink-400)]";
 
 // ─── DirectionButtons ─────────────────────────────────────────────────────────
 

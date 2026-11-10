@@ -191,7 +191,7 @@ describe("filters step — the real panel, open", () => {
       fireEvent.click(screen.getByTestId("filters-button"));
       fireEvent.click(screen.getByRole("switch", { name: t("filter.openNow", "en") }));
       fireEvent.click(screen.getByRole("switch", { name: t("filter.wic", "en") }));
-      fireEvent.click(screen.getByRole("checkbox", { name: new RegExp(t("category.full.garden", "en")) }));
+      fireEvent.click(screen.getByRole("switch", { name: new RegExp(t("category.full.garden", "en")) }));
       fireEvent.keyDown(document, { key: "Escape" });
       expect(screen.getByTestId("filters-button").getAttribute("aria-label")).toBe(activeLabel);
     });

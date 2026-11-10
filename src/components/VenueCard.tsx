@@ -41,11 +41,11 @@ export default function VenueCard({
         type="button"
         onClick={onClick}
         className={
-          "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors duration-150 " +
+          "group flex w-full items-start gap-3 px-4 py-3 text-left transition-colors duration-150 " +
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
           (isSelected
             ? "bg-[var(--color-sage-50)] border-l-[3px] border-[var(--color-sage-500)]"
-            : "border-l-[3px] border-transparent hover:bg-[var(--color-bone-100)]")
+            : "border-l-[3px] border-transparent hover:bg-[var(--color-sage-100)]")
         }
         style={{ minHeight: 96 }}
         aria-current={isSelected ? "true" : undefined}
@@ -62,7 +62,7 @@ export default function VenueCard({
           <Heading className="block text-base font-semibold text-[var(--color-ink-700)] leading-snug mb-0.5">
             {venue.name}
           </Heading>
-          <span className="block text-sm text-[var(--color-ink-400)] truncate mb-1.5">
+          <span className="block text-sm text-[var(--color-ink-400)] group-hover:text-[var(--color-ink-500)] truncate mb-1.5">
             {t(`category.full.${venue.category}`, locale)} · {venue.address}
           </span>
 

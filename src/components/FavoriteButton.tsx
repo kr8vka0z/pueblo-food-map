@@ -48,7 +48,7 @@ export default function FavoriteButton({
         // (BottomSheet/DesktopVenueWindow/BoxCardBody), which space it gap-4
         // so neighbouring hit areas stay 8px apart.
         "shrink-0 flex items-center justify-center w-12 h-12 -m-1 rounded-md transition-colors " +
-        "hover:bg-[var(--color-bone-100)] " +
+        "hover:bg-[var(--color-sage-100)] " +
         PRESS_FEEDBACK + " " +
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
       }

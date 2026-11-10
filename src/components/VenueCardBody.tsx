@@ -3,22 +3,23 @@
 /**
  * VenueCardBody — the place card's content for an ordinary venue (not a
  * blessing box; that is BoxCardBody), shared by both shells (#725):
- *   - variant "sheet": BottomSheet on a phone. Header row carries the close
- *     X; everything below Get directions sits in a detail section that is
- *     clipped to a short faded "peek" until the grab bar expands it (#666).
+ *   - variant "sheet": BottomSheet on a phone. The card starts with the
+ *     action row (VenueActionRow, #917), which also carries the keyboard-only
+ *     close X; everything below Get directions sits in a detail section that
+ *     peeks at the screen edge until the grab bar expands it (#666).
  *   - variant "panel": DesktopVenueWindow on a computer. Always shows the
  *     full details (#732, Kyle 2026-10-24: the old Show/Hide details toggle
- *     and its collapsed copy of the card are gone). Close lives in the
- *     panel's own header bar, so there is no X here.
+ *     and its collapsed copy of the card are gone). The action row and its ×
+ *     live in the panel's pinned top (DesktopVenueWindow), so the card
+ *     starts at the name.
  *
  * One block order for both. The size differences between the two (smaller
  * text and icons on desktop, compact hours table) are deliberate and kept as
  * per-variant classes; the phone card renders exactly as it did before.
  */
 
-import { X, MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
+import { X, MapPin, Clock, CircleHelp, ExternalLink } from "lucide-react";
 import type { Venue } from "@/types/venue";
-import { categoryColors } from "@/lib/categories";
 import { formatMiles } from "@/lib/distance";
 import { computeVenueOpenStatus, nextIrregularOccurrence, formatIrregularOccurrence } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
@@ -29,11 +30,11 @@ import { HIDDEN_UNTIL_FOCUS, PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { track, EVENTS } from "@/lib/analytics";
 import type { Walk } from "@/lib/useWalkingRoute";
 import ReportVenueButton from "@/components/ReportVenueButton";
-import FavoriteButton from "@/components/FavoriteButton";
-import ShareButton from "@/components/ShareButton";
+import VenueActionRow from "@/components/VenueActionRow";
 import HoursList from "@/components/HoursList";
 import DirectionButtons from "@/components/DirectionButtons";
 import EventHereLine, { type EventHere } from "@/components/EventHereLine";
+import CategoryLabel from "@/components/CategoryLabel";
 
 interface VenueCardBodyProps {
   venue: Venue & { distanceMiles?: number };
@@ -42,7 +43,7 @@ interface VenueCardBodyProps {
   walk?: Walk;
   /** An upcoming/live event tied to this place (#759): one line that opens its card. */
   eventHere?: EventHere | null;
-  /** "sheet" only: the X in the name row. */
+  /** "sheet" only: the keyboard-only close X at the end of the action row. */
   onClose?: () => void;
   /** "sheet" only: whether the detail section shows in full or as the clipped peek (#666). */
   expanded?: boolean;
@@ -116,22 +117,6 @@ export default function VenueCardBody({
         </section>
       )}
 
-      {/* Phone / Contact */}
-      {venue.phone && (
-        <section aria-label={t("detail.contact", locale)}>
-          <h3 className={sectionHeading}>{t("detail.contact", locale)}</h3>
-          <a
-            href={`tel:${venue.phone}`}
-            onClick={() => void track(EVENTS.CALL_CLICKED, { venueId: venue.id })}
-            // before:* — 2px overlay up/down takes the 44px link to 48 (#233).
-            className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
-          >
-            <Phone size={sheet ? 15 : 13} className="text-[var(--color-sage-600)]" aria-hidden />
-            {venue.phone}
-          </a>
-        </section>
-      )}
-
       {/* See full details on Plentiful (#128) — Plentiful-sourced venues only.
           safeUrl: venue.url comes from OSM (anyone can edit); reject non-http(s). */}
       {venue.source.toLowerCase().includes("plentiful") && safeUrl(venue.url) && (
@@ -161,41 +146,55 @@ export default function VenueCardBody({
   );
 
   return (
-    <div className={sheet ? "flex flex-col px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3" : "flex flex-col p-4 gap-3"}>
-      {/* Name row: title, Share, Save (+ a close button on a phone that is
-          hidden until keyboard focus, #882, so it takes no room). gap-4:
-          Share/Save (-m-1) each give back 4px of it, leaving 8px between their
-          48px hit areas (#233). */}
-      <div className="flex items-start gap-4">
-        <h2
-          id={nameId}
-          // The panel's heading is focused directly by DesktopSidePanel (#682
-          // 8b), so it needs tabIndex={-1} without joining the Tab order.
-          tabIndex={nameId ? -1 : undefined}
-          className="flex-1 text-xl font-normal text-[var(--color-ink-900)] leading-tight outline-none"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          {venue.name}
-        </h2>
-        <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={sheet ? 20 : 18} />
-        <FavoriteButton venueId={venue.id} venueName={venue.name} locale={locale} size={sheet ? 20 : 18} />
-        {sheet && onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t("detail.close", locale)}
-            className={
-              // #882: hidden on the phone (the sheet closes by swiping down), shown on keyboard focus.
-              HIDDEN_UNTIL_FOCUS + " flex items-center justify-center w-12 h-12 rounded-md " +
-              "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
-              PRESS_FEEDBACK + " " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-            }
-          >
-            <X size={18} aria-hidden />
-          </button>
-        )}
-      </div>
+    // Panel: no top padding, the pinned action row above it (DesktopVenueWindow) ends 12px above the name.
+    <div className={sheet ? "flex flex-col px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3" : "flex flex-col px-4 pb-4 gap-3"}>
+      {/* Phone (#917, R4): the action row is the card's first line, 12px
+          above the name, so the name runs the full width. It ends with a
+          close button hidden until keyboard focus (#882), which takes no room. */}
+      {sheet && (
+        <VenueActionRow
+          venue={venue}
+          locale={locale}
+          close={
+            onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={t("detail.close", locale)}
+                className={
+                  // #882: hidden on the phone (the sheet closes by swiping down), shown on keyboard focus.
+                  HIDDEN_UNTIL_FOCUS + " flex items-center justify-center w-12 h-12 rounded-md " +
+                  "text-[var(--color-ink-500)] hover:bg-[var(--color-sage-100)] transition-colors " +
+                  PRESS_FEEDBACK + " " +
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                }
+              >
+                <X size={18} aria-hidden />
+              </button>
+            )
+          }
+        />
+      )}
+      <h2
+        id={nameId}
+        // The panel's heading is focused directly by DesktopSidePanel (#682
+        // 8b), so it needs tabIndex={-1} without joining the Tab order.
+        tabIndex={nameId ? -1 : undefined}
+        className="text-xl font-normal text-[var(--color-ink-900)] leading-tight outline-none"
+        style={{ fontFamily: "var(--font-display)" }}
+      >
+        {venue.name}
+      </h2>
+
+      {/* Category label (#917, R3): colored words on their own line under the name. */}
+      <CategoryLabel
+        category={venue.category}
+        label={t(`category.full.${venue.category}`, locale)}
+        benefits={[
+          ...(venue.accepts_snap ? [t("badge.snap", locale)] : []),
+          ...(venue.accepts_wic ? [t("badge.wic", locale)] : []),
+        ]}
+      />
 
       {eventHere && <EventHereLine {...eventHere} />}
 
@@ -213,27 +212,6 @@ export default function VenueCardBody({
           </a>
         </p>
       )}
-
-      {/* Category badge + SNAP/WIC pills */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span
-          className={`inline-flex items-center gap-1.5 ${sheet ? "px-2.5 py-1 text-sm" : "px-2 py-0.5 text-xs"} rounded-full font-medium text-[var(--color-bone-50)]`}
-          style={{ backgroundColor: categoryColors[venue.category] }}
-        >
-          <span className={`${sheet ? "w-2 h-2" : "w-1.5 h-1.5"} rounded-full bg-white/40 shrink-0`} aria-hidden />
-          {t(`category.full.${venue.category}`, locale)}
-        </span>
-        {venue.accepts_snap && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-            {t("badge.snap", locale)}
-          </span>
-        )}
-        {venue.accepts_wic && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-            {t("badge.wic", locale)}
-          </span>
-        )}
-      </div>
 
       {/* Distance + hours today */}
       <div className={`flex ${sheet ? "items-center gap-4 text-sm" : "flex-wrap items-center gap-3 text-xs"} text-[var(--color-ink-500)]`}>

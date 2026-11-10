@@ -262,6 +262,12 @@ const es: Record<string, string> = {
   "share.labelGeneric": "Compartir este lugar",
   "share.copied": "Enlace copiado",
 
+  // Card action row (#917)
+  "action.call": "Llamar al {phone}", // [CHECK]
+  "action.noPhone": "Sin número de teléfono",
+  "action.website": "Visitar el sitio web de {name} (se abre en una pestaña nueva)", // [CHECK]
+  "action.noWebsite": "Sin sitio web",
+
   // View switch — search-bar suggestion row + Menu line (#514).
   "viewSuggestion.seeAsList": "Ver todos los lugares en una lista",
   "viewSuggestion.backToMap": "Volver al mapa",

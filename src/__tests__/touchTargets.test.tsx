@@ -32,11 +32,11 @@ import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 import { waitForBoxCard } from "@/lib/testing/waitForBoxCard.testutil";
 import BoxCardBody from "@/components/BoxCardBody";
-import VenuePopupHeader from "@/components/VenuePopupHeader";
 import LocationHelpCard from "@/components/LocationHelpCard";
 import AdoptBoxForm from "@/components/AdoptBoxForm";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { makeWalk } from "@/__tests__/helpers/walkTestHelpers";
+import { t } from "@/lib/i18n";
 
 // Box cards mount BoxCheckinPanel's Turnstile widget — same stub as the
 // BoxCardBody/DesktopVenueWindow tests.
@@ -149,9 +149,12 @@ describe("FilterPanel", () => {
 
   test("every Kind-of-place row is at least 48px tall", () => {
     render(<FilterPanel {...filterProps} />);
-    const boxes = screen.getAllByRole("checkbox");
-    expect(boxes.length).toBeGreaterThan(0);
-    for (const cb of boxes) expect(classes(cb.closest("label"))).toContain("min-h-12");
+    // #917: kind-of-place rows are switch rows now (no tick boxes); check all eight.
+    const kinds = ["pantry", "grocery", "convenience", "farm", "garden", "edible_landscape", "meal_site", "blessing_box"];
+    for (const kind of kinds) {
+      const row = screen.getByRole("switch", { name: t(`category.full.${kind}`, "en") }).parentElement;
+      expect(classes(row)).toContain("min-h-12");
+    }
   });
 
   test("the Show N places footer button is 48px tall", () => {
@@ -161,7 +164,7 @@ describe("FilterPanel", () => {
 
   test("the scroll container doesn't reserve py-2 (#233: growing every row to 48px made the panel ~16px taller than its available height; keeping py-2 here clipped the last Kind-of-place row's bottom 8px against the footer)", () => {
     render(<FilterPanel {...filterProps} />);
-    const scroller = screen.getByRole("checkbox", { name: /Food Pantry/ }).closest("label")?.parentElement;
+    const scroller = screen.getByRole("switch", { name: /Food Pantry/ }).parentElement?.parentElement;
     expect(classes(scroller)).toContain("pt-2");
     expect(classes(scroller)).not.toContain("py-2");
   });
@@ -306,13 +309,16 @@ describe("Venue card controls", () => {
     );
   });
 
-  test("BottomSheet phone link keeps min-h-11 and adds a 2px overlay → 48px", async () => {
-    const user = userEvent.setup();
-    render(<BottomSheet venue={makeVenue()} onClose={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /Show details/ }));
-    expect(classes(screen.getByRole("link", { name: /555-0233/ }))).toEqual(
-      expect.arrayContaining(["relative", "before:absolute", "before:inset-x-0", "before:-inset-y-0.5"]),
-    );
+  // #917 R4: the phone line in CONTACT is gone; the number is the Call
+  // button in the action row, and a missing phone or website keeps its 48px box.
+  test("BottomSheet Call, Website and their greyed stand-ins are 48×48 boxes", () => {
+    const { unmount } = render(<BottomSheet venue={makeVenue()} onClose={vi.fn()} />);
+    expect(classes(screen.getByRole("link", { name: /Call .*555-0233/ }))).toEqual(expect.arrayContaining(["w-12", "h-12"]));
+    unmount();
+    render(<BottomSheet venue={makeVenue({ phone: undefined, url: undefined })} onClose={vi.fn()} />);
+    for (const name of ["No phone number listed", "No website listed"]) {
+      expect(classes(screen.getByRole("button", { name }))).toEqual(expect.arrayContaining(["w-12", "h-12"]));
+    }
   });
 
   test("BottomSheet Plentiful link is at least 48px tall even on one line", async () => {
@@ -405,22 +411,27 @@ describe("44px leftovers reach the 48px floor (#827)", () => {
     ["box card History link", () => (boxCard(), screen.getByRole("link", { name: "History" })), OVERLAY_Y],
     ["box card email-alerts link", () => (boxCard(), screen.getByRole("button", { name: "Email me when it needs filling" })), OVERLAY_Y],
     ["box check-in buttons", () => (boxCard(), screen.getByRole("button", { name: "I filled it" })), ["min-h-12"]],
+    // #917: VenuePopupHeader's bar is gone; the × ends the action row (or the
+    // box's History line) in DesktopVenueWindow's pinned top.
     [
       "desktop card close",
-      () => (render(<VenuePopupHeader onClose={vi.fn()} />), screen.getByRole("button", { name: "Close" })),
-      // Grows down, not up: the bar's top edge is clipped (overflow-hidden).
-      ["relative", "before:absolute", "before:-inset-x-0.5", "before:top-0", "before:-bottom-1"],
+      () => (render(<DesktopVenueWindow venue={ttBox} box={ttBox} onClose={vi.fn()} locale="en" />), screen.getByRole("button", { name: "Close" })),
+      ["w-12", "h-12"],
     ],
     [
       "desktop box card History link",
-      () => (render(<VenuePopupHeader onClose={vi.fn()} historyHref="/box/x/history" />), screen.getByRole("link", { name: "History" })),
-      ["relative", "before:absolute", "before:inset-x-0", "before:-top-1.5", "before:-bottom-2.5"],
+      () => (render(<DesktopVenueWindow venue={ttBox} box={ttBox} onClose={vi.fn()} locale="en" />), screen.getByRole("link", { name: "History" })),
+      // 40px drawn, 4px overlay up and down → 48.
+      ["relative", "before:absolute", "before:inset-x-0", "before:-inset-y-1", "min-h-[40px]"],
     ],
     [
-      // Those overlays reach into the body; the bar's own layer keeps a
-      // positioned body element (a box photo) from covering them.
-      "desktop card header bar",
-      () => (render(<VenuePopupHeader onClose={vi.fn()} />), screen.getByRole("button", { name: "Close" }).parentElement!),
+      // Those overlays reach past the pinned top into the body; its own
+      // layer keeps a positioned body element (a box photo) from covering them.
+      "desktop card pinned top",
+      () => (
+        render(<DesktopVenueWindow venue={ttBox} box={ttBox} onClose={vi.fn()} locale="en" />),
+        screen.getByRole("button", { name: "Close" }).parentElement!.parentElement!
+      ),
       ["relative", "z-10"],
     ],
     [

@@ -100,7 +100,7 @@ export default function ViewSuggestion({
         className={
           "flex items-center gap-3 w-full px-4 h-[52px] text-left " +
           "text-sm font-semibold text-[var(--color-sage-700)] " +
-          "hover:bg-[var(--color-bone-100)] transition-colors duration-100 " +
+          "hover:bg-[var(--color-sage-100)] transition-colors duration-150 " +
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset " +
           "focus-visible:ring-[var(--color-sage-500)]"
         }

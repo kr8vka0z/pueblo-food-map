@@ -107,6 +107,13 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = [], initial
     () => venuesWithDistance.filter((v) => v.accepts_wic).length,
     [venuesWithDistance],
   );
+  // Places of each kind (#917), for the Filters panel's kind-of-place switch
+  // rows: a total like snapCount, not narrowed by the other filters.
+  const categoryCounts = useMemo(() => {
+    const counts: Partial<Record<VenueCategory, number>> = {};
+    for (const v of venuesWithDistance) counts[v.category] = (counts[v.category] ?? 0) + 1;
+    return counts;
+  }, [venuesWithDistance]);
 
   // ── Main filter pipeline ─────────────────────────────────────────────────────
   //
@@ -230,9 +237,9 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = [], initial
     filterWic ||
     filterEvents;
 
-  // ── Category checkbox toggle (#513 — Filters panel, multi-select) ───────────
+  // ── Category switch toggle (#513 — Filters panel, multi-select) ─────────────
   // Replaces the old single-select handleCategoryBrowseSelect: the panel
-  // renders 8 independent checkboxes, so toggling one must add/remove just
+  // renders 8 independent switches (#917; tick boxes before), so toggling one must add/remove just
   // that category from the set, not replace the whole selection. Empty Set
   // normalizes back to null so `selectedCategories !== null && size > 0` (the
   // filter guard above, and every other null-check on this state) stays the
@@ -290,6 +297,7 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = [], initial
     openNowCount,
     snapCount,
     wicCount,
+    categoryCounts,
     // Handlers
     toggleCategory,
     clearFilters,

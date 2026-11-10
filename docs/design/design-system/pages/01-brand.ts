@@ -1,6 +1,6 @@
 // Design system: Brand and feel. The feel ("Civic Editorial", from DESIGN.md Overview), who it's for, the concrete
 // reference behind the look, the logo rules, the settled brand decisions, the mission and vision word for word from
-// the About page, the five proposed values, and the one-line voice. Mission, vision and values live in the brand
+// the About page, the four draft brand values, the five building principles, and the one-line voice. Mission, vision and values live in the brand
 // note in the knowledge base (private: never name its path on this public page). CSS: mock.css "patterns-brand".
 import { b, dsSec, hex, ratio, sw, toc, ul, type Page, type Token } from "../lib";
 
@@ -11,7 +11,7 @@ const wm = (cls = "") => `<span class="pb-wm${cls ? ` ${cls}` : ""}">Pueblo Food
 /** The app icon's pin mark (src/app/apple-icon.png, public/icons/): an orange pin with a white edge and a white dot,
  *  on sage 600. Drawn here so no new image file is needed. */
 const pinMark = (size = 96) => `<svg class="pb-pinmark" width="${size}" height="${size}" viewBox="0 0 96 96" role="img" aria-label="The app icon: an orange map pin on green"><rect width="96" height="96" rx="20" fill="var(--color-sage-600)"/><path d="M48 18c-11.6 0-21 9.2-21 20.6C27 54 48 78 48 78s21-24 21-39.4C69 27.2 59.6 18 48 18z" fill="var(--color-brand-orange)" stroke="#fff" stroke-width="4" stroke-linejoin="round"/><circle cx="48" cy="38" r="8" fill="#fff"/></svg>`;
-const proposed = `<span class="pb-prop">Proposed: adjust or approve</span>`;
+const proposed = `<span class="pb-prop">Draft: to review with the Pueblo Food Project team</span>`;
 
 const feel = dsSec({
   id: "feel", name: "The feel: Civic Editorial",
@@ -83,10 +83,16 @@ const decisions = dsSec({
 
 const mission = dsSec({
   id: "mission", name: "Mission, vision and values",
-  note: "Kyle kept the mission and vision exactly as the About page says them (2026-11-08). They are copied here word for word from the live page. The values are a first draft for Kyle to adjust or approve. All three live in the brand note in the knowledge base.",
+  note: "Kyle kept the mission and vision exactly as the About page says them (2026-11-08). They are copied here word for word from the live page. The four brand values are drafts (2026-11-09) until Kyle goes over them with the Pueblo Food Project team. All three live in the brand note in the knowledge base.",
   body: `<div class="bmvv"><div><h3>Mission</h3><p class="bbig">Pueblo Food Map puts every free and low-cost food resource in Pueblo County on one mobile-friendly map — so anyone, in any neighborhood, can find what they need in minutes.</p><small>About page, Our mission. <span class="pb-flag">Breaks a ruling: long dash</span> The brand note has a comma there instead.</small></div>
   <div><h3>Vision</h3><p class="bbig">A Pueblo County where no one goes hungry because they couldn't find the resources already available in their community.</p><small>About page, Our vision.</small></div></div>
-  <h3>Values ${proposed}</h3><div class="bvals">${[
+  <h3>Brand values ${proposed}</h3><div class="bvals">${[
+    ["Dignity first.", "Looking for food is normal. Nobody has to explain themselves or prove anything."],
+    ["Neighbors helping neighbors.", "Made in Pueblo, for Pueblo, alongside the pantries and volunteers already doing the work."],
+    ["Everyone is welcome.", "Every neighborhood, both languages, any phone."],
+    ["Worth trusting.", "We say what we know and admit what we don't, so no one makes a wasted trip."],
+  ].map(([t, d]) => `<div><b>${t}</b><small>${d}</small></div>`).join("")}</div>
+  <h3>How we build</h3><p class="dssz">These guide how the site is made, not what the brand stands for (Kyle, 2026-11-09).</p><div class="bvals">${[
     ["Find it in minutes.", "The map comes first, and every screen helps someone find food and get there."],
     ["Works on the phone people have.", "Built for an older Android on slow data, used one-handed."],
     ["Right, or it says so.", "Hours and details are checked against their sources, and anything unsure is marked “call ahead” instead of guessed."],
@@ -113,17 +119,17 @@ const items: [string, string][] = [["#feel", "The feel"], ["#who", "Who it's for
 
 export const pages: Page[] = [{
   slug: "brand", route: "DESIGN.md → Overview", title: "Design system: Brand and feel", area: "Design system", nav: "Brand",
-  blurb: "Civic Editorial: who it's for, where the look comes from, the logo rules, the settled decisions, the mission and vision, the proposed values, and how we sound.",
+  blurb: "Civic Editorial: who it's for, where the look comes from, the logo rules, the settled decisions, the mission and vision, the draft brand values, how we build, and how we sound.",
   changed: [
     "The opening section of the design system, filled in from DESIGN.md, the About page and the brand note in the knowledge base.",
-    "The five values are new: a first draft, marked Proposed.",
+    "Four brand values are new: drafts until you go over them with the Pueblo Food Project team.",
+    "The five earlier values moved to How we build: they describe how the site is made (your call, 2026-11-09).",
   ],
   kept: [
     "The mission and vision, word for word as the About page says them (your call, 2026-11-08). The mission's long dash is flagged; the brand note has a comma there.",
     "The settled decisions: one orange action per screen, the category colors, no decorative pictures, the map is the product.",
   ],
   check: [
-    "The five values: adjust or approve each one.",
     "The logo: on green, the brand shows as the pin, never the name. Agree?",
   ],
   html: `<div class="head"><h1>Brand and feel</h1>${b("wn", "Draft")}</div>${toc(items)}${parts.join("")}`,

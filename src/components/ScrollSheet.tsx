@@ -228,6 +228,10 @@ export default function ScrollSheet({
       }
       armed.current = true;
       lastRest.current = r;
+      // A one-height card has no collapsed state to leave, so resting at its
+      // one height is not an expand. Reported as one, a box's "Loading…" line
+      // that rested on a slow connection opened the loaded box fully (PR #925).
+      if (r === "full" && d.single) return;
       onRestRef.current(r);
     }
     function onScroll() {

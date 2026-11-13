@@ -12,8 +12,9 @@
  * - fully open stops at a short card's own height (PR #884 review);
  * - a lazily loaded card that arrives after the first measurement still
  *   re-measures (PR #884 review: nothing observed resized);
- * - a box "Loading…" placeholder that rests fully open before the box loads
- *   does not freeze its missing first view (PR #925 review: one height);
+ * - a box "Loading…" placeholder that rests before the box loads leaves the
+ *   loaded box collapsed, and one that the tour holds open does not freeze
+ *   its missing first view (PR #925 review: one height, then opened full);
  * - one resting height lays the card out as expanded (PR #884 review: the
  *   lower controls stayed `inert` and the bar toggled nothing).
  */
@@ -190,7 +191,7 @@ describe("BottomSheet resting heights", () => {
     expect(detents()).toEqual([396, 600]);
   });
 
-  test("a box placeholder that rests before the box loads does not freeze a missing first view (PR #925 review)", async () => {
+  test("a box placeholder that rests before the box loads leaves the loaded box collapsed (PR #925 review)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     vi.stubGlobal("turnstile", { render: vi.fn(() => "widget-id-1"), reset: vi.fn(), remove: vi.fn() });
     const boxVenue: Venue = { ...venue, id: "box-1", category: "blessing_box" };
@@ -202,11 +203,13 @@ describe("BottomSheet resting heights", () => {
     const track = document.querySelector<HTMLElement>("[data-scroll-sheet]")!;
     let top = 0;
     Object.defineProperty(track, "scrollTop", { get: () => top, set: (v: number) => (top = v), configurable: true });
-    track.scrollTo = vi.fn() as unknown as typeof track.scrollTo;
+    const scrollTo = vi.fn();
+    track.scrollTo = scrollTo as unknown as typeof track.scrollTo;
     top = 60;
     fireEvent.scroll(track);
     act(() => vi.advanceTimersByTime(200));
-    expect(onExpandedChange).toHaveBeenLastCalledWith(true); // the placeholder rested "full"
+    // A one-height card has no collapsed state to leave: resting at its one height is not "expanded".
+    expect(onExpandedChange).not.toHaveBeenCalled();
     vi.useRealTimers();
 
     view.rerender(<BottomSheet venue={boxVenue} box={box} onClose={() => {}} onExpandedChange={onExpandedChange} />);
@@ -214,6 +217,26 @@ describe("BottomSheet resting heights", () => {
     fireResize();
 
     // Collapsed: 400 - 100 + 96px box peek. Fully open: the whole 640 track.
+    expect(detents()).toEqual([396, 640]);
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 396, behavior: "smooth" });
+    expect(onExpandedChange).not.toHaveBeenCalled();
+    const bar = document.querySelector<HTMLButtonElement>("button[aria-controls='bottomsheet-detail']")!;
+    expect(bar.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  test("a box that loads while the tour holds the sheet open does not freeze the placeholder's missing first view (PR #925 review)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("turnstile", { render: vi.fn(() => "widget-id-1"), reset: vi.fn(), remove: vi.fn() });
+    const boxVenue: Venue = { ...venue, id: "box-1", category: "blessing_box" };
+    // Measured collapsed while still "Loading…" (no detail section), then expanded by the tour.
+    const view = render(<BottomSheet venue={boxVenue} box={null} onClose={() => {}} />);
+    expect(detents()).toEqual([60]);
+    view.rerender(<BottomSheet venue={boxVenue} box={null} onClose={() => {}} forceExpanded />);
+
+    view.rerender(<BottomSheet venue={boxVenue} box={box} onClose={() => {}} forceExpanded />);
+    await waitForBoxCard();
+    fireResize();
+
     expect(detents()).toEqual([396, 640]);
   });
 

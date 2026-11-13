@@ -1449,7 +1449,9 @@ review** (see "Shared events" below).
   and the sheet re-measures, so a lazily loaded card body still counts
   (never while a finger is down). `restingAt` names the detent a settled
   scroll (150 ms with no scroll and no finger) is at, and that sets
-  `expanded`; a change of `expanded` from the grab bar, "Read more", the peek
+  `expanded`, except a rest on a one-height card, which has no collapsed
+  state to leave (a box's "Loading…" line resting on a slow connection would
+  otherwise open the loaded box fully); a change of `expanded` from the grab bar, "Read more", the peek
   or the tour scrolls the track there. Swipe to close: a swipe from collapsed
   that snaps to 0 closes; a slow pull more than 100px down from collapsed is
   finished by a scroll to 0 (snap alone would spring back); a swipe that

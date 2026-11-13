@@ -61,16 +61,20 @@ describe("PublishPanel — change summary", () => {
     expect(screen.getByText(/0 removed/i)).toBeDefined();
   });
 
-  test("an all-zero summary shows 'up to date' and disables the Publish button", () => {
+  // #926 R3: the off Publish stays focusable (aria-disabled) and a press asks nothing.
+  test("an all-zero summary shows 'up to date' and turns the Publish button off", async () => {
     render(<PublishPanel summary={summary()} />);
 
     expect(screen.getByText(/public map is up to date/i)).toBeDefined();
-    expect(screen.getByRole("button", { name: /publish/i })).toBeDisabled();
+    const publish = screen.getByRole("button", { name: /publish/i });
+    expect(publish).toHaveAttribute("aria-disabled", "true");
+    await userEvent.click(publish);
+    expect(screen.queryByRole("group")).toBeNull();
   });
 
   test("a non-zero summary leaves the Publish button enabled", () => {
     render(<PublishPanel summary={summary({ newDrafts: 1 })} />);
-    expect(screen.getByRole("button", { name: /publish/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /publish/i })).not.toHaveAttribute("aria-disabled");
   });
 });
 

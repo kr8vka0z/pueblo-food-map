@@ -56,6 +56,7 @@ import { focusFirstProblem } from "@/lib/focusFirstProblem";
 import {
   ADMIN_PRIMARY_BUTTON,
   ADMIN_SECONDARY_BUTTON,
+  busyButtonProps,
   cancelLinkProps,
   errorClass,
   fieldGroupClass,
@@ -260,6 +261,19 @@ export default function EventForm({ venues, eventId, initialValues, status: init
     message: "",
     options: [],
   });
+
+  // When a press removes the pressed control (a picked place, Change), focus
+  // goes to what replaced it once that has rendered, not to the page body (#926).
+  const changePlaceRef = useRef<HTMLButtonElement>(null);
+  const venueSearchRef = useRef<HTMLInputElement>(null);
+  const findLocationRef = useRef<HTMLButtonElement>(null);
+  const focusNext = useRef<"change" | "search" | null>(null);
+  useEffect(() => {
+    if (!focusNext.current) return;
+    const target = focusNext.current === "change" ? changePlaceRef.current : venueSearchRef.current;
+    focusNext.current = null;
+    target?.focus();
+  }, [values.venueId]);
 
   const set = <K extends keyof EventFormValues>(key: K, value: EventFormValues[K]) => setValues((p) => ({ ...p, [key]: value }));
   const showCancelNote = cancelling || status === "cancelled";
@@ -471,7 +485,17 @@ export default function EventForm({ venues, eventId, initialValues, status: init
   const cancelNoteFields = (
     // data-admin-step: the note sits in its own TextField wrapper, so the
     // step's Escape listener goes on this box to work from both buttons too.
-    <fieldset data-admin-step className="rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] p-4">
+    // While cancelling it is a step beside the Archive confirm, so it takes the
+    // confirm's look (AdminConfirm: 1 px red edge, 10 px corners, white) and
+    // its button row. A cancelled event's note, edited later, keeps the clay group.
+    <fieldset
+      data-admin-step
+      className={
+        cancelling
+          ? "rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white p-4"
+          : "rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] p-4"
+      }
+    >
       <legend className={`${labelClass} px-1`}>Cancellation note</legend>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <TextField id="event-cancel-note" multiline required label="Note (English)" value={values.cancelNote} onChange={(v) => set("cancelNote", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note} fieldRef={cancelling ? cancelNoteRef : undefined} />
@@ -480,11 +504,11 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       {/* #926 decision 8: the safe button first, then the red one. "Keep event",
           not "Cancel": this form already has a Cancel that leaves the page. */}
       {cancelling && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <button type="button" disabled={busy} onClick={keepEvent} className={secondaryButtonClass}>
             Keep event
           </button>
-          <button type="button" disabled={busy} onClick={() => void send("cancel")} className={dangerButtonClass}>
+          <button type="button" onClick={() => void send("cancel")} {...busyButtonProps(busy)} className={dangerButtonClass}>
             {busy ? "Cancelling…" : "Confirm cancel event"}
           </button>
         </div>
@@ -535,7 +559,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" disabled={suggest === "busy"} onClick={() => void suggestSpanish()} className={secondaryButtonClass}>
+        <button type="button" onClick={() => void suggestSpanish()} {...busyButtonProps(suggest === "busy")} className={secondaryButtonClass}>
           {suggest === "busy" ? "Suggesting…" : "Suggest Spanish"}
         </button>
         <p aria-live="polite" className={`text-sm ${suggest === "error" ? "text-[var(--color-danger)]" : "text-[var(--color-ink-500)]"}`}>
@@ -597,7 +621,15 @@ export default function EventForm({ venues, eventId, initialValues, status: init
                   <br />
                   {values.address}
                 </p>
-                <button type="button" onClick={clearPlace} className={secondaryButtonClass}>
+                <button
+                  ref={changePlaceRef}
+                  type="button"
+                  onClick={() => {
+                    focusNext.current = "search";
+                    clearPlace();
+                  }}
+                  className={secondaryButtonClass}
+                >
                   Change
                 </button>
               </div>
@@ -607,6 +639,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
                   Search places by name or address
                 </label>
                 <input
+                  ref={venueSearchRef}
                   id="event-venue-search"
                   type="text"
                   value={venueQuery}
@@ -622,7 +655,10 @@ export default function EventForm({ venues, eventId, initialValues, status: init
                       <li key={m.id}>
                         <button
                           type="button"
-                          onClick={() => pickVenue(m)}
+                          onClick={() => {
+                            focusNext.current = "change";
+                            pickVenue(m);
+                          }}
                           className={pickerOptionClass}
                         >
                           <span className="font-medium text-[var(--color-ink-900)]">{m.name}</span>
@@ -657,9 +693,11 @@ export default function EventForm({ venues, eventId, initialValues, status: init
               {placeError}
             </div>
             <button
+              ref={findLocationRef}
               type="button"
+              disabled={!values.address.trim()}
               onClick={() => void findLocation()}
-              disabled={!values.address.trim() || geo.state === "loading"}
+              {...busyButtonProps(geo.state === "loading")}
               className={`${secondaryButtonClass} whitespace-nowrap`}
             >
               {/* Both words in one grid cell, so the button keeps its width while
@@ -675,7 +713,12 @@ export default function EventForm({ venues, eventId, initialValues, status: init
             </button>
             {/* "Looking up…" shows once, in the button; mounted while empty so the result is still announced. */}
             {geo.message && (
-              <p aria-live="polite" className="text-sm text-[var(--color-ink-500)]">{geo.state === "loading" ? "" : geo.message}</p>
+              <p
+                aria-live="polite"
+                className={geo.state === "none" || geo.state === "error" ? errorClass : "text-sm text-[var(--color-ink-500)]"}
+              >
+                {geo.state === "loading" ? "" : geo.message}
+              </p>
             )}
             {values.lat !== "" && values.lng !== "" && geo.state !== "found" && (
               <p className="text-sm text-[var(--color-sage-600)]">Location set.</p>
@@ -686,7 +729,11 @@ export default function EventForm({ venues, eventId, initialValues, status: init
                   <li key={`${m.lat}-${m.lng}-${i}`}>
                     <button
                       type="button"
-                      onClick={() => applyMatch(m)}
+                      onClick={() => {
+                        applyMatch(m);
+                        // The list goes away with the pressed match in it: focus goes back to Find location.
+                        findLocationRef.current?.focus();
+                      }}
                       className={pickerOptionClass}
                     >
                       {m.matchedAddress}
@@ -778,15 +825,15 @@ export default function EventForm({ venues, eventId, initialValues, status: init
           // px-4) and nowrap: at 360 each of these two is 103 wide, and with
           // 16 px sides "Save draft" broke onto two lines. 87 of room holds it.
           <div className="grid grid-cols-2 gap-2">
-            <button type="submit" disabled={busy} className={`${ADMIN_SECONDARY_BUTTON} w-full whitespace-nowrap px-2!`}>
+            <button type="submit" {...busyButtonProps(busy)} className={`${ADMIN_SECONDARY_BUTTON} w-full whitespace-nowrap px-2!`}>
               {busy ? "Saving…" : "Save draft"}
             </button>
-            <button type="button" disabled={busy} onClick={() => void send("publish")} className={`${ADMIN_PRIMARY_BUTTON} w-full whitespace-nowrap px-2!`}>
+            <button type="button" onClick={() => void send("publish")} {...busyButtonProps(busy)} className={`${ADMIN_PRIMARY_BUTTON} w-full whitespace-nowrap px-2!`}>
               Publish
             </button>
           </div>
         ) : (
-          <button type="submit" disabled={busy} className={`${ADMIN_PRIMARY_BUTTON} w-full`}>
+          <button type="submit" {...busyButtonProps(busy)} className={`${ADMIN_PRIMARY_BUTTON} w-full`}>
             {busy ? "Saving…" : isEdit && status !== "draft" ? "Save changes" : "Save draft"}
           </button>
         )}

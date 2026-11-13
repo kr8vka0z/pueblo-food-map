@@ -84,7 +84,7 @@ describe("AdminRowMenu", () => {
     expect(button).toHaveFocus();
   });
 
-  test("disabled: the button is natively off and neither a press nor a key opens the menu", async () => {
+  test("disabled: the button keeps focus (aria-disabled) and neither a press nor a key opens the menu", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     render(
@@ -94,10 +94,10 @@ describe("AdminRowMenu", () => {
       </div>,
     );
     const button = screen.getByRole("button", { name: "More actions for Busy item" });
-    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("aria-disabled", "true");
     await user.click(button);
-    button.focus();
-    await user.keyboard("{Enter}{ArrowDown}");
+    expect(button).toHaveFocus();
+    await user.keyboard("{Enter}{ArrowDown}{ArrowUp}");
     expect(screen.queryByRole("menu")).toBeNull();
     expect(onSelect).not.toHaveBeenCalled();
   });

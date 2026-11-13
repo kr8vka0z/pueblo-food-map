@@ -14,6 +14,7 @@
  * so it gets a plain button, not a menu.
  */
 
+import { busyButtonProps } from "@/components/formClasses";
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatEventWhen } from "@/lib/eventTime";
@@ -70,7 +71,7 @@ function SubmissionCard({ item }: { item: PendingEventSubmission }) {
           <h4 id={nameId} className={`${cardNameClass} min-w-0 flex-1 py-3`}>
             {p.name}
           </h4>
-          {/* disabled: while one choice runs, the three-dot button itself is off. */}
+          {/* disabled: while one choice runs, the three-dot button itself is off (it keeps focus). */}
           <AdminRowMenu
             labelledBy={nameId}
             disabled={busy}
@@ -132,7 +133,7 @@ function SubmissionCard({ item }: { item: PendingEventSubmission }) {
         </p>
       )}
       {!p && (
-        <button type="button" disabled={busy} onClick={() => void act("dismiss")} className={`mt-3 ${secondaryButtonClass}`}>
+        <button type="button" onClick={() => void act("dismiss")} {...busyButtonProps(busy)} className={`mt-3 ${secondaryButtonClass}`}>
           Dismiss
         </button>
       )}

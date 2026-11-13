@@ -34,6 +34,7 @@
  * before (POST .../approve, applyApprovedProposal's isRestore branch).
  */
 
+import { busyButtonProps } from "@/components/formClasses";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -134,10 +135,6 @@ const CHANGE_TYPE_LABEL: Record<ProposalChangeType, string> = {
 
 function capitalizeDay(day: string): string {
   return day.charAt(0).toUpperCase() + day.slice(1);
-}
-
-function lowerFirst(words: string): string {
-  return words.charAt(0).toLowerCase() + words.slice(1);
 }
 
 /**
@@ -352,7 +349,7 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
           <button
             type="button"
             onClick={() => handleApprove()}
-            disabled={approveState.status === "submitting"}
+            {...busyButtonProps(approveState.status === "submitting")}
             className={primaryButtonClass}
           >
             {approveState.status === "submitting" ? "Applying…" : rename ? "Approve rename" : "Approve"}
@@ -671,8 +668,9 @@ function ProposalSourceNotes({ diff, showSummary }: { diff: ProposedDiff; showSu
           key={p.field}
           className="rounded-[var(--radius-md)] bg-[var(--color-clay-100)] px-2 py-1.5 text-sm text-[var(--color-clay-700)]"
         >
-          {/* Only the first letter is lowered, so "Accepts SNAP" reads "the accepts SNAP", never "accepts snap". */}
-          <span className="font-medium">The venue told us the {lowerFirst(fieldLabel(p.field))}</span> on{" "}
+          {/* The field's own label leads, as written ("Accepts SNAP", "Phone"), so the
+              sentence reads the same for every field (#926). */}
+          <span className="font-medium">{fieldLabel(p.field)}</span>: the venue told us this itself on{" "}
           {formatLastVerified(p.pinned_at.slice(0, 10))}
           {p.note ? ` (${p.note})` : ""}.
           {p.stale ? " That was over a year ago, so this change may be right; renew the pin if the venue confirms again." : " Approve only if you trust this source over the venue."}

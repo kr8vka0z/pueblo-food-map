@@ -136,7 +136,8 @@ export const tableHeadCellClass = tableCellClass + " whitespace-nowrap font-medi
 
 // Shared by every admin button: one height, centred words that may wrap on a
 // narrow phone, the press dim, and the off look, both for disabled and for
-// aria-disabled (a working button that must keep keyboard focus).
+// aria-disabled (a working button keeps keyboard focus: busyButtonProps in
+// src/components/formClasses.ts).
 const buttonBase =
   "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] px-4 py-2 text-center " +
   "transition-colors duration-150 " +

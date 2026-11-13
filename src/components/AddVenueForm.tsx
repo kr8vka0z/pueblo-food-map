@@ -81,6 +81,7 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import {
   ADMIN_PRIMARY_BUTTON,
   ADMIN_SECONDARY_BUTTON,
+  busyButtonProps,
   cancelLinkProps,
   checkboxClass,
   checkboxRowClass,
@@ -471,6 +472,7 @@ export default function AddVenueForm({
   // place (the next schedule), or to "+ Add monthly schedule" if none follows.
   const scheduleRemoveRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const addScheduleRef = useRef<HTMLButtonElement>(null);
+  const findLocationRef = useRef<HTMLButtonElement>(null);
   const focusAfterScheduleRemove = useRef<number | null>(null);
   useEffect(() => {
     if (focusAfterScheduleRemove.current === null) return;
@@ -687,13 +689,15 @@ export default function AddVenueForm({
   // convention), clay for "didn't work, here's guidance" (the same role clay
   // already plays in VenueListView) — never red, since
   // these never block submission the way a field validation error does.
+  // A lookup that found nothing is a problem with the address, so it reads
+  // like the field errors around it (errorClass); the rest is a quiet note.
   const geocodeToneClass: Record<GeocodeStatus, string> = {
     idle: "",
-    loading: "text-[var(--color-ink-500)]",
-    found: "text-[var(--color-sage-600)]",
-    "no-match": "text-[var(--color-clay-700)]",
-    multiple: "text-[var(--color-ink-500)]",
-    error: "text-[var(--color-clay-700)]",
+    loading: "mt-2 text-sm text-[var(--color-ink-500)]",
+    found: "mt-2 text-sm text-[var(--color-sage-600)]",
+    "no-match": errorClass,
+    multiple: "mt-2 text-sm text-[var(--color-ink-500)]",
+    error: errorClass,
   };
   const requiredMark = (
     <span aria-hidden className={requiredMarkClass}>
@@ -908,10 +912,14 @@ export default function AddVenueForm({
             {/* Find location from address (US Census geocoder — see
                 src/app/api/admin/geocode/route.ts for why Census, not Mapbox) */}
             <div>
+              {/* Off natively only while there is no address; while it looks up
+                  it keeps focus (busyButtonProps), so the keyboard is not lost. */}
               <button
+                ref={findLocationRef}
                 type="button"
+                disabled={!values.address.trim()}
                 onClick={handleGeocode}
-                disabled={!values.address.trim() || geocodeStatus === "loading"}
+                {...busyButtonProps(geocodeStatus === "loading")}
                 className={`${secondaryButtonClass} whitespace-nowrap`}
               >
                 {/* WHY both words in one grid cell: the button keeps the width
@@ -936,7 +944,7 @@ export default function AddVenueForm({
                   result. It stays mounted while empty so the live region
                   still announces the result when it lands. */}
               {geocodeMessage && (
-                <p aria-live="polite" className={`mt-2 text-sm ${geocodeToneClass[geocodeStatus]}`}>
+                <p aria-live="polite" className={geocodeToneClass[geocodeStatus]}>
                   {geocodeStatus === "loading" ? "" : geocodeMessage}
                 </p>
               )}
@@ -950,7 +958,11 @@ export default function AddVenueForm({
                       <li key={`${match.lat}-${match.lng}-${i}`}>
                         <button
                           type="button"
-                          onClick={() => applyGeocodeMatch(match)}
+                          onClick={() => {
+                            applyGeocodeMatch(match);
+                            // The list goes away with the pressed match in it: focus goes back to Find location.
+                            findLocationRef.current?.focus();
+                          }}
                           className={pickerOptionClass}
                         >
                           {match.matchedAddress}
@@ -1418,12 +1430,7 @@ export default function AddVenueForm({
         <Link href={afterSaveHref} className={ADMIN_SECONDARY_BUTTON} {...cancelLinkProps(status === "submitting")}>
           Cancel
         </Link>
-        <button
-          type="submit"
-          disabled={status === "submitting"}
-          className={ADMIN_PRIMARY_BUTTON}
-          aria-disabled={status === "submitting"}
-        >
+        <button type="submit" {...busyButtonProps(status === "submitting")} className={ADMIN_PRIMARY_BUTTON}>
           {status === "submitting" ? "Saving…" : isEditMode ? "Save changes" : "Add venue"}
         </button>
       </div>

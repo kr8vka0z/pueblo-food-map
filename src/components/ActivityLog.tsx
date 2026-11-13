@@ -116,12 +116,17 @@ function ActionLine({ item }: { item: ActivityItem }) {
         </div>
         {summary.changes.length > 0 && (
           <ul className="mt-1 space-y-0.5 text-sm text-[var(--color-ink-700)]">
-            {summary.changes.map((c) => (
-              <li key={c.field} className="break-words">
-                <span className="font-medium">{fieldLabel(c.field)}</span>: <span className="text-[var(--color-ink-500)]">{c.before}</span> →{" "}
-                {c.after}
-              </li>
-            ))}
+            {summary.changes.map((c) => {
+              // A phone number never breaks mid-number (#926); other values may wrap.
+              const keep = c.field === "phone" ? "whitespace-nowrap" : undefined;
+              return (
+                <li key={c.field} className="break-words">
+                  <span className="font-medium">{fieldLabel(c.field)}</span>:{" "}
+                  <span className={`text-[var(--color-ink-500)] ${keep ?? ""}`}>{c.before}</span> →{" "}
+                  <span className={keep}>{c.after}</span>
+                </li>
+              );
+            })}
             {summary.moreChanges > 0 && <li className="text-[var(--color-ink-500)]">+{summary.moreChanges} more {summary.moreChanges === 1 ? "field" : "fields"}</li>}
           </ul>
         )}
@@ -278,7 +283,8 @@ export default function ActivityLog({ days, filters, people, olderHref, filtered
           <input id="activity-q" type="search" name="q" defaultValue={filters.q} className={inputClass} />
         </div>
         <div className="flex gap-3 sm:col-span-2">
-          <button type="submit" className={`${ADMIN_PRIMARY_BUTTON} flex-1`}>
+          {/* Fills the row beside Clear filters on a phone; its own width from 640 (#926). */}
+          <button type="submit" className={`${ADMIN_PRIMARY_BUTTON} flex-1 sm:flex-none`}>
             Show activity
           </button>
           {/* The page's one Clear filters, always here, so an empty result needs no second one (#926). */}

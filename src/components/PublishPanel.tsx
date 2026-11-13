@@ -49,6 +49,7 @@ import type { PublishChangeSummary } from "@/lib/adminVenues";
 import { pluralize } from "@/lib/pluralize";
 import { cardClass, failureLineClass, linkClass, primaryButtonClass, tapLinkClass } from "@/lib/adminCardStyles";
 import AdminConfirm, { useAdminConfirm } from "@/components/AdminConfirm";
+import { busyButtonProps } from "@/components/formClasses";
 
 export interface PublishPanelProps {
   summary: PublishChangeSummary;
@@ -195,12 +196,15 @@ export default function PublishPanel({ summary, reviewHref }: PublishPanelProps)
               Review changes
             </Link>
           )}
+          {/* aria-disabled, not disabled (busyButtonProps): after a publish lands,
+              focus comes back here just as the refreshed page turns it off, and a
+              natively disabled button would drop that focus to the page body. */}
           <button
             ref={triggerRef}
             type="button"
             hidden={asking}
             onClick={ask}
-            disabled={upToDate || submitting}
+            {...busyButtonProps(upToDate || submitting)}
             className={primaryButtonClass}
           >
             {submitting ? "Publishing…" : "Publish"}

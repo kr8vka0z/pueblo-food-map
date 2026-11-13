@@ -36,6 +36,7 @@
  * it under.
  */
 
+import { busyButtonProps } from "@/components/formClasses";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -175,7 +176,7 @@ export default function SubmissionCard({ submission }: SubmissionCardProps) {
           <button
             type="button"
             onClick={handleMarkDone}
-            disabled={doneState.status === "submitting"}
+            {...busyButtonProps(doneState.status === "submitting")}
             className={primaryButtonClass}
           >
             {doneState.status === "submitting" ? "Marking done…" : "Mark done"}

@@ -126,12 +126,17 @@ describe("AdminConfirm", () => {
     expect(screen.getByRole("textbox", { name: "Reason" })).toBeInTheDocument();
   });
 
-  test("busy disables both buttons, shows the busy label, and Escape does not close", async () => {
+  // #926: the working action button keeps focus (aria-disabled) instead of
+  // dropping it to the page; a press on it still sends nothing.
+  test("busy turns Cancel off, holds the action button, shows the busy label, and Escape does not close", async () => {
     const onConfirm = vi.fn();
-    const { group } = await open({ onConfirm, busy: true });
+    const { user, group } = await open({ onConfirm, busy: true });
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Removing…" })).toBeDisabled();
-    // Fired on the group itself: with both buttons disabled nothing inside holds focus.
+    const action = screen.getByRole("button", { name: "Removing…" });
+    expect(action).toHaveAttribute("aria-disabled", "true");
+    await user.click(action);
+    expect(action).toHaveFocus();
+    expect(onConfirm).not.toHaveBeenCalled();
     fireEvent.keyDown(group, { key: "Escape" });
     expect(screen.getByRole("group")).toBeInTheDocument();
   });

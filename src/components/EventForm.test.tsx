@@ -159,6 +159,17 @@ describe("EventForm place and time handling", () => {
     await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith("/admin/events/new-1/edit?saved=1"));
   });
 
+  // #926: a pressed control that goes away hands focus to what replaced it,
+  // never to the page body: the picked result to Change, Change to the search box.
+  test("picking a place puts focus on Change; Change puts it back in the search box", async () => {
+    render(<EventForm venues={VENUES} />);
+    await pickVenue();
+    const change = screen.getByRole("button", { name: "Change" });
+    expect(change).toHaveFocus();
+    await userEvent.click(change);
+    expect(screen.getByLabelText(/search places/i)).toHaveFocus();
+  });
+
   test("editing a typed address drops its old coordinates so they can't outlive the address", async () => {
     render(<EventForm venues={VENUES} initialValues={{ address: "1 Main", lat: "38.2", lng: "-104.6" }} />);
     await userEvent.type(screen.getByLabelText(/^Address/), "x");

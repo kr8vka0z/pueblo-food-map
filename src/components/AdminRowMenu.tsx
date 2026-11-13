@@ -16,9 +16,12 @@
  *               pass the risky (danger) items last. A bone 200 line goes
  *               above the first danger item. Keyboard order is the rendered
  *               order.
- *   disabled    optional; disables the three-dot button itself (natively),
- *               for example while the row's own request runs. The menu never
- *               shows while it is set.
+ *   disabled    optional; turns the three-dot button off while the row's
+ *               own request runs. It is aria-disabled, not natively disabled:
+ *               choosing an item hands focus back to this button just as the
+ *               row goes busy, and a natively disabled button would drop that
+ *               focus to the page body. Presses and keys then do nothing and
+ *               the menu never shows.
  *
  * Keyboard (the WAI-ARIA menu-button pattern): Enter, Space or ArrowDown on
  * the button opens and focuses the first item; ArrowUp opens on the last;
@@ -71,6 +74,7 @@ export default function AdminRowMenu({ labelledBy, items, disabled = false }: Ad
   const firstDanger = items.findIndex((i) => i.danger);
 
   function openMenu(where: "first" | "last") {
+    if (disabled) return;
     focusOnOpen.current = where;
     setOpen(true);
   }
@@ -155,7 +159,7 @@ export default function AdminRowMenu({ labelledBy, items, disabled = false }: Ad
       <button
         ref={buttonRef}
         type="button"
-        disabled={disabled}
+        aria-disabled={disabled || undefined}
         aria-labelledby={`${prefixId} ${labelledBy}`}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -168,7 +172,7 @@ export default function AdminRowMenu({ labelledBy, items, disabled = false }: Ad
           PRESS_FEEDBACK +
           " " +
           focusRingClass +
-          " disabled:cursor-not-allowed disabled:opacity-50 " +
+          " aria-disabled:cursor-not-allowed aria-disabled:opacity-50 " +
           (open ? "bg-[var(--color-sage-100)] text-[var(--color-ink-700)]" : "text-[var(--color-ink-500)]")
         }
       >
@@ -197,7 +201,9 @@ export default function AdminRowMenu({ labelledBy, items, disabled = false }: Ad
               onClick={() => choose(item)}
               className={
                 "flex min-h-12 w-full items-center px-4 py-2 text-left text-sm transition-colors duration-150 " +
+                // The inset ring tells a keyboard stop from the pointer's fill (#926 decision 4).
                 "hover:bg-[var(--color-sage-100)] focus-visible:bg-[var(--color-sage-100)] focus-visible:outline-none " +
+                "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
                 (i === firstDanger ? "border-t border-[var(--color-bone-200)] " : "") +
                 (item.danger ? "text-[var(--color-danger)]" : "text-[var(--color-ink-700)]")
               }

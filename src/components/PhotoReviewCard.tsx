@@ -19,6 +19,7 @@
  * reconcile" convention every other admin queue in this app already uses.
  */
 
+import { busyButtonProps } from "@/components/formClasses";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminRejectStep, useAdminStep } from "@/components/AdminConfirm";
@@ -133,7 +134,7 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
         <button
           type="button"
           onClick={handleApprove}
-          disabled={state.status === "submitting"}
+          {...busyButtonProps(state.status === "submitting")}
           className={primaryButtonClass}
         >
           {state.status === "submitting" && state.action === "approve"

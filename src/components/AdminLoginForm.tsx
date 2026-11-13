@@ -46,12 +46,13 @@ import { EMAIL_RE } from "@/lib/email";
 import {
   ADMIN_PRIMARY_BUTTON,
   ADMIN_SECONDARY_BUTTON,
+  busyButtonProps,
   errorClass,
   inputBase,
   inputBorder,
   labelClass,
 } from "@/components/formClasses";
-import { failureLineClass, signInCardClass, tapLinkClass } from "@/lib/adminCardStyles";
+import { signInCardClass, tapLinkClass } from "@/lib/adminCardStyles";
 
 type FormStatus = "idle" | "sending" | "sent" | "error";
 type CodeStatus = "idle" | "verifying" | "error";
@@ -286,7 +287,7 @@ export default function AdminLoginForm() {
         <button
           type="button"
           onClick={handlePasskeyRegister}
-          disabled={passkeyRegister === "registering"}
+          {...busyButtonProps(passkeyRegister === "registering")}
           className={primaryButtonClass}
         >
           {passkeyRegister === "registering" ? "Setting up…" : "Set up a passkey"}
@@ -348,7 +349,7 @@ export default function AdminLoginForm() {
                 {codeError}
               </p>
             )}
-            <button type="submit" disabled={codeStatus === "verifying"} className={`${primaryButtonClass} mt-4`}>
+            <button type="submit" {...busyButtonProps(codeStatus === "verifying")} className={`${primaryButtonClass} mt-4`}>
               {codeStatus === "verifying" ? "Signing in…" : "Sign in"}
             </button>
           </form>
@@ -413,15 +414,17 @@ export default function AdminLoginForm() {
             </p>
           )}
 
+          {/* busyButtonProps on all three working buttons here: a natively
+              disabled button drops keyboard focus to the page body (#926). */}
           <button
             type="submit"
-            disabled={formStatus === "sending"}
+            {...busyButtonProps(formStatus === "sending")}
             className={`${primaryButtonClass} mt-4`}
           >
             {formStatus === "sending" ? "Sending…" : "Email me a code"}
           </button>
           {formStatus === "error" && (
-            <p className={`mt-2 ${failureLineClass}`} role="alert">
+            <p className={errorClass} role="alert">
               The code was not sent. Try again.
             </p>
           )}
@@ -435,7 +438,7 @@ export default function AdminLoginForm() {
           <button
             type="button"
             onClick={handlePasskeySignIn}
-            disabled={passkeySignIn === "authenticating"}
+            {...busyButtonProps(passkeySignIn === "authenticating")}
             className={secondaryButtonClass}
           >
             {passkeySignIn === "authenticating"
@@ -443,7 +446,7 @@ export default function AdminLoginForm() {
               : "Use a passkey"}
           </button>
           {passkeySignIn === "error" && (
-            <p className={`mt-2 ${failureLineClass}`} role="alert">
+            <p className={errorClass} role="alert">
               Passkey sign-in didn&apos;t work. Use an email code instead.
             </p>
           )}

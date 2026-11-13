@@ -32,7 +32,8 @@
  *     confirmLabel  names the action ("Remove from map"), never Yes or OK
  *     busyLabel     optional, shown on the action button while busy ("Removing…")
  *     tone          "danger" (red: removals) | "primary" (green: Publish, Approve all)
- *     busy          optional; disables both buttons (and Escape) while the request runs
+ *     busy          optional; while the request runs Cancel and Escape are off and the
+ *                   action button ignores presses but keeps focus (aria-disabled)
  *     error         optional; a red line under the buttons (role="alert")
  *     onConfirm     runs the action; only the action button calls it
  *     onCancel      pass the hook's cancel
@@ -65,7 +66,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from "@/lib/adminCardStyles";
-import { hintClass, inputClass } from "@/components/formClasses";
+import { busyButtonProps, hintClass, inputClass } from "@/components/formClasses";
 
 export function useAdminConfirm(): {
   asking: boolean;
@@ -184,7 +185,7 @@ export function AdminRejectStep({
         <button type="button" onClick={onCancel} disabled={busy} className={secondaryButtonClass}>
           Cancel
         </button>
-        <button type="button" onClick={onConfirm} disabled={busy} className={dangerButtonClass}>
+        <button type="button" onClick={onConfirm} {...busyButtonProps(busy)} className={dangerButtonClass}>
           {busy ? busyLabel : confirmLabel}
         </button>
       </div>
@@ -253,10 +254,11 @@ export default function AdminConfirm({
         <button ref={cancelRef} type="button" disabled={busy} onClick={onCancel} className={secondaryButtonClass}>
           Cancel
         </button>
+        {/* The pressed button keeps focus while it works (busyButtonProps); Cancel is simply off. */}
         <button
           type="button"
-          disabled={busy}
           onClick={onConfirm}
+          {...busyButtonProps(busy)}
           className={tone === "danger" ? dangerButtonClass : primaryButtonClass}
         >
           {busy && busyLabel ? busyLabel : confirmLabel}

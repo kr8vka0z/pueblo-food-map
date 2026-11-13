@@ -210,7 +210,7 @@ describe("BoxCheckinsAdminPanel — toggling visibility", () => {
     const buttons = screen.getAllByRole("button", { name: /^Hide / });
     await user.click(buttons[0]);
 
-    await waitFor(() => expect(screen.getByText("Saving…")).toBeDefined());
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Saving… / })).toBeDefined());
     const stillIdle = screen.getAllByRole("button", { name: /^Hide / });
     expect(stillIdle).toHaveLength(1); // the other row's button is untouched
     expect(stillIdle[0]).not.toBeDisabled();

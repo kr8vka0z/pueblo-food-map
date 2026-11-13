@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * EventsList — the body of /admin/events (#757): a table of events (name,
- * date in Pueblo time, status, edit link), the "No events yet" empty state
+ * EventsList — the body of /admin/events (#757): "All events", a table of
+ * events (name, date in Pueblo time, status, edit link) under a title row
+ * with Add event, the "No events yet" empty state
  * with an Add event button, and a "couldn't load" state with Retry.
  *
  * The server page does the read and passes `events` (null when the read
@@ -24,6 +25,7 @@ import {
   linkClass,
   loadingLineClass,
   secondaryButtonClass,
+  sectionTitleClass,
   tableCellClass,
   tableHeadCellClass,
   tableHeadRowClass,
@@ -95,8 +97,13 @@ export default function EventsList({ events }: EventsListProps) {
   }
 
   return (
-    <div>
-      <div className="mb-4">
+    <section aria-labelledby={`${rowId}-heading`}>
+      {/* The table's title with Add event at its right, as Blessing Boxes titles
+          its table; on a phone the button wraps under the title. */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h3 id={`${rowId}-heading`} className={sectionTitleClass}>
+          All events
+        </h3>
         <Link href="/admin/events/new" className={ADMIN_PRIMARY_BUTTON}>
           Add event
         </Link>
@@ -144,6 +151,6 @@ export default function EventsList({ events }: EventsListProps) {
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
   );
 }

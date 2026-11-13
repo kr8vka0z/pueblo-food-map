@@ -62,7 +62,9 @@ export default function AdminSegmented({ name, legend, legendClass, options, val
     options.findIndex((o) => o.value === value),
   );
   return (
-    <fieldset className="min-w-0">
+    // w-full on the fieldset too: in a flex row (the Dashboard's title row) it
+    // would otherwise shrink to its words and the track could not fill the phone.
+    <fieldset className="w-full min-w-0 sm:w-auto">
       <legend className={legendClass ?? "sr-only"}>{legend}</legend>
       <div
         className={

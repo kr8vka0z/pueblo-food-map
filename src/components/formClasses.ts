@@ -18,6 +18,7 @@
  *   ADMIN_PRIMARY_BUTTON     the form-level green button (Save), 16 px words, 48 tall
  *   ADMIN_SECONDARY_BUTTON   its outline partner (Cancel beside Save); also dims when aria-disabled
  *   saveRowClass             the Cancel (a third) + Save (two thirds) row
+ *   busyButtonProps(busy)    spread on a working button: aria-disabled, keeps focus, presses stopped
  *   cancelLinkProps(busy)    spread on the Cancel <Link> so it is off while a save runs
  */
 
@@ -81,6 +82,29 @@ export const saveRowClass = "grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2"
  * order, and its click is stopped (next/link skips navigating when the
  * click's default is prevented).
  */
+/**
+ * Spread on a button that stays on the page while its own request runs
+ * (Save, Find location, Approve, a confirm's action button). While busy it
+ * is marked aria-disabled, dimmed by the shared button strings, instead of
+ * natively disabled: a natively disabled button drops keyboard focus to the
+ * page body the moment it turns off (#926). A press while busy is stopped
+ * in the capture phase, before the button's own onClick runs, and its
+ * default is prevented, so a submit button (and Enter in a field) sends
+ * nothing either. Keep the button's own onClick as it is:
+ *   <button type="button" onClick={save} {...busyButtonProps(busy)} className={primaryButtonClass}>
+ */
+export function busyButtonProps(busy: boolean) {
+  return {
+    "aria-disabled": busy || undefined,
+    onClickCapture: busy ? stopPress : undefined,
+  };
+}
+
+function stopPress(e: { preventDefault: () => void; stopPropagation: () => void }) {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
 export function cancelLinkProps(busy: boolean) {
   return busy
     ? { "aria-disabled": true, tabIndex: -1, onClick: (e: { preventDefault: () => void }) => e.preventDefault() }

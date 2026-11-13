@@ -346,8 +346,9 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
           {/* WHY these minimums: at 560 the Box column was squeezed to 103 px
               on a phone and names wrapped to three or four lines. 240 (with
               its 32 px padding) keeps a name to two lines; the table scrolls
-              sideways inside its box instead (#926). */}
-          <table className="w-full min-w-[720px] text-left text-sm">
+              sideways inside its box instead (#926). 160 for Sponsor holds
+              "Needs a sponsor" on one line, so the table is 800. */}
+          <table className="w-full min-w-[800px] text-left text-sm">
             <thead>
               <tr className={tableHeadRowClass}>
                 <th scope="col" className={`${tableHeadCellClass} min-w-[240px]`}>
@@ -359,7 +360,7 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
                 <th scope="col" className={tableHeadCellClass}>
                   Last report
                 </th>
-                <th scope="col" className={tableHeadCellClass}>
+                <th scope="col" className={`${tableHeadCellClass} min-w-[160px]`}>
                   Sponsor
                 </th>
                 <th scope="col" className={tableHeadCellClass}>
@@ -390,7 +391,10 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
                       <span className={tagClass(badge.tone)}>{badge.label}</span>
                     </td>
                     <td className={`${tableCellClass} whitespace-nowrap text-[var(--color-ink-700)]`}>{formatLastReport(entry)}</td>
-                    <td className={`${tableCellClass} text-[var(--color-ink-700)]`}>{formatSponsors(entry.sponsors)}</td>
+                    {/* "Needs a sponsor" stays on one line; a list of names may wrap. */}
+                    <td className={`${tableCellClass} text-[var(--color-ink-700)] ${entry.sponsors.length === 0 ? "whitespace-nowrap" : ""}`}>
+                      {formatSponsors(entry.sponsors)}
+                    </td>
                     <td className={tableCellClass}>
                       <ReviewCell summary={review} />
                     </td>

@@ -25,7 +25,7 @@ import { useEffect, useRef, useState } from "react";
 import { shrinkFlyerToJpeg, UnsupportedImageError } from "@/lib/imageResize";
 import type { PublicFlyer } from "@/lib/events";
 import { dangerButtonClass, secondaryButtonClass } from "@/lib/adminCardStyles";
-import { errorClass, fieldGroupClass, hintClass, labelClass, inputClass } from "@/components/formClasses";
+import { busyButtonProps, errorClass, fieldGroupClass, hintClass, inputClass, labelClass } from "@/components/formClasses";
 import AdminConfirm, { useAdminConfirm } from "@/components/AdminConfirm";
 
 export interface EventFlyerFieldProps {
@@ -54,7 +54,8 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
   const chooseRef = useRef<HTMLButtonElement>(null);
   const { asking, ask, cancel, triggerRef } = useAdminConfirm();
   const focusChooseNext = useRef(false);
-  // An effect, not a focus call in remove(): the button is still disabled until busy clears and re-renders.
+  // An effect, not a focus call in remove(): after a removal the pressed Remove is gone, so focus goes to
+  // "Choose image" once the confirm has closed and the request has finished.
   useEffect(() => {
     if (busy === null && !asking && focusChooseNext.current) {
       focusChooseNext.current = false;
@@ -153,7 +154,7 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
   return (
     <fieldset className={`space-y-3 ${fieldGroupClass}`}>
       <legend className={`${labelClass} px-1`}>
-        Flyer or photo <span className={hintClass}>(optional) shown at the top of the event card</span>
+        Flyer or photo <span className={hintClass}>(optional)</span>
       </legend>
 
       {flyer && (
@@ -181,7 +182,8 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
         }}
       />
       <div className="flex flex-wrap items-center gap-3">
-        <button ref={chooseRef} type="button" disabled={busy !== null} onClick={() => input.current?.click()} className={secondaryButtonClass}>
+        {/* busyButtonProps: the pressed button keeps focus through Uploading… (#926). */}
+        <button ref={chooseRef} type="button" onClick={() => input.current?.click()} {...busyButtonProps(busy !== null)} className={secondaryButtonClass}>
           {busy === "uploading" ? "Uploading…" : flyer ? "Replace image" : "Choose image"}
         </button>
         {flyer && (
@@ -189,7 +191,9 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
             Remove
           </button>
         )}
-        <p className="text-xs text-[var(--color-ink-500)]">JPEG, PNG or WebP. It is shrunk to about 150 KB before upload.</p>
+        <p className="text-xs text-[var(--color-ink-500)]">
+          Shown at the top of the event card. JPEG, PNG or WebP, shrunk to about 150 KB before upload.
+        </p>
       </div>
       {flyer && asking && (
         <AdminConfirm
@@ -241,8 +245,10 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
       {flyer && (
         <button
           type="button"
-          disabled={busy !== null || !altDirty}
+          // aria-disabled also when nothing changed: right after a save it turns
+          // off with focus on it, and a natively disabled button would drop that focus.
           onClick={() => void send({ method: "POST", body: body() }, "saving", "Description saved.")}
+          {...busyButtonProps(busy !== null || !altDirty)}
           className={secondaryButtonClass}
         >
           {busy === "saving" ? "Saving…" : "Save description"}

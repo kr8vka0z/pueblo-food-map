@@ -28,7 +28,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import AdminSegmented from "@/components/AdminSegmented";
-import { errorClass, inputBase, inputBorder, labelClass } from "@/components/formClasses";
+import { busyButtonProps, errorClass, inputBase, inputBorder, labelClass } from "@/components/formClasses";
 import { dangerButtonClass, emptyStateClass, failureLineClass, primaryButtonClass } from "@/lib/adminCardStyles";
 import { EMAIL_RE } from "@/lib/email";
 
@@ -172,7 +172,7 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
                   type="button"
                   aria-labelledby={`${buttonId} ${emailId}`}
                   onClick={() => handleRemove(h.email, index)}
-                  disabled={state.status === "submitting"}
+                  {...busyButtonProps(state.status === "submitting")}
                   className={`${dangerButtonClass} shrink-0`}
                 >
                   {removingThis ? "Removing…" : "Remove"}

@@ -510,10 +510,14 @@ export default function VenueListView({
         </div>
       ) : (
         <div className={tableWrapClass}>
-          <table className="w-full min-w-[680px] text-left text-sm">
+          {/* WHY 1080 with a 240 name and a 200 address column: at 680 the name
+              was squeezed to 125 on a phone and wrapped to four lines, and the
+              address to 101 and five lines. Now a name takes two lines at most
+              and the table scrolls sideways inside its box (#926). */}
+          <table className="w-full min-w-[1080px] text-left text-sm">
             <thead>
               <tr className={tableHeadRowClass}>
-                <th scope="col" className={tableHeadCellClass}>
+                <th scope="col" className={`${tableHeadCellClass} min-w-[240px]`}>
                   Name
                 </th>
                 <th scope="col" className={tableHeadCellClass}>
@@ -525,7 +529,7 @@ export default function VenueListView({
                 <th scope="col" className={tableHeadCellClass}>
                   To review
                 </th>
-                <th scope="col" className={tableHeadCellClass}>
+                <th scope="col" className={`${tableHeadCellClass} min-w-[200px]`}>
                   Address
                 </th>
                 <th scope="col" className={tableHeadCellClass}>

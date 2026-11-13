@@ -27,6 +27,7 @@
  * ProposalCard through SuggestionsBox, so this adds nothing to its bundle.
  */
 
+import { Fragment } from "react";
 import { categoryLabels } from "@/lib/categories";
 import { formatFieldValue } from "@/components/ProposalCard";
 import { clayNoticeClass } from "@/lib/adminCardStyles";
@@ -51,6 +52,26 @@ function readable(field: string, value: string): string {
   return value;
 }
 
+/**
+ * One side as it is drawn (#926): a phone number never breaks, and hours
+ * ("Mon: 5pm – 7pm · Wed: …") break only between days, the dot staying at
+ * the end of a line instead of starting the next one.
+ */
+function ValueText({ field, text }: { field: string; text: string }) {
+  if (field === "phone") return <span className="whitespace-nowrap">{text}</span>;
+  if (field !== "hours_weekly" && field !== "hours_irregular") return text;
+  const pieces = text.split(" · ");
+  return pieces.map((piece, i) => (
+    <Fragment key={i}>
+      {i > 0 && " "}
+      <span className="whitespace-nowrap">
+        {piece}
+        {i < pieces.length - 1 && " ·"}
+      </span>
+    </Fragment>
+  ));
+}
+
 export default function WaitingToPublishBox({ changes }: WaitingToPublishBoxProps) {
   const shown = changes
     .map((c) => ({ ...c, onMapNow: readable(c.field, c.onMapNow), afterPublish: readable(c.field, c.afterPublish) }))
@@ -66,9 +87,13 @@ export default function WaitingToPublishBox({ changes }: WaitingToPublishBoxProp
           <div key={change.field}>
             <dt className="font-semibold">{change.label}</dt>
             <dd className="mt-0.5">
-              <span className="line-through decoration-1">{change.onMapNow}</span>
+              <span className="line-through decoration-1">
+                <ValueText field={change.field} text={change.onMapNow} />
+              </span>
               {" → "}
-              <span className="font-medium">{change.afterPublish}</span>
+              <span className="font-medium">
+                <ValueText field={change.field} text={change.afterPublish} />
+              </span>
               <span className="block text-xs text-[var(--color-ink-500)]">Changed by {change.who}</span>
             </dd>
           </div>

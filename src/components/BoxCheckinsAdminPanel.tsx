@@ -45,6 +45,7 @@ export const KIND_LABEL: Record<AdminCheckinRow["kind"], string> = {
 };
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
+const HIDE_WORDS = ["Hide", "Saving…", "Unhide"];
 
 export default function BoxCheckinsAdminPanel({ checkins }: BoxCheckinsAdminPanelProps) {
   const router = useRouter();
@@ -133,7 +134,19 @@ export default function BoxCheckinsAdminPanel({ checkins }: BoxCheckinsAdminPane
               aria-disabled={pendingId === row.id || undefined}
               className={`${secondaryButtonClass} shrink-0`}
             >
-              {pendingId === row.id ? "Saving…" : row.visibility === "visible" ? "Hide" : "Unhide"}
+              {/* All three words in one grid cell, so the button keeps the width
+                  of the longest and its edge does not jump while it works; the
+                  unseen ones are aria-hidden. */}
+              <span className="grid">
+                {HIDE_WORDS.map((word) => {
+                  const shown = word === (pendingId === row.id ? "Saving…" : row.visibility === "visible" ? "Hide" : "Unhide");
+                  return (
+                    <span key={word} aria-hidden={!shown || undefined} className={`[grid-area:1/1] ${shown ? "" : "invisible"}`}>
+                      {word}
+                    </span>
+                  );
+                })}
+              </span>
             </button>
           </li>
         );

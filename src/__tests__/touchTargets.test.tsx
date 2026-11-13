@@ -209,20 +209,15 @@ describe("LanguageToggle", () => {
     expect(classes(screen.getByRole("group"))).not.toContain("overflow-hidden");
   });
 
-  test("each segment rounds its own outer end and reaches 48px tall, extending outward only", () => {
+  // #917 round 3 rebuilt it as the design system's slider: each segment is
+  // drawn 48 wide by 40 tall in a track with 4px padding, so the ::before
+  // reaches 4px up and down to make 48 by 48, and the two meet in the middle.
+  test("each segment is 48 wide and reaches 48px tall through the track's padding", () => {
     render(<LanguageToggle />);
+    expect(classes(screen.getByRole("group"))).toContain("p-1");
     for (const name of ["Language: English", "Language: Spanish"]) {
       expect(classes(screen.getByRole("button", { name }))).toEqual(
-        expect.arrayContaining([
-          "relative",
-          "first:rounded-l-full",
-          "last:rounded-r-full",
-          "before:absolute",
-          "before:inset-x-0",
-          "before:-inset-y-[11px]",
-          "first:before:-left-2.5",
-          "last:before:-right-2.5",
-        ]),
+        expect.arrayContaining(["relative", "w-12", "h-[40px]", "before:absolute", "before:inset-x-0", "before:-inset-y-1"]),
       );
     }
   });

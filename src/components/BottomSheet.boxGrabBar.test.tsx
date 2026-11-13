@@ -114,6 +114,8 @@ describe("BottomSheet box card grab bar", () => {
     const bar = document.querySelector<HTMLButtonElement>("[data-bottom-sheet] button[aria-controls='bottomsheet-detail']");
     expect(bar).not.toBeNull();
     expect(bar!.disabled).toBe(true);
+    // A touch on it falls through to the sheet, so a swipe down still drags.
+    expect(bar!.className).toContain("pointer-events-none");
     // ...but it is still drawn: nothing above it hides it.
     for (let el: HTMLElement | null = bar; el && !el.hasAttribute("data-bottom-sheet"); el = el.parentElement) {
       expect(el.className).not.toMatch(/\b(invisible|hidden|sr-only|opacity-0)\b/);

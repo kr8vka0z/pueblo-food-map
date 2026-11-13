@@ -1744,7 +1744,8 @@ it a draft and publishes it.
   `GET /api/admin/event-submissions/[id]/flyer` (session only, `no-store`). An
   upload never followed by a submit stays in the bucket (no cleanup yet).
 - **Admin.** The Events tab lists pending submissions under "Sent in by the
-  public" (`EventSubmissionsList`). **"Make it a draft event"**
+  public" (`EventSubmissionsList`), each with one three-dot menu
+  (`AdminRowMenu`) holding its two actions. **"Make it a draft event"**
   (`POST /api/admin/event-submissions/[id]/convert`) uses the stored pin when
   the sender picked a checked address, otherwise geocodes the address with the
   Census lookup the forms use (`src/lib/censusGeocode.ts`); with a pin or
@@ -1796,8 +1797,23 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   submission that prompted it). They land together or not at all.
 - **Nothing is deleted.** Archive sets `status='archived'`; the row and its
   audit history stay.
-- **Destructive actions confirm with native `window.confirm()`** — no modal
-  dependency exists or is needed.
+- **Risky actions confirm on the page, never with `window.confirm()`**
+  (#926). `src/components/AdminConfirm.tsx` is one small box with Cancel
+  first: the trigger hides (still mounted, so focus can return), the box
+  opens in its place, and the request is sent only from the box's own
+  action button, the same gate the browser pop-up gave. Used by Remove from
+  map, Archive this venue, Publish, Approve all date-only updates, Archive
+  event and Remove this flyer. `useAdminStep` in the same file gives the
+  change cards' reason steps the same focus handling. No modal dependency.
+- **One set of admin UI parts** (#926). Class strings live in
+  `src/lib/adminCardStyles.ts` (titles, page bodies, cards, tables,
+  buttons, links, tags, chips, failure and empty states) and
+  `src/components/formClasses.ts` (fields, tick boxes, the Cancel + Save
+  row); the shared components are `AdminConfirm`, `AdminRowMenu` (the
+  three-dot menu) and `AdminSegmented` (a two- or three-way slider of real
+  radios). Pages import them instead of typing classes, and
+  `src/__tests__/touchTargets.test.tsx` holds the 48-pixel floor and the
+  hover rules on them. DESIGN.md has the look.
 - **Public (unauthenticated) routes that touch D1** — the suggest/report
   queue, `/api/public/**` box routes — read `getCloudflareContext().env.ADMIN_DB`
   directly, never `getAdminDb()`.
@@ -1815,6 +1831,17 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   full-page request to a guarded admin URL answers 200 (noindex) and redirects
   or renders forbidden/not-found on the client instead of a 307/403/404 (this
   includes an unknown venue id on the edit page). It carries no admin data.
+- **`admin/error.tsx`** (#926) catches an admin page that throws while
+  loading (a D1 read, say) and shows "This page didn't load" in the admin's
+  look, never the error's text. It covers every `/admin/*` page (vinext
+  applies a segment's error file to every page below it). It does not swallow
+  the auth redirects: `redirect()`, `notFound()` and `forbidden()` are
+  digest-tagged signals that vinext turns into their own responses on the
+  server before any error page is considered, and in the browser their
+  boundaries sit inside the error boundary, which re-throws them anyway (read
+  in vinext 1.4.4, not run). So a signed-out visitor still lands on
+  `/admin/login`. Try again is a full reload, because vinext's `reset` only
+  re-renders the payload that already failed.
 
 ### Surfaces
 
@@ -1839,8 +1866,10 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   are kept permanently — the 90-day email cleanup never touches them.
 
 - **`/admin` — Dashboard** (`src/app/(site)/admin/page.tsx`, overhauled #680). A
-  greeting + a 7/30/90-day period switch (`?period=`, server-rendered
-  `<Link>`s, no client JS) that every period-scoped number on the page
+  greeting + a 7/30/90-day period slider (`?period=`; the page stays a
+  Server Component and reads the param, and `DashboardPeriodPicker`, its one
+  client piece, navigates to `/admin?period=…` keeping the other query
+  values) that every period-scoped number on the page
   reads from and compares against the previous period of the same length
   (`src/lib/boxStats.ts`'s `filterByPeriod`/`filterByPreviousPeriod`;
   `src/lib/cfAnalytics.ts`'s equivalent split for Cloudflare's numbers).
@@ -1923,15 +1952,17 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   `summarizePublishChanges()`'s three buckets (`newDrafts`,
   `editedSincePublish`, `archived` — `archived` counts only rows that were
   published, since archiving a never-live draft changes nothing public),
-  confirms, then maps the response to one of five messages or a generic
-  retry. The route snapshots `draft`+`published` rows, validates, commits
+  confirms on the page (`AdminConfirm`, nothing sent before its own Publish
+  press), then maps the response to one of five messages or, for a 500 or a
+  lost connection, one that says it can't tell whether the map changed and
+  to reload (the PR may already be open by then). The route snapshots `draft`+`published` rows, validates, commits
   `published-venues.ts` to the `publish-bot` branch, opens/reuses its
   auto-merging PR, and **only then** promotes drafts in D1 — the reverse
   order could mark rows published when the file never shipped. It refuses
   on staging (`isProductionWorker()`, #591) and returns
   `503 publish_not_configured` when `GITHUB_PUBLISH_TOKEN` is unset. The
-  button is sage, not brand orange: DESIGN.md reserves orange for the public
-  map.
+  button is sage, not brand orange: the admin's one orange button is Add
+  place (DESIGN.md Colors).
   - **"Published" means "PR open and armed," not "merged" (#598).** If that
     PR's CI then fails, D1 says published while the live site serves the old
     file until the next Publish repairs it. Waiting for the real merge was

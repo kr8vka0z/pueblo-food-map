@@ -46,6 +46,7 @@ import { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
 import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuery";
 import type { Locale } from "@/lib/i18n";
 import { useOverlayEscape, useOverlayRegistration, useScrollLock } from "@/lib/overlayRegistry";
+import { usePresence } from "@/lib/usePresence";
 import type { Venue } from "@/types/venue";
 import type { ViewMode } from "@/lib/useMapUI";
 
@@ -257,6 +258,13 @@ export default function HamburgerMenu({
   // `maxHeight` already clears the bar via `barClearance` — so it stays out
   // of the registry and the bar stays visible for it, same as before.
   useOverlayRegistration(open && isMobile);
+  // #917 round 3 (Kyle: "way too fast"): on a phone the panel slides in from
+  // the right in 300 ms and out in 250 ms on --ease-out-circ, the dim fading
+  // with it; still mounted while it slides out. The tablet/desktop dropdown
+  // has no slide, so it is never held. The bottom bar comes back as soon as
+  // `open` turns false (registration above stays on `open`): the close
+  // handler's focus return looks for the bar's item within ~10 frames.
+  const mounted = usePresence(open, 250, isMobile);
 
   // The bottom bar (z 1003) still draws over the tablet/desktop DROPDOWN
   // variant below 2xl (isBelow2xl but !isMobile) — keep its last item
@@ -330,22 +338,38 @@ export default function HamburgerMenu({
       }}
     >
       {/* ── Mobile backdrop ─────────────────────────────────────────────────── */}
-      {open && isMobile && (
+      {mounted && isMobile && (
         <div
           aria-hidden="true"
+          className={
+            "transition-opacity ease-out-circ motion-reduce:transition-none " +
+            (open ? "opacity-100 duration-300 starting:opacity-0" : "pointer-events-none opacity-0 duration-250")
+          }
           style={{
             position: "fixed",
             inset: 0,
             backgroundColor: "rgba(26,24,23,0.4)",
             zIndex: 1001,
           }}
-          onClick={close}
+          onClick={open ? close : undefined}
         />
       )}
 
       {/* ── Panel ───────────────────────────────────────────────────────────── */}
-      {open && (
-        <div id="hamburger-panel" ref={panelRef} style={panelStyle}>
+      {mounted && (
+        <div
+          id="hamburger-panel"
+          ref={panelRef}
+          // Closing (sliding out): nothing on it may take focus or a tap.
+          inert={!open || undefined}
+          className={
+            isMobile
+              ? "transition-transform ease-out-circ motion-reduce:transition-none " +
+                (open ? "translate-x-0 duration-300 starting:translate-x-full" : "translate-x-full duration-250")
+              : undefined
+          }
+          style={panelStyle}
+        >
           <HamburgerMenuContent
             view={view}
             locale={locale}

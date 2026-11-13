@@ -134,6 +134,7 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
   }
 
   function handleRemove(hostEmail: string, index: number) {
+    if (state.status === "submitting") return;
     focusAfterRemove.current = index;
     void mutate("DELETE", { email: hostEmail });
   }

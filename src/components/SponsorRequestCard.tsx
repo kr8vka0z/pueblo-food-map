@@ -74,6 +74,7 @@ export default function SponsorRequestCard({ adopter }: SponsorRequestCardProps)
     "This applicant hasn't confirmed their email yet, so they can't be approved until they do.";
 
   async function handleApprove() {
+    if (state.status === "submitting") return;
     setState({ status: "submitting", action: "approve" });
     try {
       const res = await fetch(`/api/admin/box-adopters/${adopter.id}/approve`, { method: "POST" });
@@ -92,6 +93,7 @@ export default function SponsorRequestCard({ adopter }: SponsorRequestCardProps)
   }
 
   async function handleConfirmReject() {
+    if (state.status === "submitting") return;
     setState({ status: "submitting", action: "reject" });
     try {
       const res = await fetch(`/api/admin/box-adopters/${adopter.id}/reject`, {

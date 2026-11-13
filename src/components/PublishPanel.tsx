@@ -146,6 +146,7 @@ export default function PublishPanel({ summary, reviewHref }: PublishPanelProps)
 
   // Runs only from the confirm's own Publish button: the second press is the gate.
   async function handlePublish() {
+    if (submitting) return;
     setState({ status: "submitting" });
     try {
       const res = await fetch("/api/admin/publish", { method: "POST" });

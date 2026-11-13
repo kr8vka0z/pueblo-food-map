@@ -54,6 +54,9 @@ export default function BoxCheckinsAdminPanel({ checkins }: BoxCheckinsAdminPane
   const [errorId, setErrorId] = useState<number | null>(null);
 
   async function toggleVisibility(row: AdminCheckinRow) {
+    // One check-in at a time: a second row's press would take over pendingId
+    // and un-busy the first row while its request still runs.
+    if (pendingId !== null) return;
     const nextVisibility = row.visibility === "visible" ? "hidden" : "visible";
     setPendingId(row.id);
     setErrorId(null);

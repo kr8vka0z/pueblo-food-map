@@ -231,6 +231,10 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
   // One body for Approve and Reject: the two differ only in path, request
   // body, which state they drive and the failure sentence.
   async function act(path: "approve" | "reject", body: unknown, setState: (s: ActionState) => void, failMessage: string) {
+    // WHY both states: Approve and the Reject step each have their own, and
+    // both stay pressable while the other runs (#926), so one decision at a
+    // time is enforced here, not by the buttons.
+    if (approveState.status === "submitting" || rejectState.status === "submitting") return;
     setState({ status: "submitting" });
     try {
       const res = await postAction(path, body);

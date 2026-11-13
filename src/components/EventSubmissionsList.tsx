@@ -35,6 +35,7 @@ function SubmissionCard({ item }: { item: PendingEventSubmission }) {
   const p = item.payload;
 
   async function act(path: "convert" | "dismiss") {
+    if (busy) return;
     setBusy(true);
     setMessage(null);
     try {

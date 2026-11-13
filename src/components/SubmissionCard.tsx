@@ -111,7 +111,12 @@ export default function SubmissionCard({ submission }: SubmissionCardProps) {
     closeReject();
   }
 
+  // Mark done and Confirm reject stay pressable while the other runs, so
+  // each refuses while either is in flight: one decision per report.
+  const working = rejectState.status === "submitting" || doneState.status === "submitting";
+
   async function handleConfirmReject() {
+    if (working) return;
     setRejectState({ status: "submitting" });
     try {
       const res = await fetch(`/api/admin/submissions/${submission.id}/reject`, {
@@ -130,6 +135,7 @@ export default function SubmissionCard({ submission }: SubmissionCardProps) {
   }
 
   async function handleMarkDone() {
+    if (working) return;
     setDoneState({ status: "submitting" });
     try {
       const res = await fetch(`/api/admin/submissions/${submission.id}/done`, { method: "POST" });

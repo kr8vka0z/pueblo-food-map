@@ -161,6 +161,7 @@ export default function AdminLoginForm() {
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (formStatus === "sending") return;
     const trimmed = email.trim();
     if (!EMAIL_RE.test(trimmed)) {
       setFieldError("Enter a valid email address.");
@@ -232,6 +233,7 @@ export default function AdminLoginForm() {
   }
 
   async function handlePasskeySignIn() {
+    if (passkeySignIn === "authenticating") return;
     setPasskeySignIn("authenticating");
     const result = await authClient.signIn.passkey({});
     if (result?.error) {
@@ -242,6 +244,7 @@ export default function AdminLoginForm() {
   }
 
   async function handlePasskeyRegister() {
+    if (passkeyRegister === "registering") return;
     setPasskeyRegister("registering");
     const result = await authClient.passkey.addPasskey({});
     if (result?.error) {

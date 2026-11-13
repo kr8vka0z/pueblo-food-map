@@ -531,7 +531,8 @@ export default function AddVenueForm({
    */
   async function handleGeocode() {
     const q = values.address.trim();
-    if (!q) return;
+    // One lookup at a time: a late answer must not land over a newer one.
+    if (!q || geocodeStatus === "loading") return;
 
     setGeocodeStatus("loading");
     setGeocodeMessage("Looking up…");
@@ -580,6 +581,10 @@ export default function AddVenueForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // WHY here and not only on the button: the Save button is aria-disabled
+    // while it works (it keeps focus), so the handler is what refuses a
+    // second create or save, whatever path the submit came by (#926).
+    if (status === "submitting") return;
 
     const clientErrors = validateClient(values);
     if (Object.keys(clientErrors).length > 0) {

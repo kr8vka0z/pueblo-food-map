@@ -53,6 +53,7 @@ export default function ArchiveVenueButton({
   const { asking, ask, cancel, triggerRef } = useAdminConfirm();
 
   async function handleConfirm() {
+    if (status === "submitting") return;
     setStatus("submitting");
     try {
       const res = await fetch(`/api/admin/venues/${venueId}/archive`, { method: "POST" });

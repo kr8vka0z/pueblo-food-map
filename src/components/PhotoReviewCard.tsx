@@ -74,6 +74,7 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
   // Approve sends no body; reject sends `{ reason }`. Anything but a 200
   // (or a network error) shows that action's error line.
   async function act(path: "approve" | "reject", body?: { reason: string }) {
+    if (state.status === "submitting") return;
     setState({ status: "submitting", action: path });
     try {
       const res = await fetch(`/api/admin/box-photos/${photo.id}/${path}`, {

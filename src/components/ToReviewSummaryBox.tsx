@@ -78,6 +78,7 @@ export default function ToReviewSummaryBox({ reviewRowCount, proposals, submissi
   if (reviewRowCount === 0) return null;
 
   async function handleBulkApprove(ids: number[]) {
+    if (bulkState.status === "submitting") return;
     setBulkState({ status: "submitting" });
     try {
       const res = await fetch("/api/admin/proposals/approve-date-only", {

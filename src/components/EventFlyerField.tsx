@@ -77,6 +77,10 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
 
   /** Sends one flyer request and folds the answer into state; returns whether it worked. */
   async function send(init: RequestInit, busyState: Exclude<Busy, null>, done: string): Promise<boolean> {
+    // One flyer request at a time. choose() sets busy itself before it
+    // shrinks the image, then calls this from that same render, where busy
+    // is still null, so its own upload is not refused here.
+    if (busy !== null) return false;
     setBusy(busyState);
     setError(null);
     setNotice(null);
@@ -115,7 +119,7 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
   }
 
   async function choose(file: File | undefined) {
-    if (!file) return;
+    if (!file || busy !== null) return;
     // Some Android pickers report no type at all; only refuse a type that is present and wrong.
     // A non-image with a blank type still fails at decode, with its own message below.
     if (file.type && !ACCEPTED.includes(file.type)) {

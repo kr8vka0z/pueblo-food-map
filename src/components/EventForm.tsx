@@ -306,7 +306,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
 
   async function findLocation() {
     const q = values.address.trim();
-    if (!q) return;
+    if (!q || geo.state === "loading") return;
     setGeo({ state: "loading", message: "Looking up…", options: [] });
     try {
       const res = await fetch(`/api/admin/geocode?q=${encodeURIComponent(q)}`);
@@ -321,6 +321,10 @@ export default function EventForm({ venues, eventId, initialValues, status: init
   }
 
   async function send(action: "save_draft" | "save" | "publish" | "cancel") {
+    // One write at a time across Save draft, Publish, Save, Confirm cancel
+    // and Archive (they share `busy`): the buttons are aria-disabled, not
+    // disabled, so the handler is the gate (#926).
+    if (busy) return;
     const clientErrors = validateClient(values, action === "cancel");
     if (Object.keys(clientErrors).length > 0) {
       setErrors(clientErrors);
@@ -382,6 +386,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
   }
 
   async function suggestSpanish() {
+    if (suggest === "busy") return;
     // Only fields with English text and a still-empty Spanish box are worth asking for.
     const pairs: [string, keyof EventFormValues, keyof EventFormValues][] = [
       ["name", "name", "nameEs"],
@@ -428,6 +433,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
 
   // Runs only from the on-page confirm's Archive event button: that second press is the gate.
   async function archive() {
+    if (busy) return;
     setBusy(true);
     setFailure(null);
     setArchiveError(null);

@@ -472,8 +472,11 @@ describe("admin shared class strings", () => {
     ["inputBase", formClasses.inputBase],
     ["checkboxRowClass", formClasses.checkboxRowClass],
   ];
-  test.each(pressable)("%s is at least 48 tall", (_name, value) => {
-    expect(value.split(/\s+/)).toContain("min-h-12");
+  // One test per rule, looping over the strings: a failure lists every
+  // offending string by name (an empty list is the pass).
+  test("every admin pressable string is at least 48 tall", () => {
+    const short = pressable.filter(([, value]) => !value.split(/\s+/).includes("min-h-12")).map(([name]) => name);
+    expect(short.join(", "), "these strings lost min-h-12").toBe("");
   });
 
   const tones = ["calm", "attention", "quiet", "neutral", "caution", "danger"] as const;
@@ -491,14 +494,14 @@ describe("admin shared class strings", () => {
       readFileSync(join(process.cwd(), "src", "components", f), "utf-8"),
     ]),
   ];
-  test.each(everyString)("%s has no grey or brightening hover", (_name, value) => {
-    for (const banned of [
+  test("no admin string or shared component file has a grey or brightening hover", () => {
+    const banned = [
       "hover:bg-[var(--color-bone-100)]",
       "hover:bg-[var(--color-bone-200)]",
       "hover:bg-[var(--color-sage-50)]",
       "hover:brightness",
-    ]) {
-      expect(value).not.toContain(banned);
-    }
+    ];
+    const found = everyString.flatMap(([name, value]) => banned.filter((b) => value.includes(b)).map((b) => `${name}: ${b}`));
+    expect(found.join("; "), "these strings carry a banned hover").toBe("");
   });
 });

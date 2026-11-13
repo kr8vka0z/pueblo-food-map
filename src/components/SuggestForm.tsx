@@ -77,7 +77,7 @@ export default function SuggestForm() {
       fieldIds={FIELD_IDS}
       rateLimitField="venueName"
       validate={validate}
-      onSuccess={() => void track(EVENTS.SUGGESTION_SENT, { category })}
+      onSuccess={() => void track(EVENTS.SUGGESTION_SENT)}
       body={() => ({
         venueName: venueName.trim(),
         address: address.trim(),

@@ -62,7 +62,7 @@ export default function ReportForm({ venueId }: ReportFormProps) {
       fieldIds={FIELD_IDS}
       rateLimitField="description"
       validate={validate}
-      onSuccess={() => void track(EVENTS.REPORT_SENT, { venueId, issueType })}
+      onSuccess={() => void track(EVENTS.REPORT_SENT, { venueId })}
       // venueName and venueAddress intentionally omitted: the server looks
       // them up from venueId to prevent client-side subject-line injection.
       body={() => ({

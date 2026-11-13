@@ -58,7 +58,9 @@ export const ITEM_CLASS =
   // at 320 on the 4-item bar) and returns to 12px at 360px and up. One
   // conditional, not a layout system (ponytail: the 360px floor is the
   // mockup's measured number, not a breakpoint — re-measure before touching it).
-  "flex flex-1 flex-col items-center justify-center gap-[3px] h-full min-w-0 rounded-full " +
+  // `relative isolate`: the hover fill is the ::before below, drawn behind
+  // the icon and label.
+  "relative isolate flex flex-1 flex-col items-center justify-center gap-[3px] h-full min-w-0 rounded-full " +
   "text-[11px] min-[360px]:text-[12px] leading-[14px] font-bold " +
   // 2xl: icon and word on one line inside the pill (§5).
   "2xl:flex-none 2xl:flex-row 2xl:gap-1.5 2xl:px-3 " +
@@ -76,7 +78,17 @@ export const ITEM_CLASS =
   // this Tailwind hover rule.
   // #917 R1: sage 100 under the pointer; a Boxes item that is on gets no
   // fill (raspberry words on sage 100 are 3.4 to 1, DESIGN.md Bottom bar).
-  "hover:bg-[var(--color-sage-100)] aria-pressed:hover:bg-transparent " +
+  // #917 round 3 (Kyle: the end items' fill "doesn't fully cover the bar"):
+  // the fill is a ::before inset 4px top and bottom inside the full-height
+  // item, and the bar has 4px side padding (NAV_CLASS), so on Near me and
+  // Menu it sits 4px in from the pill's edge all round and its round end
+  // follows the pill's curve (radius = the bar's inner radius minus 4).
+  // The item itself keeps the bar's full height, so tap areas don't shrink.
+  // 2xl: the item is 44 tall (BottomNav's `2xl:h-11` li), 3px under the 52px
+  // bar's inner edge, so the fill insets 1px more to land 4px in there too.
+  "before:absolute before:inset-x-0 before:inset-y-1 2xl:before:inset-y-px before:-z-10 before:rounded-full " +
+  "before:transition-colors before:duration-150 " +
+  "hover:before:bg-[var(--color-sage-100)] aria-pressed:hover:before:bg-transparent " +
   "disabled:cursor-default " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
   // #670 — the actual fix for the grey-circle symptom above: disables the
@@ -109,7 +121,9 @@ export const NAV_CLASS =
   "fixed left-3 right-[calc(0.75rem+var(--panel-right-inset,0px))] z-[1003] " +
   "max-w-[460px] mx-auto 2xl:max-w-none " +
   "transition-[right] duration-300 " +
-  "h-16 px-1.5 " +
+  // px-1: the items' hover fill sits 4px in from the pill's edge on every
+  // side (see ITEM_CLASS), concentric with its round ends.
+  "h-16 px-1 " +
   "bg-[var(--color-bone-50)] border border-[var(--color-bone-300)] rounded-[var(--radius-full)] " +
   "shadow-[0_4px_16px_rgba(26,24,23,0.14),0_0_0_1px_rgba(26,24,23,0.04)] " +
   // 2xl: pill floating bottom-centre — same height, radius, shadow and

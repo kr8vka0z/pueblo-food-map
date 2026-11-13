@@ -231,4 +231,19 @@ describe("BottomSheet swipes (native scroll sheet)", () => {
     settle();
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  test("the top edge outside the track is shown only once the sheet's top reaches the track's top", () => {
+    const { scrollToTop } = setup();
+    const track = document.querySelector<HTMLElement>("[data-scroll-sheet]")!;
+    // The edge is the track's next sibling, so the CSS `+` rule can reach it.
+    expect(track.nextElementSibling!.hasAttribute("data-sheet-edge")).toBe(true);
+    scrollToTop(364); // collapsed: the sheet's own shadow shows
+    expect(track.hasAttribute("data-at-top")).toBe(false);
+    scrollToTop(640); // fully open: the sheet's top is the track's top, which clips its shadow
+    expect(track.hasAttribute("data-at-top")).toBe(true);
+    scrollToTop(900); // scrolled into the details
+    expect(track.hasAttribute("data-at-top")).toBe(true);
+    scrollToTop(600);
+    expect(track.hasAttribute("data-at-top")).toBe(false);
+  });
 });

@@ -104,11 +104,27 @@ export default function ScrollSheet({
   // undefined = not measured yet; null = the card has no detail section.
   const firstView = useRef<number | null | undefined>(undefined);
 
+  // ── The top edge's shadow at full height ───────────────────────────────
+  // The track is the scroll container, so it clips everything inside it: once
+  // the sheet's top reaches the track's top (a card at least as tall as the
+  // track, fully open or scrolled into the details), the sheet's own shadow
+  // and hairline above that edge are cut off and the card runs straight into
+  // the map. `[data-sheet-edge]`, a sibling outside the track, draws that edge
+  // instead, only while the sheet's top is at the track's top (globals.css).
+  // Called from scroll and from measure: a resize moves no scroll position.
+  const syncEdge = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const h = track.clientHeight;
+    track.toggleAttribute("data-at-top", openRef.current && h > 0 && track.scrollTop >= h - 1);
+  }, []);
+
   // ── Measure the detents ────────────────────────────────────────────────
   const measure = useCallback(() => {
     const track = trackRef.current;
     const sheet = sheetRef.current;
     if (!track || !sheet) return;
+    syncEdge();
     if (fingerDown.current) {
       // Moving the detents under the finger would fight it; measure on release.
       measurePending.current = true;
@@ -131,7 +147,7 @@ export default function ScrollSheet({
         ? prev
         : next,
     );
-  }, [detailId]);
+  }, [detailId, syncEdge]);
 
   useLayoutEffect(() => {
     firstView.current = undefined;
@@ -161,6 +177,7 @@ export default function ScrollSheet({
   useLayoutEffect(() => {
     const track = trackRef.current;
     if (!track) return;
+    syncEdge();
     if (!open) {
       armed.current = false;
       lastRest.current = "closed";
@@ -173,7 +190,7 @@ export default function ScrollSheet({
     if (expanded && cur >= detents.full - 2) return;
     const target = expanded ? detents.full : detents.collapsed;
     if (Math.abs(cur - target) > 1) scrollTrack(track, target);
-  }, [open, expanded, detents]);
+  }, [open, expanded, detents, syncEdge]);
 
   // ── Watch the scroll: rest, swipe-to-close, snap off inside the content ─
   useEffect(() => {
@@ -204,6 +221,7 @@ export default function ScrollSheet({
     }
     function onScroll() {
       if (!track) return;
+      syncEdge();
       // Scrolled into the content: snap alignment off, so a layout change in
       // the card (a lazy chunk, Read more, the check-in panel) can't make
       // Safari re-snap to the sheet's top (the article's "re-snapping" note).
@@ -256,7 +274,7 @@ export default function ScrollSheet({
       track.removeEventListener("touchend", onTouchEnd);
       track.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [measure]);
+  }, [measure, syncEdge]);
 
   // ── Escape (document capture, where Radix's listener sat) ──────────────
   const onEscapeRef = useRef(onEscape);
@@ -298,49 +316,59 @@ export default function ScrollSheet({
 
   if (typeof document === "undefined") return null;
   const descId = `scroll-sheet-desc-${contentKey}`;
+  const height = `calc(100dvh - ${MAP_PEEK_PX}px - env(safe-area-inset-bottom))`;
   return createPortal(
-    <div
-      ref={trackRef}
-      // #530: the safe-area bottom comes from globals.css's [data-bottom-sheet] rule.
-      data-bottom-sheet=""
-      data-scroll-sheet=""
-      role="dialog"
-      aria-modal="false"
-      aria-label={label}
-      aria-describedby={descId}
-      // Closing (`!open`): the held card is still sliding away; nothing on it may take focus or be read.
-      inert={inert || !open || undefined}
-      className={
-        "fixed left-0 right-0 z-[800] overflow-y-scroll overscroll-contain " +
-        "snap-y snap-mandatory pointer-events-none rounded-t-[var(--radius-xl)] focus:outline-none"
-      }
-      style={{ height: `calc(100dvh - ${MAP_PEEK_PX}px - env(safe-area-inset-bottom))` }}
-    >
-      <p id={descId} className="sr-only">
-        {description}
-      </p>
-      {/* Detents: 1px markers (Safari needs a height to snap). */}
-      <div data-snap="" aria-hidden style={{ top: 0 }} />
-      {detents.measured && !detents.single && (
-        // snap-stop: from fully open a fast flick down rests here, never straight to closed.
-        <div data-snap="" data-snap-stop="" aria-hidden style={{ top: detents.collapsed }} />
-      )}
-      {detents.measured && <div data-snap="" aria-hidden style={{ top: detents.full }} />}
-      {/* The track: as tall as the sheet's maximum, so scrollTop 0 hides the sheet. */}
-      <div aria-hidden className="h-full" />
+    <>
       <div
-        ref={sheetRef}
-        data-sheet=""
-        data-sheet-surface=""
-        className="pointer-events-auto relative flex flex-col bg-[var(--color-bone-50)] rounded-t-[var(--radius-xl)] elevation-2"
+        ref={trackRef}
+        // #530: the safe-area bottom comes from globals.css's [data-bottom-sheet] rule.
+        data-bottom-sheet=""
+        data-scroll-sheet=""
+        role="dialog"
+        aria-modal="false"
+        aria-label={label}
+        aria-describedby={descId}
+        // Closing (`!open`): the held card is still sliding away; nothing on it may take focus or be read.
+        inert={inert || !open || undefined}
+        className={
+          "fixed left-0 right-0 z-[800] overflow-y-scroll overscroll-contain " +
+          "snap-y snap-mandatory pointer-events-none rounded-t-[var(--radius-xl)] focus:outline-none"
+        }
+        style={{ height }}
       >
-        <div data-sheet-part="" className="sticky top-0 z-10 bg-[var(--color-bone-50)] rounded-t-[var(--radius-xl)]">
-          {header}
+        <p id={descId} className="sr-only">
+          {description}
+        </p>
+        {/* Detents: 1px markers (Safari needs a height to snap). */}
+        <div data-snap="" aria-hidden style={{ top: 0 }} />
+        {detents.measured && !detents.single && (
+          // snap-stop: from fully open a fast flick down rests here, never straight to closed.
+          <div data-snap="" data-snap-stop="" aria-hidden style={{ top: detents.collapsed }} />
+        )}
+        {detents.measured && <div data-snap="" aria-hidden style={{ top: detents.full }} />}
+        {/* The track: as tall as the sheet's maximum, so scrollTop 0 hides the sheet. */}
+        <div aria-hidden className="h-full" />
+        <div
+          ref={sheetRef}
+          data-sheet=""
+          data-sheet-surface=""
+          className="pointer-events-auto relative flex flex-col bg-[var(--color-bone-50)] rounded-t-[var(--radius-xl)] elevation-2"
+        >
+          <div data-sheet-part="" className="sticky top-0 z-10 bg-[var(--color-bone-50)] rounded-t-[var(--radius-xl)]">
+            {header}
+          </div>
+          <div data-sheet-part="">{children}</div>
+          <div data-snap-end="" aria-hidden />
         </div>
-        <div data-sheet-part="">{children}</div>
-        <div data-snap-end="" aria-hidden />
       </div>
-    </div>,
+      {/* The sheet's top edge at full height, drawn outside the clipping track (see syncEdge). */}
+      <div
+        data-sheet-edge=""
+        aria-hidden
+        className="fixed left-0 right-0 z-[800] pointer-events-none rounded-t-[var(--radius-xl)] elevation-2"
+        style={{ height, bottom: "env(safe-area-inset-bottom)" }}
+      />
+    </>,
     document.body,
   );
 }

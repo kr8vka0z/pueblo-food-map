@@ -356,6 +356,18 @@ body {
 [data-scroll-sheet][data-deep] :is([data-snap], [data-sheet], [data-snap-end]) {
   scroll-snap-align: none;
 }
+/* The sheet's top edge at full height (ScrollSheet.tsx, syncEdge): the track
+   clips the sheet's own shadow where its top meets the track's top, so this
+   sibling, the track's exact box outside it, draws the same elevation-2 edge.
+   Clipped to the strip above the edge, so nothing is drawn over the sheet or
+   into the safe-area strip below; shown only while the sheet's top is there. */
+[data-sheet-edge] {
+  clip-path: inset(-16px 0 100% 0);
+  visibility: hidden;
+}
+[data-scroll-sheet][data-at-top] + [data-sheet-edge] {
+  visibility: visible;
+}
 /* WebKit bug: under a `pointer-events: none` scroll container, a touch on a
    `pointer-events: auto` child doesn't scroll the container. A 1px sideways
    overflow on the child works around it (pure-web-bottom-sheet, after J.J.

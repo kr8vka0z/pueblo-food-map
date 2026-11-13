@@ -55,8 +55,8 @@ next-env.d.ts
 # Serena (local code-intelligence tooling — not part of the project)
 .serena/
 
-# generated SQL from scripts/seed-admin-db.ts — derivable from committed
-# src/data/*.ts; regenerate with `bun run scripts/seed-admin-db.ts` (#237)
+# generated SQL + geocode cache from scripts/load-real-blessing-boxes.ts —
+# derivable from that committed script
 scripts/generated/
 
 # Local ops secret-reference map -- keeps op:// paths out of this public repo
@@ -67,3 +67,6 @@ OPS-SECRETS.local.md
 # the touch-target audit PR description for how it was driven.
 /.audit-233/
 .release-prs.md
+
+# design-system review pages: built output of docs/design/design-system/build.ts
+docs/design/design-system/dist/

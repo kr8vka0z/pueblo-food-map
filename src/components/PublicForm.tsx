@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * PublicForm + Field — the shared shell of the three public page forms
- * (FeedbackForm, ReportForm, SuggestForm). Each form owns only its own field
- * state, its validate(), and the JSON it sends; everything they had copied
- * three times lives here once:
+ * PublicForm + Field — the shared shell of the public page forms
+ * (FeedbackForm, ReportForm, SuggestForm, ShareEventForm). Each form owns only
+ * its own field state, its validate(), and the JSON it sends; everything they
+ * had copied lives here once:
  *
  * - the Turnstile widget (useTurnstile, managed key) and its <Script>
  * - the honeypot `website` field (hidden from people, caught server-side)
@@ -15,7 +15,7 @@
  * - the success panel with its "Back to map" link
  *
  * Copy comes from i18n keys under the form's own prefix (`feedback.*`,
- * `report.*`, `suggest.*`), so the three keep their own wording.
+ * `report.*`, `suggest.*`, `shareEvent.*`), so each keeps its own wording.
  */
 
 import { useRef, useState, type ReactNode } from "react";
@@ -23,9 +23,10 @@ import Script from "next/script";
 import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { localizedHref } from "@/lib/localizedHref";
 import { useTurnstile } from "@/lib/useTurnstile";
 
-type FormName = "feedback" | "report" | "suggest";
+type FormName = "feedback" | "report" | "suggest" | "shareEvent";
 export type FieldErrors<K extends string> = Partial<Record<K, string>>;
 
 // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
@@ -132,6 +133,10 @@ export default function PublicForm<K extends string>({
   validate,
   body,
   children,
+  onSuccess,
+  submitRow = (submit) => submit,
+  beforeSubmit,
+  onFailure,
 }: {
   form: FormName;
   /** POST target, e.g. "/feedback/submit". */
@@ -144,8 +149,15 @@ export default function PublicForm<K extends string>({
   /** The form's own JSON fields; `website` and `turnstileToken` are appended. */
   body: () => Record<string, unknown>;
   children: (errors: FieldErrors<NoInfer<K>>, locale: Locale) => ReactNode;
+  onSuccess?: () => void;
+  /** Wraps the submit button (default: the button alone). */
+  submitRow?: (submit: ReactNode) => ReactNode;
+  /** Runs after client validation passes, before the POST; false = don't send. body() runs after it, so it can read a ref the hook set. */
+  beforeSubmit?: () => Promise<boolean>;
+  /** Told the server's error code before the generic error banner shows. */
+  onFailure?: (error: string | undefined) => void;
 }) {
-  const { locale } = useLocale();
+  const { locale, tree } = useLocale();
   const [honeypot, setHoneypot] = useState("");
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
   const turnstile = useTurnstile(turnstileContainerRef, { rebuildDeadWidget: false });
@@ -168,6 +180,10 @@ export default function PublicForm<K extends string>({
     setStatus("submitting");
 
     try {
+      if (beforeSubmit && !(await beforeSubmit())) {
+        setStatus("idle");
+        return;
+      }
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -182,6 +198,7 @@ export default function PublicForm<K extends string>({
 
       if (data.ok) {
         setStatus("success");
+        onSuccess?.();
       } else if (data.error === "rate_limit") {
         setErrors({ [rateLimitField]: t(`${form}.error.rateLimit`, locale) } as FieldErrors<K>);
         setStatus("idle");
@@ -189,6 +206,7 @@ export default function PublicForm<K extends string>({
         turnstile.fail(); // shows the inline message, resets the widget so the visitor can retry
         setStatus("idle");
       } else {
+        onFailure?.(data.error);
         setStatus("error");
       }
     } catch {
@@ -208,8 +226,9 @@ export default function PublicForm<K extends string>({
         {/* #534: --color-ink-600 undefined in globals.css @theme — mapped to
             ink-700, DESIGN.md's documented body-text token. */}
         <p className="text-sm text-[var(--color-ink-700)] mb-6 leading-relaxed">{t(`${form}.success.body`, locale)}</p>
+        {/* The tree, not the locale: /es pages go back to /es (#894); an EN page read in Spanish stays on "/". */}
         <Link
-          href="/"
+          href={localizedHref("/", tree)}
           className={
             "inline-flex items-center justify-center px-5 h-10 rounded-[var(--radius-md)] " +
             "bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
@@ -267,6 +286,7 @@ export default function PublicForm<K extends string>({
           )}
         </div>
 
+        {submitRow(
         <button
           type="submit"
           disabled={waiting}
@@ -286,7 +306,8 @@ export default function PublicForm<K extends string>({
             : !turnstile.token
               ? t("form.turnstile.verifying", locale)
               : t(`${form}.submit`, locale)}
-        </button>
+        </button>,
+        )}
 
         {status === "error" && (
           <button
@@ -299,7 +320,7 @@ export default function PublicForm<K extends string>({
               // search bar border at rest").
               "border border-[var(--color-bone-300)] text-[var(--color-ink-700)] " +
               "text-base font-medium transition-colors duration-150 " +
-              "hover:bg-[var(--color-bone-100)] " +
+              "hover:bg-[var(--color-sage-100)] " +
               "focus-visible:outline-none focus-visible:ring-2 " +
               "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
             }

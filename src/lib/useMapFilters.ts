@@ -107,6 +107,13 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = [], initial
     () => venuesWithDistance.filter((v) => v.accepts_wic).length,
     [venuesWithDistance],
   );
+  // Places of each kind (#917), for the Filters panel's kind-of-place switch
+  // rows: a total like snapCount, not narrowed by the other filters.
+  const categoryCounts = useMemo(() => {
+    const counts: Partial<Record<VenueCategory, number>> = {};
+    for (const v of venuesWithDistance) counts[v.category] = (counts[v.category] ?? 0) + 1;
+    return counts;
+  }, [venuesWithDistance]);
 
   // ── Main filter pipeline ─────────────────────────────────────────────────────
   //
@@ -119,6 +126,10 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = [], initial
   const filteredVenues = useMemo(() => {
     if (filterEvents) return [];
     const now = new Date();
+    // Each venue's open state, computed once in the filter pass and read back
+    // by the sort comparator (which would otherwise recompute it for both
+    // sides of every comparison, re-parsing the hours each time).
+    const openState = new Map<object, string>();
 
     const afterFilters = venuesWithDistance
       .filter((v) => {
@@ -127,6 +138,7 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = [], initial
         }
         if (filterOpenNow) {
           const status = computeVenueOpenStatus(v, now);
+          openState.set(v, status.state);
           // "no_hours" survives the filter deliberately (board review finding
           // #1): 74 of 107 venues have no hours_weekly data, so treating
           // "unknown" the same as "closed" hid 25 of 35 food pantries behind
@@ -151,8 +163,8 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = [], initial
         // MapWrapper when geolocation is unavailable — never NaN/undefined),
         // so no special-casing is needed for a missing-distance case.
         if (filterOpenNow) {
-          const aOpen = computeVenueOpenStatus(a, now).state === "open";
-          const bOpen = computeVenueOpenStatus(b, now).state === "open";
+          const aOpen = openState.get(a) === "open";
+          const bOpen = openState.get(b) === "open";
           if (aOpen !== bOpen) return aOpen ? -1 : 1;
         }
         return a.distanceMiles - b.distanceMiles;
@@ -225,9 +237,9 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = [], initial
     filterWic ||
     filterEvents;
 
-  // ── Category checkbox toggle (#513 — Filters panel, multi-select) ───────────
+  // ── Category switch toggle (#513 — Filters panel, multi-select) ─────────────
   // Replaces the old single-select handleCategoryBrowseSelect: the panel
-  // renders 8 independent checkboxes, so toggling one must add/remove just
+  // renders 8 independent switches (#917; tick boxes before), so toggling one must add/remove just
   // that category from the set, not replace the whole selection. Empty Set
   // normalizes back to null so `selectedCategories !== null && size > 0` (the
   // filter guard above, and every other null-check on this state) stays the
@@ -285,6 +297,7 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = [], initial
     openNowCount,
     snapCount,
     wicCount,
+    categoryCounts,
     // Handlers
     toggleCategory,
     clearFilters,

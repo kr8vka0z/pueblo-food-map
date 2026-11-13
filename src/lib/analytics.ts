@@ -1,19 +1,21 @@
 /**
- * analytics.ts — PostHog core (#485). Named `track()` calls inside
- * components ship in a later PR ("PR 2 - Admin", per the issue's final
- * comment) — this file only provides the init entry point, the event
- * allowlist, and the sanitizer those calls will use.
+ * analytics.ts — PostHog core (#485): the init gate, the event allowlist
+ * and the sanitizer. Components call `track(EVENTS.X)`.
  *
- * WHY persistence: "memory" + person_profiles: "never", not cookieless_mode
- * (Kyle, 2026-09-26, "option B"): the issue originally chose
- * cookieless_mode: "always", but posthog-js creates no session manager in
- * that mode, so Session Replay never records (verified in iOS Simulator
- * Safari: only /ingest/e/ uploads, never replay snapshots). Memory
- * persistence keeps the privacy page's promises (no cookie, nothing stored
- * on the device) and lets replay work. Cost: every page load is a new
- * anonymous PostHog visitor, so **unique-visitor counts always come from
- * Cloudflare Web Analytics, never PostHog** (Kyle's condition for option B;
- * see #680/#681).
+ * WHY persistence: "sessionStorage" + person_profiles: "never", not
+ * cookieless_mode: posthog-js creates no session manager in cookieless mode,
+ * so Session Replay never records (verified in iOS Simulator Safari,
+ * 2026-09-26). It was "memory" until #919, which made every page load a new
+ * visit; Kyle (2026-11-13) approved a tab-only visit ID instead, so a walk
+ * from the homepage to a place page to Spanish is one `$session_id`, and
+ * closing the tab ends it. Still no cookie and no person profile, and the ID
+ * never outlives the tab, so **unique-visitor counts always come from
+ * Cloudflare Web Analytics, never PostHog** (#680/#681). The privacy page's
+ * `privacy.analytics` text says exactly this; change both together.
+ *
+ * WHY the `returning` flag (#919): a bare "1" under RETURNING_STORAGE_KEY in
+ * localStorage, no ID and no date, so PostHog can split first visits from
+ * repeat ones without anything that tells one browser from another.
  *
  * WHY api_host: "/ingest": PostHog's own SDK bytes and API calls are proxied
  * same-origin through custom-worker.ts's /ingest handler (src/lib/
@@ -30,18 +32,35 @@
  */
 
 const INTERNAL_DEVICE_STORAGE_KEY = "pfm_internal";
+const RETURNING_STORAGE_KEY = "pfm_returning";
+
+// The build's short commit, set by vite.config.ts's `define`. Undefined under
+// vitest, whose config is separate, hence the typeof check.
+declare const __SITE_VERSION__: string | undefined;
+const SITE_VERSION = typeof __SITE_VERSION__ === "string" ? __SITE_VERSION__ : "dev";
 
 type PostHogClient = {
   init: (key: string, config: Record<string, unknown>) => void;
   capture: (name: string, props?: Record<string, unknown>) => void;
+  register: (props: Record<string, unknown>) => void;
+  register_once: (props: Record<string, unknown>) => void;
   stopSessionRecording: () => void;
 };
 
 // Set once initAnalytics() passes every gate and posthog-js has loaded.
-// track() checks this rather than re-deriving the gates itself, so a
-// caller that fires before/without init (or on a gated device) is a silent,
-// zero-cost no-op — never a network call to an uninitialized SDK.
+// track() checks this rather than re-deriving the gates itself: a caller
+// that fires before init is queued (`pending` below), and one on a gated
+// device is a silent no-op, never a network call to an uninitialized SDK.
 let client: PostHogClient | null = null;
+
+// Events tracked before posthog-js has loaded (#919 review: the splash's tour
+// tap and nearest_food can fire before the deferred init). Flushed once init
+// succeeds; set to null, dropping them, the moment any gate refuses (no key,
+// /admin, internal device), so the gates still win. ponytail: capped at
+// MAX_PENDING and anything past it is dropped; nothing tracked before init
+// comes close in practice.
+const MAX_PENDING = 20;
+let pending: [EventName, Record<string, unknown>][] | null = [];
 
 // Set the first time an event would be sent from an /admin page (#861).
 // Once set, nothing more is sent for the rest of this page load, public
@@ -56,8 +75,8 @@ function isAdminPath(pathname: string): boolean {
 /**
  * True if this browser is flagged as one of Kyle's own — set by the admin
  * sign-in success path (AdminLoginForm.tsx) via markInternalDevice(), since
- * memory-only persistence leaves no other durable, cross-network way to recognize
- * "this is Kyle's phone on cellular" (#485 comment, 2026-09-26).
+ * PostHog's tab-only persistence leaves no other durable, cross-network way
+ * to recognize "this is Kyle's phone on cellular" (#485 comment, 2026-09-26).
  */
 export function isInternalDevice(): boolean {
   if (typeof window === "undefined") return false;
@@ -92,11 +111,41 @@ export function clearInternalDeviceFlag(): void {
 
 export { INTERNAL_DEVICE_STORAGE_KEY };
 
+/** Whether this browser has visited before, then notes that it has. See the header's `returning` WHY. */
+function readAndMarkReturning(): boolean {
+  try {
+    const seen = window.localStorage.getItem(RETURNING_STORAGE_KEY) === "1";
+    if (!seen) window.localStorage.setItem(RETURNING_STORAGE_KEY, "1");
+    return seen;
+  } catch {
+    return false; // Private mode can refuse storage — count it as a first visit.
+  }
+}
+
+/** Facts sent on every event (#919): the build, the connection and the display settings. Nothing about the person. */
+function deviceFacts(): Record<string, unknown> {
+  const nav = navigator as Navigator & {
+    connection?: { effectiveType?: string; saveData?: boolean };
+    standalone?: boolean; // iOS Safari's home-screen flag
+  };
+  const media = (query: string) => window.matchMedia?.(query).matches ?? false;
+  const facts: Record<string, unknown> = {
+    site_version: SITE_VERSION,
+    standalone: media("(display-mode: standalone)") || nav.standalone === true,
+    dark_mode: media("(prefers-color-scheme: dark)"),
+    reduced_motion: media("(prefers-reduced-motion: reduce)"),
+  };
+  // Chromium only; Safari and Firefox have no navigator.connection.
+  if (nav.connection?.effectiveType) facts.effective_type = nav.connection.effectiveType;
+  if (typeof nav.connection?.saveData === "boolean") facts.save_data = nav.connection.saveData;
+  return facts;
+}
+
 /**
  * The full named-event allowlist (#485 + its 2026-09-26 amendment comment,
  * "add these so the admin dashboard (#681) can show them"). Autocapture
- * covers raw clicks; these give them meaning. Exported so PR 2's component
- * code imports the constants rather than retyping event-name strings.
+ * covers raw clicks; these give them meaning. Components import the
+ * constants rather than retyping event-name strings.
  */
 export const EVENTS = {
   NEAR_ME_CLICKED: "near_me_clicked",
@@ -112,6 +161,21 @@ export const EVENTS = {
   FILTER_TOGGLED: "filter_toggled",
   LOCALE_SWITCHED: "locale_switched",
   SEARCH_USED: "search_used",
+  // #919: the rest of what people do on the site. Taps that also exist off
+  // the map (call, directions, website) carry `surface: "map" | "venue_page"`.
+  BOX_CHECKIN: "box_checkin",
+  BOX_PHOTO_UPLOADED: "box_photo_uploaded",
+  BOX_ADOPTED: "box_adopted",
+  EVENT_OPENED: "event_opened",
+  EVENT_SHARED: "event_shared",
+  EVENT_CALENDAR_ADDED: "event_calendar_added",
+  SUGGESTION_SENT: "suggestion_sent",
+  REPORT_SENT: "report_sent",
+  VIEW_SWITCHED: "view_switched",
+  NAV_TAB: "nav_tab",
+  WELCOME_CLOSED_WITHOUT_NEAR_ME: "welcome_closed_without_near_me",
+  MAP_MOVED: "map_moved",
+  NEAREST_FOOD: "nearest_food",
 } as const;
 
 export type EventName = (typeof EVENTS)[keyof typeof EVENTS];
@@ -145,7 +209,6 @@ export async function track(
   props: Record<string, unknown> = {},
 ): Promise<void> {
   if (!ALLOWED_EVENTS.has(name)) return;
-  if (!client) return;
 
   let finalProps = props;
   if (name === EVENTS.SEARCH_USED) {
@@ -154,7 +217,19 @@ export async function track(
     finalProps = sanitized === undefined ? rest : { ...rest, term: sanitized };
   }
 
-  client.capture(name, finalProps);
+  if (client) client.capture(name, finalProps);
+  else if (pending && pending.length < MAX_PENDING) pending.push([name, finalProps]);
+}
+
+/** Probes sessionStorage: posthog-js silently falls back to localStorage and cookies when it can't use it (#919 review). */
+function sessionStorageWorks(): boolean {
+  try {
+    window.sessionStorage.setItem("pfm_probe", "1");
+    window.sessionStorage.removeItem("pfm_probe");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -167,6 +242,7 @@ export async function track(
 export function _resetAnalyticsStateForTest(): void {
   client = null;
   stoppedForAdmin = false;
+  pending = [];
 }
 
 export type InitAnalyticsOptions = {
@@ -191,7 +267,17 @@ export const SESSION_REPLAY_SAMPLE_RATE = 0.2;
  * recorder otherwise re-records ~130 pins on every pan frame. Replay shows a
  * blank box of the same size; autocapture and the named events still fire.
  */
-export const REPLAY_BLOCK_SELECTOR = ".mapboxgl-map";
+export const REPLAY_BLOCK_SELECTOR = ".mapboxgl-map, .ph-no-capture";
+
+/**
+ * Class for page text that is someone's unsent personal input shown back as
+ * ordinary text, which maskAllInputs does not cover (#883: the "Share an
+ * event" live preview card, address-check results and the phone preview
+ * sheet). posthog-js skips it in autocapture and its recorder blocks it by
+ * default; it is also in REPLAY_BLOCK_SELECTOR so that holds even if a
+ * posthog-js release changes its own default.
+ */
+export const NO_CAPTURE_CLASS = "ph-no-capture";
 
 /**
  * Loads and initializes posthog-js, or does nothing at all (no import, no
@@ -216,19 +302,22 @@ export async function initAnalytics(options: InitAnalyticsOptions = {}): Promise
   }
 
   const key = options.key ?? process.env.NEXT_PUBLIC_POSTHOG_KEY;
-  if (!key) return; // No key configured — total no-op (local dev, tests, Lighthouse CI).
-
   const pathname =
     options.pathname ?? (typeof window !== "undefined" ? window.location.pathname : "");
-  if (isAdminPath(pathname)) return;
-
-  if (isInternalDevice()) return;
+  // No key (local dev, tests, Lighthouse CI), /admin, or Kyle's own device:
+  // a total no-op, and anything queued before now is dropped unsent.
+  if (!key || isAdminPath(pathname) || isInternalDevice()) {
+    pending = null;
+    return;
+  }
 
   const posthog = (await import("posthog-js")).default as unknown as PostHogClient;
   posthog.init(key, {
     api_host: "/ingest",
-    // Memory only: no cookie, no localStorage/sessionStorage (see header).
-    persistence: "memory",
+    // Tab-only: the visit ID lives in sessionStorage, never a cookie (see
+    // header). Where sessionStorage is refused, memory, never posthog-js's
+    // own fallback to localStorage and cookies, which would outlive the tab.
+    persistence: sessionStorageWorks() ? "sessionStorage" : "memory",
     person_profiles: "never",
     autocapture: true,
     // No PostHog surveys exist (project 630731 has zero, checked 2026-09-29) and
@@ -249,6 +338,7 @@ export async function initAnalytics(options: InitAnalyticsOptions = {}): Promise
       if (!isAdminPath(window.location.pathname)) return event;
       stoppedForAdmin = true;
       client = null;
+      pending = null;
       posthog.stopSessionRecording();
       return null;
     },
@@ -270,6 +360,23 @@ export async function initAnalytics(options: InitAnalyticsOptions = {}): Promise
       sampleRate: SESSION_REPLAY_SAMPLE_RATE,
       blockSelector: REPLAY_BLOCK_SELECTOR,
     },
+    // Exception and dead-click autocapture are switched on in the PostHog
+    // project settings (#919); posthog-js follows the project when these
+    // options are left unset, so they are deliberately absent here.
   });
+  // Registered straight after init(): posthog-js sends the first pageview on
+  // a timer, so these ride on it too.
+  posthog.register(deviceFacts());
+  // register_once keeps the tab's first answer (it persists in
+  // sessionStorage), so a first visit's second page doesn't flip to true.
+  posthog.register_once({ returning: readAndMarkReturning() });
+  // Location permission as it stands before any prompt; query() never asks.
+  // Async, so the first pageview may go without it.
+  navigator.permissions
+    ?.query({ name: "geolocation" })
+    .then((status) => posthog.register({ geo_permission: status.state }))
+    .catch(() => {});
   client = posthog;
+  for (const [name, props] of pending ?? []) posthog.capture(name, props);
+  pending = null;
 }

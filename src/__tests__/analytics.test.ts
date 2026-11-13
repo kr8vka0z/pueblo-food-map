@@ -11,11 +11,15 @@ import { describe, test, expect, vi, beforeEach } from "vitest";
 const capture = vi.fn();
 const init = vi.fn();
 const stopSessionRecording = vi.fn();
+const register = vi.fn();
+const register_once = vi.fn();
 
 vi.mock("posthog-js", () => ({
   default: {
     init,
     capture,
+    register,
+    register_once,
     opt_out_capturing: vi.fn(),
     stopSessionRecording,
   },
@@ -175,18 +179,31 @@ describe("initAnalytics — init options (session replay, masking)", () => {
     );
   });
 
-  test("memory-only persistence (no cookie, nothing stored) and no cookieless_mode, which would disable replay", async () => {
+  // #919: "persistence: "sessionStorage", person_profiles: "never" unchanged".
+  test("tab-only persistence (sessionStorage, never a cookie), no person profiles, and no cookieless_mode, which would disable replay", async () => {
     await initAnalytics({ key: "test-key", pathname: "/" });
     expect(init).toHaveBeenCalledWith(
       "test-key",
       expect.objectContaining({
         api_host: "/ingest",
-        persistence: "memory",
+        persistence: "sessionStorage",
         person_profiles: "never",
       }),
     );
     const [, config] = init.mock.calls[0] as [string, Record<string, unknown>];
     expect(config).not.toHaveProperty("cookieless_mode");
+  });
+
+  // #919: the returning flag is a bare yes in localStorage, pinned for the
+  // tab with register_once so a first visit's later pages don't flip to true.
+  test("returning: false on a first visit, true on the next, and the stored note is only a yes", async () => {
+    await initAnalytics({ key: "test-key", pathname: "/" });
+    expect(register_once).toHaveBeenLastCalledWith({ returning: false });
+    expect(Object.entries(window.localStorage)).toEqual([["pfm_returning", "1"]]);
+
+    _resetAnalyticsStateForTest();
+    await initAnalytics({ key: "test-key", pathname: "/" });
+    expect(register_once).toHaveBeenLastCalledWith({ returning: true });
   });
 
   test("does not override autocapture/heatmaps/web-vitals off — leaves them to PostHog remote config", async () => {
@@ -276,5 +293,46 @@ describe("initAnalytics — moving into /admin without a reload (#861)", () => {
 
     window.history.pushState(null, "", "/");
     expect(beforeSend({ event: "$pageview" })).toBeNull();
+  });
+});
+
+describe("initAnalytics — #919 review: no persistent ID, no lost early events", () => {
+  beforeEach(() => {
+    init.mockClear();
+    capture.mockClear();
+    window.localStorage.clear();
+    _resetAnalyticsStateForTest();
+  });
+
+  test("storage refused: memory persistence, never posthog-js's localStorage+cookie fallback", async () => {
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
+    try {
+      await initAnalytics({ key: "test-key", pathname: "/" });
+    } finally {
+      setItem.mockRestore();
+    }
+    expect(init).toHaveBeenCalledWith("test-key", expect.objectContaining({ persistence: "memory" }));
+  });
+
+  test("an event tracked before init is sent once init succeeds", async () => {
+    await track(EVENTS.NEAREST_FOOD, { nearest_open_miles: 1, within_1_mile: 2 });
+    expect(capture).not.toHaveBeenCalled();
+    await initAnalytics({ key: "test-key", pathname: "/" });
+    expect(capture).toHaveBeenCalledWith(EVENTS.NEAREST_FOOD, { nearest_open_miles: 1, within_1_mile: 2 });
+  });
+
+  test.each([
+    ["/admin path", { key: "test-key", pathname: "/admin/places" }, false],
+    ["internal device", { key: "test-key", pathname: "/" }, true],
+    ["no key", { key: undefined, pathname: "/" }, false],
+  ])("an event tracked before a refused init (%s) is never sent", async (_name, options, internal) => {
+    if (internal) markInternalDevice();
+    await track(EVENTS.VENUE_OPENED, { venueId: "abc" });
+    await initAnalytics(options);
+    await track(EVENTS.VENUE_OPENED, { venueId: "abc" });
+    expect(init).not.toHaveBeenCalled();
+    expect(capture).not.toHaveBeenCalled();
   });
 });

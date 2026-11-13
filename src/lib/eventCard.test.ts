@@ -5,7 +5,8 @@
  */
 
 import { describe, expect, test } from "vitest";
-import { eventBadge, eventText, eventWhen, localizeEvent } from "@/lib/eventCard";
+import { eventAction, eventBadge, eventText, eventWhen, localizeEvent } from "@/lib/eventCard";
+import { t } from "@/lib/i18n";
 import type { PublicEventDetail } from "@/lib/events";
 
 const MIN = 60_000;
@@ -102,5 +103,38 @@ describe("eventWhen", () => {
     expect(eventWhen(ev, "en")).toEqual({ day: "Saturday, November 21", time: "10 AM – 2 PM" });
     const overnight = { starts_at: "2026-11-22T05:00:00.000Z", ends_at: "2026-11-22T09:00:00.000Z" };
     expect(eventWhen(overnight, "en").time).toContain("Sunday, November 22");
+  });
+});
+
+// #882: what the card's action button says, and the site name under it.
+describe("eventAction", () => {
+  const link = (over: Record<string, string | null> = {}) => ({
+    link_url: "https://www.facebook.com/events/1",
+    link_label: null,
+    link_label_custom: null,
+    link_label_custom_es: null,
+    ...over,
+  });
+
+  test.each([
+    ["no wording (an event saved before #882) reads as Visit website", link(), "en", t("events.card.action.website", "en")],
+    ["an unknown stored wording reads as Visit website", link({ link_label: "buy-now" }), "en", t("events.card.action.website", "en")],
+    ["a built-in wording uses its own Spanish", link({ link_label: "signup" }), "es", t("events.card.action.signup", "es")],
+    ["Custom in English", link({ link_label: "custom", link_label_custom: "Save a turkey", link_label_custom_es: "Aparta un pavo" }), "en", "Save a turkey"],
+    ["Custom in Spanish", link({ link_label: "custom", link_label_custom: "Save a turkey", link_label_custom_es: "Aparta un pavo" }), "es", "Aparta un pavo"],
+    ["Custom with no Spanish falls back to English", link({ link_label: "custom", link_label_custom: "Save a turkey" }), "es", "Save a turkey"],
+    ["Custom with no words at all reads as Visit website", link({ link_label: "custom" }), "en", t("events.card.action.website", "en")],
+  ] as const)("%s", (_name, event, locale, label) => {
+    expect(eventAction(event, locale)?.label).toBe(label);
+  });
+
+  test("the site name is the link's host without www.", () => {
+    expect(eventAction(link(), "en")?.site).toBe("facebook.com");
+    expect(eventAction(link({ link_url: "https://forms.gle/xyz" }), "en")?.site).toBe("forms.gle");
+  });
+
+  test("no button for a missing or non-http(s) link", () => {
+    expect(eventAction(link({ link_url: null }), "en")).toBeNull();
+    expect(eventAction(link({ link_url: "javascript:alert(1)" }), "en")).toBeNull();
   });
 });

@@ -86,6 +86,8 @@ describe("AdminLoginForm — signed-out: email code (#684)", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/valid email/i);
     expect(mockSendCode).not.toHaveBeenCalled();
+    // #926: focus moves to the box with the problem, not left on the button.
+    expect(screen.getByLabelText(/^email$/i)).toHaveFocus();
   });
 
   test("a send shows the same code step for any address (anti-enumeration), on the same page", async () => {
@@ -119,6 +121,7 @@ describe("AdminLoginForm — signed-out: email code (#684)", () => {
     await user.type(screen.getByLabelText(/sign-in code/i), "123456");
 
     expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(screen.getByLabelText(/sign-in code/i)).toHaveFocus();
   });
 
   test("a short code isn't sent; the Sign in button explains", async () => {
@@ -129,15 +132,21 @@ describe("AdminLoginForm — signed-out: email code (#684)", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/6-digit code/i);
     expect(mockSignInEmailOtp).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/sign-in code/i)).toHaveFocus();
   });
 
-  test("Resend code is disabled for 30 seconds after a send, then sends a new code", async () => {
+  // #926: Resend is marked busy (aria-disabled), not natively disabled, so a
+  // keyboard user's focus stays on it after pressing; presses during the
+  // countdown send nothing.
+  test("Resend code is blocked for 30 seconds after a send, then sends a new code and keeps focus", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       const user = await reachCodeStep();
       const resend = screen.getByRole("button", { name: /resend code/i });
-      expect(resend).toBeDisabled();
+      expect(resend).toHaveAttribute("aria-disabled", "true");
       expect(resend).toHaveTextContent("Resend code (30s)");
+      await user.click(resend);
+      expect(mockSendCode).toHaveBeenCalledTimes(1);
 
       // One tick per second, each flushed through React (the ticker chains timeouts).
       for (let i = 0; i < 31; i++) {
@@ -145,11 +154,15 @@ describe("AdminLoginForm — signed-out: email code (#684)", () => {
           await vi.advanceTimersByTimeAsync(1000);
         });
       }
-      await waitFor(() => expect(screen.getByRole("button", { name: /resend code/i })).not.toBeDisabled());
-      await user.click(screen.getByRole("button", { name: /resend code/i }));
+      await waitFor(() => expect(screen.getByRole("button", { name: /resend code/i })).not.toHaveAttribute("aria-disabled"));
+      screen.getByRole("button", { name: /resend code/i }).focus();
+      await user.keyboard("{Enter}");
 
       expect(mockSendCode).toHaveBeenCalledTimes(2);
-      expect(screen.getByRole("button", { name: /resend code/i })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /resend code/i })).toHaveAttribute("aria-disabled", "true");
+      expect(screen.getByRole("button", { name: /resend code/i })).toHaveFocus();
+      await user.keyboard("{Enter}");
+      expect(mockSendCode).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }
@@ -162,6 +175,8 @@ describe("AdminLoginForm — signed-out: email code (#684)", () => {
 
     expect(screen.queryByTestId("admin-login-sent")).toBeNull();
     expect((screen.getByLabelText(/^email$/i) as HTMLInputElement).value).toBe("");
+    // #926: a keyboard user lands in the email box, not at the top of the page.
+    expect(screen.getByLabelText(/^email$/i)).toHaveFocus();
   });
 
   test("an API-level error sending the code (result.error, no thrown exception) shows the error state", async () => {
@@ -174,7 +189,7 @@ describe("AdminLoginForm — signed-out: email code (#684)", () => {
     await user.type(screen.getByLabelText(/^email$/i), "kysboyd@gmail.com");
     await user.click(screen.getByRole("button", { name: /email me a code/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/something went wrong/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/code was not sent/i);
     expect(screen.queryByTestId("admin-login-sent")).toBeNull();
   });
 
@@ -186,7 +201,7 @@ describe("AdminLoginForm — signed-out: email code (#684)", () => {
     await user.type(screen.getByLabelText(/^email$/i), "kysboyd@gmail.com");
     await user.click(screen.getByRole("button", { name: /email me a code/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/something went wrong/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/code was not sent/i);
   });
 
   test("never mentions a sign-in link", () => {

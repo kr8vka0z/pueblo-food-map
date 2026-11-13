@@ -23,10 +23,11 @@
  * deliver two tokens to one queued tap; the page forms never had the phone
  * bug the rebuild fixes.
  *
- * Queued submits (a tap that lands before a token exists) stay in each form:
- * BoxCheckinPanel's queue restores a closed note form on failure and the
- * other forms' don't, so the shapes differ. `switchToFallback()` is exposed
- * because BoxCheckinPanel's 15 s no-callback timeout calls it directly.
+ * Queued submits (a tap that lands before a token exists): the two card
+ * forms share `useQueuedTurnstileSubmit` below. BoxCheckinPanel keeps its own
+ * queue because it restores a closed note form on failure and the card forms
+ * don't, so the shapes differ. `switchToFallback()` is exposed because
+ * BoxCheckinPanel's 15 s no-callback timeout calls it directly.
  *
  * The container ref is a PARAMETER, not part of the return value: the React
  * Compiler's `react-hooks/refs` lint rule flags a ref bundled into an object
@@ -34,7 +35,8 @@
  * `useRef<HTMLDivElement>(null)` and passes it in.
  *
  * Renders no <Script>: each form loads
- * https://challenges.cloudflare.com/turnstile/v0/api.js itself and passes
+ * https://challenges.cloudflare.com/turnstile/v0/api.js itself (the card
+ * forms through CardFormTurnstile) and passes
  * `mount` to `onLoad` (page forms) or `onReady` (card forms, which mount after
  * BoxCheckinPanel already loaded the script — `onLoad` fires once per
  * document, `onReady` on every mount). The mount-if-already-loaded effect
@@ -44,6 +46,12 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 export type TurnstileMode = "box" | "fallback";
+
+// A queued tap must not wait forever for a token that may never come — 15s is
+// comfortably longer than Turnstile's own typical challenge-resolution time,
+// short enough that a real visitor isn't left staring at "Sending…"
+// wondering if their tap registered. BoxCheckinPanel and the card forms.
+export const PENDING_SUBMIT_TIMEOUT_MS = 15_000;
 
 export interface UseTurnstile {
   token: string | null;
@@ -202,4 +210,53 @@ export function useTurnstile(
   }
 
   return { token, mode, error, currentMode: () => modeRef.current, mount, reset, fail, switchToFallback };
+}
+
+/**
+ * The card forms' (AdoptBoxForm, BoxAlertSignupForm) queued submit. A click
+ * before a token exists calls `queue(values)` rather than blocking the button
+ * or sending an empty token; the first effect fires `submit(values)` the
+ * instant a token arrives, and after PENDING_SUBMIT_TIMEOUT_MS with no token
+ * `onTimeout` runs (the form shows its plain error). The form itself still
+ * sets its own "submitting" state and calls `turnstile.reset()` when it
+ * queues, so a fresh token is asked for at once.
+ *
+ * ponytail: no note/state restore on failure, because these forms simply
+ * stay open (nothing is cleared until a real success), unlike a one-tap
+ * check-in button.
+ */
+export function useQueuedTurnstileSubmit<T>(
+  token: string | null,
+  submit: (values: T) => void,
+  onTimeout: () => void,
+): { queued: boolean; queue: (values: T) => void } {
+  const [pending, setPending] = useState<T | null>(null);
+
+  useEffect(() => {
+    if (!token || !pending) return;
+    const values = pending;
+    // Both the state clear AND the submit() call (which itself calls setState
+    // synchronously as its first line) are deferred to the same microtask:
+    // react-hooks/set-state-in-effect flags a synchronous setState in an
+    // effect body.
+    queueMicrotask(() => {
+      setPending(null);
+      submit(values);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- submit() closes over this render's token/form values already; re-run per pending/token change, not per render.
+  }, [token, pending]);
+
+  // No token ever arrives (widget failed to load/callback at all) — fail the
+  // queued submit rather than leaving it stuck on "Sending…" forever.
+  useEffect(() => {
+    if (!pending) return;
+    const timer = setTimeout(() => {
+      setPending(null);
+      onTimeout();
+    }, PENDING_SUBMIT_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the timer is per queued submit; onTimeout only calls stable setters.
+  }, [pending]);
+
+  return { queued: pending !== null, queue: setPending };
 }

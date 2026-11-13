@@ -23,10 +23,11 @@
  * `db` getAdminDb() returned.
  */
 
-export const ACTIVITY_TIME_ZONE = "America/Denver";
-export const DEFAULT_RANGE_DAYS = 30;
+import { TIME_ZONE, puebloLocalToUtcIso } from "@/lib/eventTime";
+
+const DEFAULT_RANGE_DAYS = 30;
 /** Rows fetched per source per page; the page offers "Show older" past it. */
-export const ACTIVITY_PAGE_SIZE = 300;
+const ACTIVITY_PAGE_SIZE = 300;
 // D1 caps bound parameters per statement at 100.
 const MAX_IN_PARAMS = 90;
 
@@ -45,7 +46,7 @@ export const ACTIVITY_TYPES: { value: ActivityType; label: string }[] = [
 export interface ActivityFilters {
   person: string;
   type: ActivityType;
-  from: string; // YYYY-MM-DD, local (ACTIVITY_TIME_ZONE)
+  from: string; // YYYY-MM-DD, local (America/Denver)
   to: string; // YYYY-MM-DD, local, inclusive
   q: string;
   /** Inclusive upper bound (ISO) for "Show older" pages; undefined on the first page. */
@@ -92,33 +93,21 @@ export interface AuditActionRow {
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
-function tzOffsetMs(instant: number): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: ACTIVITY_TIME_ZONE,
-    hourCycle: "h23",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).formatToParts(new Date(instant));
-  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
-  const asUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
-  return asUtc - Math.floor(instant / 1000) * 1000;
-}
-
-/** UTC instant (ms) of local midnight at the start of `ymd`. */
-export function localDayStartMs(ymd: string): number {
-  const [y, m, d] = ymd.split("-").map(Number);
-  const noonUtc = Date.UTC(y, m - 1, d, 12);
-  return Date.UTC(y, m - 1, d) - tzOffsetMs(noonUtc);
+/**
+ * UTC instant (ms) of local midnight at the start of `ymd`. Uses midnight's
+ * own offset: on a clock-change day noon's differs (#904). Denver changes
+ * clocks at 02:00, so midnight always exists and the conversion never fails;
+ * shiftYmd(ymd, 0) first normalises an out-of-range day like 02-30, which the
+ * filter regex lets through and the converter would reject.
+ */
+function localDayStartMs(ymd: string): number {
+  return Date.parse(puebloLocalToUtcIso(`${shiftYmd(ymd, 0)}T00:00`)!);
 }
 
 /** Local calendar date (YYYY-MM-DD) of an instant. */
 export function localYmd(instant: Date | string | number): string {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: ACTIVITY_TIME_ZONE,
+    timeZone: TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -130,7 +119,7 @@ function shiftYmd(ymd: string, days: number): string {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
-export function formatDayLabel(ymd: string): string {
+function formatDayLabel(ymd: string): string {
   const [y, m, d] = ymd.split("-").map(Number);
   return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "long", month: "short", day: "numeric", year: "numeric" }).format(
     new Date(Date.UTC(y, m - 1, d, 12)),
@@ -138,7 +127,7 @@ export function formatDayLabel(ymd: string): string {
 }
 
 export function formatTime(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone: ACTIVITY_TIME_ZONE, hour: "numeric", minute: "2-digit" }).format(new Date(iso));
+  return new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit" }).format(new Date(iso));
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +159,7 @@ export function parseActivityFilters(
 }
 
 /** [lower, upper] ISO bounds, both inclusive. */
-export function activityBounds(filters: ActivityFilters): { lower: string; upper: string } {
+function activityBounds(filters: ActivityFilters): { lower: string; upper: string } {
   const lower = new Date(localDayStartMs(filters.from)).toISOString();
   const rangeUpper = new Date(localDayStartMs(shiftYmd(filters.to, 1)) - 1).toISOString();
   const upper = filters.until && filters.until < rangeUpper ? filters.until : rangeUpper;
@@ -188,6 +177,9 @@ export function activityBounds(filters: ActivityFilters): { lower: string; upper
 // event's English name instead (venue_id stays null, so the page shows it as
 // plain text, not a venue link). The name falls back to the audit row's own
 // JSON when the event row is gone or the `events` table doesn't exist yet.
+// Public "Share an event" rows (entity 'event_submission', #883) read the same
+// way, from their audit JSON only (it carries the event's name, never the
+// sender's details).
 const EVENT_NAME_FROM_AUDIT_SQL = "COALESCE(json_extract(a.after_json, '$.name'), json_extract(a.before_json, '$.name'))";
 const EVENT_NAME_FROM_TABLE_SQL = `COALESCE((SELECT name FROM events WHERE id = a.entity_id), ${EVENT_NAME_FROM_AUDIT_SQL})`;
 
@@ -197,7 +189,7 @@ function actionSelectSql(eventsTable: boolean): string {
 SELECT * FROM (
   SELECT a.id, a.actor_email, a.entity, a.entity_id, a.action, a.before_json, a.after_json,
          a.timestamp, a.session_id, v.id AS venue_id,
-         COALESCE(v.name, CASE a.entity WHEN 'event' THEN ${eventName} END) AS venue_name,
+         COALESCE(v.name, CASE a.entity WHEN 'event' THEN ${eventName} WHEN 'event_submission' THEN ${EVENT_NAME_FROM_AUDIT_SQL} END) AS venue_name,
          EXISTS (
            SELECT 1 FROM change_proposals cp
            WHERE cp.target_venue_id = a.entity_id AND cp.status = 'approved'
@@ -218,7 +210,7 @@ SELECT * FROM (
 const ACTION_KIND_SQL = `CASE
     WHEN action = 'publish' THEN 'publish'
     WHEN action = 'archive' THEN 'removal'
-    WHEN entity IN ('box_photo', 'box_adopter') OR from_proposal = 1
+    WHEN entity IN ('box_photo', 'box_adopter', 'event_submission') OR from_proposal = 1
       OR after_json LIKE '%"event":"public_submission_marked_done"%' THEN 'approval'
     ELSE 'edit'
   END`;
@@ -230,7 +222,7 @@ const TYPE_TO_KIND: Partial<Record<ActivityType, ActionKind>> = {
   removals: "removal",
 };
 
-export async function loadActivityActions(db: D1Database, filters: ActivityFilters, limit = ACTIVITY_PAGE_SIZE): Promise<AuditActionRow[]> {
+async function loadActivityActions(db: D1Database, filters: ActivityFilters, limit = ACTIVITY_PAGE_SIZE): Promise<AuditActionRow[]> {
   if (filters.type === "sign_ins" || filters.type === "failed") return [];
   const { lower, upper } = activityBounds(filters);
   const where: string[] = [];
@@ -265,7 +257,7 @@ export async function loadActivityActions(db: D1Database, filters: ActivityFilte
   }
 }
 
-export async function loadActivityAuthEvents(db: D1Database, filters: ActivityFilters, limit = ACTIVITY_PAGE_SIZE): Promise<AuthEventRow[]> {
+async function loadActivityAuthEvents(db: D1Database, filters: ActivityFilters, limit = ACTIVITY_PAGE_SIZE): Promise<AuthEventRow[]> {
   // A place search or an action-only type narrows to actions; automatic
   // changes have no sign-ins.
   if (filters.q || filters.person === "automatic" || TYPE_TO_KIND[filters.type]) return [];
@@ -287,7 +279,7 @@ export async function loadActivityAuthEvents(db: D1Database, filters: ActivityFi
 }
 
 /** The sign-in rows heading sessions whose actions are on this page but whose sign-in isn't (earlier, or filtered out). */
-export async function loadSignInsForSessions(db: D1Database, sessionIds: string[]): Promise<AuthEventRow[]> {
+async function loadSignInsForSessions(db: D1Database, sessionIds: string[]): Promise<AuthEventRow[]> {
   const unique = [...new Set(sessionIds)];
   const rows: AuthEventRow[] = [];
   for (let i = 0; i < unique.length; i += MAX_IN_PARAMS) {
@@ -522,6 +514,12 @@ export function summarizeAction(row: AuditActionRow): ActionSummary {
     return { tag: "Cancelled event", tone: "bad", ...base };
   }
   if (row.action === "create") return { tag: "Added", tone: "good", changes: [], moreChanges: 0 };
+  // A reviewed "Share an event" submission (#883): converted or dismissed, nothing else ever happens to one.
+  if (row.entity === "event_submission") {
+    return after.status === "converted"
+      ? { tag: "Made shared event a draft", tone: "good", changes: [], moreChanges: 0 }
+      : { tag: "Dismissed shared event", tone: "neutral", changes: [], moreChanges: 0 };
+  }
   if (row.entity === "box_photo" || row.entity === "box_adopter") {
     const what = row.entity === "box_photo" ? "photo" : "sponsor";
     if (after.status === "approved") return { tag: `Approved ${what}`, tone: "good", ...base };
@@ -543,7 +541,7 @@ export function summarizeAction(row: AuditActionRow): ActionSummary {
   return { tag: "Edited", tone: "neutral", ...base };
 }
 
-export function isAutomaticActor(actor: string): boolean {
+function isAutomaticActor(actor: string): boolean {
   return !actor.includes("@");
 }
 

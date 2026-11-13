@@ -8,11 +8,11 @@
 // WHY a scoped named-type import for ExecutionContext/ExportedHandler/ScheduledController
 // (not a bare `wrangler types` full-runtime include, and not `.wrangler`'s own generated
 // runtime.d.ts, which is itself gitignored build output — absent in a fresh checkout, so
-// relying on it would only work by local-cache accident, not in CI): AGENTS.md's "Don't run
-// bare `wrangler types`" bullet documents why this app never enables wrangler's full runtime type set
-// (`wrangler types` default) — it collides Cloudflare's HTMLRewriter `Element` with
-// lib.dom's `Element` and corrupts DOM types project-wide. cloudflare-env.d.ts already
-// works around this by importing only the one runtime type it needs (`D1Database`) from
+// relying on it would only work by local-cache accident, not in CI): this app never enables
+// wrangler's full runtime type set (`wrangler types` default; see cloudflare-env.d.ts's header)
+// — it collides Cloudflare's HTMLRewriter `Element` with lib.dom's `Element` and corrupts DOM
+// types project-wide. cloudflare-env.d.ts already works around this by importing only the
+// runtime types it needs (`D1Database`, `R2Bucket`, `Fetcher`) from
 // `@cloudflare/workers-types/experimental` instead of pulling in the whole ambient set.
 // This file follows the exact same pattern for the three Workers runtime types a
 // scheduled()-handler signature needs — none of which is `Element` or collides with DOM.
@@ -44,7 +44,8 @@ export default {
       // Forward the method and body as-is, to the PostHog host+path, with only
       // the allowlisted headers (#858): every incoming header used to go along,
       // the sign-in cookie included. ingestRequest (src/lib/ingestTarget.ts)
-      // holds the list and its test. `redirect: "manual"` isn't needed —
+      // holds the list and its test, and adds our Origin and the visitor IP
+      // (from CF-Connecting-IP) that replay and the city lookup need (#919). `redirect: "manual"` isn't needed —
       // PostHog's ingest/assets endpoints don't redirect under normal operation.
       //
       // WHY the cast: `request` is typed via @cloudflare/workers-types (see

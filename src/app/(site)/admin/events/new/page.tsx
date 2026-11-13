@@ -4,37 +4,66 @@
  * /admin/venues/new. If the venue list can't be read the form still works
  * with a typed address (venues is an older table than events, so this is
  * defensive only).
+ *
+ * `?from=<submissionId>` (#883): "Make it a draft event" on a public
+ * submission whose address couldn't be located lands here, the form filled
+ * from that submission with the address typed and the pin unset, for the
+ * admin to locate. A submission that is no longer pending opens the plain
+ * empty form (the save would 409 anyway).
  */
 
 import { headers } from "next/headers";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
-import { loadAdminNavCounts, type AdminNavCounts } from "@/lib/adminNavCounts";
+import { loadAdminNavCounts } from "@/lib/adminNavCounts";
 import { loadVenueChoices, type VenueChoice } from "@/lib/adminEventReads";
 import AdminNav from "@/components/AdminNav";
-import EventForm from "@/components/EventForm";
+import EventForm, { type EventFormValues } from "@/components/EventForm";
+import { loadPendingEventSubmission, parseSubmissionPayload } from "@/lib/eventSubmissions";
+import { utcIsoToPuebloLocal } from "@/lib/eventTime";
+import { formPageBodyClass, pageTitleClass } from "@/lib/adminCardStyles";
 
-export default async function NewEventPage() {
-  let email: string;
-  let showActivity = false;
-  let venues: VenueChoice[] = [];
-  let navCounts: AdminNavCounts;
-
-  try {
-    const { db, identity } = await getAdminDb(await headers());
-    email = identity.email;
-    showActivity = identity.isOwner === true;
-    [venues, navCounts] = await Promise.all([loadVenueChoices(db).catch(() => [] as VenueChoice[]), loadAdminNavCounts(db)]);
-  } catch (err) {
-    handlePageAuthError(err);
-  }
+export default async function NewEventPage({ searchParams }: { searchParams?: Promise<{ from?: string }> }) {
+  const { from } = searchParams ? await searchParams : {};
+  const { db, identity } = await getAdminDb(await headers()).catch(handlePageAuthError);
+  const [venues, navCounts] = await Promise.all([loadVenueChoices(db).catch(() => [] as VenueChoice[]), loadAdminNavCounts(db)]);
+  const sub = from ? await loadPendingEventSubmission(db, from).catch(() => null) : null;
+  const p = sub ? parseSubmissionPayload(sub.payload) : null;
+  const fromSubmission: { id: string; values: Partial<EventFormValues> } | null =
+    sub && p
+      ? {
+          id: sub.id,
+          values: {
+            name: p.name,
+            host: p.host,
+            description: p.description,
+            whatToBring: p.whatToBring ?? "",
+            startsLocal: utcIsoToPuebloLocal(p.startsAt),
+            endsLocal: utcIsoToPuebloLocal(p.endsAt),
+            address: p.address,
+            venueName: p.venueName ?? "",
+            linkUrl: p.linkUrl ?? "",
+            linkLabel: p.linkLabel,
+          },
+        }
+      : null;
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="events" counts={navCounts} showActivity={showActivity} />
-      <div className="space-y-6 px-4 py-6 sm:px-6">
-        <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Add event</h2>
-        <EventForm venues={venues} />
+      <AdminNav email={identity.email} active="events" counts={navCounts} showActivity={identity.isOwner === true} />
+      <div className={formPageBodyClass}>
+        <h2 className={pageTitleClass}>Add event</h2>
+        {/* WHY a notice inside the form, not a line under the title: admin page titles carry no subtitle (#926 decision 5). */}
+        <EventForm
+          venues={venues}
+          initialValues={fromSubmission?.values}
+          submissionId={fromSubmission?.id}
+          notice={
+            fromSubmission
+              ? "Sent in by the public. We couldn’t find the address on the map: press Find location or pick a place, then save the draft. The flyer is added when you save."
+              : undefined
+          }
+        />
       </div>
     </main>
   );

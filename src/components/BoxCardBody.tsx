@@ -25,10 +25,6 @@
  * caller's container (vaul's `Drawer.Content` deliberately has none — see
  * that component's own note on the drag-to-dismiss risk).
  *
- * `headingLevel` (default "h2") lets `BoxHistoryContent` ask for this card's
- * own name to render as the page's `<h1>` instead of duplicating a second
- * heading above it — see that component for the caller-side half of this.
- *
  * No orange "Directions" button, no Walk/Bus/Drive row — deviation from a
  * literal reading of the original task brief, resolved via `advisor()`
  * mid-build (2026-09-19). `DirectionButtons.tsx` (Walk/Bus/Drive) has
@@ -41,9 +37,9 @@
  * result and asked to KEEP the in-app walking route (2026-09-19, walk
  * restore pass): the address stays the one visible control (no icon, no
  * extra row) but now DOUBLES as that Walk trigger when a map is present.
- * `walk` presence is the switch: absent (BoxHistoryContent, no map
- * to draw a route on) → the address is a plain external `<a>` to Google
- * Maps, unchanged from before. Present (BottomSheet/DesktopVenueWindow,
+ * `walk` presence is the switch: absent (no live caller today — both pass
+ * it; only some tests omit it) → the address is a plain external `<a>` to
+ * Google Maps, unchanged from before. Present (BottomSheet/DesktopVenueWindow,
  * the `walk` object MapWrapper builds with `useWalkingRoute`'s `walkFor`) → the address
  * is a `<button>` that fires the SAME callback, geolocation-request, and
  * location-hint behavior DirectionButtons' own Walk button uses for every
@@ -52,7 +48,7 @@
  * `DirectionButtons.tsx`'s exported `WalkRouteStatus` — extracted from that
  * file's own JSX (not duplicated) specifically so this restore could reuse
  * it byte-for-byte. The address `<a>`/`<button>` both build their href/
- * click target via `DirectionButtons.tsx`'s own exported `googleMapsUrl()`
+ * click target via `googleMapsUrl()` (src/lib/googleMapsUrl.ts)
  * (its `travelmode` param optional since the fix pass, item 4) — one URL
  * builder either way; the inactive/link form still omits travel mode
  * entirely (many visitors walk or ride the bus and Google Maps lets them
@@ -92,9 +88,10 @@ import BoxCheckinPanel from "@/components/BoxCheckinPanel";
 import AdoptBoxForm from "@/components/AdoptBoxForm";
 import BoxAlertSignupForm from "@/components/BoxAlertSignupForm";
 import PhotoViewer from "@/components/PhotoViewer";
-import { googleMapsUrl, WalkRouteStatus } from "@/components/DirectionButtons";
+import { WalkRouteStatus } from "@/components/DirectionButtons";
+import { googleMapsUrl } from "@/lib/googleMapsUrl";
 import type { Walk } from "@/lib/useWalkingRoute";
-import { categoryColors } from "@/lib/categories";
+import CategoryLabel from "@/components/CategoryLabel";
 import {
   STATUS_DOT_CLASS,
   STATUS_TEXT_CLASS,
@@ -106,8 +103,8 @@ import {
 interface BoxCardBodyProps {
   box: PublicBlessingBox;
   /**
-   * Default "default" — the photo-first order `DesktopVenueWindow` and
-   * `BoxHistoryContent` render. "sheet" is BottomSheet's own
+   * Default "default" — the photo-first order `DesktopVenueWindow`
+   * renders. "sheet" is BottomSheet's own
    * mobile redesign (#667): name -> inline status -> address -> most
    * needed -> host note -> check-in panel render first and unclipped;
    * photo, the sponsor band and the footer links move below a clipped
@@ -121,23 +118,21 @@ interface BoxCardBodyProps {
   /** "sheet" layout only — DOM id for the below-the-fold wrapper, so BottomSheet's grab bar `aria-controls` can point at it (mirrors the ordinary-venue detail section's own id). */
   detailSectionId?: string;
   onCheckinSuccess?: (result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => void;
-  /** See this file's own header. Default true — hidden only where a caller already provides an equivalent link elsewhere (DesktopVenueWindow's header, the history page itself). */
+  /** See this file's own header. Default true — hidden only where a caller already provides an equivalent link elsewhere (DesktopVenueWindow's header). */
   showHistoryLink?: boolean;
-  /** Default "h2" — BoxHistoryContent passes "h1" so the card's own name serves as that page's page-level heading instead of a duplicate. */
-  headingLevel?: "h1" | "h2";
   /** Outer-wrapper passthrough (e.g. BottomSheet's safe-area bottom padding). */
   className?: string;
   /** Corner-radius classes for the photo's own top edge — put on the <img> itself rather than a caller's overflow-hidden wrapper. Default "" (DesktopVenueWindow's container already clips via its own overflow-hidden). */
   photoRadiusClassName?: string;
   /** Rendered to the right of the name (Share/Favorite/Close, owned by the caller — different per caller, see BottomSheet/DesktopVenueWindow). */
   actions?: React.ReactNode;
-  /** DOM id for the name heading (fix pass, 2026-09-19, BLOCKER). DesktopVenueWindow's outer `role="dialog"` points `aria-labelledby` at `venue-window-title-<id>` — before BoxCardBody owned the whole card, that id lived on a header-rendered heading; now it has to live on THIS component's own name heading, or the dialog's accessible name dangles (points at no element) for every box. Optional/undefined elsewhere (BottomSheet uses a Drawer.Title instead, and BoxHistoryContent's page has no such dialog role to satisfy). */
+  /** DOM id for the name heading (fix pass, 2026-09-19, BLOCKER). DesktopVenueWindow's outer `role="dialog"` points `aria-labelledby` at `venue-window-title-<id>` — before BoxCardBody owned the whole card, that id lived on a header-rendered heading; now it has to live on THIS component's own name heading, or the dialog's accessible name dangles (points at no element) for every box. Optional/undefined elsewhere (BottomSheet uses a Drawer.Title instead). */
   nameId?: string;
   /**
    * In-app walking directions (walk restore pass, 2026-09-19) — see this
    * file's own header for the full rationale. Absent (default): the address
-   * renders as a plain external `<a>` to Google Maps (BoxHistoryContent — no
-   * map on that page to draw a route on). Present: the address becomes a
+   * renders as a plain external `<a>` to Google Maps (no live caller omits
+   * it today). Present: the address becomes a
    * `<button>` calling `walk.onWalk(box)`, the SAME callback DirectionButtons'
    * own Walk button uses (it self-toggles off on a second tap), and the
    * active-route readout renders below it.
@@ -287,7 +282,6 @@ export default function BoxCardBody({
   detailSectionId,
   onCheckinSuccess,
   showHistoryLink = true,
-  headingLevel = "h2",
   className = "",
   photoRadiusClassName = "",
   actions,
@@ -315,39 +309,33 @@ export default function BoxCardBody({
   // there's no admin text at all (task spec: "if the box's admin-typed
   // most_needed is set — show it exactly as today (admin wins)").
   const neededFromVisitors = mostNeededChips.length === 0 ? (box.box.neededFromVisitors ?? []) : [];
-  const NameTag = headingLevel;
 
   // ── Blocks — each defined once, ordered per layout below ────────────────
   // (#725: the two layouts used to be two full copies of the same markup.)
 
-  // Badge + actions, then name (#515 fix pass, 2026-09-19): the name gets its
-  // own row so it can run the card's full width instead of the column left
-  // beside the actions. gap-4 keeps 8px between the actions' 48px hit areas (#233).
+  // Action row, then name, then label (#917, DESIGN.md R3/R4): Share and Save
+  // sit at the row's left, 12px above the name, the same row as on a place
+  // card, so the name runs the card's full width. gap-4 keeps 8px between the
+  // actions' 48px hit areas (#233). The label is raspberry words under the
+  // name, 4px below it, no pill.
   const nameBlock = (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2">
-        <span
-          className="inline-block rounded-full px-2.5 py-1 text-[11px] font-semibold text-[var(--color-bone-50)]"
-          style={{ backgroundColor: categoryColors[box.category] }}
-        >
-          {t("category.full.blessing_box", locale)}
-        </span>
-        {actions && <div className="flex shrink-0 items-center gap-4">{actions}</div>}
-      </div>
-      <NameTag
+    <div className="flex flex-col">
+      {actions && <div className="mb-3 flex items-center gap-4">{actions}</div>}
+      <h2
         id={nameId}
         className="text-xl font-normal leading-tight text-[var(--color-ink-900)]"
         style={{ fontFamily: "var(--font-display)" }}
       >
         {box.name}
-      </NameTag>
+      </h2>
+      <CategoryLabel category={box.category} label={t("category.full.blessing_box", locale)} className="mt-1 text-sm" />
     </div>
   );
 
   // Address — the text itself is the directions link/trigger (mockup v3,
   // option B — Kyle's pick, no icon, no button row). See this file's own
-  // header for the walk-restore rationale. `walk` absent (BoxHistoryContent,
-  // no map on that page): plain external `<a>` to Google Maps with NO preset
+  // header for the walk-restore rationale. `walk` absent (no live caller
+  // today): plain external `<a>` to Google Maps with NO preset
   // travelmode (fix pass, item 4 — many box visitors walk or ride the bus).
   // `walk` present: a `<button>` starting the SAME in-app walking route
   // DirectionButtons' Walk button does, styled identically, and its visible
@@ -528,7 +516,9 @@ export default function BoxCardBody({
       <div className={`flex flex-col gap-3 ${className}`}>
         {/* First view: always rendered, never clipped — everything a visitor
             needs to report the box's status is one tap away (#667). */}
-        <div className="flex flex-col gap-3 px-4 pt-3 pb-1">
+        {/* No top padding (#917 round 3): the action row's 48px tap boxes
+            meet the grab bar's edge to edge, as on a place card. */}
+        <div className="flex flex-col gap-3 px-4 pb-1">
           {nameBlock}
           {/* Status pill ALWAYS inline here (#667 item 4), directly under the name. */}
           <StatusPill box={box} locale={locale} overlay={false} />
@@ -539,18 +529,19 @@ export default function BoxCardBody({
         </div>
 
         {/* Below the fold (#667 items 9-13): the photo (or the sponsor band)
-            peeks above a bottom-edge fade when collapsed. BottomSheet owns
-            `expanded`/`onRequestExpand`; no status pill overlay here — it
-            already rendered inline above. */}
+            peeks at the screen edge when collapsed — since #882 the sheet
+            slides (vaul snap points) and this keeps its full height, no clip
+            or fade; `data-peek-px` is how much the collapsed sheet shows.
+            BottomSheet owns `expanded`/`onRequestExpand`; no status pill
+            overlay here — it already rendered inline above. */}
         <div
           id={detailSectionId}
+          data-peek-px="96"
           onClick={!expanded ? onRequestExpand : undefined}
-          className={
-            "relative flex flex-col gap-3 " + (expanded ? "" : "max-h-24 overflow-hidden cursor-pointer")
-          }
+          className={"relative flex flex-col gap-3 " + (expanded ? "" : "cursor-pointer")}
         >
-          {/* `inert` while collapsed (#683 review): clipped controls must not
-              be reachable by Tab or a screen reader, and a tap still falls
+          {/* `inert` while collapsed (#683 review): half-shown controls must
+              not be reachable by Tab or a screen reader, and a tap still falls
               through to the wrapper's expand handler. */}
           <div className="contents" inert={!expanded}>
             {photo()}
@@ -559,19 +550,12 @@ export default function BoxCardBody({
               {footerBlock}
             </div>
           </div>
-
-          {!expanded && (
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-b from-transparent to-[var(--color-bone-50)]"
-            />
-          )}
         </div>
       </div>
     );
   }
 
-  // ── Default layout — desktop panel and the box history page ─────────────
+  // ── Default layout — desktop panel (DesktopVenueWindow) ─────────────────
   // Photo first, full-bleed, with the status pill overlaid; no photo -> a
   // plain inline pill instead, never a placeholder image.
   return (

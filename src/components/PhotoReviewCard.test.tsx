@@ -64,10 +64,16 @@ describe("PhotoReviewCard — pending photo", () => {
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
   });
 
-  test("shows the attached check-in kind when present", () => {
-    render(<PhotoReviewCard photo={makePhoto({ checkin_id: 5, checkin_kind: "filled" })} />);
+  // #926: the Check-ins list's words, never the stored code.
+  test.each([
+    ["filled", "Filled"],
+    ["took", "Used the box"],
+    ["problem", "Problem report"],
+  ])("shows the attached check-in kind %s as %s", (kind, label) => {
+    render(<PhotoReviewCard photo={makePhoto({ checkin_id: 5, checkin_kind: kind })} />);
     expect(screen.getByText(/Attached to check-in/)).toBeInTheDocument();
-    expect(screen.getByText("filled")).toBeInTheDocument();
+    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(screen.queryByText(kind)).toBeNull();
   });
 
   test("Approve: POSTs to the approve route and refreshes on success", async () => {
@@ -88,7 +94,7 @@ describe("PhotoReviewCard — pending photo", () => {
 
     await user.click(screen.getByRole("button", { name: "Approve" }));
 
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Something went wrong. Try again."));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("The photo was not approved. Try again."));
     expect(mockRefresh).not.toHaveBeenCalled();
   });
 

@@ -11,6 +11,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-13
+
+### New
+
+- Anyone can now send in a food event from a new "Share an event" page, with a live preview of the event card, and an admin reviews it before it appears on the map. ([#886](https://github.com/kr8vka0z/pueblo-food-map/pull/886))
+- Event cards have a customizable action button (such as Sign up, Tickets or Donate) and show the venue name next to the address. ([#884](https://github.com/kr8vka0z/pueblo-food-map/pull/884))
+
+### Improved
+
+- The public site has a refreshed look, with softer hover colors, a Call, Website, Share and Save row on each place card, switch-style filters with counts, and smoother sliding panels. ([#918](https://github.com/kr8vka0z/pueblo-food-map/pull/918), [#922](https://github.com/kr8vka0z/pueblo-food-map/pull/922))
+- On phones, the place card now slides up and scrolls in one smooth swipe, like other maps apps. ([#925](https://github.com/kr8vka0z/pueblo-food-map/pull/925))
+- Every admin page has a new, consistent look with larger buttons and easier-to-read fields. ([#930](https://github.com/kr8vka0z/pueblo-food-map/pull/930))
+- Search results show clearer titles, such as which stores accept SNAP/EBT, and the map gives up on finding your location sooner. ([#924](https://github.com/kr8vka0z/pueblo-food-map/pull/924))
+
+### Fixed
+
+- The home screen no longer jumps around while loading on phones. ([#924](https://github.com/kr8vka0z/pueblo-food-map/pull/924))
+- The weekly venue data refresh works again after failing for two weeks. ([#892](https://github.com/kr8vka0z/pueblo-food-map/pull/892))
+- Fourteen small problems are fixed, including walking directions shifting when your location updates, "Back to map" on Spanish pages, buttons that stayed active during a photo upload, and a wrong "no longer valid" message on alert links. ([#906](https://github.com/kr8vka0z/pueblo-food-map/pull/906))
+- Admins' reasons for rejecting a suggestion are now saved, and the Activity log shows the right day on clock-change days. ([#905](https://github.com/kr8vka0z/pueblo-food-map/pull/905))
+
 ## [1.4.1] - 2026-11-05
 
 ### Fixed

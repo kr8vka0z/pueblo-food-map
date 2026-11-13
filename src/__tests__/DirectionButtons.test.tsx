@@ -80,98 +80,54 @@ describe("DirectionButtons — Walk button", () => {
   });
 });
 
-describe("DirectionButtons — Bus deeplink", () => {
-  test("Bus link opens in a new tab", () => {
+// Bus and Drive are the same Google Maps deeplink with a different travelmode.
+describe.each([
+  { mode: "Bus", name: /bus/i, travelmode: "transit" },
+  { mode: "Drive", name: /drive/i, travelmode: "driving" },
+])("DirectionButtons — $mode deeplink", ({ mode, name, travelmode }) => {
+  test(`${mode} link opens in a new tab`, () => {
     render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" />);
-    const link = screen.getByRole("link", { name: /bus/i }) as HTMLAnchorElement;
+    const link = screen.getByRole("link", { name }) as HTMLAnchorElement;
     expect(link.target).toBe("_blank");
   });
 
-  test("Bus link has rel=noopener noreferrer", () => {
+  test(`${mode} link has rel=noopener noreferrer`, () => {
     render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" />);
-    const link = screen.getByRole("link", { name: /bus/i }) as HTMLAnchorElement;
+    const link = screen.getByRole("link", { name }) as HTMLAnchorElement;
     expect(link.rel).toContain("noopener");
     expect(link.rel).toContain("noreferrer");
   });
 
-  test("Bus link destination is venue lat,lng", () => {
+  test(`${mode} link destination is venue lat,lng`, () => {
     const venue = makeVenue({ lat: 38.2544, lng: -104.6091 });
     render(<DirectionButtons venue={venue} onWalk={vi.fn()} locale="en" />);
-    const link = screen.getByRole("link", { name: /bus/i }) as HTMLAnchorElement;
+    const link = screen.getByRole("link", { name }) as HTMLAnchorElement;
     // URLSearchParams encodes commas as %2C; decode before asserting
     const decoded = decodeURIComponent(link.href);
     expect(decoded).toContain("destination=38.2544,-104.6091");
   });
 
-  test("Bus link uses travelmode=transit", () => {
+  test(`${mode} link uses travelmode=${travelmode}`, () => {
     render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" />);
-    const link = screen.getByRole("link", { name: /bus/i }) as HTMLAnchorElement;
-    expect(link.href).toContain("travelmode=transit");
+    const link = screen.getByRole("link", { name }) as HTMLAnchorElement;
+    expect(link.href).toContain(`travelmode=${travelmode}`);
   });
 
-  test("Bus link includes api=1 (required for params)", () => {
+  test(`${mode} link includes api=1 (required for params)`, () => {
     render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" />);
-    const link = screen.getByRole("link", { name: /bus/i }) as HTMLAnchorElement;
+    const link = screen.getByRole("link", { name }) as HTMLAnchorElement;
     expect(link.href).toContain("api=1");
   });
 
-  test("Bus link omits origin (uses user current location)", () => {
+  test(`${mode} link omits origin (uses user current location)`, () => {
     render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" />);
-    const link = screen.getByRole("link", { name: /bus/i }) as HTMLAnchorElement;
+    const link = screen.getByRole("link", { name }) as HTMLAnchorElement;
     expect(link.href).not.toContain("origin=");
   });
 
-  test("Bus link does NOT include dir_action=navigate", () => {
+  test(`${mode} link does NOT include dir_action=navigate`, () => {
     render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" />);
-    const link = screen.getByRole("link", { name: /bus/i }) as HTMLAnchorElement;
-    expect(link.href).not.toContain("dir_action");
-  });
-});
-
-describe("DirectionButtons — Drive deeplink", () => {
-  test("Drive link opens in a new tab", () => {
-    render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" />);
-    const link = screen.getByRole("link", { name: /drive/i }) as HTMLAnchorElement;
-    expect(link.target).toBe("_blank");
-  });
-
-  test("Drive link has rel=noopener noreferrer", () => {
-    render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" />);
-    const link = screen.getByRole("link", { name: /drive/i }) as HTMLAnchorElement;
-    expect(link.rel).toContain("noopener");
-    expect(link.rel).toContain("noreferrer");
-  });
-
-  test("Drive link destination is venue lat,lng", () => {
-    const venue = makeVenue({ lat: 38.2544, lng: -104.6091 });
-    render(<DirectionButtons venue={venue} onWalk={vi.fn()} locale="en" />);
-    const link = screen.getByRole("link", { name: /drive/i }) as HTMLAnchorElement;
-    // URLSearchParams encodes commas as %2C; decode before asserting
-    const decoded = decodeURIComponent(link.href);
-    expect(decoded).toContain("destination=38.2544,-104.6091");
-  });
-
-  test("Drive link uses travelmode=driving", () => {
-    render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" />);
-    const link = screen.getByRole("link", { name: /drive/i }) as HTMLAnchorElement;
-    expect(link.href).toContain("travelmode=driving");
-  });
-
-  test("Drive link includes api=1 (required for params)", () => {
-    render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" />);
-    const link = screen.getByRole("link", { name: /drive/i }) as HTMLAnchorElement;
-    expect(link.href).toContain("api=1");
-  });
-
-  test("Drive link omits origin (uses user current location)", () => {
-    render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" />);
-    const link = screen.getByRole("link", { name: /drive/i }) as HTMLAnchorElement;
-    expect(link.href).not.toContain("origin=");
-  });
-
-  test("Drive link does NOT include dir_action=navigate", () => {
-    render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" />);
-    const link = screen.getByRole("link", { name: /drive/i }) as HTMLAnchorElement;
+    const link = screen.getByRole("link", { name }) as HTMLAnchorElement;
     expect(link.href).not.toContain("dir_action");
   });
 });
@@ -908,6 +864,7 @@ describe("DirectionButtons — analytics", () => {
     expect(track).toHaveBeenCalledWith(EVENTS.DIRECTIONS_CLICKED, {
       mode: "walk",
       venueId: venue.id,
+      surface: "map",
     });
   });
 
@@ -935,6 +892,7 @@ describe("DirectionButtons — analytics", () => {
     expect(track).toHaveBeenCalledWith(EVENTS.DIRECTIONS_CLICKED, {
       mode: "bus",
       venueId: venue.id,
+      surface: "map",
     });
   });
 
@@ -946,6 +904,7 @@ describe("DirectionButtons — analytics", () => {
     expect(track).toHaveBeenCalledWith(EVENTS.DIRECTIONS_CLICKED, {
       mode: "drive",
       venueId: venue.id,
+      surface: "map",
     });
   });
 });

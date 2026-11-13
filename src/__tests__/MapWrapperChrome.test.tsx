@@ -1,9 +1,5 @@
 /**
- * MapWrapper chrome layout tests — issues #97, #96, #99, #109
- *
- * #97: Wordmark is in the top-left cluster. EN/ES toggle was here but moved
- *      to the hamburger menu in #109 — top-left cluster now holds only the Wordmark.
- * #109: EN/ES toggle is in the hamburger menu (covered in HamburgerMenu.test.tsx).
+ * MapWrapper chrome tests — SearchBar's combobox wiring.
  *
  * The old #95 CategoryDropdown + SearchBar filterChip coverage that used to
  * live here was replaced by #513 (Filters button + FilterPanel) —
@@ -16,70 +12,7 @@
 
 import { describe, test, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { LocaleProvider } from "@/lib/LocaleContext";
-import Wordmark from "@/components/Wordmark";
 import SearchBar from "@/components/SearchBar";
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function renderTopLeftCluster() {
-  return render(
-    <LocaleProvider>
-      {/* Simulate the top-left container from MapWrapper (#109: toggle removed) */}
-      <div
-        data-testid="top-left-cluster"
-        style={{ position: "absolute", top: 16, left: 16, display: "flex", gap: 8, alignItems: "center" }}
-      >
-        <Wordmark onClick={vi.fn()} locale="en" size="sm" selfPositioned={false} />
-      </div>
-    </LocaleProvider>,
-  );
-}
-
-// ─── #97 / #109: Top-left cluster contains Wordmark (toggle moved to hamburger menu) ───
-
-describe("#97/#109 — top-left cluster contains Wordmark; language toggle is in hamburger menu", () => {
-  test("Wordmark renders inside the top-left container", () => {
-    renderTopLeftCluster();
-    const cluster = screen.getByTestId("top-left-cluster");
-    const wordmark = screen.getByRole("button", { name: /Pueblo Food Map/i });
-    expect(cluster.contains(wordmark)).toBe(true);
-  });
-
-  test("EN/ES toggle buttons are NOT in the top-left cluster (#109)", () => {
-    renderTopLeftCluster();
-    // After #109, language toggle is not in the top-left cluster
-    expect(screen.queryByRole("button", { name: /english/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /spanish/i })).toBeNull();
-  });
-
-  test("Wordmark does NOT carry absolute positioning classes when selfPositioned=false", () => {
-    const { container } = render(
-      <LocaleProvider>
-        <Wordmark onClick={vi.fn()} locale="en" size="sm" selfPositioned={false} />
-      </LocaleProvider>,
-    );
-    const btn = container.querySelector("button");
-    expect(btn).not.toBeNull();
-    // Should NOT have self-positioning classes
-    expect(btn!.className).not.toMatch(/\babsolute\b/);
-    expect(btn!.className).not.toMatch(/\btop-4\b/);
-    expect(btn!.className).not.toMatch(/\bleft-4\b/);
-  });
-
-  test("Wordmark retains absolute positioning classes when selfPositioned=true (default)", () => {
-    const { container } = render(
-      <LocaleProvider>
-        <Wordmark onClick={vi.fn()} locale="en" size="sm" />
-      </LocaleProvider>,
-    );
-    const btn = container.querySelector("button");
-    expect(btn).not.toBeNull();
-    expect(btn!.className).toMatch(/\babsolute\b/);
-    expect(btn!.className).toMatch(/\btop-4\b/);
-    expect(btn!.className).toMatch(/\bleft-4\b/);
-  });
-});
 
 // ─── a11y fix: combobox aria-controls switches per active listbox ─────────────
 //

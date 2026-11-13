@@ -25,18 +25,18 @@ export type Locale = "en" | "es";
 const enClient: Record<string, string> = {
   // App
   "app.name": "Pueblo Food Map",
-  // Homepage <title> (#589) — the ONE page whose SSR title isn't run through
-  // layout.tsx's "%s · Pueblo Food Map" template (it equals the layout
-  // default verbatim), so this holds the FULL string per locale rather than
-  // a short title + pageDocumentTitle() suffix like every other page.
-  "app.documentTitle": "Pueblo Food Map — Food Resources in Pueblo County, CO",
+  // Homepage <title> (#589), set client-side by MapWrapper. The homepage's
+  // SSR title is absolute (buildPageMetadata absoluteTitle, #921: the layout's
+  // "%s · Pueblo Food Map" template doubled the brand), so this holds the
+  // FULL string, the same as meta.home.title.
+  "app.documentTitle": "Pueblo Food Map · Free Food, Pantries and SNAP Stores in Pueblo County, CO",
 
   // Per-page <title>/<meta description> for /, /about, /resources and
   // /venues. Both trees read these keys (the EN page.tsx with "en", the /es
   // thin wrapper with "es", #689 PR 2), the same way the SEO hub pages do,
   // so the two languages can't drift apart and the ES side gets the same
   // native-speaker [CHECK] review as every other locale-facing string.
-  "meta.home.title": "Pueblo Food Map — Food Resources in Pueblo County, CO",
+  "meta.home.title": "Pueblo Food Map · Free Food, Pantries and SNAP Stores in Pueblo County, CO",
   "meta.home.description":
     "Find free and low-cost food near you in Pueblo County, CO — pantries, community gardens, grocery stores, and meal sites, with SNAP/WIC info and directions.",
 
@@ -138,8 +138,6 @@ const enClient: Record<string, string> = {
   "empty.tryCategoryInstead": "Try a category instead:",
   "empty.showCategoryAria": "Show {label} places",
 
-  // Sponsor credit (#69)
-
   // Operator attribution (#63)
   "operator.operated_by": "Operated by",
 
@@ -162,9 +160,6 @@ const enClient: Record<string, string> = {
   "locationCard.failed.body.unavailable": "Your phone couldn't work out where you are right now.",
   "locationCard.tapPin": "Tap any pin on the map to see hours and directions.",
   "locationCard.retry": "Try again",
-
-  // Wordmark (#61)
-  "wordmark.ariaLabel": "Pueblo Food Map — reset map view",
 
   // Search typeahead (#67)
   "typeahead.matchCount": "{count} places match",
@@ -325,6 +320,12 @@ const enClient: Record<string, string> = {
   "share.labelGeneric": "Share this place",
   "share.copied": "Link copied",
 
+  // Card action row (#917): Call and Website, and why one is greyed.
+  "action.call": "Call {phone}",
+  "action.noPhone": "No phone number listed",
+  "action.website": "Visit {name}'s website (opens in a new tab)",
+  "action.noWebsite": "No website listed",
+
   // View switch — search-bar suggestion row + Menu line (#514). Replaces the
   // old in-bar ViewToggle (#129/#191, removed): switching map/list now goes
   // through one line under an empty, focused search bar, a "See all N
@@ -419,7 +420,15 @@ const enClient: Record<string, string> = {
   "events.card.shareCopied": "Link copied",
   "events.card.shareManual": "Sharing isn't available here. Copy this link:",
   "events.card.calendar": "Add to calendar",
-  "events.card.moreInfo": "More information",
+  // Action button wording (#882), one per events.link_label (eventAction in eventCard.ts).
+  "events.card.action.website": "Visit website",
+  "events.card.action.signup": "Sign up",
+  "events.card.action.tickets": "Get tickets",
+  "events.card.action.rsvp": "RSVP",
+  "events.card.action.volunteer": "Volunteer",
+  "events.card.action.donate": "Donate",
+  "events.card.actionAria": "{label}, {site} (opens in a new tab)",
+  "events.card.readMore": "Read more",
   "events.card.seeOpenNow": "See places open now",
   "events.card.endedHelp": "Looking for food today? See what is open right now.",
   "events.card.cancelledNoNote": "This event will not take place.",
@@ -441,6 +450,85 @@ const enClient: Record<string, string> = {
   "events.filter.showResults.one": "Show {count} event",
   "events.filter.showResults.other": "Show {count} events",
   "events.list.emptyAction": "Show places again",
+  // Share an event (#883): the public form, its live card preview and links to it.
+  "events.card.preview.name": "Your event's name",
+  "events.card.preview.host": "Add who's hosting it",
+  "events.card.preview.when": "Add a date and time",
+  "events.card.preview.about": "Say what the event is",
+  "events.card.preview.where": "Add an address",
+  "events.card.preview.link": "Add a link to show this button",
+  "menu.shareEvent": "Share an event",
+  "events.list.share": "Share an event",
+  "shareEvent.title": "Share an event",
+  "shareEvent.documentTitle": "Share an Event",
+  "shareEvent.subtitle": "Holding a food event you'd like on the map? Send us the details and we'll be in touch.",
+  "shareEvent.section.event": "The event",
+  "shareEvent.section.where": "Where",
+  "shareEvent.section.link": "Link and flyer",
+  "shareEvent.section.you": "About you",
+  "shareEvent.name.label": "Event name",
+  "shareEvent.name.placeholder": "e.g. Thanksgiving Turkey Giveaway",
+  "shareEvent.host.label": "Who's hosting it?",
+  "shareEvent.host.placeholder": "e.g. St. Mary's Church",
+  "shareEvent.date.label": "Date",
+  "shareEvent.start.label": "Starts",
+  "shareEvent.end.label": "Ends",
+  "shareEvent.timeHint": "Times are Pueblo time.",
+  "shareEvent.description.label": "What is it?",
+  "shareEvent.description.placeholder": "e.g. Free turkeys and sides for families while supplies last.",
+  "shareEvent.bring.label": "What should people bring? (optional)",
+  "shareEvent.bring.placeholder": "e.g. bags, ID, a cooler",
+  "shareEvent.venueName.label": "Place name (optional)",
+  "shareEvent.venueName.placeholder": "e.g. St. Mary's Church hall",
+  "shareEvent.address.label": "Street address",
+  "shareEvent.address.placeholder": "e.g. 123 Main St, Pueblo",
+  "shareEvent.address.checking": "Checking the address…",
+  "shareEvent.address.found": "Found: {address}",
+  "shareEvent.address.notFound": "We couldn't find that address. Please check it.",
+  "shareEvent.address.choose": "Which one is it? Tap the right address:",
+  "shareEvent.link.label": "Link (optional)",
+  "shareEvent.link.placeholder": "https://example.org",
+  "shareEvent.link.hint": "A web page for the event, like a sign-up form.",
+  "shareEvent.linkLabel.label": "What should the button say?",
+  "shareEvent.flyer.label": "Flyer (optional)",
+  "shareEvent.flyer.hint": "One picture: JPEG, PNG or WebP.",
+  "shareEvent.flyer.uploading": "Adding your flyer…",
+  "shareEvent.flyer.remove": "Remove flyer",
+  "shareEvent.flyer.errorType": "That file isn't a picture we can use. Try a JPEG or PNG.",
+  "shareEvent.flyer.errorUpload": "The flyer couldn't be added. Try again.",
+  "shareEvent.flyer.errorReused": "Please add the flyer again, then send.",
+  "shareEvent.submitterName.label": "Your name",
+  "shareEvent.submitterEmail.label": "Your email",
+  "shareEvent.submitterEmail.placeholder": "email@example.com",
+  "shareEvent.submitterEmail.hint": "Never shown on the site. Only used if we need to ask about the event.",
+  "shareEvent.submit": "Send for review",
+  "shareEvent.submitting": "Sending…",
+  "shareEvent.backToMap": "Back to the map",
+  "shareEvent.another": "Share another event",
+  "shareEvent.success.title": "Thank you!",
+  "shareEvent.success.body": "We got your event. We'll look it over and be in touch before it goes on the map.",
+  "shareEvent.error.title": "Something went wrong",
+  "shareEvent.error.body": "Your event couldn't be sent. Please try again, or email us at suggestions@pueblofoodmap.com.",
+  "shareEvent.error.retry": "Try again",
+  "shareEvent.error.rateLimit": "Too many events sent from this address. Please try again in an hour.",
+  "shareEvent.validation.nameRequired": "Please enter the event's name.",
+  "shareEvent.validation.hostRequired": "Please say who is hosting it.",
+  "shareEvent.validation.dateRequired": "Please choose the date.",
+  "shareEvent.validation.startRequired": "Please enter the start time.",
+  "shareEvent.validation.endRequired": "Please enter the end time.",
+  "shareEvent.validation.endBeforeStart": "The end time must be after the start time.",
+  "shareEvent.validation.descriptionRequired": "Please say what the event is.",
+  "shareEvent.validation.addressRequired": "Please enter the street address.",
+  "shareEvent.validation.linkInvalid": "Enter a full web address starting with https://",
+  "shareEvent.validation.submitterNameRequired": "Please enter your name.",
+  "shareEvent.validation.emailRequired": "Please enter your email address.",
+  "shareEvent.validation.emailInvalid": "Please enter a valid email address.",
+  "shareEvent.preview.heading": "Preview",
+  "shareEvent.preview.live": "Updates as you type",
+  "shareEvent.preview.note": "This is how it will look on the map once we approve it.",
+  "shareEvent.preview.open": "Preview",
+  "shareEvent.preview.sheetTag": "Preview — not on the map yet",
+  "shareEvent.preview.back": "Back to editing",
 
   // External links (#162)
   "menu.opensInNewTab": "(opens in new tab)",
@@ -494,19 +582,15 @@ const enClient: Record<string, string> = {
   // described without naming (Turnstile) or didn't mention at all (Mapbox).
   "privacy.other.heading": "Other services we use",
   "privacy.other.body": "We use Mapbox to show the map. Loading it shares your IP address with Mapbox, and if you get walking directions, your location too. We use Cloudflare Turnstile on our forms and box check-ins to block spam; it checks some information about your device and browser.",
-  // Rewritten (#485, PostHog analytics core): PostHog joins Cloudflare Web
-  // Analytics (which stays on as an independent visit count — AGENTS.md
-  // "Observability"). PostHog's memory-only persistence (analytics.ts) and
-  // "Discard client IP data" project setting keep two of this page's
-  // promises (no cookies/nothing stored, IP discarded); this paragraph is
-  // rewritten to also disclose the new
-  // named taps/search tracking (#485 comment, 2026-09-26) truthfully.
-  // Session replay (screen-recording of how a page was used) was turned
-  // back ON (Kyle, 2026-09-26, reversing the issue's original "replay OFF")
-  // after seeing the #681 admin dashboard mockup — this paragraph discloses
-  // it, and that everything typed is hidden from it (analytics.ts's
-  // session_recording.maskAllInputs).
-  "privacy.analytics": "We use PostHog and Cloudflare Web Analytics to see how people use the map: which pages are viewed, taps on the map and its filters, the words people search for (only searches used often are ever looked at, never a single search — this helps us find places we're missing), and a recording of on-screen activity to help us improve the site. Anything you type is always hidden from that recording. Neither service sets a cookie or stores anything on your device, and your exact IP address is thrown away before it's used for anything. We never see what you type into a form, your exact location, or who you are.",
+  // PostHog + Cloudflare Web Analytics disclosure (#485, rewritten for #919;
+  // wording approved by Kyle 2026-11-13). Each promise maps to code: the
+  // tab-only visit ID is posthog-js's sessionStorage persistence and the
+  // yes/no note is the `pfm_returning` localStorage flag (analytics.ts);
+  // "IP used only for the city" is the /ingest relay sending CF-Connecting-IP
+  // (ingestTarget.ts) plus PostHog's "Discard client IP data" setting; "only
+  // how far" is nearest_food sending distances alone; typing is hidden by
+  // replay's maskAllInputs. Change the code and this text together.
+  "privacy.analytics": "We use PostHog and Cloudflare Web Analytics to see how people use the map: which pages are viewed, taps on the map and its filters, the words people search for (only searches used often are ever looked at, never a single search, so we can find places we're missing), errors that break the page, and a recording of on-screen activity to help us improve the site. Anything you type is always hidden from that recording. PostHog keeps a random number in your browser until you close the tab, so it can tell which pages were one visit, and a yes or no note that this browser has visited before. Neither one holds your name or anything about you, and neither is a cookie. Your IP address is used only to look up your city, then thrown away. If you share your location, we record only how far the nearest open place is, never where you are. We never see what you type into a form or who you are.",
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
   "directions.walk": "Walk",
@@ -1053,6 +1137,12 @@ const enClient: Record<string, string> = {
   "summary.snap": "It accepts SNAP/EBT.",
   "summary.wic": "It accepts WIC.",
   "summary.snapAndWic": "It accepts SNAP/EBT and WIC.",
+  // #921: a SNAP store's venue <title> and the sentence its meta description
+  // opens with (buildVenueTitle / buildVenueMetaDescription). Name-led,
+  // because a description opening "It accepts..." has nothing for "it".
+  "summary.title.acceptsSnap": "Accepts SNAP/EBT",
+  "summary.meta.snap": "{name} accepts SNAP/EBT.",
+  "summary.meta.snapAndWic": "{name} accepts SNAP/EBT and WIC.",
   "summary.lastVerified": "Last verified {month}.",
   "summary.and": "and",
   "summary.title.in": "in",

@@ -115,6 +115,14 @@ export function parseProposalRow(row: ChangeProposalRow): ParsedProposal {
 const DATE_ONLY_BULK_SOURCES: ReadonlySet<string> = new Set(["osm", "plentiful", "care_and_share", "website"]);
 
 /**
+ * Most ids POST /api/admin/proposals/approve-date-only takes per request.
+ * The route enforces it; ToReviewSummaryBox sends at most this many, so
+ * with more date-only updates waiting one click approves the first batch
+ * and the rest stay for the next click (#894 item 9).
+ */
+export const BULK_APPROVE_MAX_IDS = 200;
+
+/**
  * True for exactly the shape the first production pipeline run mostly
  * produced (89 of 107 proposals): "still there, nothing else changed." Used
  * by BOTH the client (ToReviewSummaryBox, to compute which currently-
@@ -174,7 +182,7 @@ export function renameMetaOf(diff: ProposedDiff | null): { from_id: string; to_i
 }
 
 /** Listing ids an unconfirmed Care and Share match asks about: `meta.match.upstream_id`, or `upstream_ids` for a listed-twice card. */
-export function matchUpstreamIdsOf(diff: ProposedDiff | null): string[] {
+function matchUpstreamIdsOf(diff: ProposedDiff | null): string[] {
   const m = diff?.meta?.match as { upstream_id?: unknown; upstream_ids?: unknown } | undefined;
   if (!m) return [];
   const ids = Array.isArray(m.upstream_ids) ? m.upstream_ids : [m.upstream_id];
@@ -546,15 +554,15 @@ export async function applyApprovedProposal(
         message: "This proposal has no applicable field changes to apply. Reject it instead.",
       };
     }
-    const setClauses = fields.map((f) => `${f} = ?`);
-    const values = fields.map((f) => toColumnValue(f as keyof Venue, (after as Record<string, unknown>)[f]));
-    venueStmt = db
-      .prepare(`UPDATE venues SET ${setClauses.join(", ")}, updated_by = ?, updated_at = ? WHERE id = ?`)
-      .bind(...values, identity.email, timestamp, proposalRow.target_venue_id);
     const afterRow: AdminVenueRow = { ...existing, updated_by: identity.email, updated_at: timestamp };
     for (const f of fields) {
       (afterRow as unknown as Record<string, unknown>)[f] = toColumnValue(f as keyof Venue, (after as Record<string, unknown>)[f]);
     }
+    const setClauses = fields.map((f) => `${f} = ?`);
+    const values = fields.map((f) => (afterRow as unknown as Record<string, unknown>)[f]);
+    venueStmt = db
+      .prepare(`UPDATE venues SET ${setClauses.join(", ")}, updated_by = ?, updated_at = ? WHERE id = ?`)
+      .bind(...values, identity.email, timestamp, proposalRow.target_venue_id);
     auditAction = "update";
     beforeJson = JSON.stringify(existing);
     afterRowForAudit = afterRow;
@@ -593,7 +601,7 @@ export async function applyApprovedProposal(
         notes: (afterVenue.notes ?? null) as string | null,
         operator: (afterVenue.operator ?? null) as string | null,
         source: afterVenue.source ?? existing.source,
-        last_verified: afterVenue.last_verified ?? existing.last_verified,
+        last_verified: approvedOn,
         status: "draft",
         source_type: sourceType,
         updated_by: identity.email,
@@ -649,7 +657,7 @@ export async function applyApprovedProposal(
         notes: (afterVenue.notes ?? null) as string | null,
         operator: (afterVenue.operator ?? null) as string | null,
         source: afterVenue.source ?? "",
-        last_verified: afterVenue.last_verified ?? timestamp.slice(0, 10),
+        last_verified: approvedOn,
         status: "draft",
         source_type: sourceType,
         outside_county: 0,

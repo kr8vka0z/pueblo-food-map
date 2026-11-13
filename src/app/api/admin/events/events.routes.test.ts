@@ -41,7 +41,7 @@ let cacheDelete: ReturnType<typeof vi.fn>;
 
 function freshDb(): Database.Database {
   const db = new Database(":memory:");
-  for (const f of ["0001_init_admin_schema.sql", "0017_auth_events.sql", "0018_events.sql"]) {
+  for (const f of ["0001_init_admin_schema.sql", "0017_auth_events.sql", "0018_events.sql", "0026_event_venue_and_button.sql"]) {
     db.exec(readFileSync(join(process.cwd(), "migrations", f), "utf-8"));
   }
   return db;
@@ -148,6 +148,30 @@ describe("POST /api/admin/events", () => {
     expect(Object.keys(data.errors).sort()).toEqual(["ends_at", "name", "place"]);
     expect(sqlite.prepare("SELECT COUNT(*) AS n FROM events").get()).toEqual({ n: 0 });
     expect(cacheDelete).not.toHaveBeenCalled();
+  });
+
+  test("venue name and button wording (#882) are stored on create and edit; a built-in wording clears the custom words", async () => {
+    const created = await create({
+      venue_name: "St. Mary Hall",
+      link_url: "https://forms.gle/abc",
+      link_label: "custom",
+      link_label_custom: "Save a turkey",
+      link_label_custom_es: "Aparta un pavo",
+    });
+    expect(rowOf(created.id)).toMatchObject({
+      venue_name: "St. Mary Hall",
+      link_label: "custom",
+      link_label_custom: "Save a turkey",
+      link_label_custom_es: "Aparta un pavo",
+    });
+
+    const res = await patch(created.id, {
+      ...payload({ action: "save", venue_name: "", link_url: "https://forms.gle/abc", link_label: "signup", link_label_custom: "Save a turkey" }),
+      expectedUpdatedAt: created.updated_at,
+    });
+
+    expect(res.status).toBe(200);
+    expect(rowOf(created.id)).toMatchObject({ venue_name: null, link_label: "signup", link_label_custom: null, link_label_custom_es: null });
   });
 
   test("the events table is missing -> 500 JSON, not a crash", async () => {

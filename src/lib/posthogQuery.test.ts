@@ -82,16 +82,20 @@ describe("buildTopSearches", () => {
 });
 
 describe("buildCardActions", () => {
-  test("splits directions_clicked by mode, sums the rest by event", () => {
+  // #919 item 10: "The admin dashboard still loads and shows the new `surface` split."
+  // Rows: [event, mode, count, surface]. A null surface (taps sent before #919) is the map card.
+  test("splits directions_clicked by mode, sums the rest by event, and keeps place-page taps apart", () => {
     const rows = [
-      [EVENTS.DIRECTIONS_CLICKED, "walk", 5],
-      [EVENTS.DIRECTIONS_CLICKED, "bus", 2],
-      [EVENTS.DIRECTIONS_CLICKED, "drive", 1],
-      [EVENTS.CALL_CLICKED, null, 3],
-      [EVENTS.WEBSITE_CLICKED, null, 4],
-      [EVENTS.FAVORITE_ADDED, null, 6],
-      [EVENTS.SHARE_CLICKED, null, 2],
-      [EVENTS.REPORT_OPENED, null, 1],
+      [EVENTS.DIRECTIONS_CLICKED, "walk", 5, "map"],
+      [EVENTS.DIRECTIONS_CLICKED, "bus", 2, null],
+      [EVENTS.DIRECTIONS_CLICKED, "drive", 1, "map"],
+      [EVENTS.CALL_CLICKED, null, 3, null],
+      [EVENTS.WEBSITE_CLICKED, null, 4, "map"],
+      [EVENTS.FAVORITE_ADDED, null, 6, null],
+      [EVENTS.SHARE_CLICKED, null, 2, null],
+      [EVENTS.REPORT_OPENED, null, 1, null],
+      [EVENTS.DIRECTIONS_CLICKED, null, 7, "venue_page"],
+      [EVENTS.CALL_CLICKED, null, 8, "venue_page"],
     ];
     expect(buildCardActions(rows)).toEqual({
       directionsWalk: 5,
@@ -102,11 +106,13 @@ describe("buildCardActions", () => {
       save: 6,
       share: 2,
       report: 1,
+      venuePageDirections: 7,
+      venuePageCall: 8,
     });
   });
 
   test("empty rows -> every count zero", () => {
-    expect(buildCardActions([])).toEqual({ directionsWalk: 0, directionsBus: 0, directionsDrive: 0, call: 0, website: 0, save: 0, share: 0, report: 0 });
+    expect(buildCardActions([])).toEqual({ directionsWalk: 0, directionsBus: 0, directionsDrive: 0, call: 0, website: 0, save: 0, share: 0, report: 0, venuePageDirections: 0, venuePageCall: 0 });
   });
 });
 

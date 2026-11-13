@@ -57,7 +57,7 @@ export default function EventListSection({ events, locale, onSelectEvent, showEm
                 type="button"
                 onClick={() => onSelectEvent(event.id)}
                 data-testid={`event-row-${event.id}`}
-                className="w-full min-h-16 flex items-start gap-3 px-4 py-3 text-left hover:bg-[var(--color-bone-100)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)]"
+                className="w-full min-h-16 flex items-start gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-[var(--color-sage-100)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)]"
               >
                 {/* The owner-approved event colors (DESIGN.md): the orange disc with a navy star. */}
                 <span

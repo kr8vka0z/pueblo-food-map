@@ -114,20 +114,20 @@ describe("BoxCardBody layout='sheet' — below-the-fold section (#667 items 9-13
     expect(screen.getByRole("link", { name: "History" }).closest("#test-detail")).not.toBeNull();
   });
 
-  test("collapsed (expanded=false): the wrapper is clipped and tapping it calls onRequestExpand", () => {
+  // #882: no clip any more (the sheet slides; the section keeps its height), but
+  // the half-shown peek still expands on a tap.
+  test("collapsed (expanded=false): tapping the wrapper calls onRequestExpand", () => {
     const onRequestExpand = vi.fn();
     renderSheet({}, { expanded: false, onRequestExpand });
     const wrapper = document.getElementById("test-detail")!;
-    expect(wrapper.className).toContain("overflow-hidden");
     fireEvent.click(wrapper);
     expect(onRequestExpand).toHaveBeenCalledTimes(1);
   });
 
-  test("expanded=true: the wrapper is not clipped and no longer intercepts taps", () => {
+  test("expanded=true: the wrapper no longer intercepts taps", () => {
     const onRequestExpand = vi.fn();
     renderSheet({}, { expanded: true, onRequestExpand });
     const wrapper = document.getElementById("test-detail")!;
-    expect(wrapper.className).not.toContain("overflow-hidden");
     fireEvent.click(wrapper);
     expect(onRequestExpand).not.toHaveBeenCalled();
   });

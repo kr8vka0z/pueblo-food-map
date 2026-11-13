@@ -102,7 +102,6 @@ automated diff:
 
 | Script | Purpose | When to re-run |
 |---|---|---|
-| `geocode-osm-missing.py` | Reverse-geocodes OSM venues missing an address (Nominatim, falling back to Mapbox, then raw coordinates) | After an OSM ingest leaves new venues with no address |
 
 ## Release and security automation
 
@@ -129,13 +128,14 @@ unfamiliar reader doesn't mistake them for part of the flow above:
 
 | Script | Purpose |
 |---|---|
-| `seed-blessing-boxes.ts` | Dev-only: generates throwaway fake blessing-box SQL for staging/dev |
 | `load-real-blessing-boxes.ts` | Generates ready-to-apply SQL for Kyle's real blessing-box address list |
 | `seed-dev.sql` | Fake venue rows for the staging admin D1 database's UI states |
 | `auth-cli.config.ts` | CLI-only Better Auth config for `@better-auth/cli generate`/`migrate` — never imported by the app |
 | `check-banned.mjs` | Banned-string lint (old font names, retired Tailwind palettes) — wired into `npm run lint` |
 | `check-pages-serve.sh` | `vite build`, serves the Worker in local workerd, and requests real venue/report pages (200 with the venue name) and unknown ids (404) — `ci.yml` runs it so a `next` / vinext / vite bump that breaks them fails its PR |
+| `smoke.sh` | Post-deploy smoke test of a deployed Worker origin (200s, `/es` bodies, 404s, noindex policy) — run by `deploy-prod.yml` and `deploy-dev.yml` |
 | `check-design-drift.mjs` | Token parity check between `globals.css` and `DESIGN.md` — `npm run design:drift`, a blocking CI gate |
+| `admin-preview/` | Signed-in admin preview on made-up data in local workerd, with one public link — `admin-preview/start.sh`; see its README |
 
 ## Not built: GTFS transit data
 

@@ -29,7 +29,7 @@
  */
 
 import Link from "next/link";
-import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Lightbulb, Star, History, Compass, Heart } from "lucide-react";
+import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Lightbulb, Star, History, Compass, Heart, CalendarPlus } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import StyxCredit from "./StyxCredit";
@@ -44,7 +44,7 @@ import { categoryColors } from "@/lib/categories";
 import { formatMiles } from "@/lib/distance";
 import type { ViewMode } from "@/lib/useMapUI";
 
-export interface HamburgerMenuContentProps {
+interface HamburgerMenuContentProps {
   locale?: Locale;
   onShowWelcome?: () => void;
   savedVenues?: Array<Venue & { distanceMiles?: number }>;
@@ -121,11 +121,11 @@ export default function HamburgerMenuContent({
             // row's layout and the icon's position don't move.
             "flex items-center justify-center w-12 h-12 -m-2 rounded-full " +
             "text-[var(--color-ink-500)] " +
-            "hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-700)] " +
+            "hover:bg-[var(--color-sage-100)] hover:text-[var(--color-ink-700)] " +
             PRESS_FEEDBACK + " " +
             "focus-visible:outline-none focus-visible:ring-2 " +
             "focus-visible:ring-[var(--color-sage-500)] " +
-            "transition-colors duration-100"
+            "transition-colors duration-150"
           }
         >
           <X size={16} aria-hidden />
@@ -149,9 +149,9 @@ export default function HamburgerMenuContent({
                     onClick={() => onSelectVenue?.(v.id)}
                     className={
                       "flex items-center gap-2.5 w-full min-h-12 text-left px-5 py-2.5 text-sm font-medium " +
-                      "text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-900)] " +
+                      "text-[var(--color-ink-700)] hover:bg-[var(--color-sage-100)] hover:text-[var(--color-ink-900)] " +
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
-                      "transition-colors duration-100"
+                      "transition-colors duration-150"
                     }
                   >
                     <span
@@ -293,6 +293,13 @@ export default function HamburgerMenuContent({
                 onClick={onClose}
                 icon={<MapPinPlus size={14} />}
               />
+              {/* Share an event (#883), under Suggest a place. */}
+              <HamburgerMenuItem
+                label={t("menu.shareEvent", locale)}
+                href={localizedHref("/events/share", tree)}
+                onClick={onClose}
+                icon={<CalendarPlus size={14} />}
+              />
               {/* Send us feedback (#116) */}
               <HamburgerMenuItem
                 label={t("menu.feedback", locale)}
@@ -365,11 +372,7 @@ export default function HamburgerMenuContent({
                 when the client-side toggle has flipped THIS EN page to
                 Spanish (tree stays "en"; there's no server-side redirect on
                 /, AGENTS.md hard rule). Offers the fully-Spanish /es tree
-                without auto-navigating. Placed here (Menu, below the
-                toggle) rather than floating over the map — a `preview`
-                sign-off with Kyle should confirm this placement before it
-                ships to prod (design-affecting; see this repo's DESIGN.md
-                workflow). */}
+                without auto-navigating. */}
             {tree === "en" && locale === "es" && (
               <div className="px-5 py-3 border-t border-[var(--color-bone-200)]">
                 {/* Link, not <a> (review fix): @next/next/no-html-link-for-pages

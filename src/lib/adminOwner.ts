@@ -16,7 +16,7 @@
 
 const DEFAULT_OWNER_EMAIL = "kysboyd@gmail.com";
 
-export function getAdminOwnerEmail(configured: string | undefined | null): string {
+function getAdminOwnerEmail(configured: string | undefined | null): string {
   const trimmed = configured?.trim().toLowerCase();
   return trimmed ? trimmed : DEFAULT_OWNER_EMAIL;
 }

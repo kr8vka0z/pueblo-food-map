@@ -53,10 +53,10 @@ export default function HamburgerMenuItem({
     // state below) is reserved for venue-name headings elsewhere, reused
     // here only as the existing darken-on-hover accent.
     "text-[var(--color-ink-700)] " +
-    "hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-900)] " +
+    "hover:bg-[var(--color-sage-100)] hover:text-[var(--color-ink-900)] " +
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset " +
     "focus-visible:ring-[var(--color-sage-500)] " +
-    "transition-colors duration-100";
+    "transition-colors duration-150";
 
   const children = (
     <>

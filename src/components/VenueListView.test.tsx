@@ -265,13 +265,28 @@ describe("VenueListView — empty state", () => {
   test("shows a friendly message when no venues match", () => {
     render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
     fireEvent.change(screen.getByLabelText(/search/i), { target: { value: "no-such-venue-xyz" } });
-    expect(screen.getByText(/no venues match your search/i)).toBeDefined();
+    expect(screen.getByText(/no places match your search or filters/i)).toBeDefined();
     expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  test("Clear filters empties the search box, resets the chips and brings every row back", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Draft/ }));
+    const search = screen.getByLabelText(/search/i) as HTMLInputElement;
+    fireEvent.change(search, { target: { value: "no-such-venue-xyz" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+
+    expect(search.value).toBe("");
+    expect(search).toHaveFocus();
+    expect(screen.getByRole("button", { name: /^All places/ }).getAttribute("aria-pressed")).toBe("true");
+    for (const v of VENUES) expect(screen.getByText(v.name)).toBeDefined();
   });
 
   test("renders the empty state, and no name link, when the venues prop itself is empty", () => {
     render(<VenueListView venues={[]} statusByVenueId={{}} />);
-    expect(screen.getByText(/no venues match your search/i)).toBeDefined();
+    expect(screen.getByText(/no places yet/i)).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
     expect(screen.queryByRole("link")).toBeNull();
   });
 });

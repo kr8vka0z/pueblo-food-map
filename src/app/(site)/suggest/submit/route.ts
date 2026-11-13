@@ -26,18 +26,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { categoryLabels } from "@/lib/categories";
 import type { VenueCategory } from "@/types/venue";
-import { isValidEmail } from "@/lib/email";
+import { isValidEmail, normalizeLineBreaks, stripLineBreaks } from "@/lib/email";
 import { checkFormRateLimit } from "@/lib/formRateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
 import { parsePublicPost } from "@/lib/publicRequest";
 import { sendResendEmail } from "@/lib/emailSend";
 import { insertPublicSubmission } from "@/lib/publicSubmissions";
-
-/** Strip CR and LF from a string to prevent header/subject line injection. */
-function stripLineBreaks(s: string): string {
-  return s.replace(/[\r\n]/g, " ");
-}
 
 // ─── Email sender ─────────────────────────────────────────────────────────────
 
@@ -121,13 +116,13 @@ function validate(body: SubmitPayload): string | null {
   if (typeof body.category !== "string" || !Object.hasOwn(categoryLabels, body.category)) {
     return "Invalid category";
   }
-  if (body.hours && body.hours.length > FIELD_LIMITS.SUGGEST_HOURS) {
+  if (body.hours !== undefined && (typeof body.hours !== "string" || body.hours.length > FIELD_LIMITS.SUGGEST_HOURS)) {
     return `Hours must be ${FIELD_LIMITS.SUGGEST_HOURS} characters or fewer`;
   }
-  if (body.contact && body.contact.length > FIELD_LIMITS.SUGGEST_CONTACT) {
+  if (body.contact !== undefined && (typeof body.contact !== "string" || body.contact.length > FIELD_LIMITS.SUGGEST_CONTACT)) {
     return `Contact must be ${FIELD_LIMITS.SUGGEST_CONTACT} characters or fewer`;
   }
-  if (body.notes && body.notes.length > FIELD_LIMITS.SUGGEST_NOTES) {
+  if (body.notes !== undefined && (typeof body.notes !== "string" || body.notes.length > FIELD_LIMITS.SUGGEST_NOTES)) {
     return `Notes must be ${FIELD_LIMITS.SUGGEST_NOTES} characters or fewer`;
   }
   // #232: submitterEmail is required (was optional) — never trust the client's
@@ -179,7 +174,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     contact: body.contact ? stripLineBreaks(body.contact) : undefined,
     acceptsSnap: Boolean(body.acceptsSnap),
     acceptsWic: Boolean(body.acceptsWic),
-    notes: body.notes ? stripLineBreaks(body.notes) : undefined,
+    notes: body.notes ? normalizeLineBreaks(body.notes) : undefined,
     submitterEmail: stripLineBreaks(body.submitterEmail.trim()),
   };
 

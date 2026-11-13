@@ -42,8 +42,10 @@ export default function AlertsConfirmContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
       });
-      const data = (await res.json().catch(() => null)) as { ok?: boolean } | null;
-      setState(res.ok && data?.ok ? "success" : "invalid");
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      // Only the route's explicit invalid_token means a bad link (#894); a
+      // 502 db_unavailable or an unreadable answer is temporary: "try again".
+      setState(res.ok && data?.ok ? "success" : data?.error === "invalid_token" ? "invalid" : "error");
     } catch {
       setState("error");
     }

@@ -37,7 +37,7 @@ function fillTimes(start = "2026-11-21T10:00", end = "2026-11-21T14:00") {
 }
 
 async function pickVenue() {
-  await userEvent.click(screen.getByLabelText(/already on the map/i));
+  await userEvent.click(screen.getByLabelText(/^on the map$/i));
   await userEvent.type(screen.getByLabelText(/search places/i), "east");
   await userEvent.click(screen.getByRole("button", { name: /Eastside Pantry/ }));
 }
@@ -84,6 +84,54 @@ describe("EventForm validation", () => {
     expect(invalid(screen.getByLabelText(/^Note \(English\)/))).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  // #926: the errors can sit above the fold, so focus goes to the first wrong box, not left on the button.
+  test("a refused save puts focus in the first box that is wrong", async () => {
+    render(<EventForm venues={VENUES} />);
+    await userEvent.type(nameInput(), "Turkey drive");
+
+    await userEvent.click(screen.getByRole("button", { name: /save draft/i }));
+
+    await waitFor(() => expect(startsInput()).toHaveFocus());
+  });
+
+  // #926: Cancel event is a step with a way back. Keep event, or Escape from
+  // anywhere in the step (here the red button, outside the note's own
+  // wrapper), sends nothing, drops the half-typed note, and hands focus back
+  // to "Cancel event".
+  test.each<[string, () => Promise<void>]>([
+    ["Keep event", () => userEvent.click(screen.getByRole("button", { name: /^keep event$/i }))],
+    [
+      "Escape",
+      async () => {
+        screen.getByRole("button", { name: /^confirm cancel event$/i }).focus();
+        await userEvent.keyboard("{Escape}");
+      },
+    ],
+  ])("%s closes the cancel step, sends nothing, clears the note and returns focus", async (_way, close) => {
+    render(
+      <EventForm
+        venues={VENUES}
+        eventId="e1"
+        status="published"
+        expectedUpdatedAt="2026-10-01T00:00:00.000Z"
+        initialValues={{ name: "Turkey drive", startsLocal: "2026-11-21T10:00", endsLocal: "2026-11-21T14:00", address: "1 Main", lat: "38.2", lng: "-104.6" }}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: /^cancel event$/i }));
+    const note = screen.getByLabelText(/^Note \(English\)/);
+    expect(note).toHaveFocus();
+    await userEvent.type(note, "Rained out");
+
+    await close();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText(/^Note \(English\)/)).toBeNull();
+    const reopen = screen.getByRole("button", { name: /^cancel event$/i });
+    expect(reopen).toHaveFocus();
+    await userEvent.click(reopen);
+    expect(screen.getByLabelText(/^Note \(English\)/)).toHaveValue("");
+  });
 });
 
 describe("EventForm place and time handling", () => {
@@ -109,6 +157,17 @@ describe("EventForm place and time handling", () => {
       ends_at_local: "2026-03-08T03:30",
     });
     await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith("/admin/events/new-1/edit?saved=1"));
+  });
+
+  // #926: a pressed control that goes away hands focus to what replaced it,
+  // never to the page body: the picked result to Change, Change to the search box.
+  test("picking a place puts focus on Change; Change puts it back in the search box", async () => {
+    render(<EventForm venues={VENUES} />);
+    await pickVenue();
+    const change = screen.getByRole("button", { name: "Change" });
+    expect(change).toHaveFocus();
+    await userEvent.click(change);
+    expect(screen.getByLabelText(/search places/i)).toHaveFocus();
   });
 
   test("editing a typed address drops its old coordinates so they can't outlive the address", async () => {
@@ -161,6 +220,20 @@ describe("EventForm edit mode", () => {
     expect(nameInput()).toHaveValue("My unsaved edit");
   });
 
+  // #926: nobody leaves the page while a save still lands.
+  test("while a save runs, Cancel is off and its click is stopped", async () => {
+    fetchMock.mockReturnValue(new Promise(() => {})); // the save never answers
+    render(<EventForm {...props} />);
+    const cancel = screen.getByRole("link", { name: "Cancel" });
+    expect(cancel).not.toHaveAttribute("aria-disabled");
+
+    await userEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => expect(cancel).toHaveAttribute("aria-disabled", "true"));
+    expect(cancel).toHaveAttribute("tabindex", "-1");
+    expect(fireEvent.click(cancel)).toBe(false); // preventDefault: the link does not navigate
+  });
+
   test("a server field error (422) is shown next to its field", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: false, errors: { link_url: "bad link" } }), { status: 422 }));
     render(<EventForm {...props} />);
@@ -170,23 +243,34 @@ describe("EventForm edit mode", () => {
     await waitFor(() => expect(invalid(screen.getByLabelText(/^Link/))).toBe(true));
   });
 
-  test("archive asks first, sends the precondition, and returns to the list", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+  test("Enter in a box saves: the save button is the form's first submit button", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true, id: "e1", status: "published", updated_at: "x" }), { status: 200 }));
+    render(<EventForm {...props} />);
+    await userEvent.type(nameInput(), "{Enter}");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).action).toBe("save");
+  });
+
+  test("archive asks on the page first, sends the precondition only on the second press, and returns to the list", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true, status: "archived" }), { status: 200 }));
     render(<EventForm {...props} />);
 
     await userEvent.click(screen.getByRole("button", { name: /archive event/i }));
+    expect(fetchMock).not.toHaveBeenCalled(); // the first press only opens the confirm
+    await userEvent.click(screen.getByRole("button", { name: /archive event/i })); // the confirm's action button
 
     await waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith("/admin/events"));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/admin/events/e1/archive");
     expect(JSON.parse(init.body as string)).toEqual({ expectedUpdatedAt: "2026-10-01T00:00:00.000Z" });
   });
 
-  test("declining the archive confirmation sends nothing", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
+  test("pressing Cancel in the archive confirm sends nothing and brings the Archive button back", async () => {
     render(<EventForm {...props} />);
     await userEvent.click(screen.getByRole("button", { name: /archive event/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /archive event/i })).toHaveFocus();
   });
 });

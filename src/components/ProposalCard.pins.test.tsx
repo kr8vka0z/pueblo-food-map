@@ -34,7 +34,7 @@ describe("ProposalCard venue pins and source notes", () => {
         })}
       />,
     );
-    expect(screen.getByText(/The venue told us the phone/)).toBeInTheDocument();
+    expect(screen.getByText(/the venue told us this itself/)).toBeInTheDocument();
     expect(screen.getByText(/Oct 12, 2026 \(Heather, by email\)/)).toBeInTheDocument();
   });
 

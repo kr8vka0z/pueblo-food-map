@@ -12,9 +12,10 @@
  * authentication"): getAdminDb() verifies identity before this page renders
  * anything, failing closed via handlePageAuthError.
  *
- * PERIOD SWITCH: a plain `?period=7d|30d|90d` search param, server-rendered
- * `<Link>`s (no client JS) — the whole page re-renders per period the same
- * way any other admin filter link already does in this app. Defaults to
+ * PERIOD SWITCH: a plain `?period=7d|30d|90d` search param. The slider
+ * (DashboardPeriodPicker, the page's one client piece, #926 decision 10)
+ * navigates to `/admin?period=...` keeping any other query value, and the
+ * whole page re-renders per period on the server. Defaults to
  * 30d; an unrecognized value falls back to 30d rather than erroring, same
  * "never trust a query param" posture every other admin route takes.
  * "Every number that has a time range... shows the change vs the previous
@@ -54,7 +55,7 @@ import { loadBoxHealthEntries } from "@/lib/adminBoxes";
 import { countStalePlaces, resolvePlaceUsageRows } from "@/lib/adminDashboard";
 import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
-import { fetchPublishBotPrStatus, isProductionWorker, type PublishBotPrStatus } from "@/lib/publishVenues";
+import { fetchPublishBotPrStatus, isProductionWorker } from "@/lib/publishVenues";
 import {
   filterByPeriod,
   filterByPreviousPeriod,
@@ -62,7 +63,6 @@ import {
   computeNetworkPairAverages,
   computeNetworkOverview,
   computeMilestones,
-  formatDurationMs,
   rankLongestSinceLastFill,
   loadNetworkStatsData,
   loadNetworkNeedRows,
@@ -72,6 +72,9 @@ import {
   groupCheckinsByVenue,
   periodStartMs,
 } from "@/lib/boxStats";
+import { formatDurationLabel } from "@/lib/formatDurationLabel";
+import { t } from "@/lib/i18n";
+import { pluralize } from "@/lib/pluralize";
 import { loadVisitorsAnalytics, DASHBOARD_PERIODS, type DashboardPeriod } from "@/lib/cfAnalytics";
 import { loadMapUsageAnalytics } from "@/lib/posthogQuery";
 import { createFetchLimiter } from "@/lib/analyticsFetch";
@@ -84,21 +87,22 @@ import DashboardNeedsStrip, { type NeedsCardData } from "@/components/DashboardN
 import KpiCard from "@/components/KpiCard";
 import BarList from "@/components/BarList";
 import DailyBars from "@/components/DailyBars";
+import DashboardPeriodPicker from "@/components/DashboardPeriodPicker";
+import {
+  cardClass,
+  clayNoticeClass,
+  groupTitleClass,
+  linkClass,
+  pageBodyClass,
+  pageTitleClass,
+  sectionTitleClass,
+  tapLinkClass,
+} from "@/lib/adminCardStyles";
+// The Worker runs in UTC; refresh dates are shown as Pueblo calendar days.
+import { TIME_ZONE } from "@/lib/eventTime";
 
 const DEFAULT_PERIOD: DashboardPeriod = "30d";
 const PERIOD_LABELS: Record<DashboardPeriod, string> = { "7d": "7 days", "30d": "30 days", "90d": "90 days" };
-/** Community label per box_checkins.needs key (migration 0012) — same nine keys as the public "what would help you next time?" ask; kept here rather than importing a component-facing label map since only these lowercase keys need a Dashboard-facing display string. */
-const NEED_LABELS: Record<string, string> = {
-  canned_food: "Canned food",
-  fresh_food: "Fresh food",
-  bread: "Bread",
-  baby_items: "Baby items",
-  diapers: "Diapers",
-  hygiene: "Hygiene items",
-  pet_food: "Pet food",
-  drinks: "Drinks",
-  warm_clothing: "Warm clothing",
-};
 
 function parsePeriod(raw: string | undefined): DashboardPeriod {
   return (DASHBOARD_PERIODS as readonly string[]).includes(raw ?? "") ? (raw as DashboardPeriod) : DEFAULT_PERIOD;
@@ -130,118 +134,77 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const period: DashboardPeriod = parsePeriod(rawPeriod);
   const now = new Date();
 
-  let email: string;
-  let showActivity = false;
-  let venues: AdminVenueRow[];
-  let submissionsTotal: number;
-  let proposalsTotal: number;
-  let photos: AdminBoxPhotoRow[];
-  let adopters: AdminBoxAdopterRow[];
-  let boxHealthEntries: Awaited<ReturnType<typeof loadBoxHealthEntries>>;
-  let publishBotStatus: PublishBotPrStatus | null;
-  let networkStats: Awaited<ReturnType<typeof loadNetworkStatsData>>;
-  let needRows: Awaited<ReturnType<typeof loadNetworkNeedRows>>;
-  let problemReportRows: Awaited<ReturnType<typeof loadProblemReports>>;
-  let latestRefresh: { runId: string; createdAt: string; suggestedCount: number } | null;
-  let env: Awaited<ReturnType<typeof getCloudflareContext>>["env"];
-  let visitors: Awaited<ReturnType<typeof loadVisitorsAnalytics>>;
-  let mapUsage: Awaited<ReturnType<typeof loadMapUsageAnalytics>>;
+  const { db, identity } = await getAdminDb(await headers()).catch(handlePageAuthError);
+  // Read only after the session check above. Both bindings are needed
+  // before the D1 burst below so the two analytics calls can start with it.
+  const { env } = await getCloudflareContext({ async: true });
 
-  try {
-    const { db, identity } = await getAdminDb(await headers());
-    email = identity.email;
-    showActivity = identity.isOwner === true;
-    // Read only after the session check above. Both bindings are needed
-    // before the D1 burst below so the two analytics calls can start with it.
-    ({ env } = await getCloudflareContext({ async: true }));
+  const publishToken = process.env.GITHUB_PUBLISH_TOKEN;
+  const periodStart = periodStartMs(period, now);
+  const cutoffIso = periodStart === null ? new Date(0).toISOString() : new Date(periodStart).toISOString();
+  // One limiter for this render, shared by both analytics loaders, so their
+  // fetches together never exceed 5 open (the Worker's limit is 6 and the
+  // publish-status GitHub fetch takes one): src/lib/analyticsFetch.ts.
+  const analyticsLimit = createFetchLimiter();
 
-    const publishToken = process.env.GITHUB_PUBLISH_TOKEN;
-    const periodStart = periodStartMs(period, now);
-    const cutoffIso = periodStart === null ? new Date(0).toISOString() : new Date(periodStart).toISOString();
-    // One limiter for this render, shared by both analytics loaders, so their
-    // fetches together never exceed 5 open (the Worker's limit is 6 and the
-    // publish-status GitHub fetch takes one): src/lib/analyticsFetch.ts.
-    const analyticsLimit = createFetchLimiter();
+  const [
+    venuesResult,
+    submissionsTotal,
+    proposalsTotal,
+    photos,
+    adopters,
+    boxHealthEntries,
+    publishBotStatus,
+    networkStats,
+    needRows,
+    problemReportRows,
+    latestRefreshRow,
+    visitors,
+    mapUsage,
+  ] = await Promise.all([
+    db.prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC").all<AdminVenueRow>(),
+    countPendingSubmissions(db),
+    countPendingProposals(db),
+    loadReviewQueue(db).catch(() => [] as AdminBoxPhotoRow[]),
+    loadPendingAdopters(db).catch(() => [] as AdminBoxAdopterRow[]),
+    loadBoxHealthEntries(db).catch(() => [] as Awaited<ReturnType<typeof loadBoxHealthEntries>>),
+    publishToken ? fetchPublishBotPrStatus(publishToken).catch(() => null) : Promise.resolve(null),
+    loadNetworkStatsData(db).catch(() => ({ boxes: [], checkins: [], photos: [], approvedSponsorCount: 0 })),
+    loadNetworkNeedRows(db, cutoffIso),
+    loadProblemReports(db),
+    // The suggested-count is a subquery, not a second read after this
+    // burst: a dependent query would cost one more D1 round trip.
+    db
+      .prepare(
+        // Derived table: pick the newest row first, then count once. A
+        // correlated subquery on the outer rows would run the COUNT per row
+        // before the ORDER BY (no index on created_at) and slow as the table grows.
+        "SELECT l.run_id, l.created_at, (SELECT COUNT(*) FROM change_proposals WHERE run_id = l.run_id) AS n " +
+          "FROM (SELECT run_id, created_at FROM change_proposals ORDER BY created_at DESC LIMIT 1) l",
+      )
+      .first<{ run_id: string; created_at: string; n: number }>(),
+    // WHY these two sit in the same Promise.all as the D1 reads: Cloudflare
+    // and PostHog are independent network calls (8s timeout per attempt, one
+    // retry, at most 5 open at once, each loader gives up after 20s:
+    // src/lib/analyticsFetch.ts), and the
+    // in-memory caches are empty on a cold Worker, the usual first
+    // visit after sign-in). Awaiting them after the D1 burst stacked their
+    // latency on top of it. Neither ever rejects (both return null on any
+    // failure), so they still degrade independently of every D1 read, see
+    // this file's own header. PostHog's project id / API host are plain
+    // wrangler vars, read via the binding per AGENTS.md "Runtime reads".
+    loadVisitorsAnalytics(period, now, analyticsLimit),
+    loadMapUsageAnalytics(period, env.POSTHOG_PROJECT_ID, env.POSTHOG_API_HOST, now, analyticsLimit),
+  ]);
+  const venues = venuesResult.results;
 
-    const [
-      venuesResult,
-      submissionsTotalResult,
-      proposalsTotalResult,
-      photosAll,
-      adoptersAll,
-      boxHealth,
-      publishBotStatusResult,
-      networkStatsResult,
-      needRowsResult,
-      problemReportsResult,
-      latestRefreshRow,
-      visitorsResult,
-      mapUsageResult,
-    ] = await Promise.all([
-      db.prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC").all<AdminVenueRow>(),
-      countPendingSubmissions(db),
-      countPendingProposals(db),
-      loadReviewQueue(db).catch(() => [] as AdminBoxPhotoRow[]),
-      loadPendingAdopters(db).catch(() => [] as AdminBoxAdopterRow[]),
-      loadBoxHealthEntries(db).catch(() => [] as Awaited<ReturnType<typeof loadBoxHealthEntries>>),
-      publishToken ? fetchPublishBotPrStatus(publishToken).catch(() => null) : Promise.resolve(null),
-      loadNetworkStatsData(db).catch(() => ({ boxes: [], checkins: [], photos: [], approvedSponsorCount: 0 })),
-      loadNetworkNeedRows(db, cutoffIso),
-      loadProblemReports(db),
-      // The suggested-count is a subquery, not a second read after this
-      // burst: a dependent query would cost one more D1 round trip.
-      db
-        .prepare(
-          // Derived table: pick the newest row first, then count once. A
-          // correlated subquery on the outer rows would run the COUNT per row
-          // before the ORDER BY (no index on created_at) and slow as the table grows.
-          "SELECT l.run_id, l.created_at, (SELECT COUNT(*) FROM change_proposals WHERE run_id = l.run_id) AS n " +
-            "FROM (SELECT run_id, created_at FROM change_proposals ORDER BY created_at DESC LIMIT 1) l",
-        )
-        .first<{ run_id: string; created_at: string; n: number }>(),
-      // WHY these two sit in the same Promise.all as the D1 reads: Cloudflare
-      // and PostHog are independent network calls (8s timeout per attempt, one
-      // retry, at most 5 open at once, each loader gives up after 20s:
-      // src/lib/analyticsFetch.ts), and the
-      // in-memory caches are empty on a cold Worker, the usual first
-      // visit after sign-in). Awaiting them after the D1 burst stacked their
-      // latency on top of it. Neither ever rejects (both return null on any
-      // failure), so they still degrade independently of every D1 read, see
-      // this file's own header. PostHog's project id / API host are plain
-      // wrangler vars, read via the binding per AGENTS.md "Runtime reads".
-      loadVisitorsAnalytics(period, now, analyticsLimit),
-      loadMapUsageAnalytics(period, env.POSTHOG_PROJECT_ID, env.POSTHOG_API_HOST, now, analyticsLimit),
-    ]);
-    visitors = visitorsResult;
-    mapUsage = mapUsageResult;
-
-    venues = venuesResult.results;
-    submissionsTotal = submissionsTotalResult;
-    proposalsTotal = proposalsTotalResult;
-    photos = photosAll;
-    adopters = adoptersAll;
-    boxHealthEntries = boxHealth;
-    publishBotStatus = publishBotStatusResult;
-    networkStats = networkStatsResult;
-    needRows = needRowsResult;
-    problemReportRows = problemReportsResult;
-
-    // `latestRefreshRow?.run_id` (not just `latestRefreshRow`) — a lenient
-    // test fake or a D1 shape mismatch could hand back a truthy row with no
-    // real column data, which must read as "no refresh yet," never as an
-    // Invalid Date.
-    if (latestRefreshRow?.run_id) {
-      latestRefresh = {
-        runId: latestRefreshRow.run_id,
-        createdAt: latestRefreshRow.created_at,
-        suggestedCount: latestRefreshRow.n ?? 0,
-      };
-    } else {
-      latestRefresh = null;
-    }
-  } catch (err) {
-    handlePageAuthError(err);
-  }
+  // `latestRefreshRow?.run_id` (not just `latestRefreshRow`) — a lenient
+  // test fake or a D1 shape mismatch could hand back a truthy row with no
+  // real column data, which must read as "no refresh yet," never as an
+  // Invalid Date.
+  const latestRefresh = latestRefreshRow?.run_id
+    ? { runId: latestRefreshRow.run_id, createdAt: latestRefreshRow.created_at, suggestedCount: latestRefreshRow.n ?? 0 }
+    : null;
 
   // Same "staging can never Publish" gate /admin/places uses (#673 pt.6) —
   // a live "waiting to publish" bar on staging would show test-only D1 data
@@ -312,7 +275,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       label: "Box photos & sponsor requests",
       count: photos.length + adopters.length,
       href: "/admin/boxes?show=review",
-      detail: `${photos.length} photos, ${adopters.length} sponsor requests`,
+      detail: `${pluralize(photos.length, "photo")}, ${pluralize(adopters.length, "sponsor request")}`,
     },
     {
       key: "box-help",
@@ -344,8 +307,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="dashboard" counts={navCounts} showActivity={showActivity} />
-      <div className="flex flex-col gap-6 px-4 py-6 sm:px-6">
+      <AdminNav email={identity.email} active="dashboard" counts={navCounts} showActivity={identity.isOwner === true} />
+      <div className={pageBodyClass}>
         {publishBotStatus && (
           <PublishBotStatusBanner
             prNumber={publishBotStatus.number}
@@ -357,7 +320,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           // Same copy as /admin/places' own staging banner (#673 pt.6) —
           // one consistent message wherever an admin might expect a Publish
           // panel on this test site.
-          <p className="rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]">
+          <p className={clayNoticeClass}>
             Test site: publishing is turned off here.
           </p>
         ) : (
@@ -365,33 +328,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="wordmark text-xl text-[var(--color-ink-900)]">Hi {email.split("@")[0]}</h1>
-          <nav aria-label="Time period" className="flex gap-1 rounded-[var(--radius-md)] border border-[var(--color-bone-200)] bg-white p-1">
-            {DASHBOARD_PERIODS.map((p) => (
-              <Link
-                key={p}
-                href={`/admin?period=${p}`}
-                aria-current={p === period ? "page" : undefined}
-                className={`min-h-12 rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium transition-colors duration-150 ${
-                  p === period
-                    ? "bg-[var(--color-sage-600)] text-[var(--color-bone-50)]"
-                    : "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)]"
-                }`}
-              >
-                {PERIOD_LABELS[p]}
-              </Link>
-            ))}
-          </nav>
+          {/* The page's title is an h2: AdminNav's "Pueblo Food Map Admin" is the one h1 (#926 decision 5). */}
+          <h2 className={pageTitleClass}>Hi {identity.email.split("@")[0]}</h2>
+          <DashboardPeriodPicker period={period} options={DASHBOARD_PERIODS.map((p) => ({ value: p, label: PERIOD_LABELS[p] }))} />
         </div>
 
         <section aria-label="Needs you">
           <DashboardNeedsStrip cards={needsCards} />
         </section>
 
-        <section aria-labelledby="visitors-heading" className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
-          <h2 id="visitors-heading" className="wordmark text-base text-[var(--color-ink-900)]">
+        <section aria-labelledby="visitors-heading" className={cardClass}>
+          <h3 id="visitors-heading" className={sectionTitleClass}>
             Visitors
-          </h2>
+          </h3>
           {visitors ? (
             <div className="mt-3 flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -412,18 +361,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </div>
               {visitors.phoneLcpMs !== null && (
                 <p className="text-xs text-[var(--color-ink-500)]">
-                  Google calls anything under {(LCP_GOOD_MS / 1000).toFixed(1)}s &quot;good&quot; —{" "}
+                  Google calls anything under {(LCP_GOOD_MS / 1000).toFixed(1)}s &quot;good&quot;, and{" "}
                   {visitors.phoneLcpMs <= LCP_GOOD_MS ? "we're in that range." : "we're slower than that right now."}
                 </p>
               )}
               <div>
-                <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Visitors per day</h3>
+                <h4 className={groupTitleClass}>Visitors per day</h4>
                 <DailyBars points={visitors.dailyVisitors.map((d) => ({ date: d.date, value: d.visits }))} emptyMessage="No visitor data yet for this period." />
               </div>
               <div>
-                <h3 className="text-sm font-medium text-[var(--color-ink-700)]">How people found the site</h3>
+                <h4 className={`${groupTitleClass} mb-1`}>How people found the site</h4>
                 <BarList
-                  items={visitors.referrers.map((r) => ({ label: r.label, value: r.visits, displayValue: `${r.visits} visits` }))}
+                  items={visitors.referrers.map((r) => ({ label: r.label, value: r.visits, displayValue: pluralize(r.visits, "visit") }))}
                   emptyMessage="No referrer data yet for this period."
                 />
               </div>
@@ -433,17 +382,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           )}
         </section>
 
-        <section aria-labelledby="map-usage-heading" className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
+        <section aria-labelledby="map-usage-heading" className={cardClass}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 id="map-usage-heading" className="wordmark text-base text-[var(--color-ink-900)]">
+            <h3 id="map-usage-heading" className={sectionTitleClass}>
               What people do on the map
-            </h2>
+            </h3>
             {mapUsage && posthogProjectId && (
               <a
                 href={`https://us.posthog.com/project/${posthogProjectId}`}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+                className={`${tapLinkClass} text-xs`}
               >
                 Open in PostHog →
               </a>
@@ -457,7 +406,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 <KpiCard label="Place cards opened" displayValue={String(mapUsage.headline.cardsOpened)} value={mapUsage.headline.cardsOpened} previousValue={mapUsage.headline.previousCardsOpened} />
                 <KpiCard
                   label="Switched to Spanish"
-                  displayValue={cfVisits === null ? `${mapUsage.headline.localeSwitchedToEs} switches` : formatPct(localeEsPct)}
+                  displayValue={cfVisits === null ? `${mapUsage.headline.localeSwitchedToEs} ${mapUsage.headline.localeSwitchedToEs === 1 ? "switch" : "switches"}` : formatPct(localeEsPct)}
                   value={cfVisits === null ? mapUsage.headline.localeSwitchedToEs : (localeEsPct ?? 0)}
                   previousValue={cfVisits === null ? mapUsage.headline.previousLocaleSwitchedToEs : (previousLocaleEsPct ?? undefined)}
                 />
@@ -465,19 +414,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Most opened places</h3>
+                  <h4 className={`${groupTitleClass} mb-1`}>Most opened places</h4>
                   <BarList
                     items={placeUsage.slice(0, 6).map((p) => ({
                       label: p.name ?? "Removed place",
                       value: p.count,
-                      displayValue: `${p.count} opens`,
+                      displayValue: pluralize(p.count, "open"),
                       href: p.href ?? undefined,
                     }))}
                     emptyMessage="No place cards opened yet this period."
                   />
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Top searches</h3>
+                  <h4 className={`${groupTitleClass} mb-1`}>Top searches</h4>
                   <BarList
                     items={mapUsage.topSearches.map((s) => ({
                       label: s.term,
@@ -487,14 +436,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     emptyMessage="Not enough repeated searches yet to say."
                   />
                   <p className="mt-1 text-xs text-[var(--color-ink-500)]">
-                    Terms searched 3+ times only. A &quot;0 results&quot; tag means every one of those searches found nothing — a hint the map may be missing that place.
+                    Terms searched 3+ times only. A &quot;0 results&quot; tag means every one of those searches found nothing, a hint the map may be missing that place.
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">After opening a card, people…</h3>
+                  <h4 className={`${groupTitleClass} mb-1`}>After opening a card, people…</h4>
                   <BarList
                     items={[
                       { label: "Directions (walk)", value: mapUsage.cardActions.directionsWalk, displayValue: formatPct(pctOf(mapUsage.cardActions.directionsWalk, mapUsage.headline.cardsOpened)) },
@@ -509,14 +458,23 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     emptyMessage="No card actions yet this period."
                   />
                   <p className="mt-1 text-xs text-[var(--color-ink-500)]">Share of cards opened this period.</p>
+                  {/* #919: taps on a place's own page, as plain counts: that page isn't a card, so a share of cards opened would mislead. */}
+                  <h4 className={`${groupTitleClass} mb-1 mt-4`}>On a place&apos;s own page, people…</h4>
+                  <BarList
+                    items={[
+                      { label: "Directions", value: mapUsage.cardActions.venuePageDirections },
+                      { label: "Call", value: mapUsage.cardActions.venuePageCall },
+                    ]}
+                    emptyMessage="No taps on place pages yet this period."
+                  />
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Filters people use</h3>
+                  <h4 className={`${groupTitleClass} mb-1`}>Filters people use</h4>
                   <BarList
                     items={mapUsage.filters.map((f) => ({
                       label: filterLabel(f.filter),
                       value: f.count,
-                      displayValue: cfVisits === null ? `${f.count} toggles` : formatPct(pctOf(f.count, cfVisits)),
+                      displayValue: cfVisits === null ? pluralize(f.count, "toggle") : formatPct(pctOf(f.count, cfVisits)),
                     }))}
                     emptyMessage="No filters toggled on yet this period."
                   />
@@ -525,7 +483,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Location shared?</h3>
+                  <h4 className={`${groupTitleClass} mb-1`}>Location shared?</h4>
                   <BarList
                     items={[
                       { label: "Granted", value: mapUsage.location.granted, displayValue: `${mapUsage.location.granted}` },
@@ -538,12 +496,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   />
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Came from a flyer or link tag</h3>
+                  <h4 className={`${groupTitleClass} mb-1`}>Came from a flyer or link tag</h4>
                   <BarList
                     items={mapUsage.utmSources.map((u) => ({
                       label: u.campaign ? `${u.source} · ${u.campaign}` : u.source,
                       value: u.sessions,
-                      displayValue: `${u.sessions} sessions`,
+                      displayValue: pluralize(u.sessions, "session"),
                     }))}
                     emptyMessage="No tagged flyer or link visits yet this period."
                   />
@@ -555,17 +513,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           )}
         </section>
 
-        <section aria-labelledby="boxes-heading" className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
-          <h2 id="boxes-heading" className="wordmark text-base text-[var(--color-ink-900)]">
+        <section aria-labelledby="boxes-heading" className={cardClass}>
+          <h3 id="boxes-heading" className={sectionTitleClass}>
             Blessing boxes
-          </h2>
+          </h3>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <KpiCard label="Times filled" displayValue={String(counts.fills)} value={counts.fills} previousValue={previousCounts.fills} />
             <KpiCard label="Times used" displayValue={String(counts.uses)} value={counts.uses} previousValue={previousCounts.uses} />
             <KpiCard label="Reported empty" displayValue={String(counts.emptyReports)} value={counts.emptyReports} previousValue={previousCounts.emptyReports} />
             <KpiCard
               label="Avg. empty → refilled"
-              displayValue={networkAverages.emptyToFillMs === null ? "—" : formatDuration(networkAverages.emptyToFillMs)}
+              displayValue={formatDurationLabel(networkAverages.emptyToFillMs, "en")}
               value={networkAverages.emptyToFillMs ?? 0}
             />
           </div>
@@ -582,30 +540,30 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           )}
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Longest since last filled</h3>
+              <h4 className={`${groupTitleClass} mb-1`}>Longest since last filled</h4>
               <BarList
                 items={longestSinceFill.map((b) => ({
                   label: b.name,
                   value: b.lastFilledAt ? now.getTime() - new Date(b.lastFilledAt).getTime() : now.getTime(),
-                  displayValue: b.lastFilledAt ? formatDuration(now.getTime() - new Date(b.lastFilledAt).getTime()) : "never",
+                  displayValue: b.lastFilledAt ? formatDurationLabel(now.getTime() - new Date(b.lastFilledAt).getTime(), "en") : "never",
                 }))}
                 emptyMessage="No boxes yet."
               />
             </div>
             <div>
-              <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Most-needed items</h3>
+              <h4 className={`${groupTitleClass} mb-1`}>Most-needed items</h4>
               <BarList
-                items={mostNeeded.map((n) => ({ label: NEED_LABELS[n.key] ?? n.key, value: n.count, displayValue: `${n.count} asks` }))}
+                items={mostNeeded.map((n) => ({ label: t(`box.needs.${n.key}`, "en"), value: n.count, displayValue: pluralize(n.count, "ask") }))}
                 emptyMessage="Not enough check-ins yet to say."
               />
             </div>
           </div>
         </section>
 
-        <section aria-labelledby="map-health-heading" className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
-          <h2 id="map-health-heading" className="wordmark text-base text-[var(--color-ink-900)]">
+        <section aria-labelledby="map-health-heading" className={cardClass}>
+          <h3 id="map-health-heading" className={sectionTitleClass}>
             Map data health
-          </h2>
+          </h3>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <KpiCard label="Places on the map" displayValue={String(publishedVenues.length)} value={publishedVenues.length} previousValue={publishedVenues.length - newPlacesThisPeriod} />
             <KpiCard label="New this period" displayValue={String(newPlacesThisPeriod)} value={newPlacesThisPeriod} />
@@ -615,8 +573,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <p className="mt-3 text-sm text-[var(--color-ink-500)]">
             {latestRefresh ? (
               <>
-                Last data refresh {new Date(latestRefresh.createdAt).toLocaleDateString()} — {latestRefresh.suggestedCount} suggested changes.{" "}
-                <Link href="/admin/places?show=review" className="font-medium text-[var(--color-sage-700)] underline underline-offset-2">
+                Last data refresh {new Date(latestRefresh.createdAt).toLocaleDateString("en-US", { timeZone: TIME_ZONE })}:{" "}
+                {pluralize(latestRefresh.suggestedCount, "suggested change")}.{" "}
+                <Link href="/admin/places?show=review" className={linkClass}>
                   Review →
                 </Link>
               </>
@@ -625,7 +584,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             )}
           </p>
           {staleThreeMonths > 0 && (
-            <Link href="/admin/places" className="mt-1 inline-block text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2">
+            <Link href="/admin/places" className={`${tapLinkClass} text-sm`}>
               See places due for a check →
             </Link>
           )}
@@ -633,9 +592,4 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </div>
     </main>
   );
-}
-
-function formatDuration(ms: number): string {
-  const { value, unit } = formatDurationMs(ms);
-  return `${value} ${unit}`;
 }

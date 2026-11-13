@@ -104,12 +104,66 @@ describe("MapWrapper — venue_opened", () => {
     });
     await user.click(venueButton);
 
+    // #919 item 8: "venue_opened gets open_now and has_hours" (their values follow the real venue's hours and the clock).
     expect(track).toHaveBeenCalledWith(EVENTS.VENUE_OPENED, {
       category: REAL_VENUE_CATEGORY,
       venueId: REAL_VENUE_ID,
+      open_now: expect.any(Boolean),
+      has_hours: expect.any(Boolean),
     });
     expect(
       vi.mocked(track).mock.calls.filter((c) => c[0] === EVENTS.VENUE_OPENED),
     ).toHaveLength(1);
+  });
+});
+
+describe("MapWrapper — event_opened (#919)", () => {
+  // Far-future dates so the feed keeps them on any test day.
+  const makeEvent = (id: string, name: string) => ({
+    id, name, name_es: null, host: null, host_es: null, description: null, description_es: null,
+    what_to_bring: null, what_to_bring_es: null, starts_at: "2099-10-10T18:00:00.000Z",
+    ends_at: "2099-10-10T20:00:00.000Z", lat: 38.26, lng: -104.61, address: "1 Main St",
+    venue_id: null, link_url: null,
+  });
+  const openedIds = () =>
+    vi.mocked(track).mock.calls.filter((c) => c[0] === EVENTS.EVENT_OPENED).map((c) => c[1]);
+
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          json: async () =>
+            url === "/api/public/events"
+              ? { events: [makeEvent("e1", "Turkey drive"), makeEvent("e2", "Coat giveaway")] }
+              : { boxes: [] },
+        }),
+      ),
+    );
+  });
+
+  test("a ?event= link counts once across re-renders, and a tapped event counts too", async () => {
+    const user = userEvent.setup();
+    const ui = (
+      <LocaleProvider>
+        <MapWrapper initialEventId="e1" />
+      </LocaleProvider>
+    );
+    let rerender!: (ui: React.ReactElement) => void;
+    await act(async () => {
+      ({ rerender } = render(ui));
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+    // (a) the deep link resolving.
+    expect(openedIds()).toEqual([{ eventId: "e1" }]);
+
+    // (c) the same selection re-rendered: still one.
+    await act(async () => rerender(ui));
+    expect(openedIds()).toEqual([{ eventId: "e1" }]);
+
+    // (b) a tap on another event in the list.
+    await user.click(await screen.findByRole("button", { name: /Coat giveaway/i }));
+    expect(openedIds()).toEqual([{ eventId: "e1" }, { eventId: "e2" }]);
   });
 });

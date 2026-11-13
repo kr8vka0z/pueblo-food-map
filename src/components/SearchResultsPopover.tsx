@@ -173,11 +173,11 @@ export default function SearchResultsPopover({
                 onClose();
               }}
               className={
-                "flex items-center gap-3 px-4 h-[52px] cursor-pointer " +
-                "transition-colors duration-100 " +
+                "group flex items-center gap-3 px-4 h-[52px] cursor-pointer " +
+                "transition-colors duration-150 " +
                 (isActive
                   ? "bg-[var(--color-sage-50,#f0f7f3)]"
-                  : "hover:bg-[var(--color-bone-100)]")
+                  : "hover:bg-[var(--color-sage-100)]")
               }
             >
               {/* Primary: venue name */}
@@ -193,7 +193,7 @@ export default function SearchResultsPopover({
                 <span
                   className={
                     "block truncate text-xs " +
-                    "text-[var(--color-ink-400)]"
+                    "text-[var(--color-ink-400)] group-hover:text-[var(--color-ink-500)]"
                   }
                 >
                   {categoryLabel}
@@ -204,7 +204,7 @@ export default function SearchResultsPopover({
               <span
                 className={
                   "shrink-0 text-xs tabular-nums " +
-                  "text-[var(--color-ink-400)]"
+                  "text-[var(--color-ink-400)] group-hover:text-[var(--color-ink-500)]"
                 }
                 aria-label={`${formatDistance(venue.distanceMiles)} away`}
               >
@@ -242,7 +242,7 @@ export default function SearchResultsPopover({
             "flex items-center gap-2.5 w-full px-4 h-[46px] text-left text-xs " +
             "text-[var(--color-sage-700)] font-semibold " +
             "border-t border-[var(--color-bone-200)] " +
-            "hover:bg-[var(--color-bone-100)] transition-colors duration-100 " +
+            "hover:bg-[var(--color-sage-100)] transition-colors duration-150 " +
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset " +
             "focus-visible:ring-[var(--color-sage-500)]"
           }

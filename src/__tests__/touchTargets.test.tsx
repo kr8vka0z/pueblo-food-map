@@ -32,11 +32,15 @@ import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 import { waitForBoxCard } from "@/lib/testing/waitForBoxCard.testutil";
 import BoxCardBody from "@/components/BoxCardBody";
-import VenuePopupHeader from "@/components/VenuePopupHeader";
 import LocationHelpCard from "@/components/LocationHelpCard";
 import AdoptBoxForm from "@/components/AdoptBoxForm";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { makeWalk } from "@/__tests__/helpers/walkTestHelpers";
+import { t } from "@/lib/i18n";
+import * as adminStyles from "@/lib/adminCardStyles";
+import * as formClasses from "@/components/formClasses";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 // Box cards mount BoxCheckinPanel's Turnstile widget — same stub as the
 // BoxCardBody/DesktopVenueWindow tests.
@@ -149,9 +153,12 @@ describe("FilterPanel", () => {
 
   test("every Kind-of-place row is at least 48px tall", () => {
     render(<FilterPanel {...filterProps} />);
-    const boxes = screen.getAllByRole("checkbox");
-    expect(boxes.length).toBeGreaterThan(0);
-    for (const cb of boxes) expect(classes(cb.closest("label"))).toContain("min-h-12");
+    // #917: kind-of-place rows are switch rows now (no tick boxes); check all eight.
+    const kinds = ["pantry", "grocery", "convenience", "farm", "garden", "edible_landscape", "meal_site", "blessing_box"];
+    for (const kind of kinds) {
+      const row = screen.getByRole("switch", { name: t(`category.full.${kind}`, "en") }).parentElement;
+      expect(classes(row)).toContain("min-h-12");
+    }
   });
 
   test("the Show N places footer button is 48px tall", () => {
@@ -161,7 +168,7 @@ describe("FilterPanel", () => {
 
   test("the scroll container doesn't reserve py-2 (#233: growing every row to 48px made the panel ~16px taller than its available height; keeping py-2 here clipped the last Kind-of-place row's bottom 8px against the footer)", () => {
     render(<FilterPanel {...filterProps} />);
-    const scroller = screen.getByRole("checkbox", { name: /Food Pantry/ }).closest("label")?.parentElement;
+    const scroller = screen.getByRole("switch", { name: /Food Pantry/ }).parentElement?.parentElement;
     expect(classes(scroller)).toContain("pt-2");
     expect(classes(scroller)).not.toContain("py-2");
   });
@@ -206,20 +213,15 @@ describe("LanguageToggle", () => {
     expect(classes(screen.getByRole("group"))).not.toContain("overflow-hidden");
   });
 
-  test("each segment rounds its own outer end and reaches 48px tall, extending outward only", () => {
+  // #917 round 3 rebuilt it as the design system's slider: each segment is
+  // drawn 48 wide by 40 tall in a track with 4px padding, so the ::before
+  // reaches 4px up and down to make 48 by 48, and the two meet in the middle.
+  test("each segment is 48 wide and reaches 48px tall through the track's padding", () => {
     render(<LanguageToggle />);
+    expect(classes(screen.getByRole("group"))).toContain("p-1");
     for (const name of ["Language: English", "Language: Spanish"]) {
       expect(classes(screen.getByRole("button", { name }))).toEqual(
-        expect.arrayContaining([
-          "relative",
-          "first:rounded-l-full",
-          "last:rounded-r-full",
-          "before:absolute",
-          "before:inset-x-0",
-          "before:-inset-y-[11px]",
-          "first:before:-left-2.5",
-          "last:before:-right-2.5",
-        ]),
+        expect.arrayContaining(["relative", "w-12", "h-[40px]", "before:absolute", "before:inset-x-0", "before:-inset-y-1"]),
       );
     }
   });
@@ -285,10 +287,12 @@ describe("Venue card controls", () => {
     );
   });
 
-  test("BottomSheet header: 48px close, 16px flex gap so Share/Save/× hit areas sit 8px apart", () => {
+  // #882: the phone sheet's × is hidden until keyboard focus (Kyle: it closes by
+  // swiping down), so it no longer sits in the row; when it shows it is 48px.
+  test("BottomSheet header: 48px close when focused, 16px flex gap so Share/Save hit areas sit 8px apart", () => {
     render(<BottomSheet venue={makeVenue()} onClose={vi.fn()} />);
     const close = screen.getByRole("button", { name: "Close" });
-    expect(classes(close)).toEqual(expect.arrayContaining(["w-12", "h-12", "-ml-1", "-mr-3"]));
+    expect(classes(close)).toEqual(expect.arrayContaining(["w-12", "h-12", "focus-visible:h-12", "focus-visible:w-12"]));
     expect(classes(close.parentElement)).toContain("gap-4");
   });
 
@@ -304,13 +308,16 @@ describe("Venue card controls", () => {
     );
   });
 
-  test("BottomSheet phone link keeps min-h-11 and adds a 2px overlay → 48px", async () => {
-    const user = userEvent.setup();
-    render(<BottomSheet venue={makeVenue()} onClose={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /Show details/ }));
-    expect(classes(screen.getByRole("link", { name: /555-0233/ }))).toEqual(
-      expect.arrayContaining(["relative", "before:absolute", "before:inset-x-0", "before:-inset-y-0.5"]),
-    );
+  // #917 R4: the phone line in CONTACT is gone; the number is the Call
+  // button in the action row, and a missing phone or website keeps its 48px box.
+  test("BottomSheet Call, Website and their greyed stand-ins are 48×48 boxes", () => {
+    const { unmount } = render(<BottomSheet venue={makeVenue()} onClose={vi.fn()} />);
+    expect(classes(screen.getByRole("link", { name: /Call .*555-0233/ }))).toEqual(expect.arrayContaining(["w-12", "h-12"]));
+    unmount();
+    render(<BottomSheet venue={makeVenue({ phone: undefined, url: undefined })} onClose={vi.fn()} />);
+    for (const name of ["No phone number listed", "No website listed"]) {
+      expect(classes(screen.getByRole("button", { name }))).toEqual(expect.arrayContaining(["w-12", "h-12"]));
+    }
   });
 
   test("BottomSheet Plentiful link is at least 48px tall even on one line", async () => {
@@ -403,22 +410,27 @@ describe("44px leftovers reach the 48px floor (#827)", () => {
     ["box card History link", () => (boxCard(), screen.getByRole("link", { name: "History" })), OVERLAY_Y],
     ["box card email-alerts link", () => (boxCard(), screen.getByRole("button", { name: "Email me when it needs filling" })), OVERLAY_Y],
     ["box check-in buttons", () => (boxCard(), screen.getByRole("button", { name: "I filled it" })), ["min-h-12"]],
+    // #917: VenuePopupHeader's bar is gone; the × ends the action row (or the
+    // box's History line) in DesktopVenueWindow's pinned top.
     [
       "desktop card close",
-      () => (render(<VenuePopupHeader onClose={vi.fn()} />), screen.getByRole("button", { name: "Close" })),
-      // Grows down, not up: the bar's top edge is clipped (overflow-hidden).
-      ["relative", "before:absolute", "before:-inset-x-0.5", "before:top-0", "before:-bottom-1"],
+      () => (render(<DesktopVenueWindow venue={ttBox} box={ttBox} onClose={vi.fn()} locale="en" />), screen.getByRole("button", { name: "Close" })),
+      ["w-12", "h-12"],
     ],
     [
       "desktop box card History link",
-      () => (render(<VenuePopupHeader onClose={vi.fn()} historyHref="/box/x/history" />), screen.getByRole("link", { name: "History" })),
-      ["relative", "before:absolute", "before:inset-x-0", "before:-top-1.5", "before:-bottom-2.5"],
+      () => (render(<DesktopVenueWindow venue={ttBox} box={ttBox} onClose={vi.fn()} locale="en" />), screen.getByRole("link", { name: "History" })),
+      // 40px drawn, 4px overlay up and down → 48.
+      ["relative", "before:absolute", "before:inset-x-0", "before:-inset-y-1", "min-h-[40px]"],
     ],
     [
-      // Those overlays reach into the body; the bar's own layer keeps a
-      // positioned body element (a box photo) from covering them.
-      "desktop card header bar",
-      () => (render(<VenuePopupHeader onClose={vi.fn()} />), screen.getByRole("button", { name: "Close" }).parentElement!),
+      // Those overlays reach past the pinned top into the body; its own
+      // layer keeps a positioned body element (a box photo) from covering them.
+      "desktop card pinned top",
+      () => (
+        render(<DesktopVenueWindow venue={ttBox} box={ttBox} onClose={vi.fn()} locale="en" />),
+        screen.getByRole("button", { name: "Close" }).parentElement!.parentElement!
+      ),
       ["relative", "z-10"],
     ],
     [
@@ -439,5 +451,57 @@ describe("44px leftovers reach the 48px floor (#827)", () => {
     ],
   ])("%s", (_name, find, expected) => {
     expect(classes(find())).toEqual(expect.arrayContaining(expected));
+  });
+});
+
+// #926: the admin's shared class strings are the one place the admin's
+// look is set, so this is the one place they are asserted. Every pressable
+// string keeps the 48 px floor, and none brings back a grey or brightening
+// hover (DESIGN.md R1, R2).
+describe("admin shared class strings", () => {
+  const pressable: [string, string][] = [
+    ["primaryButtonClass", adminStyles.primaryButtonClass],
+    ["secondaryButtonClass", adminStyles.secondaryButtonClass],
+    ["dangerButtonClass", adminStyles.dangerButtonClass],
+    ["ADMIN_PRIMARY_BUTTON", formClasses.ADMIN_PRIMARY_BUTTON],
+    ["ADMIN_SECONDARY_BUTTON", formClasses.ADMIN_SECONDARY_BUTTON],
+    ["chipClass(true)", adminStyles.chipClass(true)],
+    ["chipClass(false)", adminStyles.chipClass(false)],
+    ["tapLinkClass", adminStyles.tapLinkClass],
+    ["pickerOptionClass", adminStyles.pickerOptionClass],
+    ["inputBase", formClasses.inputBase],
+    ["checkboxRowClass", formClasses.checkboxRowClass],
+  ];
+  // One test per rule, looping over the strings: a failure lists every
+  // offending string by name (an empty list is the pass).
+  test("every admin pressable string is at least 48 tall", () => {
+    const short = pressable.filter(([, value]) => !value.split(/\s+/).includes("min-h-12")).map(([name]) => name);
+    expect(short.join(", "), "these strings lost min-h-12").toBe("");
+  });
+
+  const tones = ["calm", "attention", "quiet", "neutral", "caution", "danger"] as const;
+  const everyString: [string, string][] = [
+    ...Object.entries({ ...adminStyles, ...formClasses }).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+    ["inputBorder(false)", formClasses.inputBorder(false)],
+    ["inputBorder(true)", formClasses.inputBorder(true)],
+    ["chipClass(true)", adminStyles.chipClass(true)],
+    ["chipClass(false)", adminStyles.chipClass(false)],
+    ...tones.map((tone): [string, string] => [`tagClass(${tone})`, adminStyles.tagClass(tone)]),
+    ...["AdminConfirm.tsx", "AdminRowMenu.tsx", "AdminSegmented.tsx"].map((f): [string, string] => [
+      f,
+      readFileSync(join(process.cwd(), "src", "components", f), "utf-8"),
+    ]),
+  ];
+  test("no admin string or shared component file has a grey or brightening hover", () => {
+    const banned = [
+      "hover:bg-[var(--color-bone-100)]",
+      "hover:bg-[var(--color-bone-200)]",
+      "hover:bg-[var(--color-sage-50)]",
+      "hover:brightness",
+    ];
+    const found = everyString.flatMap(([name, value]) => banned.filter((b) => value.includes(b)).map((b) => `${name}: ${b}`));
+    expect(found.join("; "), "these strings carry a banned hover").toBe("");
   });
 });

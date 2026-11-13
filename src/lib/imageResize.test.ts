@@ -11,28 +11,15 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { fitWithin, shrinkImageToJpeg, UnsupportedImageError } from "@/lib/imageResize";
 
 describe("fitWithin", () => {
-  test("leaves an already-small image untouched", () => {
-    expect(fitWithin(800, 600, 1600)).toEqual({ width: 800, height: 600 });
-  });
-
-  test("shrinks a landscape image so the longest side hits the cap", () => {
-    expect(fitWithin(3200, 2400, 1600)).toEqual({ width: 1600, height: 1200 });
-  });
-
-  test("shrinks a portrait image the same way, on the height", () => {
-    expect(fitWithin(2400, 3200, 1600)).toEqual({ width: 1200, height: 1600 });
-  });
-
-  test("exactly at the cap is left untouched (no off-by-one shrink)", () => {
-    expect(fitWithin(1600, 900, 1600)).toEqual({ width: 1600, height: 900 });
-  });
-
-  test("never upscales a smaller-than-cap image", () => {
-    expect(fitWithin(400, 300, 1600)).toEqual({ width: 400, height: 300 });
-  });
-
-  test("a zero dimension is left alone rather than dividing by zero", () => {
-    expect(fitWithin(0, 0, 1600)).toEqual({ width: 0, height: 0 });
+  test.each([
+    ["leaves an already-small image untouched", 800, 600, { width: 800, height: 600 }],
+    ["shrinks a landscape image so the longest side hits the cap", 3200, 2400, { width: 1600, height: 1200 }],
+    ["shrinks a portrait image the same way, on the height", 2400, 3200, { width: 1200, height: 1600 }],
+    ["exactly at the cap is left untouched (no off-by-one shrink)", 1600, 900, { width: 1600, height: 900 }],
+    ["never upscales a smaller-than-cap image", 400, 300, { width: 400, height: 300 }],
+    ["a zero dimension is left alone rather than dividing by zero", 0, 0, { width: 0, height: 0 }],
+  ])("%s", (_name, w, h, out) => {
+    expect(fitWithin(w, h, 1600)).toEqual(out);
   });
 });
 

@@ -58,10 +58,11 @@
 import { headers } from "next/headers";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
-import { loadAdminNavCounts, ZERO_ADMIN_NAV_COUNTS, type AdminNavCounts } from "@/lib/adminNavCounts";
+import { loadAdminNavCounts } from "@/lib/adminNavCounts";
 import AdminNav from "@/components/AdminNav";
 import AddVenueForm, { type AddVenueFormValues } from "@/components/AddVenueForm";
 import ProposalCard from "@/components/ProposalCard";
+import { formPageBodyClass, pageTitleClass, sectionTitleClass } from "@/lib/adminCardStyles";
 import { mapSubmissionPayloadToFormValues, mapAddProposalToFormValues } from "@/lib/adminVenueForm";
 import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@/lib/adminProposals";
 import type { NewVenuePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
@@ -144,38 +145,26 @@ export default async function NewVenuePage({
 }: {
   searchParams?: Promise<{ submission?: string; proposal?: string }>;
 } = {}) {
-  let email: string;
-  let showActivity = false;
-  let prefill: NewVenuePrefill | null = null;
-  let proposalPrefill: NewVenueProposalPrefill | null = null;
-  let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
-
-  try {
-    const { db, identity } = await getAdminDb(await headers());
-    email = identity.email;
-    showActivity = identity.isOwner === true;
-    const { submission, proposal } = searchParams ? await searchParams : {};
-    // Independent reads, one round trip's wait instead of three (each D1 call
-    // is an edge -> primary round trip).
-    [prefill, proposalPrefill, navCounts] = await Promise.all([
-      resolveSubmissionPrefill(db, submission),
-      resolveProposalPrefill(db, proposal),
-      loadAdminNavCounts(db),
-    ]);
-  } catch (err) {
-    handlePageAuthError(err);
-  }
+  const { db, identity } = await getAdminDb(await headers()).catch(handlePageAuthError);
+  const { submission, proposal } = searchParams ? await searchParams : {};
+  // Independent reads, one round trip's wait instead of three (each D1 call
+  // is an edge -> primary round trip).
+  const [prefill, proposalPrefill, navCounts] = await Promise.all([
+    resolveSubmissionPrefill(db, submission),
+    resolveProposalPrefill(db, proposal),
+    loadAdminNavCounts(db),
+  ]);
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="places" counts={navCounts} showActivity={showActivity} />
-      <div className="px-4 py-6 sm:px-6 space-y-6">
-        <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Add a venue</h2>
+      <AdminNav email={identity.email} active="places" counts={navCounts} showActivity={identity.isOwner === true} />
+      <div className={formPageBodyClass}>
+        <h2 className={pageTitleClass}>Add a venue</h2>
         {proposalPrefill && (
-          <div className="max-w-2xl">
-            <h3 className="mb-2 text-sm font-semibold text-[var(--color-ink-700)]">Suggested new place</h3>
+          <section>
+            <h3 className={`mb-3 ${sectionTitleClass}`}>Suggested new place</h3>
             <ProposalCard proposal={proposalPrefill.proposal} />
-          </div>
+          </section>
         )}
         {proposalPrefill ? (
           <AddVenueForm initialValues={proposalPrefill.initialValues} proposalId={proposalPrefill.proposalId} />

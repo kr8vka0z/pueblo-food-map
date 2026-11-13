@@ -51,16 +51,17 @@ export const FREE_CATEGORIES: ReadonlySet<Venue["category"]> = new Set([
 
 /**
  * The OSM-import placeholder venue.address stores when OpenStreetMap had no
- * address data. Same literal BottomSheet.tsx and DesktopVenueWindow.tsx
- * already guard against (their own inline `venue.address === "Address not
- * in OpenStreetMap"` checks — no shared exported constant exists yet in
- * this repo to import, so this mirrors their literal rather than inventing
- * a cross-file dependency those two map-card components don't otherwise
- * need). Unlike those two (which fall back to raw lat/lng), a summary
- * sentence drops the address entirely and falls back to the parsed city —
- * "at 38.27, -104.61" reads like a bug in a sentence meant for a human.
+ * address data. The map card and the venue page show coordinates instead
+ * (displayAddress below); a summary sentence drops the address entirely and
+ * falls back to the parsed city — "at 38.27, -104.61" reads like a bug in a
+ * sentence meant for a human.
  */
 export const PLACEHOLDER_ADDRESS = "Address not in OpenStreetMap";
+
+/** The address to show for a venue: OSM's placeholder text is never shown, its coordinates are. */
+export function displayAddress(venue: Venue): string {
+  return venue.address === PLACEHOLDER_ADDRESS ? `${venue.lat}, ${venue.lng}` : venue.address;
+}
 
 // ─── City parsing (title's "{City}, CO", and the no-address sentence) ──────
 
@@ -148,8 +149,15 @@ export function buildVenueTitle(venue: Venue, locale: Locale = "en"): string {
   const connector = t("summary.title.in", locale);
   const categoryFull = t(`category.full.${venue.category}`, locale);
   const categoryShort = t(`summary.title.category.${venue.category}`, locale);
+  // #921: a SNAP store leads with what searchers ask ("does loaf n jug take
+  // ebt"); a long name drops ", CO", then the verb, then falls back to the
+  // same ladder as every other venue. Every SNAP rung keeps the place (#921).
+  const snap = venue.accepts_snap === true ? t("summary.title.acceptsSnap", locale) : null;
 
   const candidates = [
+    ...(snap
+      ? [`${venue.name}, ${city}, CO: ${snap}`, `${venue.name}, ${city}: ${snap}`, `${venue.name}, ${city}: SNAP/EBT`]
+      : []),
     `${venue.name} – ${categoryFull} ${connector} ${city}, CO`,
     `${venue.name} – ${categoryShort} ${connector} ${city}, CO`,
     `${venue.name} ${connector} ${city}, CO`,
@@ -431,7 +439,14 @@ export function buildVenueMetaDescription(
   locale: Locale = "en",
   maxLen = 160,
 ): string {
-  const sentences = buildVenueSummary(venue, locale);
+  let sentences = buildVenueSummary(venue, locale);
+  // #921: a SNAP store's description opens with the SNAP/WIC fact, named
+  // (the on-page summary and JSON-LD keep the #704 order and "It accepts").
+  if (venue.accepts_snap === true) {
+    const snapWic = buildSnapWicSentence(venue, locale);
+    const key = venue.accepts_wic === true ? "summary.meta.snapAndWic" : "summary.meta.snap";
+    sentences = [t(key, locale, { name: venue.name }), ...sentences.filter((s) => s !== snapWic)];
+  }
   let result = "";
   for (const sentence of sentences) {
     const candidate = result ? `${result} ${sentence}` : sentence;

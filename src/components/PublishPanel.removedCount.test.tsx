@@ -32,7 +32,6 @@ beforeEach(() => {
   mockFetch.mockReset();
   mockRefresh.mockReset();
   vi.stubGlobal("fetch", mockFetch);
-  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -56,6 +55,8 @@ describe("PublishPanel — removals-only publish (#568 item 2)", () => {
     const user = userEvent.setup();
     render(<PublishPanel summary={summary({ archived: 3 })} />);
 
+    // Publish asks first; the confirm's own Publish sends.
+    await user.click(screen.getByRole("button", { name: /^publish$/i }));
     await user.click(screen.getByRole("button", { name: /^publish$/i }));
 
     expect(await screen.findByText(/0 places pushed, 3 places removed/i)).toBeDefined();
@@ -75,6 +76,8 @@ describe("PublishPanel — removals-only publish (#568 item 2)", () => {
     const user = userEvent.setup();
     render(<PublishPanel summary={summary({ newDrafts: 2 })} />);
 
+    // Publish asks first; the confirm's own Publish sends.
+    await user.click(screen.getByRole("button", { name: /^publish$/i }));
     await user.click(screen.getByRole("button", { name: /^publish$/i }));
 
     // Scoped to the success paragraph specifically — the pre-publish change

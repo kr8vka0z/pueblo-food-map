@@ -41,7 +41,7 @@ export default function ReportVenueButton({
         // above — "intentionally lower visual weight" than a primary action.
         "border border-[var(--color-bone-300)] text-[var(--color-ink-500)] " +
         "text-sm font-medium transition-colors duration-150 " +
-        "hover:bg-[var(--color-bone-100)] hover:border-[var(--color-ink-400)] " +
+        "hover:bg-[var(--color-sage-100)] hover:border-[var(--color-ink-400)] " +
         "focus-visible:outline-none focus-visible:ring-2 " +
         "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
       }

@@ -19,60 +19,63 @@
  * other admin queue in this app already uses.
  */
 
+import { busyButtonProps } from "@/components/formClasses";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AdminRejectStep, useAdminStep } from "@/components/AdminConfirm";
 import type { AdminBoxAdopterRow } from "@/lib/boxAdopters";
+import {
+  cardClass,
+  cardNameClass,
+  failureLineClass,
+  fieldLabelClass,
+  formatSubmittedAt,
+  linkClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+  tagClass,
+} from "@/lib/adminCardStyles";
 
 export interface SponsorRequestCardProps {
   adopter: AdminBoxAdopterRow;
 }
 
-const cardClass =
-  "elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5";
-
-const primaryButtonClass =
-  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
-  "px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] transition-colors duration-150 " +
-  "hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 " +
-  "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
-
-const secondaryButtonClass =
-  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-bone-300)] " +
-  "px-3 py-1.5 text-sm font-medium text-[var(--color-ink-700)] bg-transparent " +
-  "transition-colors duration-150 hover:bg-[var(--color-bone-100)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
-
-const dangerButtonClass =
-  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] " +
-  "px-3 py-1.5 text-sm font-medium text-[var(--color-danger)] bg-transparent " +
-  "transition-colors duration-150 hover:bg-[var(--color-danger)] hover:text-[var(--color-bone-50)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
-
-const fieldLabelClass = "text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-400)]";
-
-function formatSubmittedAt(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(date);
-}
-
-type ActionState = { status: "idle" } | { status: "submitting" } | { status: "error"; message: string };
+// `action` says which button is working, so only that one reads "Approving…"
+// or "Saving…" (both stay disabled either way).
+type ActionState =
+  | { status: "idle" }
+  | { status: "submitting"; action: "approve" | "reject" }
+  | { status: "error"; message: string };
 
 export default function SponsorRequestCard({ adopter }: SponsorRequestCardProps) {
   const router = useRouter();
-  const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [state, setState] = useState<ActionState>({ status: "idle" });
+  // Focus goes to the reason box on open and back to the button on Cancel (#926).
+  const { open: rejectOpen, openStep: openReject, closeStep: closeReject, triggerRef: rejectRef, fieldRef: reasonRef } =
+    useAdminStep({ busy: state.status === "submitting", onCancel: cancelReject });
+
+  // The step's Cancel; Escape runs it too, so the typed reason is cleared either way.
+  function cancelReject() {
+    setReason("");
+    setState({ status: "idle" });
+    closeReject();
+  }
 
   const reasonFieldId = `adopter-reject-reason-${adopter.id}`;
-  const genericErrorMessage = "Something went wrong. Try again.";
-  const unconfirmedErrorMessage = "This applicant hasn't confirmed their email yet — approve is refused until they do.";
+  const isApproved = adopter.status === "approved";
+  const confirmRejectLabel = isApproved ? "Confirm remove" : "Confirm decline";
+  // #926 decision 15: an error says what did NOT happen, then what to do.
+  const approveErrorMessage = "The sponsor was not approved. Try again.";
+  const rejectErrorMessage = isApproved
+    ? "The sponsor was not removed. Try again."
+    : "The request was not declined. Try again.";
+  const unconfirmedErrorMessage =
+    "This applicant hasn't confirmed their email yet, so they can't be approved until they do.";
 
   async function handleApprove() {
-    setState({ status: "submitting" });
+    if (state.status === "submitting") return;
+    setState({ status: "submitting", action: "approve" });
     try {
       const res = await fetch(`/api/admin/box-adopters/${adopter.id}/approve`, { method: "POST" });
       if (res.status === 200) {
@@ -83,14 +86,15 @@ export default function SponsorRequestCard({ adopter }: SponsorRequestCardProps)
         setState({ status: "error", message: unconfirmedErrorMessage });
         return;
       }
-      setState({ status: "error", message: genericErrorMessage });
+      setState({ status: "error", message: approveErrorMessage });
     } catch {
-      setState({ status: "error", message: genericErrorMessage });
+      setState({ status: "error", message: approveErrorMessage });
     }
   }
 
   async function handleConfirmReject() {
-    setState({ status: "submitting" });
+    if (state.status === "submitting") return;
+    setState({ status: "submitting", action: "reject" });
     try {
       const res = await fetch(`/api/admin/box-adopters/${adopter.id}/reject`, {
         method: "POST",
@@ -101,37 +105,30 @@ export default function SponsorRequestCard({ adopter }: SponsorRequestCardProps)
         router.refresh();
         return;
       }
-      setState({ status: "error", message: genericErrorMessage });
+      setState({ status: "error", message: rejectErrorMessage });
     } catch {
-      setState({ status: "error", message: genericErrorMessage });
+      setState({ status: "error", message: rejectErrorMessage });
     }
   }
 
   return (
     <div className={cardClass}>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <span
-          className={
-            "inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium " +
-            (adopter.email_confirmed_at
-              ? "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]"
-              : "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]")
-          }
-        >
+        <span className={tagClass(adopter.email_confirmed_at ? "calm" : "attention")}>
           {adopter.email_confirmed_at ? "Email confirmed" : "Awaiting email confirmation"}
         </span>
         <p className="text-xs text-[var(--color-ink-400)]">{formatSubmittedAt(adopter.created_at)}</p>
       </div>
 
       <div className="mt-3 space-y-1">
-        <p className="text-base font-semibold text-[var(--color-ink-700)]">{adopter.venue_name}</p>
+        <p className={cardNameClass}>{adopter.venue_name}</p>
         <p className="text-sm text-[var(--color-ink-700)]">
           <span className={fieldLabelClass}>Name: </span>
           {adopter.display_name}
         </p>
         <p className="text-sm text-[var(--color-ink-700)]">
           <span className={fieldLabelClass}>Email: </span>
-          <a href={`mailto:${adopter.email}`} className="underline underline-offset-2">
+          <a href={`mailto:${adopter.email}`} className={`${linkClass} break-words`}>
             {adopter.email}
           </a>
         </p>
@@ -153,67 +150,40 @@ export default function SponsorRequestCard({ adopter }: SponsorRequestCardProps)
         <button
           type="button"
           onClick={handleApprove}
-          disabled={state.status === "submitting"}
+          {...busyButtonProps(state.status === "submitting")}
           className={primaryButtonClass}
         >
-          {state.status === "submitting" ? "Approving…" : "Approve sponsor"}
+          {state.status === "submitting" && state.action === "approve" ? "Approving…" : "Approve sponsor"}
         </button>
-        {!rejectOpen && (
-          <button
-            type="button"
-            onClick={() => setRejectOpen(true)}
-            disabled={state.status === "submitting"}
-            className={secondaryButtonClass}
-          >
-            {adopter.status === "approved" ? "Remove" : "Decline"}
-          </button>
-        )}
+        <button
+          ref={rejectRef}
+          type="button"
+          hidden={rejectOpen}
+          onClick={openReject}
+          disabled={state.status === "submitting"}
+          className={secondaryButtonClass}
+        >
+          {isApproved ? "Remove" : "Decline"}
+        </button>
       </div>
 
       {rejectOpen && (
-        <div className="mt-4 border-t border-[var(--color-bone-200)] pt-4">
-          <label htmlFor={reasonFieldId} className={`${fieldLabelClass} mb-1 block`}>
-            Reason <span className="font-normal normal-case text-[var(--color-ink-400)]">(optional)</span>
-          </label>
-          <textarea
-            id={reasonFieldId}
-            rows={2}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            className={
-              "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm " +
-              "text-[var(--color-ink-900)] bg-white placeholder:text-[var(--color-ink-400)] " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-              "focus-visible:border-[var(--color-sage-500)]"
-            }
-          />
-          <div className="mt-2 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleConfirmReject}
-              disabled={state.status === "submitting"}
-              className={dangerButtonClass}
-            >
-              {state.status === "submitting" ? "Saving…" : `Confirm ${adopter.status === "approved" ? "remove" : "decline"}`}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setRejectOpen(false);
-                setReason("");
-                setState({ status: "idle" });
-              }}
-              disabled={state.status === "submitting"}
-              className={secondaryButtonClass}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+        <AdminRejectStep
+          id={reasonFieldId}
+          fieldRef={reasonRef}
+          reason={reason}
+          onReason={setReason}
+          busy={state.status === "submitting"}
+          confirmLabel={confirmRejectLabel}
+          // "Saving…" only while the decline itself runs; an Approve running keeps the plain label.
+          busyLabel={state.status === "submitting" && state.action === "reject" ? "Saving…" : confirmRejectLabel}
+          onCancel={cancelReject}
+          onConfirm={handleConfirmReject}
+        />
       )}
 
       {state.status === "error" && (
-        <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
+        <p role="alert" className={`mt-2 ${failureLineClass}`}>
           {state.message}
         </p>
       )}

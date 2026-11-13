@@ -16,6 +16,7 @@
  */
 
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
+import { optionalStringCapped } from "@/lib/adminVenueValidation";
 
 /**
  * Llama 3.3 70B: on Cloudflare's JSON-mode list, current, and strong in
@@ -31,6 +32,8 @@ export const TRANSLATABLE_FIELDS = {
   description: FIELD_LIMITS.SUGGEST_NOTES,
   what_to_bring: FIELD_LIMITS.EVENT_SHORT_TEXT,
   cancel_note: FIELD_LIMITS.EVENT_SHORT_TEXT,
+  // The Custom action-button wording (#882); the form sends it only when "Custom" is chosen.
+  link_label_custom: FIELD_LIMITS.EVENT_LINK_LABEL,
 } as const;
 export type TranslatableField = keyof typeof TRANSLATABLE_FIELDS;
 const FIELD_KEYS = Object.keys(TRANSLATABLE_FIELDS) as TranslatableField[];
@@ -64,19 +67,8 @@ export function validateTranslateRequest(body: unknown): ValidatedTranslateReque
   const errors: Record<string, string> = {};
   const fields: Partial<Record<TranslatableField, string>> = {};
   for (const key of FIELD_KEYS) {
-    const value = b[key];
-    if (value === undefined || value === null) continue;
-    if (typeof value !== "string") {
-      errors[key] = "Must be text.";
-      continue;
-    }
-    const trimmed = value.trim();
-    if (!trimmed) continue;
-    if (trimmed.length > TRANSLATABLE_FIELDS[key]) {
-      errors[key] = `Must be ${TRANSLATABLE_FIELDS[key]} characters or fewer.`;
-      continue;
-    }
-    fields[key] = trimmed;
+    const text = optionalStringCapped(b[key], key, TRANSLATABLE_FIELDS[key], errors);
+    if (text !== null) fields[key] = text;
   }
   if (Object.keys(errors).length === 0 && Object.keys(fields).length === 0) {
     errors._form = "There is no English text to translate.";

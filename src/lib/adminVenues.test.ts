@@ -26,7 +26,7 @@ import type { AdminVenueRow } from "@/types/venue";
 import type { Venue } from "@/types/venue";
 
 // The fixture matching makeRow()'s default fields, mapped exactly the way
-// validateAndMapRow (publishVenues.ts) would — see venueSignature's own
+// validateAndMapRow (publishVenues.ts) would — see hasNonTrivialDiff's own
 // comment in adminVenues.ts for why both sides must agree bit-for-bit.
 const PUBLISHED_VENUE_A: Venue = {
   id: "venue-a",

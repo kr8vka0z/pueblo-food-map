@@ -13,7 +13,8 @@
  *    (`inputmode="numeric"`, `autocomplete="one-time-code"` so iOS/Android
  *    can fill it from the email) → "Sign in" (authClient.signIn.emailOtp).
  *    Six digits submit on their own, so an autofilled code signs straight
- *    in. "Resend code" is disabled for 30 s after each send.
+ *    in. "Resend code" can't be pressed for 30 s after each send (marked
+ *    aria-disabled, not disabled, so keyboard focus stays on it).
  * A successful sign-in flips `authClient.useSession()` (Better Auth's
  * client refetches the session after a /sign-in call), which renders the
  * signed-in view below — exactly what a link sign-in used to land on.
@@ -36,12 +37,22 @@
  * Better Auth session this form creates (AGENTS.md "Admin authentication").
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/authClient";
 import { markInternalDevice } from "@/lib/analytics";
 import { EMAIL_RE } from "@/lib/email";
+import {
+  ADMIN_PRIMARY_BUTTON,
+  ADMIN_SECONDARY_BUTTON,
+  busyButtonProps,
+  errorClass,
+  inputBase,
+  inputBorder,
+  labelClass,
+} from "@/components/formClasses";
+import { signInCardClass, tapLinkClass } from "@/lib/adminCardStyles";
 
 type FormStatus = "idle" | "sending" | "sent" | "error";
 type CodeStatus = "idle" | "verifying" | "error";
@@ -50,7 +61,7 @@ type PasskeyRegisterStatus = "idle" | "registering" | "error";
 
 const CODE_LENGTH = 6;
 /** Seconds "Resend code" stays disabled after each send (#684). */
-export const RESEND_COOLDOWN_SECONDS = 30;
+const RESEND_COOLDOWN_SECONDS = 30;
 
 /** Maps Better Auth's error to the copy #684 asks for — never reveals whether an email is an admin. */
 function codeErrorMessage(error: { code?: string; status?: number } | null | undefined): string {
@@ -63,31 +74,14 @@ function codeErrorMessage(error: { code?: string; status?: number } | null | und
     case "TOO_MANY_ATTEMPTS":
       return "Too many tries. Send a new code.";
     default:
-      return "Something went wrong. Try again.";
+      return "That code didn't work. Try again.";
   }
 }
 
-// text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
-const inputBase =
-  "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
-  // #534: --color-ink-300 undefined — DESIGN.md documents ink-400 as the
-  // placeholder-text token.
-  "bg-white placeholder:text-[var(--color-ink-400)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-  "focus-visible:border-[var(--color-sage-500)]";
-const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
-const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
-const primaryButtonClass =
-  "w-full h-12 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
-  "text-base font-semibold transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-  "focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed";
-const secondaryButtonClass =
-  "w-full h-12 inline-flex items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
-  "text-sm font-medium text-[var(--color-sage-600)] bg-transparent " +
-  "transition-colors duration-150 hover:bg-[var(--color-sage-50)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
+const primaryButtonClass = `${ADMIN_PRIMARY_BUTTON} w-full`;
+const secondaryButtonClass = `${ADMIN_SECONDARY_BUTTON} w-full`;
+// The small text buttons under the code box: 48 tall tap area plus the ring.
+const textButtonClass = `${tapLinkClass} text-sm aria-disabled:cursor-not-allowed aria-disabled:no-underline aria-disabled:opacity-60`;
 
 export default function AdminLoginForm() {
   const { data: session, isPending: sessionPending } = authClient.useSession();
@@ -109,6 +103,17 @@ export default function AdminLoginForm() {
 
   const router = useRouter();
   const hasPasskey = (passkeys?.length ?? 0) > 0;
+  // Focus only (#926): a problem moves focus to the box that has it, and
+  // "Use a different email" puts it in the email box once that step shows.
+  const emailRef = useRef<HTMLInputElement>(null);
+  const codeRef = useRef<HTMLInputElement>(null);
+  const focusEmailNext = useRef(false);
+  useEffect(() => {
+    if (formStatus === "idle" && focusEmailNext.current) {
+      focusEmailNext.current = false;
+      emailRef.current?.focus();
+    }
+  }, [formStatus]);
 
   // Signed in AND this account already has a passkey → nothing to do on this
   // page, go straight into the admin app. Covers both a passkey sign-in and
@@ -156,9 +161,11 @@ export default function AdminLoginForm() {
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (formStatus === "sending") return;
     const trimmed = email.trim();
     if (!EMAIL_RE.test(trimmed)) {
       setFieldError("Enter a valid email address.");
+      emailRef.current?.focus();
       return;
     }
     setFieldError(null);
@@ -192,6 +199,7 @@ export default function AdminLoginForm() {
     if (value.length !== CODE_LENGTH) {
       setCodeStatus("error");
       setCodeError(`Enter the ${CODE_LENGTH}-digit code from the email.`);
+      codeRef.current?.focus();
       return;
     }
     setCodeStatus("verifying");
@@ -201,6 +209,7 @@ export default function AdminLoginForm() {
       if (result?.error) {
         setCodeStatus("error");
         setCodeError(codeErrorMessage(result.error));
+        codeRef.current?.focus();
         return;
       }
       // Signed in: useSession() flips and the signed-in view takes over.
@@ -208,6 +217,7 @@ export default function AdminLoginForm() {
     } catch {
       setCodeStatus("error");
       setCodeError(codeErrorMessage(null));
+      codeRef.current?.focus();
     }
   }
 
@@ -223,6 +233,7 @@ export default function AdminLoginForm() {
   }
 
   async function handlePasskeySignIn() {
+    if (passkeySignIn === "authenticating") return;
     setPasskeySignIn("authenticating");
     const result = await authClient.signIn.passkey({});
     if (result?.error) {
@@ -233,6 +244,7 @@ export default function AdminLoginForm() {
   }
 
   async function handlePasskeyRegister() {
+    if (passkeyRegister === "registering") return;
     setPasskeyRegister("registering");
     const result = await authClient.passkey.addPasskey({});
     if (result?.error) {
@@ -253,7 +265,7 @@ export default function AdminLoginForm() {
       return (
         <div
           data-testid="admin-login-passkey-prompt"
-          className="elevation-2 rounded-[var(--radius-lg)] bg-white p-6 sm:p-8"
+          className={signInCardClass}
         >
           <p className="text-sm text-[var(--color-ink-500)]">Signing you in…</p>
         </div>
@@ -265,7 +277,7 @@ export default function AdminLoginForm() {
     return (
       <div
         data-testid="admin-login-passkey-prompt"
-        className="elevation-2 rounded-[var(--radius-lg)] bg-white p-6 sm:p-8"
+        className={signInCardClass}
       >
         <p className="text-sm text-[var(--color-ink-500)]">Signed in as</p>
         <p className="mb-4 text-lg font-medium text-[var(--color-sage-700)]">
@@ -278,7 +290,7 @@ export default function AdminLoginForm() {
         <button
           type="button"
           onClick={handlePasskeyRegister}
-          disabled={passkeyRegister === "registering"}
+          {...busyButtonProps(passkeyRegister === "registering")}
           className={primaryButtonClass}
         >
           {passkeyRegister === "registering" ? "Setting up…" : "Set up a passkey"}
@@ -290,7 +302,7 @@ export default function AdminLoginForm() {
         )}
         <Link
           href="/admin"
-          className="mt-4 block text-center text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+          className={`${tapLinkClass} mt-4 w-full justify-center text-sm`}
         >
           Continue to admin without a passkey
         </Link>
@@ -300,7 +312,7 @@ export default function AdminLoginForm() {
 
   // ─── Signed-out view: email code + passkey sign-in ──────────────────────
   return (
-    <div className="elevation-2 rounded-[var(--radius-lg)] bg-white p-6 sm:p-8">
+    <div className={signInCardClass}>
       {formStatus === "sent" ? (
         <div data-testid="admin-login-sent">
           <p role="status" className="text-sm text-[var(--color-ink-700)]">
@@ -319,6 +331,7 @@ export default function AdminLoginForm() {
               Sign-in code
             </label>
             <input
+              ref={codeRef}
               id="admin-login-code"
               type="text"
               inputMode="numeric"
@@ -331,9 +344,7 @@ export default function AdminLoginForm() {
               onChange={(e) => handleCodeChange(e.target.value)}
               aria-invalid={codeError ? "true" : undefined}
               aria-describedby={codeError ? "admin-login-code-error" : undefined}
-              className={`${inputBase} ${
-                codeError ? "border-[var(--color-danger)]" : "border-[var(--color-bone-300)]"
-              } tracking-[0.4em] tabular-nums`}
+              className={`${inputBase} ${inputBorder(Boolean(codeError))} tracking-[0.4em] tabular-nums`}
               placeholder="123456"
             />
             {codeError && (
@@ -341,22 +352,30 @@ export default function AdminLoginForm() {
                 {codeError}
               </p>
             )}
-            <button type="submit" disabled={codeStatus === "verifying"} className={`${primaryButtonClass} mt-4`}>
+            <button type="submit" {...busyButtonProps(codeStatus === "verifying")} className={`${primaryButtonClass} mt-4`}>
               {codeStatus === "verifying" ? "Signing in…" : "Sign in"}
             </button>
           </form>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+          {/* WHY stacked at every width and tabular digits: side by side they
+              wrapped to two rows and jumped back to one as the countdown's
+              digits narrowed (the card moved 56 px). Stacked, neither moves. */}
+          <div className="mt-4 flex flex-col items-start gap-2">
+            {/* WHY aria-disabled, not disabled: a natively disabled button
+                drops keyboard focus to the top of the page the moment it is
+                pressed; this one keeps it, and handleResend ignores presses
+                while the countdown runs. */}
             <button
               type="button"
               onClick={handleResend}
-              disabled={resendIn > 0}
-              className="min-h-12 text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60"
+              aria-disabled={resendIn > 0 || undefined}
+              className={`${textButtonClass} tabular-nums`}
             >
               {resendIn > 0 ? `Resend code (${resendIn}s)` : "Resend code"}
             </button>
             <button
               type="button"
               onClick={() => {
+                focusEmailNext.current = true;
                 setFormStatus("idle");
                 setEmail("");
                 setCode("");
@@ -364,7 +383,7 @@ export default function AdminLoginForm() {
                 setCodeStatus("idle");
                 setResendIn(0);
               }}
-              className="min-h-12 text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+              className={textButtonClass}
             >
               Use a different email
             </button>
@@ -376,6 +395,7 @@ export default function AdminLoginForm() {
             Email
           </label>
           <input
+            ref={emailRef}
             id="admin-login-email"
             type="email"
             autoComplete="email webauthn"
@@ -388,11 +408,7 @@ export default function AdminLoginForm() {
             onChange={(e) => setEmail(e.target.value)}
             aria-invalid={fieldError ? "true" : undefined}
             aria-describedby={fieldError ? "admin-login-email-error" : undefined}
-            className={`${inputBase} ${
-              fieldError
-                ? "border-[var(--color-danger)]"
-                : "border-[var(--color-bone-300)]"
-            } mb-1`}
+            className={`${inputBase} ${inputBorder(Boolean(fieldError))} mb-1`}
             placeholder="you@example.com"
           />
           {fieldError && (
@@ -401,16 +417,18 @@ export default function AdminLoginForm() {
             </p>
           )}
 
+          {/* busyButtonProps on all three working buttons here: a natively
+              disabled button drops keyboard focus to the page body (#926). */}
           <button
             type="submit"
-            disabled={formStatus === "sending"}
+            {...busyButtonProps(formStatus === "sending")}
             className={`${primaryButtonClass} mt-4`}
           >
             {formStatus === "sending" ? "Sending…" : "Email me a code"}
           </button>
           {formStatus === "error" && (
             <p className={errorClass} role="alert">
-              Something went wrong sending the code. Try again.
+              The code was not sent. Try again.
             </p>
           )}
 
@@ -423,7 +441,7 @@ export default function AdminLoginForm() {
           <button
             type="button"
             onClick={handlePasskeySignIn}
-            disabled={passkeySignIn === "authenticating"}
+            {...busyButtonProps(passkeySignIn === "authenticating")}
             className={secondaryButtonClass}
           >
             {passkeySignIn === "authenticating"

@@ -137,7 +137,7 @@ export default function ResourcesContent({ faqJsonLd }: { faqJsonLd?: string }) 
               <summary
                 className={
                   "flex items-start gap-3 p-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden " +
-                  "rounded-[var(--radius-lg)] hover:bg-[var(--color-bone-100)] " +
+                  "rounded-[var(--radius-lg)] transition-colors duration-150 hover:bg-[var(--color-sage-100)] " +
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
                 }
               >

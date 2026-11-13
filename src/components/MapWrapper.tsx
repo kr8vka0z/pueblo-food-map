@@ -6,17 +6,17 @@
  * Spec: docs/pueblo-food-map-v2-handoff.md §Mobile·375×812·map(located)
  *       and §Desktop·1440×900·map(located)
  *
- * Layout (all viewports):
+ * Layout (all viewports), in DOM order:
  *   <div relative h-full w-full>
- *     <Map />            — fills viewport
- *     <SearchBar />      — absolute top-center, z-index 1000 (Map/List switch inside)
- *     {isMobile && <BottomSheet />}
- *     <BottomNav />      — bar below 2xl, pill floating bottom-centre at 2xl+ (§3, §5); last in DOM
+ *     <Map /> or <ListView /> — fills viewport (ListView holds the map's box until it loads)
+ *     <SearchBar />           — absolute top-center (+ its popovers: results, empty search)
+ *     <EventStrip />          — upcoming special events
+ *     <FilterPanel />         — left side panel from SearchBar's Filters button
+ *     <BottomSheet />         — phone venue/box/event card
+ *     <DesktopSidePanel />    — fixed right-hand shell on desktop (#682)
+ *     <BottomNav />           — bar below 2xl, pill floating bottom-centre at 2xl+ (§3, §5)
+ *     <GuidedTour />
  *   </div>
- *
- * No sidebar. No category rail. No desktop split-pane.
- * Search behavior wired in PR 6: query state + searchVenues filter + EmptySearchPopover.
- * Typeahead dropdown wired in #67: SearchResultsPopover + ARIA combobox.
  */
 
 import {
@@ -79,6 +79,8 @@ import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBo
 import { useMapUI, type ViewMode } from "@/lib/useMapUI";
 import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
 import { track, EVENTS } from "@/lib/analytics";
+import { nearestFoodProps } from "@/lib/nearestFood";
+import { computeVenueOpenStatus } from "@/lib/hours";
 import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY, prefersReducedMotion } from "@/lib/useMediaQuery";
 import type { SplashViewport } from "@/lib/splashGate";
 
@@ -97,7 +99,7 @@ const MapCanvas = dynamic(() => import("./Map"), {
 // viewMode === "map" && selectedVenue` (see its JSX below) — on the mobile
 // viewport this whole app targets first, that condition is never true, so a
 // plain top-level import still shipped ~800 lines of desktop-only markup
-// (DesktopVenueWindow.tsx + VenuePopupHeader.tsx) into every mobile visitor's
+// (DesktopVenueWindow.tsx and, then, its VenuePopupHeader.tsx) into every mobile visitor's
 // synchronous MapWrapper chunk for code that never mounts. Same next/dynamic
 // pattern as MapCanvas above, minus a loading fallback (see the
 // desktopWindowPrefetched effect below, near `isMobile`, for why): the JSX is
@@ -745,6 +747,7 @@ export default function MapWrapper({
     openNowCount,
     snapCount,
     wicCount,
+    categoryCounts,
     toggleCategory,
     clearFilters,
     handleClearAllFilters,
@@ -765,7 +768,7 @@ export default function MapWrapper({
   // render needs to reflect. Left null (the default, no override) for:
   // turning Boxes OFF, turning it on with no known location (never triggers
   // the geolocation prompt — Near me already owns that), or the Filters
-  // panel's own checkbox (which calls toggleCategory directly, bypassing
+  // panel's own Blessing Box switch (which calls toggleCategory directly, bypassing
   // this handler, so it keeps today's fit-all).
   const pendingBoxesFitBoundsRef = useRef<
     [[number, number], [number, number]] | null
@@ -816,10 +819,32 @@ export default function MapWrapper({
   // otherwise), which keeps MapWrapper off the minute clock: the strip and the
   // list each subscribe to it themselves.
   // Judged at render time from the wall clock, like eventHereFor below.
-  const upcomingEventCount = () =>
-    // eslint-disable-next-line react-hooks/purity -- wall clock on purpose; see above
-    listOrder(events, Date.now()).length;
-  const filterEventsCount = filterPanelOpen ? upcomingEventCount() : 0;
+  // eslint-disable-next-line react-hooks/purity -- wall clock on purpose; see above
+  const filterEventsCount = filterPanelOpen ? listOrder(events, Date.now()).length : 0;
+
+  // Bottom offset for the map's centred notices (EventsEmptyNotice and the
+  // outside-county toast).
+  // Below 2xl: lifted clear of the bottom nav bar AND the Mapbox
+  // credits row above it (globals.css's `@media (width < 96rem)`
+  // rule lifts that row the same way). Recomputed 2026-09-16 — the
+  // old "+ 52" dated from a taller credits control that no longer
+  // exists:
+  //   BOTTOM_NAV_HEIGHT_PX (76) — the nav bar itself
+  //   + 8                       — nav-to-credits gap (globals.css)
+  //   + 26                      — credits row height: the 20px
+  //                               logo/attrib control (globals.css
+  //                               `.mapboxgl-ctrl-logo`) plus its
+  //                               own 6px bottom margin
+  //                               (`.mapboxgl-ctrl-bottom-right
+  //                               .mapboxgl-ctrl`) — margins don't
+  //                               collapse in a flex row, so both
+  //                               count toward the row's height
+  //   + 12                      — clearance above the credits row
+  // 2xl: above the floating nav pill (24px up + 52px tall + 12px
+  // gap) — credits aren't lifted at 2xl (the pill sits centred,
+  // clear of the bottom-right corner). LocationHelpCard.tsx's
+  // `2xl:bottom-[88px]` is the same 24 + 52 + 12.
+  const aboveCreditsBottom = isBelow2xl ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + 8px + 26px + 12px + env(safe-area-inset-bottom))` : 24 + 52 + 12;
 
   // ── Typeahead popover state (issue #67) ──────────────────────────────────────
   // isPopoverOpen: true when input is focused + query is non-empty + matches exist.
@@ -1071,22 +1096,12 @@ export default function MapWrapper({
     });
   }, [walkingRoute, mapboxMap, isMobile]);
 
-  // Pre-compute distance map for Map.tsx (aria-labels on markers)
-  const userDistances = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const v of venuesWithDistance) {
-      m.set(v.id, v.distanceMiles);
-    }
-    return m;
-  }, [venuesWithDistance]);
-
-  // Selected venue object — used by BottomSheet (mobile) and DesktopVenueWindow (desktop)
+  // Selected venue object — used by BottomSheet (mobile) and DesktopVenueWindow (desktop).
+  // filteredVenues is a subset of venuesWithDistance (same objects), so this
+  // one lookup also finds a selected venue the filters currently hide.
   const selectedVenue = useMemo(
-    () =>
-      filteredVenues.find((v) => v.id === selectedVenueId) ??
-      venuesWithDistance.find((v) => v.id === selectedVenueId) ??
-      null,
-    [filteredVenues, venuesWithDistance, selectedVenueId],
+    () => venuesWithDistance.find((v) => v.id === selectedVenueId) ?? null,
+    [venuesWithDistance, selectedVenueId],
   );
 
   // ── Event card (#759) ────────────────────────────────────────────────────────
@@ -1096,6 +1111,31 @@ export default function MapWrapper({
   // without the parameter (the selection stays inert: no pin matches it).
   // Ended/cancelled events never reach `events`, so they get no pin.
   const { event: selectedEvent } = useEventDetail(selectedEventId, events, eventsLoaded);
+
+  // event_opened (#919): keyed off the resolved event, not selectEvent(), so a
+  // `/?event=<id>` link (selected through useMapUI, never selectEvent) counts
+  // too. Same last-tracked ref as venue_opened below, so a re-render of the
+  // same open card doesn't fire again.
+  const lastTrackedEventIdRef = useRef<string | null>(null);
+  const selectedEventIdResolved = selectedEvent?.id ?? null;
+  useEffect(() => {
+    if (selectedEventIdResolved === lastTrackedEventIdRef.current) return;
+    lastTrackedEventIdRef.current = selectedEventIdResolved;
+    if (selectedEventIdResolved !== null) void track(EVENTS.EVENT_OPENED, { eventId: selectedEventIdResolved });
+  }, [selectedEventIdResolved]);
+
+  // The phone sheet's React key (#882 preview feedback). It used to be the
+  // selected id or "empty", so closing flipped it to "empty" and remounted the
+  // sheet mid-close: vaul's slide-off never played. Now it changes only when a
+  // card OPENS (from nothing, or switching to a different item), which still
+  // gives every opened card a fresh sheet (that is what the key is for), and
+  // never when the selection goes back to null, so the closing sheet stays
+  // mounted and BottomSheet can hold its last card while vaul animates it away.
+  const sheetItemId = selectedVenueId ?? selectedEvent?.id ?? null;
+  const [sheetSlot, setSheetSlot] = useState({ item: sheetItemId, n: 0 });
+  if (sheetItemId !== sheetSlot.item) {
+    setSheetSlot({ item: sheetItemId, n: sheetItemId !== null ? sheetSlot.n + 1 : sheetSlot.n });
+  }
 
   // "See places open now" on an ended/cancelled card: the existing Open-now filter.
   const handleSeeOpenNow = useCallback(() => {
@@ -1137,11 +1177,25 @@ export default function MapWrapper({
     }
     if (lastTrackedVenueIdRef.current === selectedVenue.id) return;
     lastTrackedVenueIdRef.current = selectedVenue.id;
+    const openState = computeVenueOpenStatus(selectedVenue).state;
     void track(EVENTS.VENUE_OPENED, {
       category: selectedVenue.category,
       venueId: selectedVenue.id,
+      open_now: openState === "open",
+      has_hours: openState !== "no_hours",
     });
   }, [selectedVenue]);
+
+  // nearest_food (#919): once per page load, the first time a real location
+  // is known (never the PUEBLO_CENTER fallback `origin` uses). Only distances
+  // leave; see nearestFoodProps. Waits for the box feed so the count includes
+  // boxes, which load after the pantries.
+  const nearestFoodSentRef = useRef(false);
+  useEffect(() => {
+    if (nearestFoodSentRef.current || userLocation === null || liveBoxesLoading) return;
+    nearestFoodSentRef.current = true;
+    void track(EVENTS.NEAREST_FOOD, nearestFoodProps(venuesWithDistance));
+  }, [userLocation, liveBoxesLoading, venuesWithDistance]);
 
   // ── Typeahead popover handlers (issue #67) ───────────────────────────────────
   // These come after filteredVenues / isMobile are declared so closures are valid.
@@ -1364,9 +1418,12 @@ export default function MapWrapper({
   // own suggestion row and results row, #514, "Near me" below, and the Menu
   // line) must honor the same mapUnavailable guard (selecting "map" while the
   // map can't mount would show a blank screen, #165).
+  // `source` names the control a visitor used (#919 view_switched). Near me and the guided tour switch views
+  // themselves and pass none, so they are never counted as a visitor's choice.
   const handleViewModeChange = useCallback(
-    (mode: ViewMode) => {
+    (mode: ViewMode, source?: string) => {
       if (mapUnavailable && mode === "map") return;
+      if (source) void track(EVENTS.VIEW_SWITCHED, { to: mode, source });
       setViewMode(mode);
     },
     [mapUnavailable, setViewMode],
@@ -1392,7 +1449,7 @@ export default function MapWrapper({
    */
   const handleViewSuggestionSelect = useCallback(
     (mode: ViewMode) => {
-      handleViewModeChange(mode);
+      handleViewModeChange(mode, "search_suggestion");
       setIsPopoverOpen(false);
       setActiveIndex(-1);
       if (document.activeElement instanceof HTMLElement) {
@@ -1698,7 +1755,6 @@ export default function MapWrapper({
             venues={filteredVenues}
             selectedVenueId={selectedVenueId}
             userLocation={userLocation}
-            userDistances={userDistances}
             recenterRequestId={recenterRequestId}
             onSelectVenue={selectVenue}
             events={events}
@@ -1859,7 +1915,7 @@ export default function MapWrapper({
           events={events}
           locale={locale}
           onOpen={selectEvent}
-          onMore={() => handleViewModeChange("list")}
+          onMore={() => handleViewModeChange("list", "event_strip")}
           rightInset={desktopPanelOpen ? DESKTOP_PANEL_RIGHT_CLEARANCE_PX : 0}
         />
       )}
@@ -1870,11 +1926,7 @@ export default function MapWrapper({
           events={events}
           locale={locale}
           onShowPlaces={() => setFilterEvents(false)}
-          bottom={
-            isBelow2xl
-              ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + 8px + 26px + 12px + env(safe-area-inset-bottom))`
-              : 24 + 52 + 12
-          }
+          bottom={aboveCreditsBottom}
         />
       )}
 
@@ -1896,6 +1948,7 @@ export default function MapWrapper({
         wicCount={wicCount}
         selectedCategories={selectedCategories}
         onToggleCategory={toggleCategory}
+        categoryCounts={categoryCounts}
         onClearAll={clearFilters}
         filterEvents={filterEvents}
         onToggleEvents={() => setFilterEvents((v) => !v)}
@@ -1931,7 +1984,7 @@ export default function MapWrapper({
           view={menuSection ?? "top"}
           ignoreOutsideRef={navRef}
           viewMode={viewMode}
-          onToggleView={() => handleViewModeChange(viewMode === "map" ? "list" : "map")}
+          onToggleView={() => handleViewModeChange(viewMode === "map" ? "list" : "map", "menu")}
           mapDisabled={mapUnavailable}
           onStartTour={handleMenuStartTour}
         />
@@ -1944,28 +1997,7 @@ export default function MapWrapper({
           aria-live="polite"
           style={{
             position: "absolute",
-            // Below 2xl: lifted clear of the bottom nav bar AND the Mapbox
-            // credits row above it (globals.css's `@media (width < 96rem)`
-            // rule lifts that row the same way). Recomputed 2026-09-16 — the
-            // old "+ 52" dated from a taller credits control that no longer
-            // exists:
-            //   BOTTOM_NAV_HEIGHT_PX (76) — the nav bar itself
-            //   + 8                       — nav-to-credits gap (globals.css)
-            //   + 26                      — credits row height: the 20px
-            //                               logo/attrib control (globals.css
-            //                               `.mapboxgl-ctrl-logo`) plus its
-            //                               own 6px bottom margin
-            //                               (`.mapboxgl-ctrl-bottom-right
-            //                               .mapboxgl-ctrl`) — margins don't
-            //                               collapse in a flex row, so both
-            //                               count toward the row's height
-            //   + 12                      — clearance above the credits row
-            // 2xl: above the floating nav pill (24px up + 52px tall + 12px
-            // gap) — credits aren't lifted at 2xl (the pill sits centred,
-            // clear of the bottom-right corner), so this branch is unchanged.
-            bottom: isBelow2xl
-              ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + 8px + 26px + 12px + env(safe-area-inset-bottom))`
-              : 24 + 52 + 12,
+            bottom: aboveCreditsBottom,
             left: "50%",
             transform: "translateX(-50%)",
             zIndex: 1001,
@@ -2000,7 +2032,7 @@ export default function MapWrapper({
           // (possibly with a new reason), if it works the same effect clears it.
           onRetry={handleLocateRequest}
           onShowList={() => {
-            handleViewModeChange("list");
+            handleViewModeChange("list", "location_help");
             setLocationFailure(null);
           }}
           onDismiss={() => setLocationFailure(null)}
@@ -2016,7 +2048,7 @@ export default function MapWrapper({
           regardless of whether a venue is currently selected. */}
       {isMobile && (viewMode === "map" || mapUnavailable) && (
         <BottomSheet
-          key={selectedVenueId ?? selectedEvent?.id ?? "empty"}
+          key={`sheet-${sheetSlot.n}`}
           venue={selectedVenue}
           event={selectedVenue ? null : selectedEvent}
           userLocation={userLocation}
@@ -2105,7 +2137,7 @@ export default function MapWrapper({
                 locale={locale}
                 onShowWelcome={onShowWelcome}
                 viewMode={viewMode}
-                onToggleView={() => handleViewModeChange(viewMode === "map" ? "list" : "map")}
+                onToggleView={() => handleViewModeChange(viewMode === "map" ? "list" : "map", "menu")}
                 mapDisabled={mapUnavailable}
                 onClose={close}
                 headingId={panelHeadingId}

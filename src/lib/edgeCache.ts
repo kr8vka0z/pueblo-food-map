@@ -45,7 +45,7 @@ export interface BestEffortResult<T> {
  * in vitest/node, so route tests stub it; every caller treats undefined as
  * "always compute fresh" rather than throwing.
  */
-export function edgeCacheDefault(): Cache | undefined {
+function edgeCacheDefault(): Cache | undefined {
   return (globalThis as { caches?: { default?: Cache } }).caches?.default;
 }
 
@@ -124,8 +124,8 @@ export interface EdgeCacheOptions {
 
 /**
  * Serves a GET request from the Workers edge cache when possible, otherwise
- * runs `load()`, returns its data as JSON with a 60s Cache-Control header,
- * and — ONLY when the load was not degraded and is a 200 — stores that
+ * runs `load()`, returns its data as JSON with a 60s Cache-Control header
+ * (no-store when degraded or non-200), and — ONLY when the load was not degraded and is a 200 — stores that
  * response in the cache for the next request (serveFromEdgeCache). Mirrors
  * the caches.default pattern both public blessing-box routes established
  * (see each route's own file header for the wider Cache API rationale).
@@ -142,11 +142,32 @@ export async function respondWithEdgeCache<T>(
     const { data, degraded, status = 200 } = await load();
     const response = NextResponse.json(data, {
       status,
-      // A non-200 (404 for a not-yet-published event, or a degraded read) must
+      // A non-200 (404 for a not-yet-published event) or a degraded read must
       // not sit in a browser cache for a minute: the admin purge can't reach
-      // it, so a link shared just before publishing would look dead.
-      headers: { "Cache-Control": status === 200 ? `public, max-age=${CACHE_TTL_SECONDS}` : "no-store" },
+      // it, so a link shared just before publishing would look dead, and an
+      // empty fallback list would outlive the D1 blip that caused it (#904).
+      headers: { "Cache-Control": status === 200 && !degraded ? `public, max-age=${CACHE_TTL_SECONDS}` : "no-store" },
     });
     return { response, degraded };
   });
+}
+
+/**
+ * The best-effort read the public list routes hand to respondWithEdgeCache():
+ * runs `load` against ADMIN_DB, and on any throw logs it and answers with
+ * `fallback` flagged `degraded`, so a D1 blip shows an empty list for one
+ * request instead of a 500 and is never cached.
+ */
+export async function bestEffort<T>(
+  load: (db: D1Database) => Promise<T>,
+  fallback: T,
+  logFailure: (message: string) => void,
+): Promise<BestEffortResult<T>> {
+  try {
+    const { env } = getCloudflareContext();
+    return { data: await load(env.ADMIN_DB), degraded: false };
+  } catch (err) {
+    logFailure(err instanceof Error ? err.message : "unknown error");
+    return { data: fallback, degraded: true };
+  }
 }

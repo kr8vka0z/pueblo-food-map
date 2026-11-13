@@ -121,6 +121,9 @@ jobs:
       # "run whatever's newest from npm" is never an acceptable fallback
       # here, only a loud failure is.
       - run: npx --no-install tsx scripts/refresh-ingest.ts --db-mode remote
+        # A step timeout counts as a failure, so the alert below fires; a
+        # job-level timeout alone would only mark the run cancelled.
+        timeout-minutes: 25
         env:
           # TypeSafe Jev triage (#543), scoped to this one step so npm/pip
           # install scripts never see it. Optional: unset or failing =
@@ -130,3 +133,22 @@ jobs:
           # stays OFF until a watched run's triage has been checked against
           # Kyle's own decisions (#543's order of work). "true" enables it.
           REFRESH_AI_AUTO_APPLY: "false"
+      # WHY: this run crashed silently on 2026-10-26 and 11-02 (#893) and
+      # nobody knew for two weeks. A failed, timed-out or cancelled run now
+      # messages Kyle in the Atlas Telegram chat (Kyle, 2026-11-06). It goes
+      # through a dedicated n8n webhook, not the bot token: this job reads
+      # untrusted pages, and the webhook's key can only send this one fixed
+      # message (workflow "PFM refresh failed -> Telegram"; key in 1Password
+      # "n8n - PFM Refresh Alert Webhook Key"). n8n adds the run link only if
+      # it is this repo's Actions run. A failed send is logged, never a second
+      # failure.
+      - name: Tell Kyle on Telegram that the refresh failed
+        if: failure() || cancelled()
+        env:
+          PFM_ALERT_WEBHOOK_KEY: ${{ secrets.PFM_ALERT_WEBHOOK_KEY }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -sS --fail-with-body --retry 3 --max-time 20 -X POST https://n8n.boyd.fo/webhook/pfm-refresh-failed \
+            -H "X-PFM-Alert-Key: ${PFM_ALERT_WEBHOOK_KEY}" -H "Content-Type: application/json" \
+            -d "{\"run_url\":\"${RUN_URL}\"}" \
+            || echo "::warning::Telegram alert failed to send"

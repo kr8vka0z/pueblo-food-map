@@ -14,7 +14,7 @@
  *
  * Accessibility:
  *   - aria-label: "<name>, <readable-category>[, <distance>]"
- *   - Keyboard: Enter/Space fires onClick via onKeyDown handler.
+ *   - Keyboard: Enter/Space fires onSelect via onKeyDown handler.
  *   - The <button> element provides native role="button" — no ARIA role needed.
  */
 
@@ -48,7 +48,6 @@ interface VenueMarkerProps {
   selected: boolean;
   /** Distance from user in miles, appended to aria-label when available. */
   distanceMiles?: number;
-  onClick?: () => void;
   /** Stable venue selector callback (#291). */
   onSelect?: (id: string) => void;
   /** Called with venue.id on mouseenter/focusin — hover tooltip is managed in Map.tsx. */
@@ -64,7 +63,6 @@ function VenueMarker({
   venue,
   selected,
   distanceMiles,
-  onClick,
   onSelect,
   onHover,
   onLeave,
@@ -88,8 +86,7 @@ function VenueMarker({
     : `${venue.name}, ${readableName}`;
 
   function handleAction() {
-    if (onClick) onClick();
-    if (onSelect) onSelect(venue.id);
+    onSelect?.(venue.id);
   }
 
   // Keyboard handler: fire click on Enter or Space (native <button> behaviour

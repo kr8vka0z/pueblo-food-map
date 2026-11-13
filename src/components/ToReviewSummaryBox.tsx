@@ -32,8 +32,10 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { isDateOnlyUpdateProposal } from "@/lib/adminProposals";
+import { BULK_APPROVE_MAX_IDS, isDateOnlyUpdateProposal } from "@/lib/adminProposals";
 import type { ParsedProposal } from "@/lib/adminProposals";
+import { cardSlimClass, primaryButtonClass } from "@/lib/adminCardStyles";
+import AdminConfirm, { useAdminConfirm } from "@/components/AdminConfirm";
 
 export interface ToReviewSummaryBoxProps {
   /** Places rows (existing venues + "Suggested new place" rows) with at least one pending item (a proposal, a submission, or both). */
@@ -43,16 +45,6 @@ export interface ToReviewSummaryBoxProps {
   /** #675: every pending public_submissions row's own count ("from the public"). */
   submissionCount: number;
 }
-
-const cardClass =
-  "elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-3 mb-4";
-
-const primaryButtonClass =
-  "inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
-  "px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] transition-colors duration-150 " +
-  "hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 " +
-  "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
 
 /** Bulk-approve's own local result state — mirrors ProposalsReviewView.tsx's original BulkApproveState exactly (same route, same response shape). */
 type BulkApproveState =
@@ -64,19 +56,29 @@ type BulkApproveState =
 export default function ToReviewSummaryBox({ reviewRowCount, proposals, submissionCount }: ToReviewSummaryBoxProps) {
   const router = useRouter();
   const [bulkState, setBulkState] = useState<BulkApproveState>({ status: "idle" });
+  // On-page confirm (#926 decision 7): nothing is sent until its own
+  // Approve button is pressed, the same gate window.confirm used to be.
+  const { asking, ask, cancel, triggerRef } = useAdminConfirm();
 
+  // Capped at the route's per-request limit: past it the route refuses the
+  // whole request, so the button approves the first batch and the rest wait.
   const dateOnlyIds = useMemo(
-    () => proposals.filter((p) => !p.parseError && isDateOnlyUpdateProposal(p.row, p.diff)).map((p) => p.row.id),
+    () =>
+      proposals
+        .filter((p) => !p.parseError && isDateOnlyUpdateProposal(p.row, p.diff))
+        .map((p) => p.row.id)
+        .slice(0, BULK_APPROVE_MAX_IDS),
     [proposals],
   );
+  // One update reads "Approve 1 date-only update", never "all 1 … updates".
+  const one = dateOnlyIds.length === 1;
+  const allOrCount = one ? "1" : dateOnlyIds.length < BULK_APPROVE_MAX_IDS ? `all ${dateOnlyIds.length}` : String(BULK_APPROVE_MAX_IDS);
+  const updatesWord = one ? "update" : "updates";
 
   if (reviewRowCount === 0) return null;
 
   async function handleBulkApprove(ids: number[]) {
-    const confirmed = window.confirm(
-      `Approve all ${ids.length} proposals that only update the last-verified date? Real changes are not included.`,
-    );
-    if (!confirmed) return;
+    if (bulkState.status === "submitting") return;
     setBulkState({ status: "submitting" });
     try {
       const res = await fetch("/api/admin/proposals/approve-date-only", {
@@ -99,7 +101,7 @@ export default function ToReviewSummaryBox({ reviewRowCount, proposals, submissi
       if (data?.error === "too_many_ids") {
         setBulkState({
           status: "error",
-          message: "More than 200 date-only proposals selected — narrow the filter and retry.",
+          message: "Nothing was approved: more than 200 date-only proposals were selected. Narrow the filter and try again.",
         });
         return;
       }
@@ -107,33 +109,61 @@ export default function ToReviewSummaryBox({ reviewRowCount, proposals, submissi
       setBulkState({
         status: "error",
         message: requestNeverStarted
-          ? "Something went wrong. Nothing was applied. Try again."
-          : "Something went wrong. Some proposals may already be approved — refresh before retrying.",
+          ? "Nothing was approved. Try again."
+          : "Some updates may not have been approved. Refresh the page to see which, then try again.",
       });
     } catch {
-      setBulkState({ status: "error", message: "Something went wrong. Nothing was applied. Try again." });
+      setBulkState({ status: "error", message: "Nothing was approved. Try again." });
+    } finally {
+      // Close the confirm either way; the result line below says what happened.
+      cancel();
     }
   }
 
+  const submitting = bulkState.status === "submitting";
+
   return (
-    <div className={cardClass}>
+    <div className={cardSlimClass}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-[var(--color-ink-700)]">
           {reviewRowCount} to review · {proposals.length} from the data refresh, {submissionCount} from the public
         </p>
         {dateOnlyIds.length > 0 && (
           <button
+            ref={triggerRef}
             type="button"
-            onClick={() => handleBulkApprove(dateOnlyIds)}
-            disabled={bulkState.status === "submitting"}
+            hidden={asking}
+            onClick={ask}
+            disabled={submitting}
             className={primaryButtonClass}
           >
-            {bulkState.status === "submitting" ? "Approving…" : `Approve all ${dateOnlyIds.length} date-only updates`}
+            {`Approve ${allOrCount} date-only ${updatesWord}`}
           </button>
         )}
       </div>
+      {asking && dateOnlyIds.length > 0 && (
+        <div className="mt-3">
+          <AdminConfirm
+            title={`Approve ${allOrCount} date-only ${updatesWord}?`}
+            confirmLabel={`Approve ${dateOnlyIds.length} ${updatesWord}`}
+            busyLabel="Approving…"
+            tone="primary"
+            busy={submitting}
+            onConfirm={() => handleBulkApprove(dateOnlyIds)}
+            onCancel={cancel}
+          >
+            {one ? "This only updates" : "These only update"} the last-verified date. Real changes are not included.
+          </AdminConfirm>
+        </div>
+      )}
       {(bulkState.status === "done" || bulkState.status === "error") && (
-        <p aria-live="polite" className="mt-1 text-sm text-[var(--color-ink-500)]">
+        <p
+          aria-live="polite"
+          className={
+            "mt-1 text-sm " +
+            (bulkState.status === "error" ? "text-[var(--color-danger)]" : "text-[var(--color-ink-500)]")
+          }
+        >
           {bulkState.status === "done" ? `Approved ${bulkState.approved}. Skipped ${bulkState.skipped}.` : bulkState.message}
         </p>
       )}

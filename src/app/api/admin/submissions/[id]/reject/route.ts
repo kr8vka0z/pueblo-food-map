@@ -17,13 +17,14 @@
  * tells us whether there was anything to reject: 0 changed rows means the
  * id doesn't exist, or the row was already approved/rejected by someone
  * else (or a prior click) — surfaced to the caller as 404 rather than a
- * silent 200, so SubmissionsReviewView can tell a real reject apart from a
+ * silent 200, so SubmissionCard can tell a real reject apart from a
  * stale card.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
+import { positiveInt } from "@/lib/positiveInt";
+import { readOptionalReason } from "@/lib/adminRequest";
 
 const REJECT_SUBMISSION_SQL =
   "UPDATE public_submissions SET status = 'rejected', review_reason = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ? AND status = 'pending'";
@@ -35,39 +36,21 @@ const REJECT_SUBMISSION_SQL =
 // shared constant, since nothing else references this limit.
 const REVIEW_REASON_MAX_LENGTH = 1000;
 
-/** Optional `{ reason }` from the JSON body -> trimmed text capped at REVIEW_REASON_MAX_LENGTH, or null. Never throws on a missing/empty/non-JSON body. */
-async function readOptionalReason(req: NextRequest): Promise<string | null> {
-  try {
-    const body: unknown = await req.json();
-    const raw = (body as { reason?: unknown })?.reason;
-    if (typeof raw !== "string") return null;
-    const trimmed = raw.trim();
-    if (trimmed.length === 0) return null;
-    return trimmed.slice(0, REVIEW_REASON_MAX_LENGTH);
-  } catch {
-    return null; // no/empty/non-JSON body — reason is optional
-  }
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
 
   const { id: rawId } = await params;
-  const id = Number(rawId);
-  if (!Number.isInteger(id) || id <= 0) {
+  const id = positiveInt(Number(rawId));
+  if (id === null) {
     return NextResponse.json({ ok: false, error: "Invalid id" }, { status: 400 });
   }
 
-  const reason = await readOptionalReason(req);
+  const reason = await readOptionalReason(req, REVIEW_REASON_MAX_LENGTH);
   const timestamp = new Date().toISOString();
 
   const result = await db

@@ -30,10 +30,11 @@ import {
 } from "@/lib/boxStats";
 import { formatDurationLabel } from "@/lib/formatDurationLabel";
 
-const FIELD_LABEL = "block text-xs font-medium text-[var(--color-ink-700)] mb-1";
-// text-base md:text-sm — iOS Safari auto-zooms on focusing a field under 16px
-// (same reasoning BoxesActivityContent.tsx's own SELECT_CLASS documents).
-const SELECT_CLASS =
+// Also used by BoxesActivityContent.tsx's filter fields.
+export const FIELD_LABEL = "block text-xs font-medium text-[var(--color-ink-700)] mb-1";
+// text-base md:text-sm, not a bare text-sm: iOS Safari auto-zooms the page
+// on focusing any field under 16px (see mobile-viewport-and-form-zoom.test.ts).
+export const SELECT_CLASS =
   "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm " +
   "text-[var(--color-ink-900)] bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
 

@@ -8,7 +8,7 @@
  * while the page itself stays a server-rendered, crawlable Server Component
  * (no cookies() read — ARCHITECTURE.md "i18n model", #287). The
  * grouped-by-category data is computed server-side by groupVenuesByCategory
- * (still exported from page.tsx, pure and locale-independent) and passed in.
+ * (src/lib/venueGroups.ts, pure and locale-independent) and passed in.
  */
 
 import Link from "next/link";

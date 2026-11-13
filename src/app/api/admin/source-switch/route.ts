@@ -8,8 +8,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getAdminDb } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminReadAccess } from "@/lib/adminAuthErrors";
 import {
   computeSwitchStates,
   SWITCH_HISTORY_SQL,
@@ -19,12 +18,9 @@ import {
 } from "@/lib/sourceSwitch";
 
 export async function GET(req: NextRequest): Promise<Response> {
-  let db: D1Database;
-  try {
-    ({ db } = await getAdminDb(req.headers));
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminReadAccess(req);
+  if (access instanceof Response) return access;
+  const { db } = access;
   try {
     const [history, resets] = await Promise.all([
       db.prepare(SWITCH_HISTORY_SQL).all<SwitchHistoryRow>(),

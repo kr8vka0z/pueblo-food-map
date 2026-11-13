@@ -56,6 +56,9 @@ export default function SplashScreen({ onPrimary, pending, onTour }: SplashScree
   useEffect(() => {
     if (!geoRequested) return;
     if (geo.state.permission === 'prompt') return;
+    // An earlier visit's grant reads as granted with no fix yet (#894): wait
+    // for the fix (or a failure) instead of falling back to Pueblo-center.
+    if (geo.state.permission === 'granted' && geo.state.position === null) return;
 
     const mode: SplashViewport =
       geo.state.permission === 'granted' && geo.state.position !== null
@@ -182,7 +185,6 @@ export default function SplashScreen({ onPrimary, pending, onTour }: SplashScree
           {/* Wordmark */}
           <div>
             <Wordmark
-              size="xl"
               className="text-[var(--color-brand-navy)] block splash-text-outline"
             />
           </div>
@@ -210,7 +212,7 @@ export default function SplashScreen({ onPrimary, pending, onTour }: SplashScree
                 'w-full rounded-[var(--radius-md)] px-6 py-4 md:py-5',
                 'text-lg md:text-xl font-semibold leading-none',
                 'bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)]',
-                'hover:brightness-105 active:brightness-95',
+                'active:brightness-95',
                 'transition-[filter] duration-150',
                 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
                 'focus-visible:outline-[var(--color-brand-orange)]',
@@ -235,7 +237,7 @@ export default function SplashScreen({ onPrimary, pending, onTour }: SplashScree
                 'w-full rounded-[var(--radius-md)] px-4 sm:px-6 py-4 md:py-5',
                 'text-lg md:text-xl font-semibold leading-none text-balance',
                 'bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)]',
-                'hover:brightness-105 active:brightness-95',
+                'active:brightness-95',
                 'transition-[filter] duration-150',
                 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
                 'focus-visible:outline-[var(--color-brand-orange)]',
@@ -256,7 +258,7 @@ export default function SplashScreen({ onPrimary, pending, onTour }: SplashScree
                   'text-lg font-semibold leading-tight',
                   'bg-[var(--color-bone-50)] text-[var(--color-sage-700)]',
                   'border-2 border-[var(--color-sage-600)]',
-                  'hover:bg-[var(--color-bone-100)] active:brightness-95',
+                  'hover:bg-[var(--color-sage-100)] active:brightness-95',
                   'transition-colors duration-150',
                   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
                   'focus-visible:outline-[var(--color-sage-500)]',

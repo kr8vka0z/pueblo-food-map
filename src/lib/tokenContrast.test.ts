@@ -92,4 +92,34 @@ describe("token contrast (WCAG AA)", () => {
       });
     }
   }
+
+  // #926 admin rebuild: words on the sage 100 hover tint and the tag fills
+  // (DESIGN.md R1, tagClass tones), plus the ink 400 text-box edge, which
+  // only needs the 3:1 non-text floor. White is not a theme token, so it is
+  // a literal here.
+  const WCAG_NON_TEXT = 3;
+  const WHITE = "#FFFFFF";
+  const adminPairs: [fg: string, bg: string, floor: number][] = [
+    ["ink-500", "sage-100", WCAG_AA_NORMAL_TEXT],
+    ["ink-700", "sage-100", WCAG_AA_NORMAL_TEXT],
+    ["sage-700", "sage-100", WCAG_AA_NORMAL_TEXT],
+    // Words inside a tinted row or link: the stuck publish banner's red link,
+    // Boxes' "Removed from service", an Events row's name.
+    ["danger", "sage-100", WCAG_AA_NORMAL_TEXT],
+    ["clay-700", "sage-100", WCAG_AA_NORMAL_TEXT],
+    ["ink-900", "sage-100", WCAG_AA_NORMAL_TEXT],
+    ["clay-700", "clay-100", WCAG_AA_NORMAL_TEXT],
+    ["danger", "clay-100", WCAG_AA_NORMAL_TEXT],
+    ["ink-900", "brand-yellow", WCAG_AA_NORMAL_TEXT],
+    ["ink-500", "bone-100", WCAG_AA_NORMAL_TEXT],
+    ["ink-700", "bone-200", WCAG_AA_NORMAL_TEXT],
+    ["ink-400", "white", WCAG_NON_TEXT],
+  ];
+  test.each(adminPairs)("%s on %s clears %s:1", (fg, bg, floor) => {
+    const fgHex = colors.get(fg);
+    const bgHex = bg === "white" ? WHITE : colors.get(bg);
+    expect(fgHex, `${fg} missing from globals.css @theme`).toBeDefined();
+    expect(bgHex, `${bg} missing from globals.css @theme`).toBeDefined();
+    expect(contrastRatio(fgHex as string, bgHex as string)).toBeGreaterThanOrEqual(floor);
+  });
 });

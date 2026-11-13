@@ -89,17 +89,17 @@ import { headers } from "next/headers";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
-import { summarizePublishChanges, displayStatusOf, type AdminDisplayStatus } from "@/lib/adminVenues";
+import { summarizePublishChanges, displayStatusOf, buildPublishedVenueById, type AdminDisplayStatus } from "@/lib/adminVenues";
 import { isProductionWorker } from "@/lib/publishVenues";
-import { publishedVenues } from "@/data/published-venues";
-import { loadAdminNavCounts, ZERO_ADMIN_NAV_COUNTS, type AdminNavCounts } from "@/lib/adminNavCounts";
-import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@/lib/adminProposals";
-import { parseSubmissionRow, type PublicSubmissionRow, type ReviewItem, type ReviewSubmission } from "@/lib/publicSubmissions";
+import { loadAdminNavCounts } from "@/lib/adminNavCounts";
+import { parseProposalRow, type ChangeProposalRow } from "@/lib/adminProposals";
+import { parseSubmissionRow, type PublicSubmissionRow, type ReviewItem } from "@/lib/publicSubmissions";
 import VenueListView from "@/components/VenueListView";
 import ToReviewSummaryBox from "@/components/ToReviewSummaryBox";
 import SourceSwitchPanel from "@/components/SourceSwitchPanel";
 import PublishPanel from "@/components/PublishPanel";
 import AdminNav from "@/components/AdminNav";
+import { clayNoticeClass, pageBodyClass, pageTitleClass } from "@/lib/adminCardStyles";
 import type { AdminVenueRow } from "@/types/venue";
 
 /**
@@ -133,49 +133,34 @@ function groupItemsByTarget(
 export default async function PlacesPage({
   searchParams,
 }: { searchParams?: Promise<{ show?: string; from?: string }> } = {}) {
-  let email: string;
-  let showActivity = false;
-  let venues: AdminVenueRow[];
-  let proposals: ParsedProposal[] = [];
-  let submissions: ReviewSubmission[] = [];
-  let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
-
-  try {
-    const { db, identity } = await getAdminDb(await headers());
-    email = identity.email;
-    showActivity = identity.isOwner === true;
-    // WHY one Promise.all: the reads are independent, and each D1 call is a
-    // round trip to the primary (WNAM), so awaiting them in turn made this
-    // page cost the SUM of five round trips instead of the slowest one. The
-    // session check above still runs first and alone. Errors surface exactly
-    // as before (loadAdminNavCounts never rejects; a failed read still
-    // reaches handlePageAuthError).
-    const [venuesResult, proposalsResult, submissionsResult, counts] = await Promise.all([
-      db.prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC").all<AdminVenueRow>(),
-      // Same query /admin/flags/page.tsx used to run before #674 folded that
-      // queue into this page.
-      db
-        .prepare("SELECT * FROM change_proposals WHERE status = 'pending' ORDER BY created_at DESC")
-        .all<ChangeProposalRow>(),
-      // #675: same query the now-retired /admin/submissions/page.tsx used to
-      // run before that queue folded into this page.
-      db
-        .prepare("SELECT * FROM public_submissions WHERE status = 'pending' ORDER BY created_at DESC")
-        .all<PublicSubmissionRow>(),
-      loadAdminNavCounts(db),
-    ]);
-    venues = venuesResult.results;
-    proposals = proposalsResult.results.map(parseProposalRow);
-    submissions = submissionsResult.results.map(parseSubmissionRow);
-    navCounts = counts;
-  } catch (err) {
-    handlePageAuthError(err);
-  }
+  const { db, identity } = await getAdminDb(await headers()).catch(handlePageAuthError);
+  // WHY one Promise.all: the reads are independent, and each D1 call is a
+  // round trip to the primary (WNAM), so awaiting them in turn made this
+  // page cost the SUM of five round trips instead of the slowest one. The
+  // session check above still runs first and alone. loadAdminNavCounts never
+  // rejects; a failed read surfaces as the page's own error (500).
+  const [venuesResult, proposalsResult, submissionsResult, navCounts] = await Promise.all([
+    db.prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC").all<AdminVenueRow>(),
+    // Same query /admin/flags/page.tsx used to run before #674 folded that
+    // queue into this page.
+    db
+      .prepare("SELECT * FROM change_proposals WHERE status = 'pending' ORDER BY created_at DESC")
+      .all<ChangeProposalRow>(),
+    // #675: same query the now-retired /admin/submissions/page.tsx used to
+    // run before that queue folded into this page.
+    db
+      .prepare("SELECT * FROM public_submissions WHERE status = 'pending' ORDER BY created_at DESC")
+      .all<PublicSubmissionRow>(),
+    loadAdminNavCounts(db),
+  ]);
+  const venues = venuesResult.results;
+  const proposals = proposalsResult.results.map(parseProposalRow);
+  const submissions = submissionsResult.results.map(parseSubmissionRow);
 
   const { env } = await getCloudflareContext({ async: true });
   const isStaging = !isProductionWorker(env);
 
-  const publishedById = new Map(publishedVenues.map((v) => [v.id, v]));
+  const publishedById = buildPublishedVenueById();
   const statusByVenueId: Record<string, AdminDisplayStatus> = {};
   for (const venue of venues) {
     statusByVenueId[venue.id] = displayStatusOf(venue, publishedById.get(venue.id), { isStaging });
@@ -191,8 +176,9 @@ export default async function PlacesPage({
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="places" counts={navCounts} showActivity={showActivity} />
-      <div className="px-4 py-6 sm:px-6">
+      <AdminNav email={identity.email} active="places" counts={navCounts} showActivity={identity.isOwner === true} />
+      <div className={pageBodyClass}>
+        <h2 className={pageTitleClass}>Places</h2>
         <ToReviewSummaryBox reviewRowCount={reviewRowCount} proposals={proposals} submissionCount={submissions.length} />
         <SourceSwitchPanel />
         {isStaging ? (
@@ -200,7 +186,7 @@ export default async function PlacesPage({
           // false there) — a Publish panel that always no-ops, next to
           // status badges that could never legitimately read "edits
           // waiting," would only teach an admin to distrust this screen.
-          <p className="mb-6 rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]">
+          <p className={clayNoticeClass}>
             Test site: publishing is turned off here.
           </p>
         ) : (

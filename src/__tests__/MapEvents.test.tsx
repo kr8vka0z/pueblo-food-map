@@ -46,7 +46,6 @@ const baseProps = {
   venues: [],
   selectedVenueId: null,
   userLocation: null,
-  userDistances: new globalThis.Map<string, number>(),
   onSelectVenue: vi.fn(),
 };
 

@@ -29,10 +29,10 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminReadAccess, adminWriteAccess } from "@/lib/adminAuthErrors";
 import { eventConflictResponse, EVENT_AUDIT_INSERT_SQL, nextTimestamp, purgeEventsFeed } from "@/lib/adminEvents";
 import { loadEvent } from "@/lib/adminEventReads";
-import { authorizeAdminWrite, getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
+import type { AdminDbAccess } from "@/lib/adminDb";
 import { publicFlyerOf, type EventRow } from "@/lib/events";
 import { flyerKey, FLYER_CONTENT_TYPES, inspectFlyer, MAX_FLYER_BYTES, type FlyerExt } from "@/lib/eventFlyers";
 
@@ -125,12 +125,8 @@ async function commit(
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await getAdminDb(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminReadAccess(req);
+  if (access instanceof Response) return access;
   const { id } = await params;
   const row = await access.db.prepare("SELECT flyer_key FROM events WHERE id = ?").bind(id).first<{ flyer_key: string | null }>();
   if (!row?.flyer_key) return new Response(null, { status: 404 });
@@ -144,12 +140,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { id } = await params;
 
   if (!(req.headers.get("content-type") ?? "").includes("multipart/form-data")) {
@@ -222,12 +214,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { id } = await params;
 
   let body: unknown;

@@ -103,10 +103,13 @@ function makeVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: nu
 }
 
 describe("BottomSheet — no route active (baseline, unchanged)", () => {
-  test("dismissible=true, no snapPoints", () => {
+  // #923: with no route the card is the native scroll sheet (ScrollSheet),
+  // not vaul, so the route strip's snap points can't apply to it.
+  test("the card is the scroll sheet, not vaul, and shows no strip", () => {
+    rootPropsHolder.dismissible = undefined;
     render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
-    expect(rootPropsHolder.dismissible).toBe(true);
-    expect(rootPropsHolder.snapPoints).toBeUndefined();
+    expect(document.querySelector("[data-scroll-sheet]")).not.toBeNull();
+    expect(rootPropsHolder.dismissible).toBeUndefined();
     expect(screen.queryByTestId("route-strip")).toBeNull();
   });
 });

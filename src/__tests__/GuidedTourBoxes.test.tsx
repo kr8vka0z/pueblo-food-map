@@ -139,7 +139,8 @@ describe("Blessing Box steps", () => {
     fireEvent.click(screen.getByRole("button", { name: EN.skip }));
     await waitFor(() => expect(screen.queryByTestId("guided-tour")).toBeNull());
     expect(boxesOn()).toBe("false");
-    expect(checkinButtons()).toHaveLength(0);
+    // #882: the closing sheet keeps the card while it slides away (0.5s), then drops it.
+    await waitFor(() => expect(checkinButtons()).toHaveLength(0));
     expect(writes()).toEqual([]);
   });
 
@@ -160,7 +161,8 @@ describe("Blessing Box steps", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(screen.queryByTestId("guided-tour")).toBeNull());
     expect(boxesOn()).toBe("true");
-    expect(checkinButtons()).toHaveLength(0);
+    // #882: the closing sheet keeps the card while it slides away (0.5s), then drops it.
+    await waitFor(() => expect(checkinButtons()).toHaveLength(0));
   });
 
   test("the box card is inert while the tour shows it, and its buttons work again after", async () => {

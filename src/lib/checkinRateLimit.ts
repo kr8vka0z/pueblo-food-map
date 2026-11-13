@@ -62,7 +62,7 @@
  * concerns (bot verification vs. write-frequency capping) with no reason
  * to share a rotation lifecycle. Set as its own runtime secret the same
  * way as RESEND_API_KEY/TURNSTILE_SECRET_KEY (see .env.example and
- * AGENTS.md's Secrets table).
+ * docs/agents/secrets.md).
  *
  * Atomicity: one `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` statement
  * per check — this is the load-bearing part. A read-then-write ("SELECT the
@@ -70,6 +70,8 @@
  * on different isolates between the read and the write, which defeats the
  * entire reason this file exists over the in-process limiter above.
  */
+
+import { toHex } from "@/lib/alertTokens";
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 
@@ -83,9 +85,7 @@ export async function hmacHex(secret: string, message: string): Promise<string> 
     ["sign"],
   );
   const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
-  return Array.from(new Uint8Array(signature))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  return toHex(new Uint8Array(signature));
 }
 
 export interface RateLimitScope {

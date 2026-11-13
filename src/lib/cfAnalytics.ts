@@ -2,8 +2,8 @@
  * cfAnalytics.ts — server-only Cloudflare Web Analytics reader for the
  * admin Dashboard's Visitors section (#680). Cloudflare's GraphQL Analytics
  * API is the ONLY source of unique-visitor numbers in this app (Kyle,
- * 2026-09-26, issue #680 comment): PostHog runs in memory-only mode (#485,
- * AGENTS.md "PostHog") and counts every page load as a new visitor, so its
+ * 2026-09-26, issue #680 comment): PostHog keeps no ID past the browser tab
+ * and makes no person profiles (#485, #919, AGENTS.md "PostHog"), so its
  * numbers must never appear here.
  *
  * WHY these exact query shapes — verified live against the real GraphQL
@@ -41,12 +41,18 @@
  */
 
 import { getCloudflareContext } from "@/lib/cloudflareContext";
-import { createFetchLimiter, fetchWithRetry, startDeadline, type FetchLimiter } from "@/lib/analyticsFetch";
+import {
+  ANALYTICS_CACHE_TTL_MS,
+  MS_PER_DAY,
+  createFetchLimiter,
+  fetchWithRetry,
+  periodStartsUtc,
+  startDeadline,
+  type FetchLimiter,
+} from "@/lib/analyticsFetch";
 
 export type DashboardPeriod = "7d" | "30d" | "90d";
 export const DASHBOARD_PERIODS: readonly DashboardPeriod[] = ["7d", "30d", "90d"];
-const PERIOD_DAYS: Record<DashboardPeriod, number> = { "7d": 7, "30d": 30, "90d": 90 };
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** Production site tag (issue #680's Plan) — the only site this dashboard ever reads, even from staging (staging has no RUM beacon of its own, #652). */
 const SITE_TAG = "2e9e3476ebf0467ca1485c9a363d4c1d";
@@ -54,7 +60,6 @@ const HOST = "pueblofoodmap.com";
 const CF_GRAPHQL_URL = "https://api.cloudflare.com/client/v4/graphql";
 /** Widest date range (inclusive days) one RUM query may span: Cloudflare's "13w2d" quota, confirmed live 2026-10-19. */
 const CF_MAX_RANGE_DAYS = 93;
-const CACHE_TTL_MS = 60 * 60 * 1000;
 
 export interface DailyVisitorsPoint {
   /** ISO date, YYYY-MM-DD (UTC — matches Cloudflare's own `date` dimension). */
@@ -77,7 +82,7 @@ export interface VisitorsAnalytics {
   phoneSharePct: number | null;
   /** Mobile p75 LCP in ms this period ("about" — RUM is sampled) — null when Cloudflare has too few samples, or the vitals call itself failed. */
   phoneLcpMs: number | null;
-  /** This period only, oldest first, one point per day that had at least one visit. */
+  /** This period only, oldest first, one point per day Cloudflare returned any row for (a day of only same-site navigations is a 0 point). */
   dailyVisitors: DailyVisitorsPoint[];
   /** This period only, visits desc. */
   referrers: ReferrerGroup[];
@@ -266,10 +271,7 @@ export async function loadVisitorsAnalytics(
   }
   if (!accountTag) return null;
 
-  const days = PERIOD_DAYS[period];
-  const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const currentStartMs = todayUTC - days * MS_PER_DAY;
-  const previousStartMs = currentStartMs - days * MS_PER_DAY;
+  const { days, todayUTC, sinceMs: currentStartMs, previousSinceMs: previousStartMs } = periodStartsUtc(period, now);
   const currentStartStr = dateOnly(currentStartMs);
   const previousStartStr = dateOnly(previousStartMs);
   const previousEndStr = dateOnly(currentStartMs - MS_PER_DAY);
@@ -291,7 +293,7 @@ export async function loadVisitorsAnalytics(
       limit(() => fetchMobileLcpP75(token, accountTag, currentStartStr, todayStr, deadline.signal)),
     ]);
     const data = buildVisitorsAnalytics(rowSets.flat(), currentStartStr, phoneLcpMs);
-    cache.set(period, { expiresAt: now.getTime() + CACHE_TTL_MS, data });
+    cache.set(period, { expiresAt: now.getTime() + ANALYTICS_CACHE_TTL_MS, data });
     return data;
   } catch {
     return null;

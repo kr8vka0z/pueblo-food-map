@@ -195,7 +195,7 @@ describe("MapWrapper — ViewSuggestion on an empty, focused search bar (#514)",
     );
 
     fireEvent.click(screen.getByRole("button", { name: /^Filters$/i }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /Food Pantry/i }));
+    fireEvent.click(screen.getByRole("switch", { name: /Food Pantry/i }));
     fireEvent.click(screen.getByRole("button", { name: /^Show \d+ places?$/i }));
 
     const filtered = Number(
@@ -309,7 +309,7 @@ describe("MapWrapper — category filter survives a view switch (#514, rewired t
     await renderAndLoadMap();
 
     fireEvent.click(screen.getByRole("button", { name: /^Filters$/i }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /Food Pantry/i }));
+    fireEvent.click(screen.getByRole("switch", { name: /Food Pantry/i }));
     fireEvent.click(screen.getByRole("button", { name: /^Show \d+ places?$/i }));
     expect(screen.getByRole("button", { name: /^Filters, 1 on$/i })).toBeDefined();
 
@@ -367,7 +367,7 @@ describe("MapWrapper — Boxes bottom-nav shortcut (#516)", () => {
   test("two ways into one state: ticking Blessing Box in the Filters panel also lights up the bar item", async () => {
     await renderAndLoadMap();
     fireEvent.click(screen.getByRole("button", { name: /^Filters$/i }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /Blessing Box/i }));
+    fireEvent.click(screen.getByRole("switch", { name: /Blessing Box/i }));
     fireEvent.click(screen.getByRole("button", { name: /^Show \d+ places?$/i }));
 
     expect(screen.getByTestId("nav-boxes").getAttribute("aria-pressed")).toBe("true");

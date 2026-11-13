@@ -17,7 +17,7 @@ const KEY = "evt-1/22222222-2222-4222-8222-222222222222.jpg";
 
 function build() {
   const db = new Database(":memory:");
-  for (const f of ["0018_events.sql", "0019_event_flyer.sql"]) db.exec(readFileSync(join(process.cwd(), "migrations", f), "utf-8"));
+  for (const f of ["0018_events.sql", "0019_event_flyer.sql", "0026_event_venue_and_button.sql"]) db.exec(readFileSync(join(process.cwd(), "migrations", f), "utf-8"));
   db.prepare(
     `INSERT INTO events (id, name, starts_at, ends_at, lat, lng, address, status, flyer_key, created_by, updated_by)
      VALUES ('evt-1', 'E', '2026-10-11T00:00:00.000Z', '2026-10-11T04:00:00.000Z', 38.25, -104.6, 'x', 'published', ?, 'a', 'a')`,
@@ -55,7 +55,7 @@ describe("public flyer reads", () => {
 // ── The public queries' visibility rules, proven on real SQLite. ─────────────
 function withRows(rows: { id: string; status: string; endsAt: string }[]) {
   const db = new Database(":memory:");
-  for (const f of ["0018_events.sql", "0019_event_flyer.sql"]) db.exec(readFileSync(join(process.cwd(), "migrations", f), "utf-8"));
+  for (const f of ["0018_events.sql", "0019_event_flyer.sql", "0026_event_venue_and_button.sql"]) db.exec(readFileSync(join(process.cwd(), "migrations", f), "utf-8"));
   for (const r of rows) {
     db.prepare(
       `INSERT INTO events (id, name, starts_at, ends_at, lat, lng, address, status, flyer_key, created_by, updated_by)

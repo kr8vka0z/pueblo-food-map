@@ -39,6 +39,21 @@ export function isValidEmail(value: unknown): boolean {
   return EMAIL_RE.test(value.slice(0, FIELD_LIMITS.EMAIL));
 }
 
+/** Replaces each CR and LF with a space, so a form value can't inject an email header or subject line. */
+export function stripLineBreaks(s: string): string {
+  return s.replace(/[\r\n]/g, " ");
+}
+
+/**
+ * Turns CRLF and lone CR into LF. For a visitor's free-text message, which
+ * goes only into a text email body and the review row, never a header or
+ * subject: their paragraph breaks are the message (#894 item 8), so they are
+ * kept, not flattened like stripLineBreaks does.
+ */
+export function normalizeLineBreaks(s: string): string {
+  return s.replace(/\r\n?/g, "\n");
+}
+
 /**
  * Trims and lowercases an email ONCE at a route boundary (2026-09-18
  * security review, item 3) — every public/admin route touching a Blessing

@@ -90,14 +90,6 @@ describe("GET /api/public/box-photos/[id]", () => {
     expect(res.status).toBe(404);
   });
 
-  test("no Cloudflare context available -> 404, never throws", async () => {
-    mockGetCloudflareContext.mockImplementation(() => {
-      throw new Error("no cloudflare context");
-    });
-    const res = await callGet();
-    expect(res.status).toBe(404);
-  });
-
   test("a cache hit is served without ever touching D1/R2", async () => {
     const cachedResponse = new Response(new Uint8Array([9, 9]), { status: 200 });
     const match = vi.fn().mockResolvedValue(cachedResponse);

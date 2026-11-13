@@ -35,12 +35,13 @@ import { Phone } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { localizedHref } from "@/lib/localizedHref";
-import { PLACEHOLDER_ADDRESS, type NearbyVenue } from "@/lib/venueSummary";
+import { displayAddress, type NearbyVenue } from "@/lib/venueSummary";
 import { formatMiles } from "@/lib/distance";
 import type { Venue } from "@/types/venue";
 import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
 import SiteFooter from "@/components/SiteFooter";
+import { track, EVENTS } from "@/lib/analytics";
 
 interface VenueContentProps {
   venue: Venue;
@@ -123,12 +124,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
           >
             {v.name}
           </h1>
-          {/* Same OSM placeholder guard as BottomSheet.tsx/DesktopVenueWindow.tsx's
-              own address lines — never render the literal "Address not in
-              OpenStreetMap" string. */}
-          <p className="mt-1 text-sm text-[var(--color-ink-500)]">
-            {v.address === PLACEHOLDER_ADDRESS ? `${v.lat}, ${v.lng}` : v.address}
-          </p>
+          <p className="mt-1 text-sm text-[var(--color-ink-500)]">{displayAddress(v)}</p>
           {/* Answer-first summary (#704) — the fact people actually search
               for ("[name] hours", "does [store] take EBT"), assembled from
               verified fields only. Includes "Last verified" (decision 6:
@@ -211,7 +207,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
           </section>
         )}
 
-        {/* Phone / Contact — same tel: link pattern as BottomSheet/DesktopVenueWindow */}
+        {/* Phone / Contact — same tel: link pattern as VenueCardBody.tsx */}
         {v.phone && (
           <section aria-label={t("detail.contact", locale)}>
             <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)] mb-2">
@@ -219,6 +215,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
             </h2>
             <a
               href={`tel:${v.phone}`}
+              onClick={() => void track(EVENTS.CALL_CLICKED, { venueId: v.id, surface: "venue_page" })}
               className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
             >
               <Phone size={15} className="text-[var(--color-sage-600)]" aria-hidden />
@@ -227,7 +224,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
           </section>
         )}
 
-        {/* Notes — same boilerplate guard as BottomSheet/DesktopVenueWindow
+        {/* Notes — same boilerplate guard as VenueCardBody.tsx
             (src/lib/venueNotes.ts); without it Plentiful's auto-generated
             "{name}. in Pueblo, CO. Phone: ..." filler leaked onto this page
             even where the map card already hid it. */}
@@ -291,6 +288,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
         <div className="flex flex-col gap-3 pt-2">
           <a
             href={directionsHref}
+            onClick={() => void track(EVENTS.DIRECTIONS_CLICKED, { venueId: v.id, surface: "venue_page" })}
             target="_blank"
             rel="noopener noreferrer"
             className={
@@ -307,7 +305,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
             className={
               "inline-flex items-center justify-center px-4 py-2 rounded " +
               "border border-[var(--color-sage-500)] text-[var(--color-sage-700)] text-sm font-medium " +
-              "hover:bg-[var(--color-sage-50)] transition-colors " +
+              "hover:bg-[var(--color-sage-100)] transition-colors duration-150 " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
             }
           >

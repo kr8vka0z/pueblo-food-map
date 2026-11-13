@@ -43,7 +43,9 @@ Browser
         ├── EventListSection.tsx  (events above the places in ListView)
         ├── EventCardBody.tsx  (the event card, lazy; phone = inside BottomSheet,
         │     desktop = inside DesktopSidePanel via EventPanel.tsx — "Event card")
-        ├── BottomSheet.tsx  (mobile: vaul bottom sheet)
+        ├── BottomSheet.tsx  (mobile: the card sheet; ScrollSheet.tsx moves it,
+        │     vaul only while a walking route is on — "Phone card sheet")
+        ├── ScrollSheet.tsx  (the native-scroll sheet with CSS scroll snap, #923)
         ├── VenueCardBody.tsx  (the place card's content, one copy for both
         │     shells — variant "sheet" in BottomSheet, "panel" in
         │     DesktopVenueWindow, which always shows full details, #732;
@@ -59,12 +61,16 @@ Browser
         │     Bus/Drive: Google Maps deep links)
         ├── SearchBar / ViewSuggestion / SearchResultsPopover / FilterPanel
         │     (Filters button opens FilterPanel — categories + Open now/SNAP/
-        │     WIC, #513. No standing Map/List control, #514: an empty focused
+        │     WIC, #513; slides in from the left and out, held mounted and
+        │     showing its last open content while it slides out —
+        │     src/lib/usePresence.ts, #917 round 3. No standing Map/List control, #514: an empty focused
         │     bar offers the other view, a typed one adds "See all N matches
         │     as a list", and the Menu has a List/Map line)
         ├── HamburgerMenu    (shell: mobile full-height sheet, or desktop
         │     dropdown on non-map pages via PageNav — position, backdrop,
-        │     focus trap/return, Escape, scroll lock. Renders
+        │     focus trap/return, Escape, scroll lock; on a phone it slides in
+        │     from the right and out, keeping the view it closed on, Saved or
+        │     Menu, until the slide ends — usePresence.ts, #917 round 3. Renders
         │     HamburgerMenuContent — List/Map line, saved places, links,
         │     language — split out by #682 8b so the SAME content also
         │     renders inside DesktopSidePanel on the map page's desktop
@@ -326,7 +332,7 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   hours change is proposed, the raw schedule text goes in `meta.schedule_text`
   and `meta.needs_review`, and the card always reads "needs a human".
   Matching runs only over our `pantry`/`meal_site` rows of any
-  `source_type` (blessing boxes stripped by `excludeBlessingBoxes`): an alias
+  `source_type` (the category filter already leaves out blessing boxes): an alias
   on file or our venue with id `cas-<locationId>` first; then **strong** =
   name overlap ≥ 0.75, within 150 m, AND the same phone (renamePairs'
   `haversineDistanceKm`/`normalizedPhoneTail`), or — when Care and Share's
@@ -445,6 +451,8 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   handles the
   supersede race, stale applies and rejection memory: atlas-kb "PFM AGENTS
   History — Venue-Refresh Pipeline", "Change-proposal review queue (#390)".
+  A reject saves the card's optional reason in `change_proposals.review_reason`
+  (#904, migration `0028`, null when none was given); the admin doesn't show it.
   Auto-supersede (§6.10a) and rejection memory (§6.10b) stay the ingestion
   job's concern, with one review-side exception: approving an update
   supersedes that venue's other pending update cards whose every change is
@@ -570,11 +578,10 @@ User taps "Near me" (BottomNav)
   → handleLocateRequest()
     → stamps userRequestedAtRef
     → increments recenterRequestId  (Map.tsx flyTo fires even if position unchanged)
-    → calls geo.request()   (first try high accuracy, ≤60 s cached fix; a timeout /
-                              unavailable error retries ONCE at low accuracy, ≤5 min cached fix;
-                              code 1 is the only "denied"; a second failure is GeoState
-                              {permission:'failed', reason:'timeout'|'unavailable'}, which the
-                              next tap simply retries — #738)
+    → calls geo.request()   (ONE try at low accuracy, ≤5 min cached fix, 5 s timeout, #921;
+                              code 1 is the only "denied"; a timeout / unavailable error is
+                              GeoState {permission:'failed', reason:'timeout'|'unavailable'} at
+                              once, which the next tap simply retries — #738)
   → useEffect watches geo.state
     → clears isLocating when permission resolves
     → sets locationFailure (LocationHelpCard) if permission is 'denied' OR 'failed' AND a fresh user request was pending; clears it on a granted position (#739)
@@ -639,8 +646,8 @@ one place it's stated; code comments point here.
 
 The in-scope routes (`/`, `/venues`, `/venue/[id]`, `/resources`,
 `/about`, the four SEO hubs `/food-pantries`, `/snap-wic-stores`,
-`/community-gardens`, `/blessing-boxes`, and `/event/[id]`; `ls src/app/es`
-is the live list) are **mirrored**: each has a full `/es` twin with its own root
+`/community-gardens`, `/blessing-boxes`, `/events/share` and `/event/[id]`;
+`ls src/app/es` is the live list) are **mirrored**: each has a full `/es` twin with its own root
 layout (`src/app/es/layout.tsx`, `lang="es"`, `LocaleProvider
 initialLocale="es"` — which also LOCKS the tree, so a stale `pfm-locale=en`
 cookie can never flip an `/es` page back to English post-hydration).
@@ -731,13 +738,14 @@ The rules it sets:
   `X-Robots-Tag: noindex, nofollow` to every response on any other host
   (dev., *.workers.dev), via `src/lib/indexingHost.ts`. This is deliberately a
   header, not a robots.txt `Disallow`: a crawler must be able to fetch a page
-  to see its noindex and drop it. `deploy-prod.yml`'s smoke test fails if the
-  canonical host ever sends the header, or if workers.dev stops sending it.
+  to see its noindex and drop it. The post-deploy smoke test
+  (`scripts/smoke.sh`, both deploy workflows) fails if a workers.dev origin
+  stops sending it, and on prod if the canonical host ever sends it.
 
 - **`/llms.txt`** is a hand-written static file, `public/llms.txt` (llmstxt.org
   format). Cloudflare Workers Static Assets serves it before the Worker runs
   (`text/plain; charset=utf-8`, no route or middleware involved, same as
-  `sw.js`), and `deploy-prod.yml` smoke-tests it. It carries no counts, so it
+  `sw.js`), and the post-deploy smoke test (`scripts/smoke.sh`) checks it. It carries no counts, so it
   can't go stale; update it by hand when a public page is added or renamed.
 - **AI crawler policy** lives in `src/app/robots.ts` (WHY in its header):
   answer/search bots are allowed, training-only crawlers are blocked.
@@ -752,14 +760,21 @@ no client-only `Intl`). It's called from **both** sides of the render: the
 server (`buildVenueJsonLd`'s `description`, `venuePageMetadataFields`'s meta
 description) and the client (`VenueContent`'s on-page paragraph, at the
 page's own current `locale`) — the same function, so the three can never
-drift apart. `{ includeAddress: false }` drops the street address from the
+drift apart. One deliberate exception (#921): for a SNAP store,
+`buildVenueMetaDescription` moves the SNAP/WIC fact first and names the store
+("Loaf 'N Jug accepts SNAP/EBT."), because a description opening "It
+accepts..." has nothing for "it"; the on-page paragraph and JSON-LD keep the
+summary's order and wording. `{ includeAddress: false }` drops the street address from the
 sentence (VenueContent passes this — the address is already shown in the
 header just above); the default (`true`, used by meta/JSON-LD) keeps it.
 
 - **City parsing** (`parseVenueCityCore`/`parseVenueCity`): pulls the city
   out of a free-text address for the page `<title>`
   (`"{Name} – {category} in {City}, CO"`, ladder-shortened to fit ≤ 70
-  rendered chars, never truncating the name) and the no-address sentence.
+  rendered chars, never truncating the name; a SNAP store first tries
+  `"{Name}, {City}, CO: Accepts SNAP/EBT"`, then `"{Name}, {City}: Accepts
+  SNAP/EBT"`, then `"{Name}, {City}: SNAP/EBT"`, then the normal ladder, so
+  the place is never dropped, #921) and the no-address sentence.
   The core returns `string | null`; `buildVenueJsonLd`'s `addressLocality`
   uses the core directly and OMITS the field on `null` rather than emit
   fallback prose ("Pueblo County") as a structured-data city name.
@@ -769,8 +784,8 @@ header just above); the default (`true`, used by meta/JSON-LD) keeps it.
 - **OSM placeholder guard** (`PLACEHOLDER_ADDRESS`): a venue whose
   `address` is literally "Address not in OpenStreetMap" (an OSM import gap)
   never shows that string in the summary, `<meta description>`, or JSON-LD
-  `streetAddress` — same guard the map card (`VenueCardBody`'s
-  `displayAddress`) applies (their own fallback is raw lat/lng; a sentence falls
+  `streetAddress` — same guard the map card and venue page apply
+  (`displayAddress`, beside the constant; their fallback is raw lat/lng; a sentence falls
   back to the parsed city instead).
 - **`sameAs`** is emitted only when a venue's `url` is unique among
   published venues (`URL_COUNTS`, computed once at module load) — 10
@@ -778,7 +793,7 @@ header just above); the default (`true`, used by meta/JSON-LD) keeps it.
   which is not any single venue's own identity.
 - **Nearby** (`nearbyVenues`): the 3–5 nearest same-category published
   venues by haversine distance (`src/lib/distance.ts`), computed in the
-  server `venue/[id]/page.tsx` (both EN and ES) and passed to `VenueContent`
+  server `src/lib/venuePageData.tsx` (shared by the EN and ES venue pages) and passed to `VenueContent`
   as a prop — adds no client JS.
 
 ---
@@ -811,7 +826,7 @@ rank for the queries people type ("food pantry Pueblo", "SNAP stores Pueblo").
   with `faqItemsFor`. The official source URLs and fetch dates for those
   answers are in the header of `src/lib/resourcesFaq.ts`.
 - **Sitemap and smoke test:** each hub has EN + ES entries with alternates;
-  `deploy-prod.yml` checks all eight (incl. `/blessing-boxes`) for 200 and the `/es` ones for `<html lang="es">`.
+  the post-deploy smoke test (`scripts/smoke.sh`) checks all eight (incl. `/blessing-boxes`) for 200 and the `/es` ones for `<html lang="es">`.
 - **`/blessing-boxes` (+ `/es`) is the dynamic one.** Boxes live only in D1, and
   admin edits must show immediately, so both page files set
   `export const dynamic = "force-dynamic"` (route-segment config; it affects only
@@ -825,8 +840,8 @@ rank for the queries people type ("food pantry Pueblo", "SNAP stores Pueblo").
   map link (never "0 boxes"), no JSON-LD, and the metadata adds
   `robots: { index: false, follow: true }`. Each box links to the map card at
   `/?venue=<id>` (`/es?venue=<id>`). Read-only per REVIEW.md: no check-in,
-  photo, adopt or alert controls. No page caching (`force-dynamic`); the cost is 2 D1 reads (~30 box rows, then their check-ins) per page
-  view, and the upgrade path is an edge-cached read like `src/lib/edgeCache.ts`.
+  photo, adopt or alert controls. No page caching (`force-dynamic`); the cost is 2 D1 reads (~30 box rows, then their check-ins; one more check-in read per
+  extra 100 boxes) per page view, and the upgrade path is an edge-cached read like `src/lib/edgeCache.ts`.
 
 ## Form-route triad
 
@@ -871,8 +886,11 @@ Turnstile is a first-party Cloudflare product with a simpler integration
 model and no Google dependency — appropriate for a civic app serving
 populations that may distrust Google tracking.
 
-**PII policy:** IP addresses are used only for rate-limiting — never logged or
-persisted. Contact emails go to Resend in the email body; the route handlers
+**PII policy:** in the form handlers, IP addresses are used only for
+rate-limiting — never logged or persisted. The one other use is analytics: the
+`/ingest` relay passes the visitor IP (`CF-Connecting-IP`, as
+`X-Forwarded-For`) to PostHog for a city lookup, and PostHog's "Discard client
+IP data" setting throws it away after (#919, `src/lib/ingestTarget.ts`). Contact emails go to Resend in the email body; the route handlers
 do not log them.
 
 **What Cloudflare Workers Logs keeps:** logs are on for prod and staging
@@ -965,8 +983,8 @@ re-run cost ~3 min per deploy and let flaky tests block green changes).
 design:drift, the full test suite (replaced by a published-data/venue-shape
 subset), the Python scraper self-tests, and the blocking production `npm audit`
 in "Dependency CVE Audit"; typecheck and build always run. The diff check, not
-the branch name, is the safety property — see `ci.yml`'s "Detect data-only
-publish-bot PR" step comment.
+the branch name, is the safety property — see the comment in
+`.github/actions/detect-data-only/action.yml`, the step both workflows share.
 
 **Release flow (replaced ad-hoc `dev` → `main` promotions).** Work
 merges to `dev` (`pr-title.yml` requires Conventional Commit PR titles).
@@ -1220,7 +1238,7 @@ Map Menu item (phone drawer or desktop side panel) → MapWrapper.startTour dire
   plumbing to the main bundle (MapWrapper's demo handlers, FilterPanel's
   `trapFocus` prop, two `data-tour` attributes).
 - **Targets** are existing hooks (`data-testid` on SearchBar/BottomNav,
-  `data-venue-id` on VenueMarker, `[data-bottom-sheet]` / the desktop card's
+  `data-venue-id` on VenueMarker, `[data-sheet-surface]` / the desktop card's
   `aria-labelledby`, `data-tour` on SearchResultsPopover and FilterPanel's
   switch rows). Every match of a step's selector is unioned into one
   highlight. A missing target falls back to a centered tooltip.
@@ -1264,7 +1282,8 @@ One-off special events (a produce giveaway, a turkey drive), plan in issue
 slice 2 (#758) adds the map pin** (see "Map pins" below); **slice 3 (#759)
 adds the event card** (see "Event card" below); **slice 4 (#760) adds the
 flyer image** (see "Event flyer" below); **slice 6 (#762) adds a web page per
-event** (see "Event page" below).
+event** (see "Event page" below); **#883 lets the public send events in for
+review** (see "Shared events" below).
 
 - **Live, never published.** Like boxes, events are read from D1 at request
   time and are not part of the venue Publish snapshot.
@@ -1275,6 +1294,17 @@ event** (see "Event page" below).
   event keeps its own coordinates), `link_url`, `flyer_key` (slice 4, see
   "Event flyer"), `status` draft / published / cancelled / archived and
   created / updated / published stamps. Nothing is deleted.
+- **Venue name and button wording (#882, `migrations/0026_event_venue_and_button.sql`,
+  ADD COLUMN only).** `venue_name` is the event's own copy of the place name
+  (the form fills it from the linked place when empty), shown in bold above the
+  address. `link_label` is what the card's action button says for `link_url`:
+  `website | signup | tickets | rsvp | volunteer | donate | custom`, NULL =
+  website (so events saved earlier read "Visit website"); checked by
+  `adminEventValidation.ts`, not a CHECK constraint, so a new wording needs no
+  table rebuild. `link_label_custom` / `_es` hold the admin's own words (25
+  characters, `FIELD_LIMITS.EVENT_LINK_LABEL`), English required, and are kept
+  only with `custom`. The public reads select all four, so 0026 must reach a
+  database before this code (until then the feed fails soft to empty).
 - **Pueblo time.** Admins type America/Denver wall-clock time; the **server**
   converts to UTC (`src/lib/eventTime.ts`, `Intl` only, DST-correct: a
   time inside the spring-forward gap is rejected, the repeated fall-back hour
@@ -1307,7 +1337,8 @@ event** (see "Event page" below).
 - **Suggest Spanish** (`POST /api/admin/events/translate`,
   `src/lib/eventTranslate.ts`). The owner does not write Spanish, so the form's
   "Suggest Spanish" button sends the English values and fills **only the
-  Spanish boxes that are empty**. The route gates like the other event routes
+  Spanish boxes that are empty** (including the Custom button words, sent only
+  when "Custom" is chosen, #882). The route gates like the other event routes
   (`authorizeAdminWrite`), checks the same `FIELD_LIMITS` caps, asks Workers
   AI through the `AI` binding (declared in `wrangler.jsonc` for production and
   `env.staging`; no key, secret or npm dependency), and returns
@@ -1372,7 +1403,7 @@ event** (see "Event page" below).
 
 - **One body, two shells.** `EventCardBody.tsx` is the card; it is rendered in
   the phone `BottomSheet` (new optional `event` prop, `layout="sheet"`, same
-  vaul sheet, grab bar, Escape and swipe paths as the place card) and, on
+  sheet, grab bar, Escape and swipe paths as the place card) and, on
   desktop, in `DesktopSidePanel` through the small `EventPanel.tsx` wrapper
   (dialog role + scroller). `DesktopVenueWindow` is the *place* card and needs
   a place, so it is not used (refactoring it is #725). Both entry points load
@@ -1382,13 +1413,97 @@ event** (see "Event page" below).
   kind: a shared link seeds the selection before `isMobile` settles, and a
   handler-set view would miss it. Opening a place, Saved or Menu clears the
   event and vice versa; closing clears `?event=`.
-- **Order** (owner-approved mockup): the flyer (#760, `EventFlyer.tsx`; absent
-  when the event has none), status badge, name, "Hosted by", When, Where (+ distance when the visitor's real
-  position is known), About, a highlighted "What to bring" box, the orange Get
-  directions button, Share and Add to calendar, then the optional link. On a
-  phone the first, always-visible view is badge, name, When and Get directions,
-  so there Get directions sits above Where/About; the rest is the clipped
-  "peek" section under the grab bar, as on the box card.
+- **Order** (owner-approved redesign #882, mockups in
+  `docs/mockups/Event Card Redesign - Mockups.html`): the flyer (#760,
+  `EventFlyer.tsx`; absent when the event has none), status badge, name,
+  "Hosted by", When, About (clamped to 3 lines with "Read more"), the green
+  action button, Where (venue name in bold, address, + distance when the
+  visitor's real position is known), a highlighted "What to bring" box, Share
+  and Add to calendar, and the orange Get directions button last. On a phone
+  the first, always-visible view is badge, name, When, About and the action
+  button; the rest is the "peek" section under the grab bar, as on the
+  box card. Only "Read more" unclamps About, on the sheet as on desktop
+  (expanding by swipe or grab bar keeps 3 lines); on a collapsed sheet it also
+  expands it (`onRequestExpand`, the grab bar's action), and collapsing clamps
+  it again. It shows only when the clamp actually cuts the text. About
+  unclamps at once; the sheet slides to its new fully-open height when it
+  re-measures (see "Phone card sheet"). On a phone the flyer sits
+  at the top of the below-the-fold section, not above the badge, so nothing
+  above the fold ever moves.
+- **Phone card sheet** (#923, replacing #882's vaul snap points; Kyle:
+  "the card slide up/slide down is still just not good"). Every phone card
+  (place, box, event) sits in `ScrollSheet.tsx`, whose movement is the
+  browser's own scrolling: a fixed, transparent, `pointer-events: none`
+  scroll container (the track, `100dvh − 100px peek − safe area`) holds a
+  spacer as tall as itself and then the sheet, so `scrollTop` is the visible
+  height of the sheet. 1px markers at the detents carry `scroll-snap-align`
+  (`snap-mandatory`; the collapsed one is `scroll-snap-stop: always`, so a
+  flick from full rests there), and past fully open the same scroll carries
+  on through the card with native momentum: one swipe grows the sheet and
+  scrolls the details. It is the pure-web-bottom-sheet technique, hand-built
+  (its dismiss needs the Popover API and its shadow DOM sits between our
+  focus, `inert` and Escape handling and the card). `sheetDetents`
+  (`src/lib/sheetSnap.ts`) turns the measurements into scrollTops: collapsed
+  is "top of `#bottomsheet-detail` + its `data-peek-px`", read only while
+  collapsed (expanded, "Read more" can make the first view taller than it
+  will be once collapsed; reading it then left one snap point, so a flick
+  down sprang back, found on the iOS simulator). It is re-read until one
+  reading is taken collapsed with the detail section present: a card that
+  opens expanded, or a box still showing "Loading…" (no detail section yet),
+  never freezes an incomplete first view; full is the sheet's own
+  height or the track's, whichever is shorter. A ResizeObserver on the track
+  and the sheet re-measures, so a lazily loaded card body still counts
+  (never while a finger is down). `restingAt` names the detent a settled
+  scroll (150 ms with no scroll and no finger) is at, and that sets
+  `expanded`, except a rest on a one-height card, which has no collapsed
+  state to leave (a box's "Loading…" line resting on a slow connection would
+  otherwise open the loaded box fully); a change of `expanded` from the grab bar, "Read more", the peek
+  or the tour scrolls the track there. Swipe to close: a swipe from collapsed
+  that snaps to 0 closes; a slow pull more than 100px down from collapsed is
+  finished by a scroll to 0 (snap alone would spring back); a swipe that
+  started fully open is floored at collapsed. Scrolled into the content, snap
+  alignment is switched off (`data-deep`), so a layout change in the card
+  can't make Safari re-snap to the sheet's top. WebKit doesn't scroll a
+  `pointer-events: none` container from a touch on its `pointer-events: auto`
+  child, so each part of the sheet gets a 1px sideways overflow (globals.css,
+  iOS only). The track clips the sheet's shadow where their tops meet, so
+  `[data-sheet-edge]`, a sibling outside the track clipped to the strip
+  above it, draws that edge while `data-at-top` is set. When the measurement
+  leaves one resting height (a short card, or a first view taller than the
+  sheet), the card is laid out as expanded: nothing `inert`, and the grab
+  bar stays drawn as the swipe handle but its button is disabled,
+  `aria-hidden` and `pointer-events-none`, so a touch on it scrolls the
+  track (#917 round 3: a box card's check-in fills the sheet on most phones,
+  and the bar used to go invisible there). It keeps its space either way
+  (removing it moved the content, which flipped the measurement back: a
+  render loop). Clamped text in the sheet (About, a place's notes) is
+  `pointer-events: none`: on iOS Safari a flick that starts on text whose
+  overflow is clipped never scrolls (found on the simulator). The map page's
+  document never scrolls. Walking-route mode (#509) is still the vaul drawer
+  (`snapPoints` strip / full card, `dismissible={false}`) until the route
+  strip moves too.
+- **Animated close** (#882 preview feedback: the card "disappeared super
+  fast"). Closing clears the selection, and `MapWrapper` used to key the
+  sheet on the selected id or `"empty"`, so a close remounted it and the
+  slide never ran. The key is now `sheet-<n>`, bumped only when a card
+  opens (from nothing, or a different item), so switching pins still gets a
+  fresh sheet and a close keeps the same one. `BottomSheet` derives `open`
+  from its props but renders the last non-null venue / event / box /
+  event-here line, held until the close is over (`SHEET_CLOSE_MS`, or vaul's
+  `onAnimationEnd(false)` in route mode), then dropped; while closing the
+  content is `inert`. Swipe-down, Close and Escape all end in the track's
+  smooth scroll to 0. There is no scrim to fade. While a walk route is
+  active nothing changed: clearing the route flips back from vaul to the
+  scroll sheet.
+- **Action button** (#882, replaced the "More information" link).
+  `eventAction()` (`src/lib/eventCard.ts`, pure) turns `link_url` +
+  `link_label(_custom/_es)` into the href (only if `safeUrl()` accepts it; no
+  link, no button), the label (built-in wording with its own Spanish, or the
+  admin's Custom words with Spanish falling back to English), an icon key and
+  the site name (the URL host without `www.`). The card, the event page (its
+  plain link keeps its layout, only the wording changes) and the calendar file
+  (`Sign up: <url>`) all read it, and the page and calendar also show the venue
+  name.
 - **Badge and the clock.** `eventBadge()` (`src/lib/eventCard.ts`, pure) turns
   `(event, nowMs)` into the stage and the countdown ("Starts in 2 days / 2
   hours / 20 min", "Happening now, ends in 40 min"; more than 7 days out reads
@@ -1429,8 +1544,8 @@ event** (see "Event page" below).
   (pin window) whose `venue_id` is the selected place and passes one
   `{label, onOpen}` line ("Event here Saturday", `EventHereLine.tsx`) to
   `BottomSheet` / `DesktopVenueWindow`. Blessing-box cards do not show it.
-- **Text.** All event text is rendered as plain React text. The optional link
-  renders only if `safeUrl()` accepts it (http/https), with
+- **Text.** All event text is rendered as plain React text. The action button
+  renders only if `safeUrl()` accepts the link (http/https), with
   `rel="noopener noreferrer"`. Spanish is used on a Spanish page when that
   column is non-blank, otherwise English (`eventText()`).
 
@@ -1471,7 +1586,10 @@ One image per event, shown at the top of the card.
   `min(55vh, 28rem)`), `loading="lazy"`, `decoding="async"`, alt = the admin's
   text in the page language, else their English text, else the event name; a
   failed image renders nothing. It is only inside the card, so it never loads
-  with the map. On the phone sheet it renders only when the sheet is expanded.
+  with the map. On the phone sheet it renders at the top of the below-the-fold
+  section, collapsed or expanded (#882: the sheet slides rather than changing
+  its content), so it starts loading when the card opens, mostly off screen
+  until the sheet is pulled up.
 - **Admin form.** `EventFlyerField.tsx`, edit mode only (a new event has no id
   yet); each action saves by itself and hands the new `updated_at` up to the form.
   "Suggest Spanish" does not cover the alt text.
@@ -1550,7 +1668,7 @@ list it as an event and a shared link previews the flyer.
   `src/lib/eventCalendar.ts` (the same file builder the map card now uses).
   Directions use `googleMapsUrl`, moved to `src/lib/googleMapsUrl.ts` because a
   function imported from the "use client" `DirectionButtons` cannot be called from a
-  server component (DirectionButtons re-exports it).
+  server component; every caller imports it from there.
 - **Visibility.** The read is `loadPublicEventById` (published, including ended, and
   cancelled). Draft, archived, unknown ids, a missing `events` table, a D1 error and
   a missing Cloudflare context all return `null` -> `notFound()` -> HTTP 404, so a
@@ -1587,6 +1705,84 @@ list it as an event and a shared link previews the flyer.
   paint with a real 404 status and `noindex`, exactly like `/box/[id]`; `es/not-found.tsx`
   gives the `/es` one a Spanish body once JavaScript runs.
 
+### Shared events (#883)
+
+The public can send an event in; nothing reaches the map until an admin makes
+it a draft and publishes it.
+
+- **Page** `/events/share` + `/es/events/share` (`ShareEventPageContent` →
+  `ShareEventForm` on `PublicForm`), indexable, in the sitemap as a mirrored
+  pair, linked from the menu (under "Suggest a place") and above the map's "No
+  events coming up" notice. Fields: name, host, one date with start and end
+  times (Pueblo time, converted on the server), what it is, what to bring,
+  place name, street address, link, button wording (the six built-ins, no
+  Custom), an optional flyer, and the sender's name and email.
+- **Live preview** (`ShareEventPreview`): the real `EventCardBody` in its
+  `preview` mode, fed from the form. Empty fields show grey placeholders, the
+  action button and Get directions are faded non-links until there is a link /
+  an address, and Share / Add to calendar are left out. Desktop: beside the form
+  (sticky). Phone: a Preview button beside "Send for review" opens it in a vaul
+  sheet ("Preview — not on the map yet", "Back to editing"). The card, the
+  sheet and the address-check results carry `NO_CAPTURE_CLASS`
+  (`ph-no-capture`, `src/lib/analytics.ts`): they show unsent personal text,
+  which `maskAllInputs` doesn't cover, so autocapture skips them and replay
+  blocks them (also listed in `REPLAY_BLOCK_SELECTOR`). Send is disabled while
+  a flyer uploads, and an address edit discards any lookup still in flight.
+- **Address check** (spec change 2026-11-05): leaving the address field (or
+  pressing Send before it was checked) calls `GET /events/share/geocode`, the
+  public twin of `/api/admin/geocode`: the same Census lookup
+  (`src/lib/censusGeocode.ts`), matches outside `PUEBLO_COUNTY_BBOX` dropped,
+  its own `checkFormRateLimit` name `event-geocode` with looser caps
+  (30/hour per IP, 300 site-wide), address never logged.
+  One match replaces the typed address and keeps its pin; several are buttons
+  to pick from (a fresh "several" at Send stops that send); none or a failed
+  lookup is a gentle note and the send still goes. The pin is sent as
+  `lat`/`lng`; the server keeps it only if both are finite and inside the
+  county box (`puebloPin`), else stores nulls.
+- **Submit** `POST /events/share/submit`: `parsePublicPost` (Turnstile,
+  honeypot) → `checkFormRateLimit(..., "event", ...)` → `validateEventSubmission`
+  (`adminEventValidation.ts`, the admin form's caps and link rule) → one
+  `event_submissions` row (required: it is the review queue) → best-effort email
+  to suggestions@.
+- **Table `event_submissions`** (`migrations/0027_event_submissions.sql`, new
+  table because `public_submissions.kind` is CHECK-limited). `payload` JSON holds
+  the validated fields with UTC times and no personal data; `submitter_name` /
+  `submitter_email` are their own columns (email: never logged, never in an
+  audit row, never public); `status` pending / converted / dismissed;
+  `converted_event_id`; `review_token` (see Admin). `flyer_key` has a partial
+  UNIQUE index: one upload belongs to one submission, so a retried send that
+  reuses it is refused (409 `flyer_reused`, the form asks for the flyer again)
+  and a convert can safely move its own source. Nothing is deleted.
+- **Flyer** `POST /events/share/flyer`: uploaded when picked (shrunk in the
+  browser first), same byte checks as the admin upload (`inspectFlyer`), its own
+  per-IP and site-wide D1 counters (no Turnstile: the form's single-use token
+  belongs to the submit). Stored under `pending.submissions/<uuid>.jpg` in
+  `EVENT_FLYERS`; the dot in that prefix fails the public flyer route's id
+  pattern, so a pending flyer has no public URL. The admin sees it through
+  `GET /api/admin/event-submissions/[id]/flyer` (session only, `no-store`). An
+  upload never followed by a submit stays in the bucket (no cleanup yet).
+- **Admin.** The Events tab lists pending submissions under "Sent in by the
+  public" (`EventSubmissionsList`), each with one three-dot menu
+  (`AdminRowMenu`) holding its two actions. **"Make it a draft event"**
+  (`POST /api/admin/event-submissions/[id]/convert`) uses the stored pin when
+  the sender picked a checked address, otherwise geocodes the address with the
+  Census lookup the forms use (`src/lib/censusGeocode.ts`); with a pin or
+  exactly one match `convertToDraft` (`src/lib/eventSubmissions.ts`) copies the
+  flyer to the new event's own key, sets the row's status to `draft` and
+  `published_at` to null itself (both are bound values, not SQL literals, so
+  this one function is the guarantee), then runs one `db.batch()`: mark the
+  submission converted with a fresh per-request `review_token` (only if still
+  pending), insert the event gated on that token, its audit row, and the
+  submission's audit row (id, name, status only) gated on the same token, so
+  a second admin acting in the same millisecond writes nothing. It then opens
+  the draft's edit page. With no single match nothing is written (`events.lat`
+  / `lng` are NOT NULL): the admin lands on `/admin/events/new?from=<id>`,
+  prefilled with the address and no pin, and saving that form
+  (`POST /api/admin/events` with `submission_id`, Save draft only) converts the
+  same atomic way. **"Dismiss"** is a status change with its token-gated audit row.
+- Production needs `0027` applied before this code is used; until then the page
+  submit fails cleanly and the admin section is simply absent.
+
 ---
 
 ## Admin panel
@@ -1606,7 +1802,8 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   through the shared `authorizeAdminWrite()` (`adminDb.ts`: session first,
   then Origin).
   Failures map to a login redirect / 401 (no session) or 403 via
-  `src/lib/adminAuthErrors.ts` (for admin *pages* the status is 200, see
+  `src/lib/adminAuthErrors.ts`, whose `adminWriteAccess()` / `adminReadAccess()`
+  are the one call each route handler makes (for admin *pages* the status is 200, see
   "Admin page speed" below). Cookie, allowlist and rate-limit gotchas:
   AGENTS.md "Admin authentication".
 - **Server Component page owns the gate and the reads; a Client Component
@@ -1618,8 +1815,45 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   submission that prompted it). They land together or not at all.
 - **Nothing is deleted.** Archive sets `status='archived'`; the row and its
   audit history stay.
-- **Destructive actions confirm with native `window.confirm()`** — no modal
-  dependency exists or is needed.
+- **Risky actions confirm on the page, never with `window.confirm()`**
+  (#926). `src/components/AdminConfirm.tsx` is one small box with Cancel
+  first: the trigger hides (still mounted, so focus can return), the box
+  opens in its place, and the request is sent only from the box's own
+  action button, the same gate the browser pop-up gave. Used by Remove from
+  map, Archive this venue, Publish, Approve all date-only updates, Archive
+  event and Remove this flyer. `useAdminStep` in the same file gives the
+  change cards' reason steps and the event form's Cancel event step the
+  same focus handling; Escape closes a step through the step's own Cancel
+  (so what was typed is cleared) and does nothing while its request runs.
+  The four change cards share one reason step, `AdminRejectStep`, in the
+  same file. No modal dependency.
+- **A working admin button keeps keyboard focus** (#926). A button that
+  stays on the page while its own request runs is marked `aria-disabled`,
+  not natively disabled (`busyButtonProps` in `src/components/formClasses.ts`):
+  a natively disabled button drops focus to the page body. Its presses are
+  stopped in the capture phase, before its own `onClick`, and their default
+  is prevented, so a busy submit button (or Enter in a field) sends nothing:
+  the same double-press gate `disabled` gave. The button is not the only
+  gate: every admin write handler also returns at once while its own
+  request (or a sibling decision on the same card or form) is running, so
+  a direct form submit, a sibling button with its own busy flag, or a
+  second row's press cannot start a second write
+  (`src/components/adminWriteGates.test.tsx`).
+- **One set of admin UI parts** (#926). Class strings live in
+  `src/lib/adminCardStyles.ts` (titles, page bodies, cards, tables,
+  buttons, links, tags, chips, failure and empty states) and
+  `src/components/formClasses.ts` (fields, tick boxes, the Cancel + Save
+  row, `busyButtonProps`); the form buttons there are built from the same
+  base as the 14-pixel buttons (`buttonClass`); the shared components are `AdminConfirm`, `AdminRowMenu` (the
+  three-dot menu) and `AdminSegmented` (a two- or three-way slider of real
+  radios). Three small helpers sit beside them: `src/lib/rowLinkClick.ts`
+  (a click on a table row opens the row's own link), `src/lib/fieldLabels.ts`
+  (the plain name of a venue field, kept out of `ProposalCard` because the
+  server-rendered Activity page needs it too) and
+  `src/lib/focusFirstProblem.ts` (after a refused save, focus to the first
+  wrong box). Pages import them instead of typing classes, and
+  `src/__tests__/touchTargets.test.tsx` holds the 48-pixel floor and the
+  hover rules on them. DESIGN.md has the look.
 - **Public (unauthenticated) routes that touch D1** — the suggest/report
   queue, `/api/public/**` box routes — read `getCloudflareContext().env.ADMIN_DB`
   directly, never `getAdminDb()`.
@@ -1637,6 +1871,17 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   full-page request to a guarded admin URL answers 200 (noindex) and redirects
   or renders forbidden/not-found on the client instead of a 307/403/404 (this
   includes an unknown venue id on the edit page). It carries no admin data.
+- **`admin/error.tsx`** (#926) catches an admin page that throws while
+  loading (a D1 read, say) and shows "This page didn't load" in the admin's
+  look, never the error's text. It covers every `/admin/*` page (vinext
+  applies a segment's error file to every page below it). It does not swallow
+  the auth redirects: `redirect()`, `notFound()` and `forbidden()` are
+  digest-tagged signals that vinext turns into their own responses on the
+  server before any error page is considered, and in the browser their
+  boundaries sit inside the error boundary, which re-throws them anyway (read
+  in vinext 1.4.4, not run). So a signed-out visitor still lands on
+  `/admin/login`. Try again is a full reload, because vinext's `reset` only
+  re-renders the payload that already failed.
 
 ### Surfaces
 
@@ -1661,8 +1906,10 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   are kept permanently — the 90-day email cleanup never touches them.
 
 - **`/admin` — Dashboard** (`src/app/(site)/admin/page.tsx`, overhauled #680). A
-  greeting + a 7/30/90-day period switch (`?period=`, server-rendered
-  `<Link>`s, no client JS) that every period-scoped number on the page
+  greeting + a 7/30/90-day period slider (`?period=`; the page stays a
+  Server Component and reads the param, and `DashboardPeriodPicker`, its one
+  client piece, navigates to `/admin?period=…` keeping the other query
+  values) that every period-scoped number on the page
   reads from and compares against the previous period of the same length
   (`src/lib/boxStats.ts`'s `filterByPeriod`/`filterByPreviousPeriod`;
   `src/lib/cfAnalytics.ts`'s equivalent split for Cloudflare's numbers).
@@ -1674,8 +1921,8 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   `/admin/places?show=review`, and the third is pending photos + sponsor
   requests, linking to `/admin/boxes?show=review`), a **Visitors** section reading
   Cloudflare's GraphQL Analytics API server-side (`cfAnalytics.ts` — the
-  ONLY source of unique-visitor numbers in this app; PostHog is
-  memory-only and counts every page load as a new visitor — AGENTS.md
+  ONLY source of unique-visitor numbers in this app; PostHog keeps
+  no ID past the browser tab and makes no person profiles — AGENTS.md
   "Scheduled jobs and observability", PostHog bullet), a **Blessing boxes** numbers section reusing
   `boxStats.ts` (the
   same math the public Boxes page uses), and a **Map data health** section
@@ -1745,15 +1992,17 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   `summarizePublishChanges()`'s three buckets (`newDrafts`,
   `editedSincePublish`, `archived` — `archived` counts only rows that were
   published, since archiving a never-live draft changes nothing public),
-  confirms, then maps the response to one of five messages or a generic
-  retry. The route snapshots `draft`+`published` rows, validates, commits
+  confirms on the page (`AdminConfirm`, nothing sent before its own Publish
+  press), then maps the response to one of five messages or, for a 500 or a
+  lost connection, one that says it can't tell whether the map changed and
+  to reload (the PR may already be open by then). The route snapshots `draft`+`published` rows, validates, commits
   `published-venues.ts` to the `publish-bot` branch, opens/reuses its
   auto-merging PR, and **only then** promotes drafts in D1 — the reverse
   order could mark rows published when the file never shipped. It refuses
   on staging (`isProductionWorker()`, #591) and returns
   `503 publish_not_configured` when `GITHUB_PUBLISH_TOKEN` is unset. The
-  button is sage, not brand orange: DESIGN.md reserves orange for the public
-  map.
+  button is sage, not brand orange: the admin's one orange button is Add
+  place (DESIGN.md Colors).
   - **"Published" means "PR open and armed," not "merged" (#598).** If that
     PR's CI then fails, D1 says published while the live site serves the old
     file until the next Publish repairs it. Waiting for the real merge was

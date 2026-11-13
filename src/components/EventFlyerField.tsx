@@ -10,7 +10,8 @@
  *   - choosing a file shrinks it in the browser (shrinkFlyerToJpeg, about
  *     150 KB, never cropped) and uploads it with the alt texts typed so far;
  *   - "Save description" re-sends only the alt texts for the flyer already there;
- *   - Remove deletes it.
+ *   - Remove asks on the page first (AdminConfirm, #926: no browser pop-up),
+ *     and only its Remove flyer button deletes it.
  * The flyer route changes the event's `updated_at`, so every success hands the
  * new value up (`onVersion`); without that the form's next Save would 409
  * against the admin's own flyer change.
@@ -20,9 +21,12 @@
  * shown right under the picture.
  */
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { shrinkFlyerToJpeg, UnsupportedImageError } from "@/lib/imageResize";
 import type { PublicFlyer } from "@/lib/events";
+import { dangerButtonClass, secondaryButtonClass } from "@/lib/adminCardStyles";
+import { busyButtonProps, errorClass, fieldGroupClass, hintClass, inputClass, labelClass } from "@/components/formClasses";
+import AdminConfirm, { useAdminConfirm } from "@/components/AdminConfirm";
 
 export interface EventFlyerFieldProps {
   /** Absent in create mode. */
@@ -36,18 +40,6 @@ export interface EventFlyerFieldProps {
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
 const WRONG_TYPE = "That file isn't a JPEG, PNG or WebP image. Choose a different one.";
 
-const inputClass =
-  "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-3 py-2 text-base md:text-sm " +
-  "text-[var(--color-ink-900)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
-const buttonClass =
-  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-sage-500)] px-4 text-sm " +
-  "font-medium text-[var(--color-sage-600)] bg-transparent hover:bg-[var(--color-sage-50)] focus-visible:outline-none " +
-  "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
-const dangerClass =
-  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] px-4 text-sm " +
-  "font-medium text-[var(--color-danger)] bg-transparent hover:bg-[var(--color-danger)] hover:text-[var(--color-bone-50)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
 
 type Busy = null | "uploading" | "saving" | "removing";
 
@@ -59,11 +51,22 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const chooseRef = useRef<HTMLButtonElement>(null);
+  const { asking, ask, cancel, triggerRef } = useAdminConfirm();
+  const focusChooseNext = useRef(false);
+  // An effect, not a focus call in remove(): after a removal the pressed Remove is gone, so focus goes to
+  // "Choose image" once the confirm has closed and the request has finished.
+  useEffect(() => {
+    if (busy === null && !asking && focusChooseNext.current) {
+      focusChooseNext.current = false;
+      chooseRef.current?.focus();
+    }
+  }, [busy, asking]);
 
   if (eventId === undefined || version === undefined) {
     return (
-      <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4">
-        <legend className="px-1 text-sm font-medium text-[var(--color-ink-700)]">Flyer or photo</legend>
+      <fieldset className={fieldGroupClass}>
+        <legend className={`${labelClass} px-1`}>Flyer or photo</legend>
         <p className="text-sm text-[var(--color-ink-500)]">Save the event first, then add a flyer here.</p>
       </fieldset>
     );
@@ -74,6 +77,10 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
 
   /** Sends one flyer request and folds the answer into state; returns whether it worked. */
   async function send(init: RequestInit, busyState: Exclude<Busy, null>, done: string): Promise<boolean> {
+    // One flyer request at a time. choose() sets busy itself before it
+    // shrinks the image, then calls this from that same render, where busy
+    // is still null, so its own upload is not refused here.
+    if (busy !== null) return false;
     setBusy(busyState);
     setError(null);
     setNotice(null);
@@ -112,7 +119,7 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
   }
 
   async function choose(file: File | undefined) {
-    if (!file) return;
+    if (!file || busy !== null) return;
     // Some Android pickers report no type at all; only refuse a type that is present and wrong.
     // A non-image with a blank type still fails at decode, with its own message below.
     if (file.type && !ACCEPTED.includes(file.type)) {
@@ -133,19 +140,25 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
     await send({ method: "POST", body: body(small) }, "uploading", "Flyer saved.");
   }
 
+  // Runs only from the on-page confirm's Remove flyer button: that second press is the gate.
   async function remove() {
-    if (!window.confirm("Remove this flyer?")) return;
-    await send(
+    const ok = await send(
       { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedUpdatedAt: version }) },
       "removing",
       "Flyer removed.",
     );
+    if (ok) {
+      // The Remove button is gone with the flyer, so close the confirm (or the next upload
+      // would open with it still asking) and give focus to Choose image once it is enabled again.
+      focusChooseNext.current = true;
+      cancel();
+    }
   }
 
   return (
-    <fieldset className="space-y-3 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4">
-      <legend className="px-1 text-sm font-medium text-[var(--color-ink-700)]">
-        Flyer or photo <span className="font-normal text-[var(--color-ink-400)]">optional, shown at the top of the event card</span>
+    <fieldset className={`space-y-3 ${fieldGroupClass}`}>
+      <legend className={`${labelClass} px-1`}>
+        Flyer or photo <span className={hintClass}>(optional)</span>
       </legend>
 
       {flyer && (
@@ -173,19 +186,37 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
         }}
       />
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" disabled={busy !== null} onClick={() => input.current?.click()} className={buttonClass}>
+        {/* busyButtonProps: the pressed button keeps focus through Uploading… (#926). */}
+        <button ref={chooseRef} type="button" onClick={() => input.current?.click()} {...busyButtonProps(busy !== null)} className={secondaryButtonClass}>
           {busy === "uploading" ? "Uploading…" : flyer ? "Replace image" : "Choose image"}
         </button>
         {flyer && (
-          <button type="button" disabled={busy !== null} onClick={() => void remove()} className={dangerClass}>
-            {busy === "removing" ? "Removing…" : "Remove"}
+          <button ref={triggerRef} type="button" hidden={asking} disabled={busy !== null} onClick={ask} className={dangerButtonClass}>
+            Remove
           </button>
         )}
-        <p className="text-xs text-[var(--color-ink-500)]">JPEG, PNG or WebP. It is shrunk to about 150 KB before upload.</p>
+        <p className="text-xs text-[var(--color-ink-500)]">
+          Shown at the top of the event card. JPEG, PNG or WebP, shrunk to about 150 KB before upload.
+        </p>
       </div>
+      {flyer && asking && (
+        <AdminConfirm
+          title="Remove this flyer?"
+          confirmLabel="Remove flyer"
+          busyLabel={busy === "removing" ? "Removing…" : undefined}
+          tone="danger"
+          // Any flyer request in flight blocks the confirm, as it blocked the old Remove button.
+          busy={busy !== null}
+          onConfirm={() => void remove()}
+          onCancel={cancel}
+        >
+          The event stays. Only the picture is removed.
+        </AdminConfirm>
+      )}
 
+      {/* The one error line for every flyer action, the confirm's included (it sits right above). */}
       {error && (
-        <p role="alert" className="text-xs text-[var(--color-danger)]">
+        <p role="alert" className={errorClass}>
           {error}
         </p>
       )}
@@ -195,30 +226,34 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
         </p>
       )}
 
-      {/* items-end: the two labels can wrap differently; keep the boxes level. */}
+      {/* items-end: the two labels can wrap differently; keep the boxes level.
+          "Read out by screen readers" lives in the line under the pair, so the
+          two labels are the same length and sit on one line each from 640. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
         <div>
-          <label htmlFor="event-flyer-alt" className="mb-1 block text-sm font-medium text-[var(--color-ink-700)]">
-            Describe the picture (English) <span className="font-normal text-[var(--color-ink-400)]">for screen readers</span>
+          <label htmlFor="event-flyer-alt" className={labelClass}>
+            Describe the picture (English)
           </label>
           <input id="event-flyer-alt" type="text" value={alt} maxLength={200} onChange={(e) => setAlt(e.target.value)} className={inputClass} />
         </div>
         <div>
-          <label htmlFor="event-flyer-alt-es" className="mb-1 block text-sm font-medium text-[var(--color-ink-700)]">
-            Describe the picture (Spanish) <span className="font-normal text-[var(--color-ink-400)]">optional</span>
+          <label htmlFor="event-flyer-alt-es" className={labelClass}>
+            Describe the picture (Spanish) <span className={hintClass}>(optional)</span>
           </label>
           <input id="event-flyer-alt-es" type="text" lang="es" value={altEs} maxLength={200} onChange={(e) => setAltEs(e.target.value)} className={inputClass} />
         </div>
       </div>
       <p className="text-xs text-[var(--color-ink-500)]">
-        If left blank, the event name is read out instead. Descriptions are saved with the picture or the Save description button, not the Save buttons below.
+        Screen readers read this description out. If left blank, the event name is read out instead. Descriptions are saved with the picture or the Save description button, not the Save buttons below.
       </p>
       {flyer && (
         <button
           type="button"
-          disabled={busy !== null || !altDirty}
+          // aria-disabled also when nothing changed: right after a save it turns
+          // off with focus on it, and a natively disabled button would drop that focus.
           onClick={() => void send({ method: "POST", body: body() }, "saving", "Description saved.")}
-          className={buttonClass}
+          {...busyButtonProps(busy !== null || !altDirty)}
+          className={secondaryButtonClass}
         >
           {busy === "saving" ? "Saving…" : "Save description"}
         </button>

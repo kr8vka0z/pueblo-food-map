@@ -14,7 +14,7 @@
  */
 
 import { t, type Locale } from "@/lib/i18n";
-import { TIME_ZONE, puebloParts } from "@/lib/eventTime";
+import { TIME_ZONE, puebloDateKey, puebloParts, sameDenverDay } from "@/lib/eventTime";
 import type { PublicEvent } from "@/lib/events";
 
 /** Events starting further out than this stay off the map (the list view still shows them, #761). */
@@ -24,18 +24,20 @@ const EVENT_PIN_WINDOW_MS = EVENT_PIN_WINDOW_DAYS * 86_400_000;
 /** Query parameter that carries the selected event in the URL (`/?event=<id>`). */
 export const EVENT_PARAM = "event";
 
+/**
+ * The five-point star in the event pin's head (24-unit Lucide MapPin box),
+ * shared by EventMarker (the map pin) and EventStrip (the first-screen strip).
+ * Pure data here so EventStrip does not pull the lazily loaded map chunk in.
+ */
+export const EVENT_STAR_POINTS =
+  "12,5.6 13.12,8.46 16.19,8.64 13.81,10.59 14.59,13.56 12,11.9 9.41,13.56 10.19,10.59 7.82,8.64 10.88,8.46";
+
 export interface EventPin {
   event: PublicEvent;
   /** Going on right now: starts_at <= now < ends_at. */
   live: boolean;
   /** Pueblo calendar day of the start equals Pueblo's today (drives the "Today" label). */
   today: boolean;
-}
-
-function sameDenverDay(aMs: number, bMs: number): boolean {
-  const a = puebloParts(aMs);
-  const b = puebloParts(bMs);
-  return a.y === b.y && a.mo === b.mo && a.d === b.d;
 }
 
 /**
@@ -66,10 +68,7 @@ export function pinsAt(
 }
 
 /** Pueblo calendar day of an instant as "2026-10-10": the key the strip's dismissals are filed under (#761). */
-export function denverDayKey(ms: number): string {
-  const p = puebloParts(ms);
-  return `${p.y}-${String(p.mo).padStart(2, "0")}-${String(p.d).padStart(2, "0")}`;
-}
+export const denverDayKey = puebloDateKey;
 
 export interface EventStripPick {
   /** The event the strip names: the one going on now, else the next to start today. */

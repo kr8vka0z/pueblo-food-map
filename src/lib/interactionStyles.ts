@@ -11,7 +11,22 @@
  * and composites over the enlarged-but-invisible hit boxes added alongside it
  * (Priority 3 tap-target fixes, same review) without any transform-origin
  * interaction to reason about.
+ *
+ * WHY press only, no hover half (#917, DESIGN.md R2): the old
+ * `hover:brightness-105` ran a filter on top of the hover color fade, which
+ * made hover stutter. Hover now animates color only (the sage 100 fill, R1).
  */
 
-/** Append to a control's className: dims 5% on press, brightens 5% on hover. */
-export const PRESS_FEEDBACK = "hover:brightness-105 active:brightness-95";
+/** Append to a control's className: dims 5% while pressed, so a tap visibly lands. */
+export const PRESS_FEEDBACK = "active:brightness-95";
+
+/**
+ * The phone sheet's close button (#882, Kyle: no visible × on the phone, the
+ * sheet closes by swiping down). Visually hidden, but still in the Tab order
+ * and announced, so keyboard and screen-reader users keep a way out; on
+ * keyboard focus it appears in the sheet's top-right corner. Absolutely
+ * positioned either way, so it never takes room from the row it sits in.
+ */
+export const HIDDEN_UNTIL_FOCUS =
+  "sr-only focus-visible:not-sr-only focus-visible:!absolute focus-visible:right-2 focus-visible:top-2 " +
+  "focus-visible:z-10 focus-visible:h-12 focus-visible:w-12 focus-visible:bg-[var(--color-bone-50)]";

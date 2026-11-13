@@ -470,8 +470,8 @@ describe("loadNetworkStatsData", () => {
   });
 
   // Fix, 2026-09-19 (reversing this slice's earlier "network totals keep an
-  // archived box's history forever" design — see boxStats.ts's own header
-  // and AGENTS.md's slice 7 section for the record): archived boxes must
+  // archived box's history forever" design — see boxStats.ts's own
+  // header): archived boxes must
   // never reach this route's response at all, same exclusion every other
   // public box query in this repo already applies. The fake DB below
   // doesn't simulate real SQL filtering (it just echoes back whatever rows

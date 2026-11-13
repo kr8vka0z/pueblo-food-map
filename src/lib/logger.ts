@@ -45,7 +45,10 @@ export type FormName =
   // confirm, stop, resubscribe, admin host-alerts) — split the same way
   // "checkin"/"checkin_photo" split two related-but-distinct write paths.
   | "adopt"
-  | "alerts";
+  | "alerts"
+  // #883: the public "Share an event" submit and its flyer upload.
+  | "event"
+  | "event_flyer";
 // "db_unavailable" (2026-09-18 security review, item 9): an unhandled D1
 // exception on a public route, distinct from "db_write_failed" (a write that
 // completed its round-trip but returned an unexpected result).
@@ -67,23 +70,10 @@ export function logFormFailure(
   reason: FormFailureReason,
   detail?: FailureDetail,
 ): void {
-  const entry: Record<string, unknown> = {
-    event: "form_submit_failure",
-    form,
-    reason,
-  };
-
-  if (detail?.status !== undefined) {
-    entry.status = detail.status;
-  }
-  if (detail?.message !== undefined) {
-    entry.message = detail.message;
-  }
-  if (detail?.recipientCount !== undefined) {
-    entry.recipientCount = detail.recipientCount;
-  }
-
-  const line = JSON.stringify(entry);
+  // Destructured, not spread, so only these fields can ever reach the log
+  // (the PII allowlist); JSON.stringify drops the ones left undefined.
+  const { status, message, recipientCount } = detail ?? {};
+  const line = JSON.stringify({ event: "form_submit_failure", form, reason, status, message, recipientCount });
 
   if (reason === "turnstile_failed") {
     console.warn(line);
@@ -223,11 +213,8 @@ interface CspViolationDetail {
  * quiet for a while" before flipping to enforcing is never actually true.
  */
 export function logCspViolation(detail: CspViolationDetail): void {
-  const entry: Record<string, unknown> = { event: "csp_violation_report" };
-  if (detail.violatedDirective !== undefined) entry.violatedDirective = detail.violatedDirective;
-  if (detail.blockedUri !== undefined) entry.blockedUri = detail.blockedUri;
-  if (detail.documentUri !== undefined) entry.documentUri = detail.documentUri;
-  console.warn(JSON.stringify(entry));
+  const { violatedDirective, blockedUri, documentUri } = detail;
+  console.warn(JSON.stringify({ event: "csp_violation_report", violatedDirective, blockedUri, documentUri }));
 }
 
 export type PublishOutcome = "success" | "failure";
@@ -253,11 +240,8 @@ export function logPublishResult(
   outcome: PublishOutcome,
   detail?: PublishResultDetail,
 ): void {
-  const entry: Record<string, unknown> = { event: "publish_result", outcome };
-  if (detail?.prUrl !== undefined) entry.prUrl = detail.prUrl;
-  if (detail?.message !== undefined) entry.message = detail.message;
-
-  const line = JSON.stringify(entry);
+  const { prUrl, message } = detail ?? {};
+  const line = JSON.stringify({ event: "publish_result", outcome, prUrl, message });
   if (outcome === "success") {
     console.log(line);
   } else {

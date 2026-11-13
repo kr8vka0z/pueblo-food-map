@@ -9,27 +9,25 @@
  * deliberately kept as ONE component shared with create mode (see its own
  * header) — bolting an archive-only branch onto it would undo that DRY
  * move for no benefit. This component owns nothing about the venue's other
- * fields; it only needs an id, a name (for the confirm message), and
+ * fields; it only needs an id, a name (for the confirm question), and
  * whether the venue is already archived.
  *
- * WHY a native window.confirm() and not a custom modal: it IS a confirm
- * dialog (the literal acceptance criterion), needs no new dependency, and
- * this codebase has no existing modal/dialog component to reuse (vaul is
- * used only for the public map's mobile BottomSheet drawer, an unrelated
- * concern) — matching CLAUDE.md's ponytail default of using the smallest
- * thing that satisfies the requirement.
+ * The confirm is the admin's shared on-page box (AdminConfirm, #926
+ * decision 7), not the browser's own pop-up: it opens right where the
+ * button was, names the place, says what happens and what does not, and
+ * puts Cancel first. The archive POST goes only from the box's second
+ * button, the same gate the pop-up used to be.
  *
- * Danger-zone styling reaches for the `--color-danger` token
- * (globals.css @theme / DESIGN.md "Semantic" colors) rather than a literal
- * Tailwind red utility — that token is already defined and drift-checked
- * but had no consumer yet; this is its first and, so far, only use, kept to
- * this one destructive action per DESIGN.md's "one clear accent per role"
- * convention (sage = interactive, clay = informational emphasis, orange =
- * the one primary CTA per screen, danger = destructive).
+ * Red (`--color-danger`) because it is the one destructive action on the
+ * page (DESIGN.md "one clear accent per role": sage = interactive, clay =
+ * informational emphasis, orange = the one Add place button, danger =
+ * destructive); the class comes from the shared dangerButtonClass.
  */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminConfirm, { useAdminConfirm } from "@/components/AdminConfirm";
+import { dangerButtonClass } from "@/lib/adminCardStyles";
 
 export interface ArchiveVenueButtonProps {
   venueId: string;
@@ -37,36 +35,32 @@ export interface ArchiveVenueButtonProps {
   /** When true, the venue is already archived — render an informational
    *  state instead of an actionable button (there is nothing to confirm). */
   alreadyArchived: boolean;
+  /** What the confirm promises. A blessing box is live (no Publish), so
+   *  archiving one takes it off the map at once (src/lib/blessingBoxes.ts:
+   *  the live box reads skip archived rows); a place waits for the next
+   *  publish. Defaults to "place". */
+  kind?: "place" | "box";
 }
-
-const dangerButtonClass =
-  "inline-flex items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] " +
-  "px-3 py-1.5 text-sm font-medium text-[var(--color-danger)] bg-transparent " +
-  "transition-colors duration-150 hover:bg-[var(--color-danger)] hover:text-[var(--color-bone-50)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
 
 export default function ArchiveVenueButton({
   venueId,
   venueName,
   alreadyArchived,
+  kind = "place",
 }: ArchiveVenueButtonProps) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
+  const { asking, ask, cancel, triggerRef } = useAdminConfirm();
 
-  async function handleClick() {
-    const confirmed = window.confirm(
-      `Remove "${venueName}" from the map? It will stop appearing on the next publish, but its record ` +
-        `is kept, not deleted, and this can be reviewed later.`,
-    );
-    if (!confirmed) return;
-
+  async function handleConfirm() {
+    if (status === "submitting") return;
     setStatus("submitting");
     try {
       const res = await fetch(`/api/admin/venues/${venueId}/archive`, { method: "POST" });
       if (res.status === 200) {
         // Back to the venue list (/admin/places, moved from /admin in the
-        // admin dashboard build), not the Dashboard.
+        // admin dashboard build), not the Dashboard. The box stays busy
+        // until the page changes, so it can't be pressed twice.
         router.push("/admin/places");
         router.refresh();
         return;
@@ -77,19 +71,37 @@ export default function ArchiveVenueButton({
     }
   }
 
+  // WHY reset the status here: a reopened box must not show the last
+  // attempt's failure line.
+  function handleCancel() {
+    setStatus("idle");
+    cancel();
+  }
+
   if (alreadyArchived) {
-    return <p className="text-sm text-[var(--color-ink-500)]">This venue is removed from the map.</p>;
+    return <p className="text-sm text-[var(--color-ink-500)]">This place is removed from the map.</p>;
   }
 
   return (
     <div>
-      <button type="button" onClick={handleClick} disabled={status === "submitting"} className={dangerButtonClass}>
-        {status === "submitting" ? "Removing…" : "Remove from map"}
+      <button type="button" ref={triggerRef} hidden={asking} onClick={ask} className={dangerButtonClass}>
+        Remove from map
       </button>
-      {status === "error" && (
-        <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
-          Something went wrong. The venue was not removed. Try again.
-        </p>
+      {asking && (
+        <AdminConfirm
+          title={`Remove ${venueName} from the map?`}
+          confirmLabel="Remove from map"
+          busyLabel="Removing…"
+          tone="danger"
+          busy={status === "submitting"}
+          error={status === "error" ? "The place was not removed. Try again." : null}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
+        >
+          {kind === "box"
+            ? "It leaves the map right away. Its record is kept, not deleted, and this can be reviewed later."
+            : "It will stop appearing on the next publish. Its record is kept, not deleted, and this can be reviewed later."}
+        </AdminConfirm>
       )}
     </div>
   );

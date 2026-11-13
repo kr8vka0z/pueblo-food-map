@@ -1,6 +1,6 @@
 /**
  * Pure helpers for per-venue structured data (JSON-LD) and URL construction.
- * Used by /venue/[id] page, layout.tsx, and homepage.
+ * Used by the venue, hub, about, event and home pages and RootShell (WebSite node).
  *
  * WHY: Extracted as a pure lib (no Next.js server APIs, no React) so every
  * helper is unit-testable in jsdom without mocking server components.
@@ -159,6 +159,8 @@ export function serializeJsonLd(value: unknown): string {
  * `description` is the same verified-fact summary sentence(s) JSON-LD's
  * `description` uses (buildVenueJsonLd below), cut at a sentence boundary
  * to stay ≤ 160 chars — never a separate, drifting description string.
+ * #921: a SNAP store's title is "{Name}, {City}, CO: Accepts SNAP/EBT" and
+ * its description opens with a named SNAP/WIC sentence instead.
  */
 export function venuePageMetadataFields(
   venue: Venue,

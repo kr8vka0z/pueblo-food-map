@@ -283,28 +283,15 @@ describe("parseVenueCityCore (no locale, no fallback text)", () => {
 });
 
 describe("parseVenueCity", () => {
-  test("street, city, CO zip", () => {
-    expect(parseVenueCity("215 Canal St, Pueblo, CO 81004")).toBe("Pueblo");
-  });
-
-  test("street, city, CO (no zip)", () => {
-    expect(parseVenueCity("136 S Purcell Blvd, Pueblo West, CO")).toBe("Pueblo West");
-  });
-
-  test("street, city zip (no CO segment)", () => {
-    expect(parseVenueCity("1242 S Prairie Ave, Pueblo 81004")).toBe("Pueblo");
-  });
-
-  test("street, city (no state or zip)", () => {
-    expect(parseVenueCity("410 Main Street, Boone")).toBe("Boone");
-  });
-
-  test("street, CO with no city segment falls back", () => {
-    expect(parseVenueCity("West Carrizo Springs Avenue, CO")).toBe("Pueblo County");
-  });
-
-  test("a bare landmark name (no comma) falls back", () => {
-    expect(parseVenueCity("Mineral Palace Park")).toBe("Pueblo County");
+  test.each([
+    ["street, city, CO zip", "215 Canal St, Pueblo, CO 81004", "Pueblo"],
+    ["street, city, CO (no zip)", "136 S Purcell Blvd, Pueblo West, CO", "Pueblo West"],
+    ["street, city zip (no CO segment)", "1242 S Prairie Ave, Pueblo 81004", "Pueblo"],
+    ["street, city (no state or zip)", "410 Main Street, Boone", "Boone"],
+    ["street, CO with no city segment falls back", "West Carrizo Springs Avenue, CO", "Pueblo County"],
+    ["a bare landmark name (no comma) falls back", "Mineral Palace Park", "Pueblo County"],
+  ])("%s", (_name, address, city) => {
+    expect(parseVenueCity(address)).toBe(city);
   });
 
   test("ES fallback is Spanish", () => {
@@ -396,7 +383,9 @@ describe("buildVenueMetaDescription — length budget over all published venues"
     });
     const description = buildVenueMetaDescription(v);
     expect(description).not.toContain("Hours:"); // too long to fit — skipped
-    expect(description).toContain("It accepts SNAP/EBT.");
+    // #921: a SNAP store's description opens with the named SNAP sentence.
+    expect(description).toContain("accepts SNAP/EBT.");
+    expect(description).toContain("Last verified"); // a later, shorter sentence still fits
   });
 });
 

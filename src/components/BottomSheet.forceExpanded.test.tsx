@@ -5,7 +5,7 @@
  * a real portal/animation context jsdom lacks).
  */
 import { describe, test, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, fireEvent } from "@testing-library/react";
 import BottomSheet from "@/components/BottomSheet";
 import type { Venue } from "@/types/venue";
 
@@ -61,6 +61,6 @@ describe("BottomSheet forceExpanded", () => {
 
   test("inert reaches the card container", () => {
     render(<BottomSheet venue={VENUE} onClose={() => {}} inert />);
-    expect(screen.getByTestId("vaul-content").hasAttribute("inert")).toBe(true);
+    expect(document.querySelector("[data-scroll-sheet]")!.hasAttribute("inert")).toBe(true);
   });
 });

@@ -44,7 +44,10 @@ export default function BoxReportsChart({ buckets }: BoxReportsChartProps) {
             const total = bucket.ok + bucket.trouble;
             const barHeightPct = (total / max) * 100;
             return (
-              <div key={bucket.weekStart} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+              // min-w-0: the one-line label below must not widen its column
+              // (and the chart) past the card on a phone; it overflows into
+              // the 8 px gap instead.
+              <div key={bucket.weekStart} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
                 <div
                   className="flex w-full flex-col overflow-hidden rounded-t-[var(--radius-sm)]"
                   style={{ height: `${barHeightPct}%` }}
@@ -56,7 +59,10 @@ export default function BoxReportsChart({ buckets }: BoxReportsChartProps) {
                   )}
                   {bucket.ok > 0 && <div className="w-full bg-[var(--color-sage-500)]" style={{ flexGrow: bucket.ok }} />}
                 </div>
-                <span className="text-[10px] text-[var(--color-ink-400)]">{formatWeekLabel(bucket.weekStart)}</span>
+                {/* One line each, so the label row stays even (#926). */}
+                <span className="whitespace-nowrap text-[10px] text-[var(--color-ink-400)]">
+                  {formatWeekLabel(bucket.weekStart)}
+                </span>
               </div>
             );
           })}

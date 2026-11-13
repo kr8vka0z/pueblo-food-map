@@ -9,11 +9,12 @@
  * here — the Better Auth gate (getAdminDb()) lives in the parent Server Component
  * (src/app/(site)/admin/venues/new/page.tsx or .../[id]/edit/page.tsx, same
  * pattern as AGENTS.md "Admin authentication"). This mirrors SuggestForm.tsx's
- * own form/route split; this component imitates SuggestForm's
- * input/label/error token classes (bone borders, sage focus rings) directly
- * rather than importing them — no shared form-component library exists
- * between the public and admin surfaces, so each form owns its own copy,
- * same as SuggestForm already does.
+ * own form/route split. Its field, label, error, tick-box and save-row
+ * classes come from formClasses.ts and its smaller buttons from
+ * src/lib/adminCardStyles.ts, shared with the other admin forms (#926; the
+ * public forms use PublicForm.tsx's). The save row is Cancel (a link that
+ * saves nothing, back to where a save would land, off while a save runs)
+ * then the submit, which stays the form's first submit button so Enter saves.
  *
  * ONE component serves both modes (#255 explicitly asked for this, not a
  * forked near-identical form) — create and edit submit the identical field
@@ -21,7 +22,8 @@
  * endpoint/method to call and what to say on the button. The optional
  * `venueId` prop is the mode switch: absent -> POST /api/admin/venues
  * (create); present -> PATCH /api/admin/venues/<venueId> (edit). Both modes
- * share the same success handling: redirect to /admin + router.refresh() so
+ * share the same success handling: redirect to `afterSaveHref` (the Places
+ * list, or its To review filter after a hand-off) + router.refresh() so
  * the Server Component's venues query re-runs and the change is visible
  * immediately. `initialValues` (pre-#255) already covered pre-filling the
  * form; edit mode is just that same prop combined with `venueId`, wired by
@@ -68,13 +70,40 @@
  * admin's version.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { categoryLabels } from "@/lib/categories";
 import StaticLocationMap from "@/components/StaticLocationMap";
+import AdminSegmented from "@/components/AdminSegmented";
 import { DISPLAY_DAY_KEYS, type DayKey } from "@/lib/hours";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
+import {
+  ADMIN_PRIMARY_BUTTON,
+  ADMIN_SECONDARY_BUTTON,
+  busyButtonProps,
+  cancelLinkProps,
+  checkboxClass,
+  checkboxRowClass,
+  errorClass,
+  fieldGroupClass,
+  hintClass,
+  inputBase,
+  inputBorder,
+  inputClass,
+  labelClass,
+  requiredMarkClass,
+  saveRowClass,
+} from "@/components/formClasses";
+import {
+  dangerButtonClass,
+  failureBoxClass,
+  failureLineClass,
+  pickerOptionClass,
+  secondaryButtonClass,
+} from "@/lib/adminCardStyles";
 import { EMAIL_RE } from "@/lib/email";
+import { focusFirstProblem } from "@/lib/focusFirstProblem";
 import type { IrregularSchedule, VenueCategory, WeeklyHours } from "@/types/venue";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -236,6 +265,13 @@ const DAY_LABELS: Record<DayKey, string> = {
   sun: "Sunday",
 };
 
+// SNAP / WIC: a three-way choice, so a slider (#926 decision 10). Same
+// values and order the old select had.
+const TRI_STATE_OPTIONS: { value: TriStateValue; label: string }[] = [
+  { value: "", label: "Unknown" },
+  { value: "1", label: "Yes" },
+  { value: "0", label: "No" },
+];
 
 function emptyHoursDraft(): HoursDraft {
   const draft = {} as HoursDraft;
@@ -379,7 +415,7 @@ export default function AddVenueForm({
   const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
   // #568 item 1: a 409 (edit refused — the venue is archived,
   // PATCH /api/admin/venues/[id]) carries a real, specific `message` the
-  // admin needs to see — the generic "Something went wrong, try again"
+  // admin needs to see — the generic "not saved, try again" line
   // below is actively misleading here, since retrying can never succeed.
   // null for every other error path, which keeps that generic copy.
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -423,6 +459,28 @@ export default function AddVenueForm({
     return () => clearTimeout(timer);
   }, [values.lat, values.lng]);
 
+  // #926: after a Save with problems, focus (and so the scroll) goes to the
+  // first box marked wrong, in page order, so the errors above the fold are
+  // seen. Bumped on every refused save, so a second refusal moves focus again.
+  const formRef = useRef<HTMLFormElement>(null);
+  const [errorFocusTick, setErrorFocusTick] = useState(0);
+  useEffect(() => {
+    if (errorFocusTick > 0) focusFirstProblem(formRef.current);
+  }, [errorFocusTick]);
+
+  // Monthly schedule Remove (#926): focus goes to the Remove now in that
+  // place (the next schedule), or to "+ Add monthly schedule" if none follows.
+  const scheduleRemoveRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const addScheduleRef = useRef<HTMLButtonElement>(null);
+  const findLocationRef = useRef<HTMLButtonElement>(null);
+  const focusAfterScheduleRemove = useRef<number | null>(null);
+  useEffect(() => {
+    if (focusAfterScheduleRemove.current === null) return;
+    const index = focusAfterScheduleRemove.current;
+    focusAfterScheduleRemove.current = null;
+    (scheduleRemoveRefs.current[index] ?? addScheduleRef.current)?.focus();
+  }, [values.hoursIrregular.length]);
+
   function setField<K extends keyof AddVenueFormValues>(key: K, value: AddVenueFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
   }
@@ -436,6 +494,7 @@ export default function AddVenueForm({
     setValues((prev) => ({ ...prev, hoursIrregular: [...prev.hoursIrregular, emptyIrregularDraft()] }));
   }
   function removeIrregularRow(index: number) {
+    focusAfterScheduleRemove.current = index;
     setValues((prev) => ({ ...prev, hoursIrregular: prev.hoursIrregular.filter((_, i) => i !== index) }));
   }
   function setIrregularField<K extends keyof IrregularEntryDraft>(
@@ -472,7 +531,8 @@ export default function AddVenueForm({
    */
   async function handleGeocode() {
     const q = values.address.trim();
-    if (!q) return;
+    // One lookup at a time: a late answer must not land over a newer one.
+    if (!q || geocodeStatus === "loading") return;
 
     setGeocodeStatus("loading");
     setGeocodeMessage("Looking up…");
@@ -482,33 +542,54 @@ export default function AddVenueForm({
       const res = await fetch(`/api/admin/geocode?q=${encodeURIComponent(q)}`);
       if (res.status !== 200) {
         setGeocodeStatus("error");
-        setGeocodeMessage("Location lookup is unavailable right now — enter coordinates below.");
+        setGeocodeMessage("Location lookup is unavailable right now. Enter coordinates below.");
         return;
       }
       const data = (await res.json()) as { matches: GeocodeMatch[] };
 
       if (data.matches.length === 0) {
         setGeocodeStatus("no-match");
-        setGeocodeMessage("No match found — check the address or enter coordinates below.");
+        setGeocodeMessage("No match found. Check the address or enter coordinates below.");
       } else if (data.matches.length === 1) {
         applyGeocodeMatch(data.matches[0]);
       } else {
         setGeocodeStatus("multiple");
         setGeocodeCandidates(data.matches);
-        setGeocodeMessage(`Found ${data.matches.length} possible matches — choose one below.`);
+        setGeocodeMessage(`Found ${data.matches.length} possible matches. Choose one below.`);
       }
     } catch {
       setGeocodeStatus("error");
-      setGeocodeMessage("Location lookup is unavailable right now — enter coordinates below.");
+      setGeocodeMessage("Location lookup is unavailable right now. Enter coordinates below.");
     }
   }
 
+  // Where a successful save lands, and where Cancel goes (#926: the same
+  // place, so leaving a review hand-off either way returns to its list).
+  // #259/#390/#674/#675: a create that approved a submission returns to the
+  // Places tab's "To review" + "The public" filters (/admin/submissions is
+  // now a redirect there, #675); either mode approving a change_proposals row
+  // returns to the Places tab's plain "To review" filter (#674 folded
+  // /admin/flags into Places), so the admin picks up the next pending item in
+  // either case. Otherwise /admin/places: a venue-edit flow lands back on the
+  // venue list, not the Dashboard at /admin.
+  const afterSaveHref =
+    !isEditMode && submissionId != null
+      ? "/admin/places?show=review&from=public"
+      : proposalId != null
+        ? "/admin/places?show=review"
+        : "/admin/places";
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // WHY here and not only on the button: the Save button is aria-disabled
+    // while it works (it keeps focus), so the handler is what refuses a
+    // second create or save, whatever path the submit came by (#926).
+    if (status === "submitting") return;
 
     const clientErrors = validateClient(values);
     if (Object.keys(clientErrors).length > 0) {
       setErrors(clientErrors);
+      setErrorFocusTick((n) => n + 1);
       return;
     }
 
@@ -581,21 +662,7 @@ export default function AddVenueForm({
       });
 
       if (res.status === successStatus) {
-        // #259/#390/#674/#675: a create that approved a submission returns
-        // to the Places tab's "To review" + "The public" filters
-        // (/admin/submissions is now a redirect there, #675); either mode
-        // approving a change_proposals row returns to the Places tab's
-        // plain "To review" filter (#674 folded /admin/flags into Places) —
-        // so the admin picks up the next pending item in either case,
-        // rather than the plain venue list.
-        // Default target is /admin/places (moved from /admin, admin
-        // dashboard build — /admin is now the Dashboard, a different
-        // screen; a venue-edit flow should land back on the venue list, not
-        // the to-do list).
-        let redirectTo = "/admin/places";
-        if (!isEditMode && submissionId != null) redirectTo = "/admin/places?show=review&from=public";
-        else if (proposalId != null) redirectTo = "/admin/places?show=review";
-        router.push(redirectTo);
+        router.push(afterSaveHref);
         router.refresh();
         return;
       }
@@ -604,6 +671,7 @@ export default function AddVenueForm({
         const data = (await res.json()) as { errors: FieldErrors };
         setErrors(data.errors);
         setStatus("idle");
+        setErrorFocusTick((n) => n + 1);
         return;
       }
 
@@ -621,73 +689,41 @@ export default function AddVenueForm({
     }
   }
 
-  // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
-  const inputBase =
-    "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
-    // #534: --color-ink-300 undefined — DESIGN.md documents ink-400 as the
-    // placeholder-text token.
-    "bg-white placeholder:text-[var(--color-ink-400)] " +
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-    "focus-visible:border-[var(--color-sage-500)]";
-  const inputBorder = (hasError: boolean) =>
-    hasError ? "border-[var(--color-danger)]" : "border-[var(--color-bone-300)]";
-  const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
-  const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
-  // Secondary (bordered, sage-text) action — visually lower weight than the
-  // primary sage-filled submit button below, but still sage per DESIGN.md
-  // ("use sage for every interactive affordance"), not the ink-toned
-  // secondary style ReportVenueButton.tsx uses for its lower-stakes action.
-  const secondaryButtonClass =
-    "inline-flex items-center rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
-    "px-3 py-1.5 text-sm font-medium text-[var(--color-sage-600)] bg-transparent " +
-    "transition-colors duration-150 hover:bg-[var(--color-sage-50)] " +
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-    "disabled:opacity-50 disabled:cursor-not-allowed";
   // Informational-emphasis tones per DESIGN.md's Do's/Don'ts: sage for a calm
   // positive confirmation (same hue as the "Show details" / operator-link
   // convention), clay for "didn't work, here's guidance" (the same role clay
   // already plays in VenueListView) — never red, since
   // these never block submission the way a field validation error does.
+  // A lookup that found nothing is a problem with the address, so it reads
+  // like the field errors around it (errorClass); the rest is a quiet note.
   const geocodeToneClass: Record<GeocodeStatus, string> = {
     idle: "",
-    loading: "text-[var(--color-ink-500)]",
-    found: "text-[var(--color-sage-600)]",
-    "no-match": "text-[var(--color-clay-700)]",
-    multiple: "text-[var(--color-ink-500)]",
-    error: "text-[var(--color-clay-700)]",
+    loading: "mt-2 text-sm text-[var(--color-ink-500)]",
+    found: "mt-2 text-sm text-[var(--color-sage-600)]",
+    "no-match": errorClass,
+    multiple: "mt-2 text-sm text-[var(--color-ink-500)]",
+    error: errorClass,
   };
   const requiredMark = (
-    <span aria-hidden className="text-[var(--color-danger)]">
+    <span aria-hidden className={requiredMarkClass}>
       {" "}
       *
     </span>
   );
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="max-w-2xl space-y-5">
+    <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-5">
       {status === "error" && (
-        <div role="alert" className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 py-3">
-          {errorMessage ? (
-            <p className="text-sm font-medium text-[var(--color-danger)]">{errorMessage}</p>
-          ) : (
-            <>
-              <p className="text-sm font-medium text-[var(--color-danger)]">Something went wrong.</p>
-              <p className="text-sm text-[var(--color-danger)] mt-0.5">The venue was not saved. Try again.</p>
-            </>
-          )}
+        <div role="alert" className={failureBoxClass}>
+          <p className={`${failureLineClass} font-medium`}>{errorMessage || "The place was not saved. Try again."}</p>
           {/* #265: a real reload, not router.refresh() — the admin needs the
               CURRENT venue row + a fresh expectedUpdatedAt from the server
               component, not just a client re-render. The form (and every
               field this admin typed) stays mounted and visible until they
               actually click this — nothing here clears `values` — so
-              they can copy their unsaved changes out first. min-h-12 (48px)
-              per RULES.md's touch-target floor. */}
+              they can copy their unsaved changes out first. */}
           {errorCode === "conflict" && (
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="mt-2 inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 text-sm font-medium text-[var(--color-danger)] transition-colors duration-150 hover:bg-[var(--color-bone-100)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
-            >
+            <button type="button" onClick={() => window.location.reload()} className={`mt-2 ${dangerButtonClass}`}>
               Reload
             </button>
           )}
@@ -750,12 +786,12 @@ export default function AddVenueForm({
           plan's admin story ("expose the box-only fields") with no stated
           required-ness. */}
       {values.category === "blessing_box" && (
-        <fieldset className="space-y-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] p-4">
+        <fieldset className={`space-y-4 ${fieldGroupClass}`}>
           <legend className={labelClass.replace("mb-1", "px-1")}>Blessing box details</legend>
 
           <div>
             <label htmlFor="box-host-name" className={labelClass}>
-              Host name
+              Host name <span className={hintClass}>(optional)</span>
             </label>
             <input
               type="text"
@@ -764,13 +800,13 @@ export default function AddVenueForm({
               onChange={(e) => setField("hostName", e.target.value)}
               placeholder="e.g. First Baptist Church"
               maxLength={FIELD_LIMITS.SUGGEST_VENUE_NAME}
-              className={`${inputBase} border-[var(--color-bone-300)]`}
+              className={inputClass}
             />
           </div>
 
           <div>
             <label htmlFor="box-host-note" className={labelClass}>
-              Public note from the host
+              Public note from the host <span className={hintClass}>(optional)</span>
             </label>
             <textarea
               id="box-host-note"
@@ -779,14 +815,14 @@ export default function AddVenueForm({
               onChange={(e) => setField("hostNote", e.target.value)}
               placeholder="Shown on the box's public page"
               maxLength={FIELD_LIMITS.BOX_ADOPTER_NOTE}
-              className={`${inputBase} border-[var(--color-bone-300)] resize-y min-h-[56px]`}
+              className={`${inputClass} resize-y min-h-[56px]`}
             />
           </div>
 
           <div>
             <label htmlFor="box-host-contact" className={labelClass}>
               Host contact{" "}
-              <span className="font-normal text-[var(--color-ink-400)]">(private — never shown publicly)</span>
+              <span className={hintClass}>(optional, private, never shown publicly)</span>
             </label>
             <input
               type="text"
@@ -795,13 +831,13 @@ export default function AddVenueForm({
               onChange={(e) => setField("hostContact", e.target.value)}
               placeholder="Phone or email, for admin use only"
               maxLength={FIELD_LIMITS.SUGGEST_CONTACT}
-              className={`${inputBase} border-[var(--color-bone-300)]`}
+              className={inputClass}
             />
           </div>
 
           <div>
             <label htmlFor="box-most-needed" className={labelClass}>
-              Most needed
+              Most needed <span className={hintClass}>(optional)</span>
             </label>
             <input
               type="text"
@@ -810,48 +846,51 @@ export default function AddVenueForm({
               onChange={(e) => setField("mostNeeded", e.target.value)}
               placeholder="e.g. canned protein, diapers, no glass"
               maxLength={FIELD_LIMITS.BOX_CHECKIN_NOTE}
-              className={`${inputBase} border-[var(--color-bone-300)]`}
+              className={inputClass}
             />
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="box-installed-on" className={labelClass}>
-                Installed on
+                Installed on <span className={hintClass}>(optional)</span>
               </label>
               <input
                 type="date"
                 id="box-installed-on"
                 value={values.installedOn}
                 onChange={(e) => setField("installedOn", e.target.value)}
-                className={`${inputBase} border-[var(--color-bone-300)]`}
+                className={inputClass}
               />
             </div>
             <div>
               <label htmlFor="box-removed-on" className={labelClass}>
-                Removed on
+                Removed on <span className={hintClass}>(optional)</span>
               </label>
               <input
                 type="date"
                 id="box-removed-on"
                 value={values.removedOn}
                 onChange={(e) => setField("removedOn", e.target.value)}
-                className={`${inputBase} border-[var(--color-bone-300)]`}
+                className={inputClass}
               />
             </div>
           </div>
         </fieldset>
       )}
 
-      {/* Location (#678): address, "Find location from address", and
-          lat/lng on the left; a static reference map on the right, fed by
-          the DEBOUNCED coordinates above (never raw values.lat/lng — see
-          that state's own comment) so it redraws after typing or after
-          "Find location from address" sets both fields at once. */}
-      <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4">
+      {/* Location (#678): address, "Find location from address", lat/lng,
+          then a static reference map under them, fed by the DEBOUNCED
+          coordinates above (never raw values.lat/lng — see that state's own
+          comment) so it redraws after typing or after "Find location from
+          address" sets both fields at once.
+          WHY stacked, not the map beside the fields (#926): the form is 672
+          wide at most, so a 420 map beside them left the fields 202 wide and
+          cut the address and coordinates off inside their boxes. */}
+      <fieldset className={fieldGroupClass}>
         <legend className={labelClass.replace("mb-1", "mb-2 px-1")}>Location</legend>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          <div className="min-w-0 flex-1 space-y-4">
+        <div className="flex flex-col gap-4">
+          <div className="min-w-0 space-y-4">
             {/* Address */}
             <div>
               <label htmlFor="venue-address" className={labelClass}>
@@ -878,17 +917,40 @@ export default function AddVenueForm({
             {/* Find location from address (US Census geocoder — see
                 src/app/api/admin/geocode/route.ts for why Census, not Mapbox) */}
             <div>
+              {/* Off natively only while there is no address; while it looks up
+                  it keeps focus (busyButtonProps), so the keyboard is not lost. */}
               <button
+                ref={findLocationRef}
                 type="button"
+                disabled={!values.address.trim()}
                 onClick={handleGeocode}
-                disabled={!values.address.trim() || geocodeStatus === "loading"}
-                className={secondaryButtonClass}
+                {...busyButtonProps(geocodeStatus === "loading")}
+                className={`${secondaryButtonClass} whitespace-nowrap`}
               >
-                {geocodeStatus === "loading" ? "Looking up…" : "Find location from address"}
+                {/* WHY both words in one grid cell: the button keeps the width
+                    of the longer one while "Looking up…" shows, instead of
+                    shrinking and jumping back. The unseen one is aria-hidden. */}
+                <span className="grid">
+                  <span
+                    aria-hidden={geocodeStatus === "loading" || undefined}
+                    className={`[grid-area:1/1] ${geocodeStatus === "loading" ? "invisible" : ""}`}
+                  >
+                    Find location from address
+                  </span>
+                  <span
+                    aria-hidden={geocodeStatus !== "loading" || undefined}
+                    className={`[grid-area:1/1] ${geocodeStatus === "loading" ? "" : "invisible"}`}
+                  >
+                    Looking up…
+                  </span>
+                </span>
               </button>
+              {/* "Looking up…" shows once, in the button; this line carries the
+                  result. It stays mounted while empty so the live region
+                  still announces the result when it lands. */}
               {geocodeMessage && (
-                <p aria-live="polite" className={`mt-2 text-sm ${geocodeToneClass[geocodeStatus]}`}>
-                  {geocodeMessage}
+                <p aria-live="polite" className={geocodeToneClass[geocodeStatus]}>
+                  {geocodeStatus === "loading" ? "" : geocodeMessage}
                 </p>
               )}
               {geocodeCandidates.length > 0 && (
@@ -901,13 +963,12 @@ export default function AddVenueForm({
                       <li key={`${match.lat}-${match.lng}-${i}`}>
                         <button
                           type="button"
-                          onClick={() => applyGeocodeMatch(match)}
-                          className={
-                            "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] " +
-                            "px-3 py-2 text-left text-sm text-[var(--color-ink-700)] " +
-                            "transition-colors duration-150 hover:bg-[var(--color-sage-50)] hover:border-[var(--color-sage-500)] " +
-                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-                          }
+                          onClick={() => {
+                            applyGeocodeMatch(match);
+                            // The list goes away with the pressed match in it: focus goes back to Find location.
+                            findLocationRef.current?.focus();
+                          }}
+                          className={pickerOptionClass}
                         >
                           {match.matchedAddress}
                         </button>
@@ -937,8 +998,10 @@ export default function AddVenueForm({
                 these two write straight to the public map's coordinates, so the
                 onWheel handlers below blur the field instead. If this is ever
                 revisited, verify the minus key on a real iPhone first. */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
+            {/* Side by side at every width: at 360 each box is 139 wide, room
+                for "-104.609123". */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="min-w-0">
                 <label htmlFor="venue-lat" className={labelClass}>
                   Latitude{requiredMark}
                 </label>
@@ -960,7 +1023,7 @@ export default function AddVenueForm({
                   </p>
                 )}
               </div>
-              <div>
+              <div className="min-w-0">
                 <label htmlFor="venue-lng" className={labelClass}>
                   Longitude{requiredMark}
                 </label>
@@ -1020,7 +1083,7 @@ export default function AddVenueForm({
       {/* Hours — basic per-day text, not a scheduler (kept lean per #254) */}
       <fieldset className="space-y-2">
         <legend className={labelClass.replace("mb-1", "mb-2")}>
-          Hours <span className="font-normal text-[var(--color-ink-400)]">(optional)</span>
+          Hours <span className={hintClass}>(optional)</span>
         </legend>
         <p className="text-xs text-[var(--color-ink-400)] mb-2">
           Comma-separated time ranges per day, e.g. &quot;9:00-17:00&quot;. Leave a day blank if closed or unknown.
@@ -1028,7 +1091,7 @@ export default function AddVenueForm({
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {DISPLAY_DAY_KEYS.map((day) => (
             <div key={day}>
-              <label htmlFor={`venue-hours-${day}`} className="block text-xs text-[var(--color-ink-500)] mb-1">
+              <label htmlFor={`venue-hours-${day}`} className={labelClass}>
                 {DAY_LABELS[day]}
               </label>
               <input
@@ -1037,7 +1100,7 @@ export default function AddVenueForm({
                 value={values.hours[day]}
                 onChange={(e) => setHourDay(day, e.target.value)}
                 placeholder="9:00-17:00"
-                className={`${inputBase} border-[var(--color-bone-300)]`}
+                className={inputClass}
               />
             </div>
           ))}
@@ -1056,21 +1119,32 @@ export default function AddVenueForm({
           have both. */}
       <fieldset className="space-y-3">
         <legend className={labelClass.replace("mb-1", "mb-2")}>
-          Monthly schedule <span className="font-normal text-[var(--color-ink-400)]">(optional)</span>
+          Monthly schedule <span className={hintClass}>(optional)</span>
         </legend>
         <p className="text-xs text-[var(--color-ink-400)] mb-2">
-          For a schedule hours_weekly can&apos;t express, e.g. &quot;4th Tuesday of each month.&quot;
+          For a schedule the weekly hours above can&apos;t show, e.g. &quot;4th Tuesday of each month.&quot;
         </p>
         {values.hoursIrregular.map((row, i) => (
-          <div key={i} className="rounded-[var(--radius-md)] border border-[var(--color-bone-300)] p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <label htmlFor={`irregular-recurrence-${i}`} className="text-xs text-[var(--color-ink-500)]">
+          <div key={i} className={`space-y-2 ${fieldGroupClass}`}>
+            <div className="flex items-center justify-between gap-2">
+              <label
+                id={`irregular-label-${i}`}
+                htmlFor={`irregular-recurrence-${i}`}
+                className="text-xs text-[var(--color-ink-500)]"
+              >
                 Schedule {i + 1}
               </label>
+              {/* Named "Remove Schedule 2" from the visible label, so two
+                  schedules' buttons can be told apart. */}
               <button
+                ref={(el) => {
+                  scheduleRemoveRefs.current[i] = el;
+                }}
+                id={`irregular-remove-${i}`}
                 type="button"
+                aria-labelledby={`irregular-remove-${i} irregular-label-${i}`}
                 onClick={() => removeIrregularRow(i)}
-                className="text-xs font-medium text-[var(--color-clay-700)] hover:underline"
+                className={secondaryButtonClass}
               >
                 Remove
               </button>
@@ -1079,7 +1153,7 @@ export default function AddVenueForm({
               id={`irregular-recurrence-${i}`}
               value={row.recurrence}
               onChange={(e) => setIrregularField(i, "recurrence", e.target.value as IrregularEntryDraft["recurrence"])}
-              className={`${inputBase} border-[var(--color-bone-300)]`}
+              className={inputClass}
             >
               <option value="">Select a kind…</option>
               <option value="monthly_ordinal">A specific weekday each month (e.g. 4th Tuesday)</option>
@@ -1093,7 +1167,7 @@ export default function AddVenueForm({
                   aria-label={`Schedule ${i + 1} ordinal`}
                   value={row.ordinal}
                   onChange={(e) => setIrregularField(i, "ordinal", e.target.value as IrregularEntryDraft["ordinal"])}
-                  className={`${inputBase} border-[var(--color-bone-300)]`}
+                  className={inputClass}
                 >
                   <option value="">1st, 2nd…</option>
                   <option value="1">1st</option>
@@ -1107,7 +1181,7 @@ export default function AddVenueForm({
                   aria-label={`Schedule ${i + 1} weekday`}
                   value={row.weekday}
                   onChange={(e) => setIrregularField(i, "weekday", e.target.value as IrregularEntryDraft["weekday"])}
-                  className={`${inputBase} border-[var(--color-bone-300)]`}
+                  className={inputClass}
                 >
                   <option value="">Weekday…</option>
                   {DISPLAY_DAY_KEYS.map((day) => (
@@ -1128,7 +1202,7 @@ export default function AddVenueForm({
                 value={row.dayOfMonth}
                 onChange={(e) => setIrregularField(i, "dayOfMonth", e.target.value)}
                 placeholder="Day of month (1-31)"
-                className={`${inputBase} border-[var(--color-bone-300)]`}
+                className={inputClass}
               />
             )}
 
@@ -1139,7 +1213,7 @@ export default function AddVenueForm({
                 value={row.slots}
                 onChange={(e) => setIrregularField(i, "slots", e.target.value)}
                 placeholder="11:00 AM - 12:00 PM"
-                className={`${inputBase} border-[var(--color-bone-300)]`}
+                className={inputClass}
               />
             )}
 
@@ -1154,11 +1228,11 @@ export default function AddVenueForm({
                   ? "Describe the schedule, e.g. \"3rd weekend, call ahead\""
                   : "Note (optional)"
               }
-              className={`${inputBase} border-[var(--color-bone-300)] resize-y min-h-[56px]`}
+              className={`${inputClass} resize-y min-h-[56px]`}
             />
           </div>
         ))}
-        <button type="button" onClick={addIrregularRow} className={secondaryButtonClass}>
+        <button ref={addScheduleRef} type="button" onClick={addIrregularRow} className={secondaryButtonClass}>
           + Add monthly schedule
         </button>
         {errors.hours_irregular && (
@@ -1171,41 +1245,31 @@ export default function AddVenueForm({
       {/* SNAP / WIC tri-state */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="venue-snap" className={labelClass}>
-            Accepts SNAP
-          </label>
-          <select
-            id="venue-snap"
+          <AdminSegmented
+            name="venue-snap"
+            legend="Accepts SNAP"
+            legendClass={labelClass}
+            options={TRI_STATE_OPTIONS}
             value={values.acceptsSnap}
-            onChange={(e) => setField("acceptsSnap", e.target.value as TriStateValue)}
-            className={`${inputBase} border-[var(--color-bone-300)]`}
-          >
-            <option value="">Unknown</option>
-            <option value="1">Yes</option>
-            <option value="0">No</option>
-          </select>
+            onChange={(v) => setField("acceptsSnap", v as TriStateValue)}
+          />
         </div>
         <div>
-          <label htmlFor="venue-wic" className={labelClass}>
-            Accepts WIC
-          </label>
-          <select
-            id="venue-wic"
+          <AdminSegmented
+            name="venue-wic"
+            legend="Accepts WIC"
+            legendClass={labelClass}
+            options={TRI_STATE_OPTIONS}
             value={values.acceptsWic}
-            onChange={(e) => setField("acceptsWic", e.target.value as TriStateValue)}
-            className={`${inputBase} border-[var(--color-bone-300)]`}
-          >
-            <option value="">Unknown</option>
-            <option value="1">Yes</option>
-            <option value="0">No</option>
-          </select>
+            onChange={(v) => setField("acceptsWic", v as TriStateValue)}
+          />
         </div>
       </div>
 
       {/* Phone */}
       <div>
         <label htmlFor="venue-phone" className={labelClass}>
-          Phone
+          Phone <span className={hintClass}>(optional)</span>
         </label>
         <input
           type="tel"
@@ -1213,14 +1277,14 @@ export default function AddVenueForm({
           value={values.phone}
           onChange={(e) => setField("phone", e.target.value)}
           maxLength={FIELD_LIMITS.SUGGEST_CONTACT}
-          className={`${inputBase} border-[var(--color-bone-300)]`}
+          className={inputClass}
         />
       </div>
 
       {/* Email */}
       <div>
         <label htmlFor="venue-email" className={labelClass}>
-          Email
+          Email <span className={hintClass}>(optional)</span>
         </label>
         <input
           type="email"
@@ -1245,7 +1309,7 @@ export default function AddVenueForm({
       {/* Website */}
       <div>
         <label htmlFor="venue-url" className={labelClass}>
-          Website
+          Website <span className={hintClass}>(optional)</span>
         </label>
         <input
           type="url"
@@ -1253,14 +1317,14 @@ export default function AddVenueForm({
           value={values.url}
           onChange={(e) => setField("url", e.target.value)}
           maxLength={FIELD_LIMITS.SUGGEST_CONTACT}
-          className={`${inputBase} border-[var(--color-bone-300)]`}
+          className={inputClass}
         />
       </div>
 
       {/* Operator */}
       <div>
         <label htmlFor="venue-operator" className={labelClass}>
-          Operator
+          Operator <span className={hintClass}>(optional)</span>
         </label>
         <input
           type="text"
@@ -1268,14 +1332,14 @@ export default function AddVenueForm({
           value={values.operator}
           onChange={(e) => setField("operator", e.target.value)}
           maxLength={FIELD_LIMITS.SUGGEST_VENUE_NAME}
-          className={`${inputBase} border-[var(--color-bone-300)]`}
+          className={inputClass}
         />
       </div>
 
       {/* Notes */}
       <div>
         <label htmlFor="venue-notes" className={labelClass}>
-          Notes
+          Notes <span className={hintClass}>(optional)</span>
         </label>
         <textarea
           id="venue-notes"
@@ -1283,7 +1347,7 @@ export default function AddVenueForm({
           value={values.notes}
           onChange={(e) => setField("notes", e.target.value)}
           maxLength={FIELD_LIMITS.SUGGEST_NOTES}
-          className={`${inputBase} border-[var(--color-bone-300)] resize-y min-h-[72px]`}
+          className={`${inputClass} resize-y min-h-[72px]`}
         />
       </div>
 
@@ -1312,74 +1376,69 @@ export default function AddVenueForm({
         )}
       </div>
 
-      {/* Outside county */}
-      <label className="flex items-center gap-2 text-sm text-[var(--color-ink-700)] cursor-pointer">
-        <input
-          type="checkbox"
-          checked={values.outsideCounty}
-          onChange={(e) => setField("outsideCounty", e.target.checked)}
-          className={
-            "w-4 h-4 rounded border-[var(--color-bone-300)] text-[var(--color-sage-500)] " +
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-          }
-        />
-        Outside Pueblo County
-      </label>
+      {/* The tick boxes, one group: the rows stack with no gap between them
+          (each row is 48 tall already), not the form's 24 between fields. */}
+      <div>
+        {/* Outside county */}
+        <label className={checkboxRowClass}>
+          <input
+            type="checkbox"
+            checked={values.outsideCounty}
+            onChange={(e) => setField("outsideCounty", e.target.checked)}
+            className={checkboxClass}
+          />
+          Outside Pueblo County
+        </label>
 
-      {/* The venue told us — edit mode only, not for blessing boxes */}
-      {isEditMode && values.category !== "blessing_box" && (
-        <div className="space-y-2">
-          <label className="flex items-start gap-2 text-sm text-[var(--color-ink-700)] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={venueToldUs}
-              onChange={(e) => setVenueToldUs(e.target.checked)}
-              aria-describedby="venue-told-us-help"
-              className={
-                "mt-0.5 w-4 h-4 rounded border-[var(--color-bone-300)] text-[var(--color-sage-500)] " +
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-              }
-            />
-            The venue told us
-          </label>
-          <p id="venue-told-us-help" className="text-xs text-[var(--color-ink-400)]">
-            Tick this when the venue itself gave you these details (feedback form, email, in person). The hours and
-            contact details you change here are then locked: automatic data checks will only suggest changes to them,
-            never make them. If you changed none, everything filled in is locked.
-          </p>
-          {venueToldUs && (
-            <div>
-              <label htmlFor="venue-told-us-note" className={labelClass}>
-                Who told us, and how <span className="font-normal text-[var(--color-ink-400)]">(optional)</span>
-              </label>
+        {/* The venue told us — edit mode only, not for blessing boxes */}
+        {isEditMode && values.category !== "blessing_box" && (
+          <div className="space-y-2">
+            <label className={checkboxRowClass}>
               <input
-                type="text"
-                id="venue-told-us-note"
-                value={venueToldUsNote}
-                maxLength={500}
-                onChange={(e) => setVenueToldUsNote(e.target.value)}
-                placeholder="e.g. Heather, admin assistant, by email"
-                className={`${inputBase} ${inputBorder(false)}`}
+                type="checkbox"
+                checked={venueToldUs}
+                onChange={(e) => setVenueToldUs(e.target.checked)}
+                aria-describedby="venue-told-us-help"
+                className={checkboxClass}
               />
-            </div>
-          )}
-        </div>
-      )}
+              The venue told us
+            </label>
+            <p id="venue-told-us-help" className="text-xs text-[var(--color-ink-400)]">
+              Tick this when the venue itself gave you these details (feedback form, email, in person). The hours and
+              contact details you change here are then locked: automatic data checks will only suggest changes to them,
+              never make them. If you changed none, everything filled in is locked.
+            </p>
+            {venueToldUs && (
+              <div>
+                <label htmlFor="venue-told-us-note" className={labelClass}>
+                  Who told us, and how <span className={hintClass}>(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  id="venue-told-us-note"
+                  value={venueToldUsNote}
+                  maxLength={FIELD_LIMITS.VENUE_TOLD_US_NOTE}
+                  onChange={(e) => setVenueToldUsNote(e.target.value)}
+                  placeholder="e.g. Heather, admin assistant, by email"
+                  className={inputClass}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
-      {/* Submit */}
-      <button
-        type="submit"
-        disabled={status === "submitting"}
-        className={
-          "w-full h-12 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
-          "text-base font-semibold transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-          "focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
-        }
-        aria-disabled={status === "submitting"}
-      >
-        {status === "submitting" ? "Saving…" : isEditMode ? "Save changes" : "Add venue"}
-      </button>
+      {/* Cancel, then submit (#926 decision 6). Cancel is a link, so the
+          submit stays the form's first submit button and Enter still saves.
+          It goes where a save would land, and is off while a save runs. */}
+      <div className={saveRowClass}>
+        <Link href={afterSaveHref} className={ADMIN_SECONDARY_BUTTON} {...cancelLinkProps(status === "submitting")}>
+          Cancel
+        </Link>
+        <button type="submit" {...busyButtonProps(status === "submitting")} className={ADMIN_PRIMARY_BUTTON}>
+          {status === "submitting" ? "Saving…" : isEditMode ? "Save changes" : "Add venue"}
+        </button>
+      </div>
     </form>
   );
 }

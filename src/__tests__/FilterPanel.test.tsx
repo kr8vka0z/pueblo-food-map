@@ -5,7 +5,7 @@
  *   1. Renders nothing when closed; dialog role + title when open.
  *   2. "Show only" switches (Open now / SNAP / WIC): role=switch, aria-checked
  *      reflects props, click fires the right handler.
- *   3. "Kind of place" checkboxes: 8 rows, color dot + localized label, checked
+ *   3. "Kind of place" switch rows (#917, no tick boxes): 8 rows, color dot + localized label, checked
  *      state reflects selectedCategories, click fires onToggleCategory.
  *   4. Clear all / Show N places / × close all fire their handlers.
  *   5. Close paths: Escape key, backdrop tap, swipe-left gesture.
@@ -98,11 +98,21 @@ describe("FilterPanel — Show only switches", () => {
   });
 });
 
-describe("FilterPanel — Kind of place checkboxes", () => {
-  test("renders all 8 categories as checkboxes", () => {
+describe("FilterPanel — Kind of place switch rows", () => {
+  test("renders all 8 categories as switches, with no tick boxes (#917)", () => {
     render(<FilterPanel {...baseProps()} />);
-    const boxes = screen.getAllByRole("checkbox");
-    expect(boxes).toHaveLength(8);
+    // 3 Show only switches (no events) + 8 kinds of place.
+    expect(screen.getAllByRole("switch")).toHaveLength(11);
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+  });
+
+  test("each kind-of-place row shows its count when counts are given (#917)", () => {
+    render(<FilterPanel {...baseProps({ categoryCounts: { pantry: 35, blessing_box: 4 } })} />);
+    const row = (name: RegExp) => screen.getByRole("switch", { name }).parentElement!;
+    expect(row(/food pantry/i).textContent).toContain("35");
+    expect(row(/blessing box/i).textContent).toContain("4");
+    // A kind with no places says 0, never a blank.
+    expect(row(/grocery/i).textContent).toContain("0");
   });
 
   test("shows EN category labels", () => {
@@ -117,12 +127,12 @@ describe("FilterPanel — Kind of place checkboxes", () => {
         {...baseProps({ selectedCategories: new Set(["pantry", "blessing_box"]) })}
       />,
     );
-    const pantry = screen.getByRole("checkbox", { name: /food pantry/i });
-    const blessing = screen.getByRole("checkbox", { name: /blessing box/i });
-    const grocery = screen.getByRole("checkbox", { name: /grocery/i });
-    expect(pantry).toBeChecked();
-    expect(blessing).toBeChecked();
-    expect(grocery).not.toBeChecked();
+    const pantry = screen.getByRole("switch", { name: /food pantry/i });
+    const blessing = screen.getByRole("switch", { name: /blessing box/i });
+    const grocery = screen.getByRole("switch", { name: /grocery/i });
+    expect(pantry).toHaveAttribute("aria-checked", "true");
+    expect(blessing).toHaveAttribute("aria-checked", "true");
+    expect(grocery).toHaveAttribute("aria-checked", "false");
   });
 
   test.each(ALL_CATEGORIES)("checking %s fires onToggleCategory with that category", (cat) => {
@@ -137,7 +147,8 @@ describe("FilterPanel — Kind of place checkboxes", () => {
             ? "Meal Site"
             : new RegExp(cat, "i"),
     );
-    fireEvent.click(label.closest("label") ?? label);
+    // The switch is the row's tap area (its overlay spans the row).
+    fireEvent.click(label.closest("div")!.querySelector('[role="switch"]')!);
     expect(onToggleCategory).toHaveBeenCalledWith(cat);
   });
 });
@@ -217,12 +228,11 @@ describe("FilterPanel — focus trap", () => {
   test("Tab from the last focusable element wraps to the first", async () => {
     const user = userEvent.setup();
     render(<FilterPanel {...baseProps()} />);
-    // Query in true DOM order (switches are <button role="switch">, so a
-    // single button + checkbox selector — not three separate role queries
-    // concatenated — reflects the panel's real tab order).
+    // Query in true DOM order (every row's switch is a <button role="switch">,
+    // so a single button selector reflects the panel's real tab order).
     const dialog = screen.getByRole("dialog");
     const focusable = Array.from(
-      dialog.querySelectorAll<HTMLElement>('button, input[type="checkbox"]'),
+      dialog.querySelectorAll<HTMLElement>("button"),
     );
     expect(focusable.length).toBeGreaterThan(1);
     focusable[focusable.length - 1]!.focus();
@@ -235,7 +245,7 @@ describe("FilterPanel — focus trap", () => {
     render(<FilterPanel {...baseProps()} />);
     const dialog = screen.getByRole("dialog");
     const focusable = Array.from(
-      dialog.querySelectorAll<HTMLElement>('button, input[type="checkbox"]'),
+      dialog.querySelectorAll<HTMLElement>("button"),
     );
     focusable[0]!.focus();
     await user.tab({ shift: true });
@@ -283,7 +293,7 @@ describe("FilterPanel — analytics", () => {
 
   test("checking a category fires filter_toggled with on=true", () => {
     render(<FilterPanel {...baseProps({ selectedCategories: null })} />);
-    fireEvent.click(screen.getByRole("checkbox", { name: /food pantry/i }));
+    fireEvent.click(screen.getByRole("switch", { name: /food pantry/i }));
     expect(track).toHaveBeenCalledWith(EVENTS.FILTER_TOGGLED, {
       filter: "pantry",
       on: true,
@@ -294,7 +304,7 @@ describe("FilterPanel — analytics", () => {
     render(
       <FilterPanel {...baseProps({ selectedCategories: new Set(["pantry"]) })} />,
     );
-    fireEvent.click(screen.getByRole("checkbox", { name: /food pantry/i }));
+    fireEvent.click(screen.getByRole("switch", { name: /food pantry/i }));
     expect(track).toHaveBeenCalledWith(EVENTS.FILTER_TOGGLED, {
       filter: "pantry",
       on: false,

@@ -78,13 +78,4 @@ describe("POST /api/public/alerts/resubscribe", () => {
     expect(res.status).toBe(200);
     expect((await res.json()).error).toBe("invalid_token");
   });
-
-  test("no live Cloudflare context -> 503", async () => {
-    mockGetCloudflareContext.mockImplementation(() => {
-      throw new Error("no context");
-    });
-    const res = await POST(makeRequest({ token: "abc" }));
-    expect(res.status).toBe(503);
-    expect(mockResubscribeByToken).not.toHaveBeenCalled();
-  });
 });

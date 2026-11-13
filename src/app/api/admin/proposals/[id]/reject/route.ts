@@ -22,38 +22,43 @@
  * regression guard proving the row's dedup-key columns survive a reject
  * byte-for-byte.
  *
+ * The optional `{ reason }` the proposal card sends is saved in
+ * `review_reason` (migration 0028), read the same way as the submissions
+ * reject route: trimmed, capped, null on a missing/blank/non-JSON body.
+ *
  * `D1Result.meta.changes === 0` (unknown id, or already reviewed —
  * correctness requirement 1, the supersede race) returns 404, never a
  * silent 200 — identical convention to the submissions reject route.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
+import { positiveInt } from "@/lib/positiveInt";
+import { readOptionalReason } from "@/lib/adminRequest";
+
+// Same cap as the submissions reject route: both are admin-only free text.
+const REVIEW_REASON_MAX_LENGTH = 1000;
 
 const REJECT_PROPOSAL_SQL =
-  "UPDATE change_proposals SET status = 'rejected', reviewed_by = ?, reviewed_at = ? WHERE id = ? AND status = 'pending'";
+  "UPDATE change_proposals SET status = 'rejected', review_reason = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ? AND status = 'pending'";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
 
   const { id: rawId } = await params;
-  const id = Number(rawId);
-  if (!Number.isInteger(id) || id <= 0) {
+  const id = positiveInt(Number(rawId));
+  if (id === null) {
     return NextResponse.json({ ok: false, error: "Invalid id" }, { status: 400 });
   }
 
+  const reason = await readOptionalReason(req, REVIEW_REASON_MAX_LENGTH);
   const timestamp = new Date().toISOString();
-  const result = await db.prepare(REJECT_PROPOSAL_SQL).bind(identity.email, timestamp, id).run();
+  const result = await db.prepare(REJECT_PROPOSAL_SQL).bind(reason, identity.email, timestamp, id).run();
 
   if (result.meta.changes === 0) {
     return NextResponse.json(

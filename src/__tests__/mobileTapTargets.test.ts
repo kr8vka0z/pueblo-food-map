@@ -66,7 +66,8 @@ describe("mobile review #13 — VenueMarker invisible hit-area floor", () => {
 describe("mobile review #14 — shared press-feedback style is defined once", () => {
   test("PRESS_FEEDBACK is exported from the shared module, not pasted per-component", () => {
     const src = readSource("src/lib/interactionStyles.ts");
-    expect(src).toMatch(/export const PRESS_FEEDBACK = "hover:brightness-105 active:brightness-95";/);
+    // #917 R2: the hover half (hover:brightness-105) is gone; the press dim stays.
+    expect(src).toMatch(/export const PRESS_FEEDBACK = "active:brightness-95";/);
   });
 
   test.each([
@@ -79,7 +80,10 @@ describe("mobile review #14 — shared press-feedback style is defined once", ()
     // HamburgerMenu.tsx itself is now pure shell (position/focus/Escape),
     // with nothing left that needs the press-feedback style.
     "src/components/HamburgerMenuContent.tsx",
-    "src/components/VenuePopupHeader.tsx",
+    // VenuePopupHeader.tsx removed by #917 (its bar is gone; the × lives in
+    // DesktopVenueWindow's pinned top) — dropped, not left to 404.
+    "src/components/DesktopVenueWindow.tsx",
+    "src/components/VenueActionRow.tsx",
     "src/components/LocationHelpCard.tsx",
     "src/components/FavoriteButton.tsx",
     "src/components/ShareButton.tsx",

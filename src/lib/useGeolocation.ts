@@ -8,8 +8,11 @@
  * - On mount: reads navigator.permissions.query to detect existing grant/denial.
  *   Defaults to { permission: 'prompt', position: null } if Permissions API
  *   is unavailable (e.g. SSR, older browsers).
- * - request(): calls getCurrentPosition; a timeout/unavailable error retries
- *   once at low accuracy (#738). Does NOT auto-invoke on mount.
+ * - request(): ONE getCurrentPosition at low accuracy, accepting a fix up to
+ *   5 min old, waiting at most 5 s (#921). #738 tried 8 s precise then a 6 s
+ *   low-accuracy retry; PostHog showed timeouts taking ~14 s and most of those
+ *   visitors leaving, and "near me" only needs a neighborhood. Does NOT
+ *   auto-invoke on mount.
  *   No watchPosition (battery concern per spec).
  * - Position is captured once per request() call.
  */
@@ -48,10 +51,9 @@ export type LocationFailure = Extract<GeoState, { permission: "denied" | "failed
 // GeolocationPositionError constructor, absent in jsdom and some old WebViews).
 const GEO_PERMISSION_DENIED = 1;
 const GEO_TIMEOUT = 3;
-const FIRST_TIMEOUT_MS = 8000;
-const FIRST_MAX_AGE_MS = 60_000;
-const RETRY_TIMEOUT_MS = 6000;
-const RETRY_MAX_AGE_MS = 5 * 60_000;
+// #921: one network/cell-level attempt. A fix up to 5 min old is as good as a
+// fresh one for "near me" and skips the GPS cold start entirely.
+const GEO_OPTIONS: PositionOptions = { enableHighAccuracy: false, timeout: 5000, maximumAge: 5 * 60_000 };
 
 const DEFAULT_STATE: GeoState = { permission: "prompt", position: null };
 
@@ -110,12 +112,12 @@ export function useGeolocation(): {
     // Me"). Read BEFORE calling geolocation, since a callback firing later
     // must judge the OUTCOME of the prompt this call started, not whatever
     // permRef says by the time it resolves. #738: "failed" counts as still
-    // undecided — a prompt answered "Allow" that then timed out, retried on
+    // undecided — a prompt answered "Allow" that then timed out, tried again on
     // the next tap, is the first time we see the grant succeed.
     const wasUndecided = permRef.current === "prompt" || permRef.current === "failed";
     const startedAt = Date.now();
-    // Integer ms from this request() to its final outcome, including the
-    // retry (#738: tap-to-result timings are how the timeout bug was found).
+    // Integer ms from this request() to its outcome (#738: tap-to-result
+    // timings are how the timeout bug was found).
     const elapsed = () => Math.max(0, Math.round(Date.now() - startedAt));
 
     const fail = (reason: GeoFailureReason) => {
@@ -128,8 +130,6 @@ export function useGeolocation(): {
       fail("unavailable");
       return;
     }
-    const geolocation = navigator.geolocation;
-
     const onSuccess = (pos: GeolocationPosition) => {
       if (wasUndecided) {
         void track(EVENTS.LOCATION_PERMISSION, { result: "granted", ms: elapsed() });
@@ -140,38 +140,24 @@ export function useGeolocation(): {
       });
     };
 
-    const onRefused = () => {
-      // "dismissed" (the issue's third result value) isn't distinguishable
-      // from an explicit "Block": every browser's Geolocation API reports
-      // code 1 for both (see #485 comment thread) — "denied" covers both
-      // here. ONLY code 1 gets here (#738).
-      if (wasUndecided) {
-        void track(EVENTS.LOCATION_PERMISSION, { result: "denied", ms: elapsed() });
-      }
-      setState({ permission: "denied", position: null });
-    };
-
-    geolocation.getCurrentPosition(
+    navigator.geolocation.getCurrentPosition(
       onSuccess,
       (err) => {
-        if (err.code === GEO_PERMISSION_DENIED) return onRefused();
-        // Position unavailable / timeout (#738): a precise GPS fix is often
-        // impossible indoors or on low-end Android, but "near me" only needs
-        // a neighborhood. Retry ONCE with network/cell positioning and a
-        // cached fix a few minutes old.
-        geolocation.getCurrentPosition(
-          onSuccess,
-          (retryErr) => {
-            if (retryErr.code === GEO_PERMISSION_DENIED) return onRefused();
-            fail(retryErr.code === GEO_TIMEOUT ? "timeout" : "unavailable");
-          },
-          { enableHighAccuracy: false, timeout: RETRY_TIMEOUT_MS, maximumAge: RETRY_MAX_AGE_MS },
-        );
+        if (err.code !== GEO_PERMISSION_DENIED) {
+          // Timeout / position unavailable: show the failure card now (#921).
+          fail(err.code === GEO_TIMEOUT ? "timeout" : "unavailable");
+          return;
+        }
+        // "dismissed" (the issue's third result value) isn't distinguishable
+        // from an explicit "Block": every browser's Geolocation API reports
+        // code 1 for both (see #485 comment thread) — "denied" covers both
+        // here. ONLY code 1 gets here (#738).
+        if (wasUndecided) {
+          void track(EVENTS.LOCATION_PERMISSION, { result: "denied", ms: elapsed() });
+        }
+        setState({ permission: "denied", position: null });
       },
-      // maximumAge: a fix under a minute old is as good as a fresh one for
-      // "near me", and skips the GPS cold start that caused the 8.0 s
-      // timeouts (#738); it was 0 (always force a new reading) before.
-      { enableHighAccuracy: true, timeout: FIRST_TIMEOUT_MS, maximumAge: FIRST_MAX_AGE_MS },
+      GEO_OPTIONS,
     );
   }, []);
 

@@ -23,7 +23,8 @@
 
 import type { VenueCategory } from "@/types/venue";
 import { categoryColors } from "@/lib/categories";
-import { googleMapsUrl } from "@/components/DirectionButtons";
+import { googleMapsUrl } from "@/lib/googleMapsUrl";
+import { tapLinkClass } from "@/lib/adminCardStyles";
 
 export interface StaticLocationMapProps {
   lat: number | null;
@@ -70,7 +71,7 @@ export default function StaticLocationMap({ lat, lng, category, name, address }:
 
   if (!mapboxToken) {
     return (
-      <p className="flex h-[240px] w-full items-center justify-center rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-[var(--color-bone-100)] px-4 text-center text-sm text-[var(--color-ink-500)] sm:w-[420px]">
+      <p className="flex h-[240px] w-full max-w-[420px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-[var(--color-bone-100)] px-4 text-center text-sm text-[var(--color-ink-500)]">
         Map unavailable right now.
       </p>
     );
@@ -78,7 +79,7 @@ export default function StaticLocationMap({ lat, lng, category, name, address }:
 
   if (!coords) {
     return (
-      <p className="flex h-[240px] w-full items-center justify-center rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-[var(--color-bone-100)] px-4 text-center text-sm text-[var(--color-ink-500)] sm:w-[420px]">
+      <p className="flex h-[240px] w-full max-w-[420px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-[var(--color-bone-100)] px-4 text-center text-sm text-[var(--color-ink-500)]">
         Add coordinates to see the map.
       </p>
     );
@@ -88,7 +89,10 @@ export default function StaticLocationMap({ lat, lng, category, name, address }:
   const alt = name && address ? `Map of ${name} at ${address}` : "Map of the venue's location";
 
   return (
-    <div className="w-full sm:w-[420px]">
+    // WHY capped at 420, not stretched to the form: the image is drawn at
+    // 420 wide (MAP_SIZE), so a wider box would blur it and crop the
+    // neighborhood view the zoom was chosen for.
+    <div className="w-full max-w-[420px]">
       {/* eslint-disable-next-line @next/next/no-img-element -- external Mapbox Static Images URL that changes with the form's own coordinates; next/image's remotePatterns + optimizer add nothing for a fixed-size static map image (see this file's own header). */}
       <img
         src={src}
@@ -101,7 +105,7 @@ export default function StaticLocationMap({ lat, lng, category, name, address }:
         href={googleMapsUrl(coords.lat, coords.lng)}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-2 inline-block text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+        className={`text-sm ${tapLinkClass}`}
       >
         Open in Google Maps
       </a>

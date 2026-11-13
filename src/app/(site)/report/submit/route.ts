@@ -26,7 +26,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
-import { isValidEmail } from "@/lib/email";
+import { isValidEmail, normalizeLineBreaks, stripLineBreaks } from "@/lib/email";
 import { checkFormRateLimit } from "@/lib/formRateLimit";
 import { venues } from "@/data/venues";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
@@ -81,11 +81,6 @@ interface SubmitPayload {
   website?: string;
   /** Cloudflare Turnstile response token from the client widget */
   turnstileToken?: string;
-}
-
-/** Strip CR and LF from a string to prevent header/subject line injection. */
-function stripLineBreaks(s: string): string {
-  return s.replace(/[\r\n]/g, " ");
 }
 
 function validate(body: SubmitPayload): string | null {
@@ -157,7 +152,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     venueName: stripLineBreaks(venue.name),
     venueAddress: stripLineBreaks(venue.address),
     issueType: body.issueType as IssueTypeKey,
-    description: stripLineBreaks(body.description.trim()),
+    description: normalizeLineBreaks(body.description.trim()),
     contactEmail: body.contactEmail ? stripLineBreaks(body.contactEmail) : undefined,
   };
 

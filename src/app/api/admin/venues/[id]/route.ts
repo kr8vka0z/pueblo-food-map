@@ -105,8 +105,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
+import { positiveInt } from "@/lib/positiveInt";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
 import { computeBoxEventWrites } from "@/lib/boxEvents";
 import { logAdminVenueEditMissingPrecondition } from "@/lib/logger";
@@ -122,14 +122,9 @@ import {
 } from "@/lib/adminVenueEditSql";
 import type { AdminVenueRow } from "@/types/venue";
 import { RECENT_APPLIED_FOR_VENUE_SQL, resetsForEdit, SWITCH_RESET_INSERT_SQL } from "@/lib/sourceSwitch";
+import { FIELD_LIMITS } from "@/lib/fieldLimits";
 
-/** Mirrors readOptionalSubmissionId's convention in the sibling create route. */
-function readOptionalProposalId(body: unknown): number | null {
-  const raw = (body as { proposalId?: unknown })?.proposalId;
-  return typeof raw === "number" && Number.isInteger(raw) && raw > 0 ? raw : null;
-}
-
-const PIN_NOTE_MAX = 500;
+const PIN_NOTE_MAX = FIELD_LIMITS.VENUE_TOLD_US_NOTE;
 
 /**
  * "The venue told us" (Venue Data Rebuild step 1): optional `venueToldUs`
@@ -234,12 +229,8 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
   const { id } = await params;
 
@@ -255,7 +246,7 @@ export async function PATCH(
     return NextResponse.json({ ok: false, errors: validation.errors }, { status: 422 });
   }
   const { fields } = validation;
-  const proposalId = readOptionalProposalId(body);
+  const proposalId = positiveInt((body as { proposalId?: unknown })?.proposalId); // same lenient read as the create route
   const venueToldUs = readVenueToldUs(body);
   if (venueToldUs === "too_long") {
     return NextResponse.json(

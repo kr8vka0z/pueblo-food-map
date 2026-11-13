@@ -45,12 +45,12 @@ import type { NextConfig } from "next";
 // with Turnstile, /venues, /admin/login), then flipped to enforcing.
 // Violations still post to /api/csp-report via report-uri. No nonce: this app's static
 // rendering depends on NOT using proxy.ts (Next 16 proxy.ts failed the build
-// on the OpenNext stack this site ran on before vinext — see the "Footgun"
-// note on `/` above),
+// on the OpenNext stack this site ran on before vinext — AGENTS.md,
+// Discoverability / SEO traps),
 // and Next's own CSP guide requires proxy-generated nonces to force every
 // page into dynamic rendering — incompatible with this app's static +
-// dynamicParams=false pages (the 10-day outage footgun this file already
-// documents). So this follows Next's documented "Without Nonces" approach
+// dynamicParams=false pages (the 10-day venue-page outage, AGENTS.md,
+// Discoverability / SEO traps). So this follows Next's documented "Without Nonces" approach
 // (node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md)
 // instead: a static header, `'unsafe-inline'` on script-src/style-src.
 // `'unsafe-inline'` on script-src is for Next's own inline RSC-hydration
@@ -182,7 +182,7 @@ const nextConfig: NextConfig = {
   // layer 404s before any page code executes). A PLAIN path redirect (no
   // `has` query-string matcher) — unlike the /?venue=<id> redirect removed
   // 2026-06-20 above, which broke because of a `has` rule on `source: "/"`
-  // — is the ordinary, well-supported Next.js/OpenNext case, so this one is
+  // — is the ordinary, well-supported Next.js case, so this one is
   // safe to add. permanent: true -> 308, matching "its old address must
   // keep working" (a real, indefinite redirect, not a temporary one).
   //

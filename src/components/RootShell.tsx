@@ -21,7 +21,6 @@
  * tree (lang="en") passes no initialLocale, same as before this change, so
  * its cookie-sync behavior is untouched.
  */
-import { preload } from "react-dom";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { buildWebSiteJsonLd, serializeJsonLd } from "@/lib/venueSchema";
 import type { Locale } from "@/lib/i18n";
@@ -35,26 +34,29 @@ export default function RootShell({
   lang: Locale;
   children: React.ReactNode;
 }>) {
-  // WHY preload() here instead of a <head> element: React 19's preload() API
-  // is idiomatic for App Router — it coexists with the Metadata API without
-  // producing duplicate or misplaced <head> tags or hydration mismatches.
-  // crossOrigin is required because font fetches are always CORS-mode; without
-  // it the browser treats the preload as a different cache entry and double-fetches.
-  // WHY only Public Sans: Fraunces is a display serif used sparingly — preloading
-  // it competes for critical-path bandwidth and can regress mobile LCP. It loads
-  // via @font-face in globals.css with font-display:swap instead.
-  preload("/fonts/PublicSans-Variable.woff2", {
-    as: "font",
-    type: "font/woff2",
-    crossOrigin: "anonymous",
-  });
-
   return (
     // suppressHydrationWarning: the home page's inline script adds
     // data-splash-seen to <html> before hydration; this silences only this
     // element's own attribute mismatch (same pattern as next-themes).
     <html lang={lang} className="h-full antialiased" suppressHydrationWarning>
       <body className="h-full flex flex-col">
+        {/* Font preload as a <link> element, which React hoists into <head>.
+            WHY not react-dom's preload(): under vinext (#823) that hint only
+            reaches the RSC payload at the end of the HTML, never <head>, so the
+            font arrived after first paint and the swap moved the splash on
+            short phones (homepage layout shift, #921). crossOrigin is required
+            because font fetches are CORS-mode; without it the browser treats
+            the preload as a different cache entry and double-fetches.
+            WHY only Public Sans: Fraunces is a display serif used sparingly —
+            preloading it competes for critical-path bandwidth and can regress
+            mobile LCP. It loads via @font-face (font-display: swap). */}
+        <link
+          rel="preload"
+          href="/fonts/PublicSans-Variable.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
         {/* WebSite JSON-LD — sitewide structured data for search engines */}
         <script
           type="application/ld+json"

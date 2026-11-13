@@ -21,10 +21,7 @@
 import { toNextJsHandler } from "better-auth/next-js";
 import { getAuth } from "@/lib/auth";
 
-// WHY force-dynamic: same reasoning as every other route in this app that
-// reads live request state (see e.g. src/app/api/admin/geocode/route.ts) —
-// Better Auth's handler inspects headers/cookies per request, so this route
-// must never be statically optimized/cached.
+// WHY force-dynamic: vinext still reads it to force no-store fetches and keep per-session auth responses private.
 export const dynamic = "force-dynamic";
 
 export const { GET, POST, PATCH, PUT, DELETE } = toNextJsHandler(

@@ -31,6 +31,7 @@ import type { Venue } from "@/types/venue";
 import { loadLatestApprovedPhotosForVenues, type PublicBoxPhoto } from "@/lib/boxPhotos";
 import { loadApprovedAdopterNamesForVenues } from "@/lib/boxAdopters";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
+import { chunkArray, D1_MAX_BOUND_PARAMS } from "@/lib/d1";
 
 // ─── D1 row shapes ──────────────────────────────────────────────────────────
 
@@ -196,10 +197,7 @@ const STATUS_SETTING_KIND: Readonly<Record<string, BoxStatus>> = {
  *   1. `outOfService` (an admin pause or confirmed damage) wins over every
  *      check-in, however recent — the diagram's own annotation: "An admin
  *      pause or confirmed damage sends ANY status to Out of service."
- *      Slice 2 has no admin UI that can set this true yet (that's slice 3's
- *      box_events "paused" lifecycle action) — callers pass `false` today;
- *      the branch exists so slice 3 only has to supply the input, not
- *      redo this function.
+ *      Callers derive it from `removed_on` (see mapRowToPublicBox).
  *   2. Otherwise, find the most recent VISIBLE check-in whose kind sets a
  *      status (filled/low/empty — never 'took' or 'problem', see
  *      STATUS_SETTING_KIND above). A hidden row is skipped even if it's
@@ -459,7 +457,7 @@ const SELECT_VISIBLE_CHECKINS_SQL = `
   ORDER BY created_at DESC, id DESC
 `;
 
-/** One D1 IN(...) query for every box on the list endpoint, not N+1 — see loadLiveBoxes' own call site. */
+/** One D1 IN(...) query per chunk of up to D1_MAX_BOUND_PARAMS boxes on the list endpoint, not N+1 — see loadVisibleCheckinsForVenues. */
 function selectVisibleCheckinsForVenuesSql(count: number): string {
   const placeholders = Array(count).fill("?").join(", ");
   return `
@@ -480,7 +478,14 @@ export async function loadVisibleCheckins(db: D1Database, venueId: string): Prom
   return result.results ?? [];
 }
 
-/** Same as loadVisibleCheckins, batched for every id in `venueIds` in one query — what loadLiveBoxes uses so the list endpoint doesn't issue one check-ins query per box. */
+/**
+ * Same as loadVisibleCheckins, batched for every id in `venueIds` — what
+ * loadLiveBoxes uses so the list endpoint doesn't issue one check-ins query
+ * per box. Chunked at D1_MAX_BOUND_PARAMS: this read has no try/catch, so an
+ * unchunked IN(...) would 500 the whole box list (every pin gone) the day
+ * live boxes pass 100. Each venue_id lands in exactly one chunk, so its
+ * newest-first order is kept.
+ */
 export async function loadVisibleCheckinsForVenues(
   db: D1Database,
   venueIds: string[],
@@ -488,16 +493,18 @@ export async function loadVisibleCheckinsForVenues(
   const byVenue = new Map<string, CheckinStatusInput[]>();
   if (venueIds.length === 0) return byVenue;
 
-  const result = await db
-    .prepare(selectVisibleCheckinsForVenuesSql(venueIds.length))
-    .bind(...venueIds)
-    .all<VisibleCheckinRow>();
+  for (const batch of chunkArray(venueIds, D1_MAX_BOUND_PARAMS)) {
+    const result = await db
+      .prepare(selectVisibleCheckinsForVenuesSql(batch.length))
+      .bind(...batch)
+      .all<VisibleCheckinRow>();
 
-  for (const row of result.results ?? []) {
-    const existing = byVenue.get(row.venue_id);
-    const entry: CheckinStatusInput = { kind: row.kind, visibility: row.visibility, created_at: row.created_at };
-    if (existing) existing.push(entry);
-    else byVenue.set(row.venue_id, [entry]);
+    for (const row of result.results ?? []) {
+      const existing = byVenue.get(row.venue_id);
+      const entry: CheckinStatusInput = { kind: row.kind, visibility: row.visibility, created_at: row.created_at };
+      if (existing) existing.push(entry);
+      else byVenue.set(row.venue_id, [entry]);
+    }
   }
   return byVenue;
 }
@@ -675,10 +682,13 @@ export async function loadLiveBoxes(db: D1Database, now: Date = new Date()): Pro
   const result = await db.prepare(SELECT_LIVE_BOXES_SQL).all<BoxJoinRow>();
   const rows = result.results ?? [];
   const venueIds = rows.map((r) => r.id);
-  const checkinsByVenue = await loadVisibleCheckinsForVenues(db, venueIds);
-  const photosByVenue = await loadLatestPhotosBestEffort(db, venueIds);
-  const adoptersByVenue = await loadAdoptersBestEffort(db, venueIds);
-  const neededByVenue = await loadNeededFromVisitorsBestEffort(db, now);
+  // Independent reads, run together; the best-effort three catch their own errors.
+  const [checkinsByVenue, photosByVenue, adoptersByVenue, neededByVenue] = await Promise.all([
+    loadVisibleCheckinsForVenues(db, venueIds),
+    loadLatestPhotosBestEffort(db, venueIds),
+    loadAdoptersBestEffort(db, venueIds),
+    loadNeededFromVisitorsBestEffort(db, now),
+  ]);
   return rows.map((row) =>
     mapRowToPublicBox(
       row,
@@ -693,7 +703,7 @@ export async function loadLiveBoxes(db: D1Database, now: Date = new Date()): Pro
 
 /**
  * Slim variant of loadLiveBoxes for /blessing-boxes: the boxes query plus the
- * visible check-ins (needed for `status`) — 2 D1 reads instead of 5. The page
+ * visible check-ins (needed for `status`) — 2 D1 reads instead of 5 (plus one check-ins read per extra 100 boxes). The page
  * shows only name, address, status, so photos/adopters/needs are skipped and
  * come back empty. Same SQL and mapper as loadLiveBoxes, so the shape and
  * status rule cannot drift; a check-ins failure throws (like loadLiveBoxes),
@@ -794,10 +804,12 @@ export async function loadLiveBoxById(
 ): Promise<PublicBlessingBox | null> {
   const row = await db.prepare(SELECT_LIVE_BOX_BY_ID_SQL).bind(id).first<BoxJoinRow>();
   if (!row) return null;
-  const checkins = await loadVisibleCheckins(db, id);
-  const photosByVenue = await loadLatestPhotosBestEffort(db, [id]);
-  const adoptersByVenue = await loadAdoptersBestEffort(db, [id]);
-  const neededFromVisitors = await loadNeededFromVisitorsForVenueBestEffort(db, id, now);
+  const [checkins, photosByVenue, adoptersByVenue, neededFromVisitors] = await Promise.all([
+    loadVisibleCheckins(db, id),
+    loadLatestPhotosBestEffort(db, [id]),
+    loadAdoptersBestEffort(db, [id]),
+    loadNeededFromVisitorsForVenueBestEffort(db, id, now),
+  ]);
   return mapRowToPublicBox(
     row,
     checkins,

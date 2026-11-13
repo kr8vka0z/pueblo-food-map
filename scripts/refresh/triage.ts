@@ -2,13 +2,13 @@
  * triage.ts — TypeSafe Jev triage + rename pairing for the refresh pipeline
  * (issue #543).
  *
- * WHY this exists: /admin/flags gets every non-date-only proposal a run
- * produces, with no way to tell "probably nothing changed" from "a human
+ * WHY this exists: /admin/places "To review" (VenueListView) gets every
+ * non-date-only proposal a run produces, with no way to tell "probably nothing changed" from "a human
  * must decide" from "these two rows are one renamed venue." Weekly runs
  * (#543) quadruple that queue. Jev is a DECISION api — typed yes/no and
  * choice questions answered with calibrated probabilities, no generated
  * text — so each proposal gets ONE batched call and a lane that is a
- * sorting/filtering aid at /admin/flags.
+ * sorting/filtering aid at /admin/places "To review" (VenueListView).
  *
  * Request/response shape verified against https://docs.typesafe.ai/api.md
  * (2026-09-24): `POST https://api.typesafe.ai/v1/systemone`, Bearer key,
@@ -436,18 +436,16 @@ export async function runTriagePass(input: TriagePassInput): Promise<TriagePassO
   const skip = (p: ProposalDraft) =>
     p.source === "link_health" || isDateOnlyUpdateProposal({ change_type: p.changeType, source: p.source }, p.proposedDiff);
 
-  const candidates = findRenamePairCandidates(input.proposals.filter((p) => !skip(p)), input.currentRows).filter((c) => {
-    const rename = buildRenameProposal(c, today);
-    return !rejectedKeys.has(rejectionKey(rename.source, rename.targetVenueId, rename.diffHash));
-  });
-  const verdicts = await mapWithConcurrency(candidates, concurrency, (c) => confirmRenamePair(c, session));
+  const candidates = findRenamePairCandidates(input.proposals.filter((p) => !skip(p)), input.currentRows)
+    .map((c) => ({ c, rename: buildRenameProposal(c, today) }))
+    .filter(({ rename }) => !rejectedKeys.has(rejectionKey(rename.source, rename.targetVenueId, rename.diffHash)));
+  const verdicts = await mapWithConcurrency(candidates, concurrency, ({ c }) => confirmRenamePair(c, session));
 
   const replaced = new Map<ProposalDraft, ProposalDraft | null>(); // remove → rename proposal, add → null (dropped)
   const extraSupersedeKeys: string[] = [];
-  candidates.forEach((c, i) => {
+  candidates.forEach(({ c, rename }, i) => {
     const { confirmed, result } = verdicts[i];
     if (confirmed === false) return; // Jev says two different places — keep remove + add separate
-    const rename = buildRenameProposal(c, today);
     replaced.set(c.removeProposal, rename);
     replaced.set(c.addProposal, null);
     extraSupersedeKeys.push(pendingKey(c.addProposal.source, c.addProposal.targetVenueId));

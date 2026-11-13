@@ -11,6 +11,7 @@ Moved verbatim from AGENTS.md, section Secrets. The hard rules stay in AGENTS.md
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | GitHub Actions secrets | Deploy workflows. |
 | `CLOUDFLARE_D1_TOKEN` | GitHub Actions secrets | Refresh pipeline only, D1 Write only. Never share it with deploys, because that job parses untrusted HTML. |
 | `JEV_API_KEY` | GitHub Actions secrets | Optional. Without it, refresh runs untriaged. |
+| `PFM_ALERT_WEBHOOK_KEY` | GitHub Actions secrets | Header key for the n8n webhook `pfm-refresh-failed`, which sends one fixed "refresh failed" message to Kyle's Atlas Telegram chat. 1Password: `n8n - PFM Refresh Alert Webhook Key`. Used only by the refresh workflow's failure step; never the Telegram bot token itself. |
 | `RESEND_API_KEY` | Worker runtime (`wrangler secret put`) | Sending-only key, scoped to pueblofoodmap.com. The full-access Resend admin key never goes in the Worker. |
 | `TURNSTILE_SECRET_KEY`, `TURNSTILE_BOX_SECRET_KEY` | Worker runtime | Kept separate so rotating one doesn't reset the other's rate-limit buckets. |
 | `CHECKIN_RATE_LIMIT_SECRET` | Worker runtime | Dedicated HMAC key for the D1 rate limiters (box check-ins, public forms, CSP reports). Never reuse a Turnstile secret. |

@@ -191,12 +191,4 @@ describe("POST /api/public/box-photos/[id]/flag", () => {
     const res = await callPost({ clientToken: "visitor-abc" });
     expect(res.status).toBe(200);
   });
-
-  test("no live Cloudflare context -> 503, never throws", async () => {
-    mockGetCloudflareContext.mockImplementation(() => {
-      throw new Error("no cloudflare context");
-    });
-    const res = await callPost({ clientToken: "visitor-abc" });
-    expect(res.status).toBe(503);
-  });
 });

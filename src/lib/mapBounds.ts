@@ -42,6 +42,11 @@ export function isPointInBounds(
   );
 }
 
+/** A finite JSON number within ±`limit` (90 for latitude, 180 for longitude); never a numeric string. */
+export function isCoord(n: unknown, limit: 90 | 180): n is number {
+  return typeof n === "number" && Number.isFinite(n) && n >= -limit && n <= limit;
+}
+
 /**
  * Returns true if the resolved position is outside the Pueblo County maxBounds.
  * Tied to the same bbox constant used by Map.tsx so they stay in sync.

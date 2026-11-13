@@ -14,9 +14,9 @@
 const es: Record<string, string> = {
   // App
   "app.name": "Pueblo Food Map",
-  "app.documentTitle": "Pueblo Food Map — Recursos de alimentos en el Condado de Pueblo, CO",
+  "app.documentTitle": "Pueblo Food Map · Comida gratis, despensas y tiendas con SNAP en el Condado de Pueblo, CO", // [CHECK]
 
-  "meta.home.title": "Pueblo Food Map — Recursos de alimentos en el Condado de Pueblo, CO",
+  "meta.home.title": "Pueblo Food Map · Comida gratis, despensas y tiendas con SNAP en el Condado de Pueblo, CO", // [CHECK]
   "meta.home.description":
     "Encuentra comida gratis y de bajo costo cerca de ti en el Condado de Pueblo, CO — despensas, huertos comunitarios, supermercados y comedores comunitarios, con información sobre SNAP/WIC y direcciones.", // [CHECK]
 
@@ -114,8 +114,6 @@ const es: Record<string, string> = {
   "empty.tryCategoryInstead": "Prueba una categoría:",
   "empty.showCategoryAria": "Mostrar lugares de {label}",
 
-  // Sponsor credit (#69)
-
   // Operator attribution (#63)
   "operator.operated_by": "Operado por",
 
@@ -133,9 +131,6 @@ const es: Record<string, string> = {
   "locationCard.failed.body.unavailable": "Tu teléfono no pudo saber dónde estás en este momento.", // [CHECK]
   "locationCard.tapPin": "Toca cualquier punto del mapa para ver horarios y cómo llegar.", // [CHECK]
   "locationCard.retry": "Intentar de nuevo", // [CHECK]
-
-  // Wordmark (#61)
-  "wordmark.ariaLabel": "Mapa de alimentos de Pueblo — restablecer vista",
 
   // Search typeahead (#67)
   "typeahead.matchCount": "{count} lugares coinciden",
@@ -267,6 +262,12 @@ const es: Record<string, string> = {
   "share.labelGeneric": "Compartir este lugar",
   "share.copied": "Enlace copiado",
 
+  // Card action row (#917)
+  "action.call": "Llamar al {phone}", // [CHECK]
+  "action.noPhone": "Sin número de teléfono",
+  "action.website": "Visitar el sitio web de {name} (se abre en una pestaña nueva)", // [CHECK]
+  "action.noWebsite": "Sin sitio web",
+
   // View switch — search-bar suggestion row + Menu line (#514).
   "viewSuggestion.seeAsList": "Ver todos los lugares en una lista",
   "viewSuggestion.backToMap": "Volver al mapa",
@@ -356,7 +357,15 @@ const es: Record<string, string> = {
   "events.card.shareCopied": "Enlace copiado", // [CHECK]
   "events.card.shareManual": "Aquí no se puede compartir. Copia este enlace:", // [CHECK]
   "events.card.calendar": "Agregar al calendario", // [CHECK]
-  "events.card.moreInfo": "Más información", // [CHECK]
+  // Action button wording (#882), one per events.link_label; built-in Spanish, so no admin typing.
+  "events.card.action.website": "Visita el sitio web", // [CHECK]
+  "events.card.action.signup": "Inscríbete", // [CHECK]
+  "events.card.action.tickets": "Consigue boletos", // [CHECK]
+  "events.card.action.rsvp": "Confirma tu asistencia", // [CHECK]
+  "events.card.action.volunteer": "Sé voluntario", // [CHECK]
+  "events.card.action.donate": "Dona", // [CHECK]
+  "events.card.actionAria": "{label}, {site} (se abre en una pestaña nueva)", // [CHECK]
+  "events.card.readMore": "Leer más", // [CHECK]
   "events.card.seeOpenNow": "Ver lugares abiertos ahora", // [CHECK]
   "events.card.endedHelp": "¿Buscas comida hoy? Mira qué está abierto ahora mismo.", // [CHECK]
   "events.card.cancelledNoNote": "Este evento no se llevará a cabo.", // [CHECK]
@@ -377,6 +386,85 @@ const es: Record<string, string> = {
   "events.filter.showResults.one": "Mostrar {count} evento", // [CHECK]
   "events.filter.showResults.other": "Mostrar {count} eventos", // [CHECK]
   "events.list.emptyAction": "Volver a mostrar lugares", // [CHECK]
+  // Share an event (#883): the public form, its live card preview and links to it.
+  "events.card.preview.name": "El nombre de tu evento", // [CHECK]
+  "events.card.preview.host": "Agrega quién lo organiza", // [CHECK]
+  "events.card.preview.when": "Agrega la fecha y la hora", // [CHECK]
+  "events.card.preview.about": "Cuenta de qué se trata", // [CHECK]
+  "events.card.preview.where": "Agrega una dirección", // [CHECK]
+  "events.card.preview.link": "Agrega un enlace para mostrar este botón", // [CHECK]
+  "menu.shareEvent": "Compartir un evento", // [CHECK]
+  "events.list.share": "Compartir un evento", // [CHECK]
+  "shareEvent.title": "Compartir un evento", // [CHECK]
+  "shareEvent.documentTitle": "Compartir un evento", // [CHECK]
+  "shareEvent.subtitle": "¿Vas a tener un evento de comida que te gustaría ver en el mapa? Mándanos los detalles y nos pondremos en contacto.", // [CHECK]
+  "shareEvent.section.event": "El evento", // [CHECK]
+  "shareEvent.section.where": "Dónde", // [CHECK]
+  "shareEvent.section.link": "Enlace y volante", // [CHECK]
+  "shareEvent.section.you": "Sobre ti", // [CHECK]
+  "shareEvent.name.label": "Nombre del evento", // [CHECK]
+  "shareEvent.name.placeholder": "p. ej., Reparto de pavos de Acción de Gracias", // [CHECK]
+  "shareEvent.host.label": "¿Quién lo organiza?", // [CHECK]
+  "shareEvent.host.placeholder": "p. ej., Iglesia de St. Mary", // [CHECK]
+  "shareEvent.date.label": "Fecha", // [CHECK]
+  "shareEvent.start.label": "Empieza", // [CHECK]
+  "shareEvent.end.label": "Termina", // [CHECK]
+  "shareEvent.timeHint": "Las horas son de Pueblo.", // [CHECK]
+  "shareEvent.description.label": "¿De qué se trata?", // [CHECK]
+  "shareEvent.description.placeholder": "p. ej., Pavos y acompañamientos gratis para familias mientras duren.", // [CHECK]
+  "shareEvent.bring.label": "¿Qué deben traer? (opcional)", // [CHECK]
+  "shareEvent.bring.placeholder": "p. ej., bolsas, identificación, una hielera", // [CHECK]
+  "shareEvent.venueName.label": "Nombre del lugar (opcional)", // [CHECK]
+  "shareEvent.venueName.placeholder": "p. ej., Salón de la Iglesia de St. Mary", // [CHECK]
+  "shareEvent.address.label": "Dirección", // [CHECK]
+  "shareEvent.address.placeholder": "p. ej., 123 Main St, Pueblo", // [CHECK]
+  "shareEvent.address.checking": "Revisando la dirección…", // [CHECK]
+  "shareEvent.address.found": "Encontrada: {address}", // [CHECK]
+  "shareEvent.address.notFound": "No pudimos encontrar esa dirección. Por favor revísala.", // [CHECK]
+  "shareEvent.address.choose": "¿Cuál es? Toca la dirección correcta:", // [CHECK]
+  "shareEvent.link.label": "Enlace (opcional)", // [CHECK]
+  "shareEvent.link.placeholder": "https://ejemplo.org", // [CHECK]
+  "shareEvent.link.hint": "Una página web del evento, como un formulario de inscripción.", // [CHECK]
+  "shareEvent.linkLabel.label": "¿Qué debe decir el botón?", // [CHECK]
+  "shareEvent.flyer.label": "Volante (opcional)", // [CHECK]
+  "shareEvent.flyer.hint": "Una imagen: JPEG, PNG o WebP.", // [CHECK]
+  "shareEvent.flyer.uploading": "Agregando tu volante…", // [CHECK]
+  "shareEvent.flyer.remove": "Quitar volante", // [CHECK]
+  "shareEvent.flyer.errorType": "No podemos usar ese archivo. Prueba con un JPEG o PNG.", // [CHECK]
+  "shareEvent.flyer.errorUpload": "No se pudo agregar el volante. Intenta de nuevo.", // [CHECK]
+  "shareEvent.flyer.errorReused": "Por favor agrega el volante otra vez y envía.", // [CHECK]
+  "shareEvent.submitterName.label": "Tu nombre", // [CHECK]
+  "shareEvent.submitterEmail.label": "Tu correo electrónico", // [CHECK]
+  "shareEvent.submitterEmail.placeholder": "correo@ejemplo.com", // [CHECK]
+  "shareEvent.submitterEmail.hint": "Nunca se muestra en el sitio. Solo lo usamos si tenemos preguntas sobre el evento.", // [CHECK]
+  "shareEvent.submit": "Enviar para revisión", // [CHECK]
+  "shareEvent.submitting": "Enviando…", // [CHECK]
+  "shareEvent.backToMap": "Volver al mapa", // [CHECK]
+  "shareEvent.another": "Compartir otro evento", // [CHECK]
+  "shareEvent.success.title": "¡Gracias!", // [CHECK]
+  "shareEvent.success.body": "Recibimos tu evento. Lo revisaremos y nos pondremos en contacto antes de que aparezca en el mapa.", // [CHECK]
+  "shareEvent.error.title": "Algo salió mal", // [CHECK]
+  "shareEvent.error.body": "No se pudo enviar tu evento. Por favor intenta de nuevo, o escríbenos a suggestions@pueblofoodmap.com.", // [CHECK]
+  "shareEvent.error.retry": "Intentar de nuevo", // [CHECK]
+  "shareEvent.error.rateLimit": "Demasiados eventos enviados desde esta dirección. Por favor intenta de nuevo en una hora.", // [CHECK]
+  "shareEvent.validation.nameRequired": "Por favor escribe el nombre del evento.", // [CHECK]
+  "shareEvent.validation.hostRequired": "Por favor di quién lo organiza.", // [CHECK]
+  "shareEvent.validation.dateRequired": "Por favor elige la fecha.", // [CHECK]
+  "shareEvent.validation.startRequired": "Por favor escribe la hora de inicio.", // [CHECK]
+  "shareEvent.validation.endRequired": "Por favor escribe la hora de fin.", // [CHECK]
+  "shareEvent.validation.endBeforeStart": "La hora de fin debe ser después de la hora de inicio.", // [CHECK]
+  "shareEvent.validation.descriptionRequired": "Por favor cuenta de qué se trata el evento.", // [CHECK]
+  "shareEvent.validation.addressRequired": "Por favor escribe la dirección.", // [CHECK]
+  "shareEvent.validation.linkInvalid": "Escribe la dirección web completa, empezando con https://", // [CHECK]
+  "shareEvent.validation.submitterNameRequired": "Por favor escribe tu nombre.", // [CHECK]
+  "shareEvent.validation.emailRequired": "Por favor escribe tu correo electrónico.", // [CHECK]
+  "shareEvent.validation.emailInvalid": "Por favor escribe un correo electrónico válido.", // [CHECK]
+  "shareEvent.preview.heading": "Vista previa", // [CHECK]
+  "shareEvent.preview.live": "Se actualiza mientras escribes", // [CHECK]
+  "shareEvent.preview.note": "Así se verá en el mapa cuando lo aprobemos.", // [CHECK]
+  "shareEvent.preview.open": "Vista previa", // [CHECK]
+  "shareEvent.preview.sheetTag": "Vista previa — aún no está en el mapa", // [CHECK]
+  "shareEvent.preview.back": "Volver a editar", // [CHECK]
 
   // External links (#162)
   "menu.opensInNewTab": "(se abre en una pestaña nueva)",
@@ -416,7 +504,7 @@ const es: Record<string, string> = {
   "privacy.retention.body": "Eliminamos automáticamente las direcciones de correo antiguas de nuestros registros: 90 días después de enviar una sugerencia o reporte de un lugar, de que se rechace una solicitud de patrocinio de caja, o de que canceles una alerta. Esto no afecta la copia que ya enviamos a nuestro propio correo cuando enviaste un formulario, ni un registro interno que el personal administrativo usa para dar seguimiento a decisiones de moderación. El correo de una alerta activa se mantiene hasta que la canceles.", // [CHECK]
   "privacy.other.heading": "Otros servicios que usamos", // [CHECK]
   "privacy.other.body": "Usamos Mapbox para mostrar el mapa. Cargarlo comparte tu dirección IP con Mapbox, y si pides indicaciones para caminar, también tu ubicación. Usamos Cloudflare Turnstile en nuestros formularios y en los registros de cajas para bloquear spam; revisa cierta información sobre tu dispositivo y navegador.", // [CHECK]
-  "privacy.analytics": "Usamos PostHog y Cloudflare Web Analytics para ver cómo la gente usa el mapa: qué páginas se ven, los toques en el mapa y sus filtros, las palabras que la gente busca (solo se revisan las búsquedas usadas con frecuencia, nunca una búsqueda individual, esto nos ayuda a encontrar lugares que nos faltan), y una grabación de la actividad en pantalla para ayudarnos a mejorar el sitio. Lo que escribas siempre queda oculto en esa grabación. Ningún servicio usa cookies ni guarda nada en tu dispositivo, y tu dirección IP exacta se descarta antes de usarse para cualquier cosa. Nunca vemos lo que escribes en un formulario, tu ubicación exacta, ni quién eres.", // [CHECK]
+  "privacy.analytics": "Usamos PostHog y Cloudflare Web Analytics para ver cómo la gente usa el mapa: qué páginas se ven, los toques en el mapa y sus filtros, las palabras que la gente busca (solo se revisan las búsquedas usadas con frecuencia, nunca una búsqueda individual, así podemos encontrar lugares que nos faltan), los errores que hacen fallar la página, y una grabación de la actividad en pantalla para ayudarnos a mejorar el sitio. Lo que escribas siempre queda oculto en esa grabación. PostHog guarda un número al azar en tu navegador hasta que cierras la pestaña, para saber qué páginas fueron una sola visita, y una nota de sí o no que dice si este navegador ya nos visitó antes. Ninguno de los dos guarda tu nombre ni nada sobre ti, y ninguno es una cookie. Tu dirección IP se usa solo para saber tu ciudad, y luego se descarta. Si compartes tu ubicación, solo registramos qué tan lejos está el lugar abierto más cercano, nunca dónde estás. Nunca vemos lo que escribes en un formulario ni quién eres.", // [CHECK]
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
   "directions.walk": "Caminar",
@@ -797,6 +885,9 @@ const es: Record<string, string> = {
   "summary.snap": "Acepta SNAP/EBT.", // [CHECK]
   "summary.wic": "Acepta WIC.", // [CHECK]
   "summary.snapAndWic": "Acepta SNAP/EBT y WIC.", // [CHECK]
+  "summary.title.acceptsSnap": "Acepta SNAP/EBT", // [CHECK]
+  "summary.meta.snap": "{name} acepta SNAP/EBT.", // [CHECK]
+  "summary.meta.snapAndWic": "{name} acepta SNAP/EBT y WIC.", // [CHECK]
   "summary.lastVerified": "Última verificación: {month}.", // [CHECK]
   "summary.and": "y", // [CHECK]
   "summary.title.in": "en", // [CHECK]

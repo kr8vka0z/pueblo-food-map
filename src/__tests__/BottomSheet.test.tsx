@@ -29,7 +29,7 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import BottomSheet from "@/components/BottomSheet";
 import type { Venue } from "@/types/venue";
@@ -160,7 +160,7 @@ describe("BottomSheet — summary always visible (collapsed)", () => {
     // so exclude that match and require exactly one visible badge.
     const visible = screen
       .getAllByText(/Food pantry/i)
-      .filter((el) => !el.closest('[data-testid="vaul-description"]'));
+      .filter((el) => !el.closest('[data-testid="vaul-description"], p.sr-only'));
     expect(visible).toHaveLength(1);
   });
 });
@@ -188,25 +188,26 @@ describe("BottomSheet — grab bar collapsed state (#666)", () => {
 });
 
 describe("BottomSheet — grab bar expand / collapse toggle (#666)", () => {
-  test("tapping the grab bar reveals phone number and flips aria-expanded", async () => {
+  test("tapping the grab bar reveals the details and flips aria-expanded", async () => {
     const user = userEvent.setup();
     render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
     const bar = screen.getByRole("button", { name: /show details/i });
     await user.click(bar);
     expect(bar.getAttribute("aria-expanded")).toBe("true");
     expect(bar.getAttribute("aria-label")).toMatch(/hide details/i);
-    expect(screen.getByText("(719) 555-0122")).toBeDefined();
+    // #917: the phone line left the details; the address is still in them.
+    expect(screen.getByText("123 Main St, Pueblo, CO 81003")).toBeDefined();
   });
 
-  test("revealed phone number is an underlined, green, 44px tel: link (option A, 2026-09-23)", async () => {
-    const user = userEvent.setup();
+  // #917 R4: the number moved from a line in CONTACT to the Call button at
+  // the top of the card, so it can be called without opening the details.
+  test("the phone number is the Call button in the action row, a tel: link above the fold", () => {
     render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
-    await user.click(screen.getByRole("button", { name: /show details/i }));
-    const link = screen.getByRole("link", { name: /555-0122/ });
+    const link = screen.getByRole("link", { name: "Call (719) 555-0122" });
     expect(link.getAttribute("href")).toBe("tel:(719) 555-0122");
-    expect(link.className.split(/\s+/)).toEqual(
-      expect.arrayContaining(["underline", "text-[var(--color-sage-700)]", "min-h-11"]),
-    );
+    const bar = screen.getByRole("button", { name: /show details/i });
+    const details = document.getElementById(bar.getAttribute("aria-controls")!)!;
+    expect(details.contains(link)).toBe(false);
   });
 
   test("collapsed detail content is inert (not tabbable or announced) until expanded (#683 review)", async () => {
@@ -241,19 +242,6 @@ describe("BottomSheet — grab bar expand / collapse toggle (#666)", () => {
     expect(bar.getAttribute("aria-expanded")).toBe("true");
   });
 
-  test("swiping the bar up expands; swiping it down while expanded collapses", () => {
-    render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
-    const bar = screen.getByRole("button", { name: /show details/i });
-    // Swipe up (clientY decreases) past the 30px threshold.
-    fireEvent.pointerDown(bar, { clientY: 200 });
-    fireEvent.pointerUp(bar, { clientY: 150 });
-    expect(bar.getAttribute("aria-expanded")).toBe("true");
-    // Swipe down (clientY increases) past the threshold collapses it back.
-    fireEvent.pointerDown(bar, { clientY: 150 });
-    fireEvent.pointerUp(bar, { clientY: 200 });
-    expect(bar.getAttribute("aria-expanded")).toBe("false");
-  });
-
   test("a small movement under the swipe threshold does not toggle on its own", () => {
     render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
     const bar = screen.getByRole("button", { name: /show details/i });
@@ -263,118 +251,22 @@ describe("BottomSheet — grab bar expand / collapse toggle (#666)", () => {
   });
 });
 
-// ─── Whole-card swipe-up + swipe-down-collapse-vs-close (follow-up to #666) ──
-// Kyle's original ask was "swipe up on the card", not only the bar, and a
-// swipe down on the EXPANDED card should collapse before it closes. These
-// tests exercise the two different mechanisms BottomSheet.tsx uses (see its
-// own header comment on `dismissDragActive` for the full vaul-source
-// citation): swipe-up is our own recognizer on Drawer.Content; swipe-down-
-// while-expanded is vaul's own `onDrag`/`onRelease`/`onOpenChange` hooks,
-// captured here via `vaulRootProps` rather than reimplemented.
-describe("BottomSheet — swipe up anywhere on the collapsed card expands it", () => {
-  test("swiping up on the card body (not the bar) expands", () => {
-    render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
-    const bar = screen.getByRole("button", { name: /show details/i });
-    const content = screen.getByTestId("vaul-content");
-    fireEvent.pointerDown(content, { clientY: 300 });
-    fireEvent.pointerUp(content, { clientY: 250 });
-    expect(bar.getAttribute("aria-expanded")).toBe("true");
-  });
-
-  test("swiping up starting on a button/link does not expand (Kyle's 'outside buttons/links')", () => {
-    render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
-    const bar = screen.getByRole("button", { name: /show details/i });
-    const closeButton = screen.getByRole("button", { name: "Close" });
-    fireEvent.pointerDown(closeButton, { clientY: 300 });
-    fireEvent.pointerUp(closeButton, { clientY: 250 });
-    expect(bar.getAttribute("aria-expanded")).toBe("false");
-  });
-
-  test("a pointercancel (native scroll taking over) clears the gesture — no expand on the eventual pointerup elsewhere", () => {
-    render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
-    const bar = screen.getByRole("button", { name: /show details/i });
-    const content = screen.getByTestId("vaul-content");
-    fireEvent.pointerDown(content, { clientY: 300 });
-    fireEvent.pointerCancel(content);
-    fireEvent.pointerUp(content, { clientY: 250 });
-    expect(bar.getAttribute("aria-expanded")).toBe("false");
-  });
-});
-
-describe("BottomSheet — swipe down while expanded collapses instead of closing", () => {
-  test("a vaul drag-dismiss while expanded collapses the card and does NOT call onClose", () => {
-    const onClose = vi.fn();
-    render(<BottomSheet venue={makeVenue()} onClose={onClose} />);
-    const bar = screen.getByRole("button", { name: /show details/i });
-    fireEvent.click(bar); // expand
-    expect(bar.getAttribute("aria-expanded")).toBe("true");
-
-    // Simulate vaul engaging a real drag (its own onDrag prop), then
-    // deciding to dismiss (its own onOpenChange(false)) — exactly the two
-    // calls vaul's source makes, in that order, for a real drag-dismiss.
-    const onDrag = vaulRootProps.current.onDrag as (...args: unknown[]) => void;
-    const onOpenChange = vaulRootProps.current.onOpenChange as (open: boolean) => void;
-    act(() => {
-      onDrag();
-      onOpenChange(false);
-    });
-
-    expect(onClose).not.toHaveBeenCalled();
-    expect(bar.getAttribute("aria-expanded")).toBe("false");
-  });
-
-  test("vaul's onRelease(event, false) after a vetoed dismiss clears the leftover drag transform", () => {
-    render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
-    const bar = screen.getByRole("button", { name: /show details/i });
-    fireEvent.click(bar);
-
-    const content = screen.getByTestId("vaul-content") as HTMLDivElement;
-    // Simulate vaul's live drag having left an inline transform (exactly
-    // what vaul's own onDrag does to the DOM node during a real drag).
-    content.style.transition = "none";
-    content.style.transform = "translate3d(0, 240px, 0)";
-
-    const onDrag = vaulRootProps.current.onDrag as (...args: unknown[]) => void;
-    const onOpenChange = vaulRootProps.current.onOpenChange as (open: boolean) => void;
-    const onRelease = vaulRootProps.current.onRelease as (event: unknown, open: boolean) => void;
-    act(() => {
-      onDrag();
-      onOpenChange(false);
-      onRelease({}, false);
-    });
-
-    expect(content.style.transform).toBe("");
-  });
-
-  test("Escape (no prior onDrag) still closes normally even while expanded — #527/#604 unchanged", () => {
+// ─── Drag (#882 vaul snap points; card mode is #923's native scroll sheet) ───
+// vaul runs the drag itself now (mocked here), so the swipe recognizers and
+// the expanded-dismiss veto these describes used to test are gone. What is
+// still ours: a mouse drag that ends on the bar must not also toggle it, and a
+// slow pull down from the collapsed card closes on release.
+// Swipes (slow pull to close, one step per swipe) are the native scroll
+// sheet's now: see BottomSheet.snap.test.tsx, which stubs the geometry they need.
+describe("BottomSheet — Escape", () => {
+  test("Escape still closes normally even while expanded — #527/#604 unchanged", () => {
     const onClose = vi.fn();
     render(<BottomSheet venue={makeVenue()} onClose={onClose} />);
     const bar = screen.getByRole("button", { name: /show details/i });
     fireEvent.click(bar);
     expect(bar.getAttribute("aria-expanded")).toBe("true");
 
-    // No onDrag call this time — mirrors Escape/scrim, which route straight
-    // to onOpenChange without ever touching vaul's onDrag prop.
-    const onOpenChange = vaulRootProps.current.onOpenChange as (open: boolean) => void;
-    act(() => {
-      onOpenChange(false);
-    });
-
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  test("a drag-dismiss while COLLAPSED still closes (only the second swipe-down, from expanded, is vetoed)", () => {
-    const onClose = vi.fn();
-    render(<BottomSheet venue={makeVenue()} onClose={onClose} />);
-    const bar = screen.getByRole("button", { name: /show details/i });
-    expect(bar.getAttribute("aria-expanded")).toBe("false");
-
-    const onDrag = vaulRootProps.current.onDrag as (...args: unknown[]) => void;
-    const onOpenChange = vaulRootProps.current.onOpenChange as (open: boolean) => void;
-    act(() => {
-      onDrag();
-      onOpenChange(false);
-    });
+    fireEvent.keyDown(document, { key: "Escape" });
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -548,7 +440,7 @@ describe("BottomSheet — analytics", () => {
     render(<BottomSheet venue={venue} onClose={() => {}} />);
     await user.click(screen.getByRole("button", { name: /show details/i }));
     await user.click(screen.getByRole("link", { name: /555-0122/ }));
-    expect(track).toHaveBeenCalledWith(EVENTS.CALL_CLICKED, { venueId: venue.id });
+    expect(track).toHaveBeenCalledWith(EVENTS.CALL_CLICKED, { venueId: venue.id, surface: "map" });
   });
 
   test("clicking the Plentiful website link fires website_clicked", async () => {
@@ -557,6 +449,6 @@ describe("BottomSheet — analytics", () => {
     render(<BottomSheet venue={venue} onClose={() => {}} />);
     await user.click(screen.getByRole("button", { name: /show details/i }));
     await user.click(screen.getByRole("link", { name: /plentiful/i }));
-    expect(track).toHaveBeenCalledWith(EVENTS.WEBSITE_CLICKED, { venueId: venue.id });
+    expect(track).toHaveBeenCalledWith(EVENTS.WEBSITE_CLICKED, { venueId: venue.id, surface: "map" });
   });
 });

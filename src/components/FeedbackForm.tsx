@@ -8,9 +8,8 @@
  * honeypot, validation focus, submit/success/error states and the shared
  * field markup live in PublicForm.tsx.
  *
- * Reads locale from useLocale() (#289) instead of a prop passed down from
- * /feedback's page.tsx — matches the rest of the codebase's client-side
- * locale pattern (SiteFooter, ListView, HamburgerMenu).
+ * Locale comes from PublicForm (its render prop and validate(locale)); this
+ * file holds only the three fields and their rules.
  */
 
 import { useState } from "react";

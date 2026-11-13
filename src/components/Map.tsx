@@ -30,6 +30,7 @@ import type { Venue } from "@/types/venue";
 import type { Locale } from "@/lib/i18n";
 import { prefersReducedMotion } from "@/lib/useMediaQuery";
 import { t } from "@/lib/i18n";
+import { track, EVENTS } from "@/lib/analytics";
 import VenueMarker from "@/components/VenueMarker";
 import EventLayer from "@/components/EventLayer";
 import type { PublicEvent } from "@/lib/events";
@@ -96,8 +97,8 @@ export interface WalkingRouteGeoJSON {
  * Distance + time text for the walking route.
  * Previously used for a map overlay pill; now consumed by DirectionButtons
  * in-card so the readout is visible on mobile (the overlay was hidden behind
- * the BottomSheet). Kept here as the canonical type; MapWrapper imports it
- * to type its walkingRouteInfo state.
+ * the BottomSheet). Kept here as the canonical type; useWalkingRoute.ts
+ * imports it for its `info` state.
  */
 export interface WalkingRouteInfo {
   distance: string; // e.g. "0.4 mi"
@@ -193,10 +194,10 @@ const COUNTY_BORDER_LAYER: LayerProps = {
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface MapProps {
-  venues: Venue[];
+  /** distanceMiles (from useMapFilters) feeds each marker's aria-label. */
+  venues: Array<Venue & { distanceMiles?: number }>;
   selectedVenueId: string | null;
   userLocation: { lat: number; lng: number } | null;
-  userDistances: Map<string, number>;
   onSelectVenue: (id: string) => void;
   /** Called once after the map loads. Receives the underlying mapboxgl.Map instance. */
   onMapReady?: (map: mapboxgl.Map) => void;
@@ -277,7 +278,6 @@ export default function Map({
   venues,
   selectedVenueId,
   userLocation,
-  userDistances,
   onSelectVenue,
   onMapReady,
   locale = "en",
@@ -351,12 +351,23 @@ export default function Map({
   const passiveFlownRef = useRef(false);
 
   // ── Selected-venue flyTo — 800ms, zoom 16, reduced-motion guard ───────────
+  //
+  // Once per selection (#894): MapWrapper rebuilds `venues` on every location
+  // refresh (distances change), and re-flying on each new array yanked the
+  // map off a walking turn back to the venue. `venues` stays a dependency so a
+  // deep-linked venue that arrives after the selection still gets its one fly.
+  const flownVenueIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (selectedVenueId === null) return;
+    if (selectedVenueId === null) {
+      flownVenueIdRef.current = null;
+      return;
+    }
+    if (flownVenueIdRef.current === selectedVenueId || !mapRef.current) return;
 
     const venue = venues.find((v) => v.id === selectedVenueId);
     if (!venue) return;
 
+    flownVenueIdRef.current = selectedVenueId;
     moveCamera(mapRef.current, { center: [venue.lng, venue.lat], zoom: 16 }, 800, prefersReducedMotion());
   }, [selectedVenueId, venues]);
 
@@ -439,8 +450,22 @@ export default function Map({
   );
 
   // ── moveend: notify MapWrapper so it can update drift detection (#108) ────
+  // map_moved (#919): one event once a visitor's pan or zoom settles. Mapbox
+  // sets `originalEvent` only on moves a person made, so flyTo/fitBounds (Near
+  // me, opening a card) never count. The 1 s wait folds a quick drag-then-
+  // pinch into one stop. Only the zoom level, rounded, leaves: never a
+  // coordinate.
+  const moveTrackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (moveTrackTimerRef.current) clearTimeout(moveTrackTimerRef.current);
+  }, []);
   const handleMoveEnd = useCallback(
-    (e: { target: mapboxgl.Map }) => {
+    (e: { target: mapboxgl.Map; originalEvent?: unknown }) => {
+      if (e.originalEvent) {
+        if (moveTrackTimerRef.current) clearTimeout(moveTrackTimerRef.current);
+        const zoom = Math.round(e.target.getZoom());
+        moveTrackTimerRef.current = setTimeout(() => void track(EVENTS.MAP_MOVED, { zoom }), 1000);
+      }
       if (!onMoveEnd) return;
       const bounds = e.target.getBounds();
       if (bounds) onMoveEnd(bounds);
@@ -531,7 +556,7 @@ export default function Map({
           key={venue.id}
           venue={venue}
           selected={venue.id === selectedVenueId}
-          distanceMiles={userDistances.get(venue.id)}
+          distanceMiles={venue.distanceMiles}
           onSelect={onSelectVenue}
           onHover={handleMarkerHover}
           onLeave={handleMarkerLeave}

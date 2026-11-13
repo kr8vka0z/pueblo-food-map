@@ -22,7 +22,7 @@
  * renders them) but only inside the FULL card — from the strip, reaching
  * them was "Show card" then "Show steps", two taps. "Steps" here opens them
  * directly as a sheet over the map, reusing DirectionButtons.tsx's own
- * `WalkStepsList` (same `<ol>` markup, not a second copy — see that
+ * `WalkStepper` (same markup as the card, not a second copy — see that
  * component's own header). Built as a native `<dialog>` + `showModal()`,
  * the same primitive PhotoViewer.tsx (#508) already established for this
  * repo's one other ad-hoc overlay — see that file's own header for why
@@ -304,7 +304,7 @@ export default function RouteStrip({
                   aria-label={t("detail.close", locale)}
                   className={
                     "flex h-9 w-9 shrink-0 items-center justify-center rounded-md " +
-                    "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
+                    "text-[var(--color-ink-500)] hover:bg-[var(--color-sage-100)] transition-colors " +
                     PRESS_FEEDBACK + " " +
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
                   }

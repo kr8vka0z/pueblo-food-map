@@ -21,12 +21,13 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
-import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
-import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { positiveInt } from "@/lib/positiveInt";
+import { readOptionalReason } from "@/lib/adminRequest";
+import { adminWriteAccess } from "@/lib/adminAuthErrors";
 import { loadBoxPhotoById, type BoxPhotoRow } from "@/lib/boxPhotos";
 import { bustEdgeCache } from "@/lib/edgeCache";
 import { logFormFailure } from "@/lib/logger";
-import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
+import { auditStatement } from "@/lib/auditLog";
 
 /** Reviewer-entered reason, capped generously — this is an internal admin note, not public-facing copy, so no i18n and no tight limit. */
 const MAX_REVIEW_REASON_LENGTH = 500;
@@ -35,32 +36,20 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  let access: AdminDbAccess;
-  try {
-    access = await authorizeAdminWrite(req.headers);
-  } catch (err) {
-    return adminAuthErrorResponse(err);
-  }
+  const access = await adminWriteAccess(req);
+  if (access instanceof Response) return access;
   const { db, identity } = access;
 
   const { id: rawId } = await params;
-  const photoId = Number(rawId);
-  if (!Number.isInteger(photoId) || photoId <= 0) {
+  const photoId = positiveInt(Number(rawId));
+  if (photoId === null) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
   // Defensive body parse — same "a bodyless POST must not throw" convention
   // ArchiveVenueButton's own route already established, since a reject can
   // reasonably be a plain button click with no reason typed.
-  let reviewReason: string | null = null;
-  try {
-    const body = (await req.json()) as { reason?: unknown };
-    if (typeof body?.reason === "string" && body.reason.trim() !== "") {
-      reviewReason = body.reason.trim().slice(0, MAX_REVIEW_REASON_LENGTH);
-    }
-  } catch {
-    // no body / not JSON — reason stays null, this is not an error
-  }
+  const reviewReason = await readOptionalReason(req, MAX_REVIEW_REASON_LENGTH);
 
   const existing = await loadBoxPhotoById(db, photoId);
   if (!existing) {
@@ -81,19 +70,14 @@ export async function POST(
       "UPDATE box_photos SET status = 'rejected', reviewed_by = ?, reviewed_at = ?, review_reason = ? WHERE id = ?",
     )
     .bind(identity.email, timestamp, reviewReason, photoId);
-  const insertAudit = db
-    .prepare(AUDIT_INSERT_VALUES_SQL)
-    .bind(
-      identity.email,
-      "box_photo",
-      String(photoId),
-      "update",
-      JSON.stringify(existing),
-      JSON.stringify(afterRow),
-      timestamp,
-      // #679: ties this action to the sign-in that made it (Activity log).
-      identity.sessionId ?? null,
-    );
+  const insertAudit = auditStatement(db, identity, {
+    entity: "box_photo",
+    entityId: String(photoId),
+    action: "update",
+    before: existing,
+    after: afterRow,
+    timestamp,
+  });
 
   await db.batch([updatePhoto, insertAudit]);
 

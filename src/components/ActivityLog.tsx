@@ -19,7 +19,7 @@ import {
   tagClass,
   type TagTone,
 } from "@/lib/adminCardStyles";
-import { ADMIN_PRIMARY_BUTTON, ADMIN_SECONDARY_BUTTON, inputBase, inputBorder, labelClass } from "@/components/formClasses";
+import { ADMIN_PRIMARY_BUTTON, inputBase, inputBorder, labelClass } from "@/components/formClasses";
 import {
   ACTIVITY_TYPES,
   describeDevice,
@@ -35,6 +35,7 @@ import {
   type ActivityItem,
   type AuthEventRow,
 } from "@/lib/activityLog";
+import { fieldLabel } from "@/lib/fieldLabels";
 
 /** Readable names for system actors (actor_email without an "@"). */
 const AUTOMATIC_ACTOR_LABELS: Record<string, string> = {
@@ -118,7 +119,7 @@ function ActionLine({ item }: { item: ActivityItem }) {
           <ul className="mt-1 space-y-0.5 text-sm text-[var(--color-ink-700)]">
             {summary.changes.map((c) => (
               <li key={c.field} className="break-words">
-                <span className="font-medium">{c.field}</span>: <span className="text-[var(--color-ink-500)]">{c.before}</span> →{" "}
+                <span className="font-medium">{fieldLabel(c.field)}</span>: <span className="text-[var(--color-ink-500)]">{c.before}</span> →{" "}
                 {c.after}
               </li>
             ))}
@@ -281,8 +282,9 @@ export default function ActivityLog({ days, filters, people, olderHref, filtered
           <button type="submit" className={`${ADMIN_PRIMARY_BUTTON} flex-1`}>
             Show activity
           </button>
-          <Link href="/admin/activity" className={ADMIN_SECONDARY_BUTTON}>
-            Reset
+          {/* Same name and size as the empty box's Clear filters: one job, one name (#926). */}
+          <Link href="/admin/activity" className={secondaryButtonClass}>
+            Clear filters
           </Link>
         </div>
       </form>

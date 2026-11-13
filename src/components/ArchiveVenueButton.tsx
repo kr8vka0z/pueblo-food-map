@@ -35,12 +35,18 @@ export interface ArchiveVenueButtonProps {
   /** When true, the venue is already archived — render an informational
    *  state instead of an actionable button (there is nothing to confirm). */
   alreadyArchived: boolean;
+  /** What the confirm promises. A blessing box is live (no Publish), so
+   *  archiving one takes it off the map at once (src/lib/blessingBoxes.ts:
+   *  the live box reads skip archived rows); a place waits for the next
+   *  publish. Defaults to "place". */
+  kind?: "place" | "box";
 }
 
 export default function ArchiveVenueButton({
   venueId,
   venueName,
   alreadyArchived,
+  kind = "place",
 }: ArchiveVenueButtonProps) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
@@ -72,7 +78,7 @@ export default function ArchiveVenueButton({
   }
 
   if (alreadyArchived) {
-    return <p className="text-sm text-[var(--color-ink-500)]">This venue is removed from the map.</p>;
+    return <p className="text-sm text-[var(--color-ink-500)]">This place is removed from the map.</p>;
   }
 
   return (
@@ -91,7 +97,9 @@ export default function ArchiveVenueButton({
           onConfirm={handleConfirm}
           onCancel={handleCancel}
         >
-          It will stop appearing on the next publish. Its record is kept, not deleted, and this can be reviewed later.
+          {kind === "box"
+            ? "It leaves the map right away. Its record is kept, not deleted, and this can be reviewed later."
+            : "It will stop appearing on the next publish. Its record is kept, not deleted, and this can be reviewed later."}
         </AdminConfirm>
       )}
     </div>

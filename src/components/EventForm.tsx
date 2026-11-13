@@ -29,8 +29,9 @@
  *
  * Status actions (#926 layout): the save row is Cancel (a link back to the
  * list, saves nothing, off while a save runs) beside Save draft / Publish on create and on a draft,
- * or beside Save changes otherwise. Cancel event (published only, reveals the
- * required cancel note there) and Archive event (asks on the page first,
+ * or beside Save changes otherwise. Cancel event (published only; a step,
+ * useAdminStep: it opens the required cancel note with Keep event first and
+ * the red Confirm cancel event second) and Archive event (asks on the page first,
  * AdminConfirm) sit apart in a Danger zone at the foot. The `updated_at` precondition (`expectedUpdatedAt`)
  * is refreshed from each successful save, so consecutive saves don't 409
  * against the admin's own previous save; a real 409 shows the server message
@@ -47,7 +48,7 @@
  * Spanish someone wrote is never overwritten. Nothing is saved by it.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
@@ -74,7 +75,7 @@ import {
   sectionTitleClass,
   tapLinkClass,
 } from "@/lib/adminCardStyles";
-import AdminConfirm, { useAdminConfirm } from "@/components/AdminConfirm";
+import AdminConfirm, { useAdminConfirm, useAdminStep } from "@/components/AdminConfirm";
 import AdminSegmented from "@/components/AdminSegmented";
 import EventFlyerField from "@/components/EventFlyerField";
 import type { PublicFlyer } from "@/lib/events";
@@ -162,9 +163,11 @@ interface TextFieldProps {
   hint?: string;
   type?: string;
   placeholder?: string;
+  /** Lets a step put focus in this box when it opens (the cancellation note). */
+  fieldRef?: React.Ref<HTMLTextAreaElement>;
 }
 
-function TextField({ id, label, value, onChange, max, error, required, multiline, lang, hint, type = "text", placeholder }: TextFieldProps) {
+function TextField({ id, label, value, onChange, max, error, required, multiline, lang, hint, type = "text", placeholder, fieldRef }: TextFieldProps) {
   const common = {
     id,
     value,
@@ -188,7 +191,7 @@ function TextField({ id, label, value, onChange, max, error, required, multiline
         )}
         {hint && <span className={hintClass}> {hint}</span>}
       </label>
-      {multiline ? <textarea rows={3} {...common} /> : <input type={type} {...common} />}
+      {multiline ? <textarea ref={fieldRef} rows={3} {...common} /> : <input type={type} {...common} />}
       {error && (
         <p id={`${id}-error`} role="alert" className={errorClass}>
           {error}
@@ -196,6 +199,22 @@ function TextField({ id, label, value, onChange, max, error, required, multiline
       )}
     </div>
   );
+}
+
+/**
+ * Puts focus in the first box marked wrong (aria-invalid) and scrolls it to
+ * the middle of the screen; when the only problem is a line with no box (the
+ * server's `_form` error), scrolls to that line instead.
+ * SHARED-GAP: the same helper sits in AddVenueForm.tsx; it belongs in one
+ * shared file (formClasses.ts holds only class strings today).
+ */
+function focusFirstProblem(form: HTMLFormElement | null) {
+  const target =
+    form?.querySelector<HTMLElement>('[aria-invalid="true"]') ?? form?.querySelector<HTMLElement>('[role="alert"]');
+  if (!target) return;
+  target.focus({ preventScroll: true });
+  // Optional call: jsdom has no scrollIntoView.
+  target.scrollIntoView?.({ block: "center" });
 }
 
 /** Client-side mirror of the server rules, for instant feedback only (the route re-checks everything). */
@@ -227,7 +246,23 @@ export default function EventForm({ venues, eventId, initialValues, status: init
   const [saved, setSaved] = useState<{ id: string } | null>(justSaved && eventId ? { id: eventId } : null);
   const [status, setStatus] = useState<EventStatus>(initialStatus ?? "draft");
   const [version, setVersion] = useState(expectedUpdatedAt);
-  const [cancelling, setCancelling] = useState(false);
+  // Cancel event is a step (#926): "Cancel event" stays mounted and hidden
+  // while it is open, focus goes to the English note box, and Keep event
+  // hands focus back to "Cancel event".
+  const {
+    open: cancelling,
+    openStep: openCancelStep,
+    closeStep: closeCancelStep,
+    triggerRef: cancelEventRef,
+    fieldRef: cancelNoteRef,
+  } = useAdminStep();
+  // #926: after a Save with problems, focus (and so the scroll) goes to the
+  // first box marked wrong. Bumped on every refusal, so a second one moves focus again.
+  const formRef = useRef<HTMLFormElement>(null);
+  const [errorFocusTick, setErrorFocusTick] = useState(0);
+  useEffect(() => {
+    if (errorFocusTick > 0) focusFirstProblem(formRef.current);
+  }, [errorFocusTick]);
   // Shown inside the archive confirm, so a failure is seen where the admin pressed (a conflict goes to the top box, with Reload, instead).
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const { asking: askingArchive, ask: askArchive, cancel: cancelArchive, triggerRef: archiveRef } = useAdminConfirm();
@@ -289,6 +324,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
     const clientErrors = validateClient(values, action === "cancel");
     if (Object.keys(clientErrors).length > 0) {
       setErrors(clientErrors);
+      setErrorFocusTick((n) => n + 1);
       return;
     }
     setErrors({});
@@ -322,6 +358,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       });
       if (res.status === 422) {
         setErrors(((await res.json()) as { errors: FieldErrors }).errors);
+        setErrorFocusTick((n) => n + 1);
       } else if (res.status === 200 || res.status === 201) {
         const data = (await res.json()) as { id?: string; status: EventStatus; updated_at: string };
         if (!isEdit && data.id) {
@@ -330,7 +367,8 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         }
         setStatus(data.status);
         setVersion(data.updated_at);
-        setCancelling(false);
+        // Any successful save closes the cancel step, as before.
+        if (cancelling) closeCancelStep();
         setSaved({ id: eventId as string });
       } else {
         const data = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
@@ -428,23 +466,47 @@ export default function EventForm({ venues, eventId, initialValues, status: init
   // Publish then) and on a draft; otherwise the save button stands alone.
   const hasPublish = isEdit ? status === "draft" : !submissionId;
 
+  // The place's problem line sits directly under the red-edged box it is
+  // about (#926), so each place mode renders it right after its own box.
+  const placeError = errors.place ? (
+    <p id="event-place-error" role="alert" className={errorClass}>
+      {errors.place}
+    </p>
+  ) : null;
+
+  // Closes the cancel step without sending anything: the half-typed note and
+  // its error go too, so a reopened step starts clean.
+  function keepEvent() {
+    setValues((p) => ({ ...p, cancelNote: "", cancelNoteEs: "" }));
+    setErrors((p) => ({ ...p, cancel_note: undefined, cancel_note_es: undefined }));
+    closeCancelStep();
+  }
+
   const cancelNoteFields = (
     <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] p-4">
       <legend className={`${labelClass} px-1`}>Cancellation note</legend>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <TextField id="event-cancel-note" multiline required label="Note (English)" value={values.cancelNote} onChange={(v) => set("cancelNote", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note} />
+        <TextField id="event-cancel-note" multiline required label="Note (English)" value={values.cancelNote} onChange={(v) => set("cancelNote", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note} fieldRef={cancelling ? cancelNoteRef : undefined} />
         <TextField id="event-cancel-note-es" multiline lang="es" label="Note (Spanish)" value={values.cancelNoteEs} onChange={(v) => set("cancelNoteEs", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note_es} />
       </div>
+      {/* #926 decision 8: the safe button first, then the red one. "Keep event",
+          not "Cancel": this form already has a Cancel that leaves the page. */}
       {cancelling && (
-        <button type="button" disabled={busy} onClick={() => void send("cancel")} className={`mt-3 ${dangerButtonClass}`}>
-          {busy ? "Cancelling…" : "Confirm cancel event"}
-        </button>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" disabled={busy} onClick={keepEvent} className={secondaryButtonClass}>
+            Keep event
+          </button>
+          <button type="button" disabled={busy} onClick={() => void send("cancel")} className={dangerButtonClass}>
+            {busy ? "Cancelling…" : "Confirm cancel event"}
+          </button>
+        </div>
       )}
     </fieldset>
   );
 
   return (
     <form
+      ref={formRef}
       onSubmit={(e) => {
         e.preventDefault();
         void send(isEdit ? "save" : "save_draft");
@@ -541,7 +603,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         {placeMode === "venue" ? (
           <div>
             {values.venueId ? (
-              <div className="flex items-start justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white p-3">
+              <div className={`flex items-start justify-between gap-3 bg-white ${fieldGroupClass}`}>
                 <p className="text-sm text-[var(--color-ink-700)]">
                   <span className="font-medium text-[var(--color-ink-900)]">{pickedVenue?.name ?? "Selected place"}</span>
                   <br />
@@ -565,6 +627,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
                   aria-describedby={errors.place ? "event-place-error" : undefined}
                   className={`${inputBase} ${inputBorder(!!errors.place)}`}
                 />
+                {placeError}
                 {matches.length > 0 && (
                   <ul className="mt-2 space-y-1.5">
                     {matches.map((m) => (
@@ -603,12 +666,28 @@ export default function EventForm({ venues, eventId, initialValues, status: init
                 aria-describedby={errors.place ? "event-place-error" : undefined}
                 className={`${inputBase} ${inputBorder(!!errors.place)}`}
               />
+              {placeError}
             </div>
-            <button type="button" onClick={() => void findLocation()} disabled={!values.address.trim() || geo.state === "loading"} className={secondaryButtonClass}>
-              {geo.state === "loading" ? "Looking up…" : "Find location from address"}
+            <button
+              type="button"
+              onClick={() => void findLocation()}
+              disabled={!values.address.trim() || geo.state === "loading"}
+              className={`${secondaryButtonClass} whitespace-nowrap`}
+            >
+              {/* Both words in one grid cell, so the button keeps its width while
+                  "Looking up…" shows; the unseen one is aria-hidden. */}
+              <span className="grid">
+                <span aria-hidden={geo.state === "loading" || undefined} className={`[grid-area:1/1] ${geo.state === "loading" ? "invisible" : ""}`}>
+                  Find location from address
+                </span>
+                <span aria-hidden={geo.state !== "loading" || undefined} className={`[grid-area:1/1] ${geo.state === "loading" ? "" : "invisible"}`}>
+                  Looking up…
+                </span>
+              </span>
             </button>
+            {/* "Looking up…" shows once, in the button; mounted while empty so the result is still announced. */}
             {geo.message && (
-              <p aria-live="polite" className="text-sm text-[var(--color-ink-500)]">{geo.message}</p>
+              <p aria-live="polite" className="text-sm text-[var(--color-ink-500)]">{geo.state === "loading" ? "" : geo.message}</p>
             )}
             {values.lat !== "" && values.lng !== "" && geo.state !== "found" && (
               <p className="text-sm text-[var(--color-sage-600)]">Location set.</p>
@@ -630,11 +709,8 @@ export default function EventForm({ venues, eventId, initialValues, status: init
             )}
           </div>
         )}
-        {errors.place && (
-          <p id="event-place-error" role="alert" className={errorClass}>
-            {errors.place}
-          </p>
-        )}
+        {/* Only when there is no box to sit under (a place is already chosen). */}
+        {placeMode === "venue" && values.venueId && placeError}
         <div className="mt-4">
           <TextField
             id="event-venue-name"
@@ -710,11 +786,14 @@ export default function EventForm({ venues, eventId, initialValues, status: init
           Cancel
         </Link>
         {hasPublish ? (
+          // WHY 8 px sides (px-2!, important so it wins over the shared
+          // px-4) and nowrap: at 360 each of these two is 103 wide, and with
+          // 16 px sides "Save draft" broke onto two lines. 87 of room holds it.
           <div className="grid grid-cols-2 gap-2">
-            <button type="submit" disabled={busy} className={`${ADMIN_SECONDARY_BUTTON} w-full`}>
+            <button type="submit" disabled={busy} className={`${ADMIN_SECONDARY_BUTTON} w-full whitespace-nowrap px-2!`}>
               {busy ? "Saving…" : "Save draft"}
             </button>
-            <button type="button" disabled={busy} onClick={() => void send("publish")} className={`${ADMIN_PRIMARY_BUTTON} w-full`}>
+            <button type="button" disabled={busy} onClick={() => void send("publish")} className={`${ADMIN_PRIMARY_BUTTON} w-full whitespace-nowrap px-2!`}>
               Publish
             </button>
           </div>
@@ -732,8 +811,16 @@ export default function EventForm({ venues, eventId, initialValues, status: init
           <h3 id="event-danger-zone" className={sectionTitleClass}>
             Danger zone
           </h3>
-          {status === "published" && !cancelling && (
-            <button type="button" disabled={busy} onClick={() => setCancelling(true)} className={dangerButtonClass}>
+          {/* Kept mounted (hidden) while the step is open, so Keep event can hand focus back. */}
+          {status === "published" && (
+            <button
+              ref={cancelEventRef}
+              type="button"
+              hidden={cancelling}
+              disabled={busy}
+              onClick={openCancelStep}
+              className={dangerButtonClass}
+            >
               Cancel event
             </button>
           )}

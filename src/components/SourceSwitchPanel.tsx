@@ -11,7 +11,8 @@
  */
 
 import { useEffect, useState } from "react";
-import { fieldLabel, SOURCE_BADGE } from "@/components/ProposalCard";
+import { SOURCE_BADGE } from "@/components/ProposalCard";
+import { fieldLabel } from "@/lib/fieldLabels";
 import type { ProposalSourceValue } from "@/lib/adminProposals";
 import { SWITCH_THRESHOLD, type SwitchState } from "@/lib/sourceSwitch";
 import { cardSlimClass, groupTitleClass, tagClass } from "@/lib/adminCardStyles";
@@ -21,13 +22,15 @@ export function SourceSwitchList({ states }: { states: SwitchState[] | null }) {
   const bySource = new Map<string, SwitchState[]>();
   for (const s of states) bySource.set(s.source, [...(bySource.get(s.source) ?? []), s]);
   return (
-    <div className={cardSlimClass}>
+    // Each source is its own block, 12 apart with a hairline between, its
+    // heading 8 above its list, so two sources never run together (#926).
+    <div className={`${cardSlimClass} flex flex-col divide-y divide-[var(--color-bone-200)]`}>
       {[...bySource].map(([source, pairs]) => (
-        <div key={source} className="text-sm">
+        <div key={source} className="py-3 text-sm first:pt-0 last:pb-0">
           <p className={groupTitleClass}>
             {SOURCE_BADGE[source as ProposalSourceValue]?.label ?? source}: switches on after {SWITCH_THRESHOLD} approvals in a row
           </p>
-          <ul className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[var(--color-ink-500)]">
+          <ul className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[var(--color-ink-500)]">
             {pairs.map((p) => (
               // A pair that runs by itself shows as a calm tag.
               <li key={p.field} className={p.on ? tagClass("calm") : undefined}>

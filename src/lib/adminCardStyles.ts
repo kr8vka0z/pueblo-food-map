@@ -29,7 +29,8 @@
  *   tableWrapClass                 the scroll box around a table (scrolls sideways inside, never the page)
  *   tableHeadRowClass              a table's heading row: 11 px ink 400 capitals over a bone 200 line
  *   tableRowClass                  a table body row: a bone 200 line under it
- *   tableLinkRowClass              the same row tinted sage 100 under the pointer: only a row that links somewhere
+ *   tableLinkRowClass              the same row tinted sage 100 under the pointer, pointer cursor: only a row that
+ *                                  links somewhere, with onClick={openRowLink} (src/lib/rowLinkClick.ts)
  *   tableCellClass                 a td: 12 by 16
  *   tableHeadCellClass             a th: the same, medium weight
  *   fieldLabelClass                11 px capitals label inside cards
@@ -38,7 +39,7 @@
  *   secondaryButtonClass           outline (bone 300 edge, ink 700 words), 48 tall
  *   dangerButtonClass              red outline, fills red under the pointer, rings red, 48 tall
  *   pickerOptionClass              a full-width, left-aligned outline option in a picker list (a place or address match)
- *   linkClass                      inline link (in a sentence or a table cell)
+ *   linkClass                      inline link (in a sentence or a table cell), sage 100 under the pointer
  *   bannerLinkClass                linkClass without its colour: takes the banner's own (Publish bot banner)
  *   tapLinkClass                   standalone link with a 48 tall tap area
  *   tagClass(tone)                 round tag; tone "calm" | "attention" | "quiet" | "neutral" | "caution" | "danger"
@@ -106,23 +107,31 @@ export const failureLineClass = "text-sm text-[var(--color-danger)]";
 // "Loading…" while a page or a list reloads.
 export const loadingLineClass = "text-sm text-[var(--color-ink-400)] motion-safe:animate-pulse";
 
-// The design page's "Nothing matches" box: flat (no shadow), 48 by 16.
+// The design page's "Nothing matches" box, 48 by 16. Lifted like the cards
+// around it (#926 decision 14), so it does not read as a different kind of box.
 export const emptyStateClass =
-  "flex flex-col items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-12 " +
+  "elevation-1 flex flex-col items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-12 " +
   "text-center text-sm text-[var(--color-ink-500)]";
 
+// WHY relative: an absolutely positioned child (an sr-only column heading)
+// is placed against its nearest positioned ancestor. Without one here it
+// escaped the scroll box and widened the whole page on a phone (Events, 360).
 export const tableWrapClass =
-  "elevation-1 overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white";
+  "elevation-1 relative overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white";
 
 export const fieldLabelClass = "text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-400)]";
 export const controlLabelClass = fieldLabelClass + " mb-1 block";
 
 export const tableHeadRowClass = "border-b border-[var(--color-bone-200)] " + fieldLabelClass;
 export const tableRowClass = "border-b border-[var(--color-bone-200)] last:border-b-0";
-export const tableLinkRowClass = tableRowClass + " transition-colors duration-150 hover:bg-[var(--color-sage-100)]";
+// cursor-pointer: the whole row opens its link (src/lib/rowLinkClick.ts).
+export const tableLinkRowClass =
+  tableRowClass + " cursor-pointer transition-colors duration-150 hover:bg-[var(--color-sage-100)]";
 export const tableCellClass = "px-4 py-3";
 // font-medium on the th itself: a browser draws th bold by default.
-export const tableHeadCellClass = tableCellClass + " font-medium";
+// whitespace-nowrap: a column heading stays on one line; the table scrolls
+// inside tableWrapClass instead.
+export const tableHeadCellClass = tableCellClass + " whitespace-nowrap font-medium";
 
 // Shared by the three buttons: one height, centred words that may wrap on a
 // narrow phone, the press dim, and the disabled look.
@@ -161,9 +170,14 @@ export const pickerOptionClass =
   " " +
   focusRingClass;
 
-export const bannerLinkClass = "rounded-[var(--radius-sm)] font-medium underline underline-offset-2 " + focusRingClass;
+// box-decoration-clone: a link that wraps draws its ring and hover tint
+// whole on every line, not in ragged pieces.
+export const bannerLinkClass =
+  "rounded-[var(--radius-sm)] font-medium underline underline-offset-2 box-decoration-clone " + focusRingClass;
 
-export const linkClass = bannerLinkClass + " text-[var(--color-sage-700)]";
+// The sage 100 tint under the pointer (#926 decision 1); sage 700 words on it stay readable.
+export const linkClass =
+  bannerLinkClass + " text-[var(--color-sage-700)] transition-colors duration-150 hover:bg-[var(--color-sage-100)]";
 
 export const tapLinkClass = "inline-flex min-h-12 items-center " + linkClass;
 

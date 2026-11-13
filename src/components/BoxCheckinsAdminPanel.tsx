@@ -34,7 +34,9 @@ interface BoxCheckinsAdminPanelProps {
   checkins: AdminCheckinRow[];
 }
 
-const KIND_LABEL: Record<AdminCheckinRow["kind"], string> = {
+// Exported: the photo card on the same page names a photo's check-in with
+// these same words (PhotoReviewCard.tsx), so the two never disagree.
+export const KIND_LABEL: Record<AdminCheckinRow["kind"], string> = {
   filled: "Filled",
   took: "Used the box",
   low: "Running low",
@@ -118,13 +120,18 @@ export default function BoxCheckinsAdminPanel({ checkins }: BoxCheckinsAdminPane
                 </p>
               )}
             </div>
+            {/* WHY aria-disabled, not disabled: a natively disabled button
+                drops keyboard focus to the top of the page; this one keeps
+                it, and the click is ignored while its request runs. */}
             <button
               id={buttonId}
               type="button"
               aria-labelledby={`${buttonId} ${kindId} ${dateId}`}
-              onClick={() => toggleVisibility(row)}
-              disabled={pendingId === row.id}
-              className={`${secondaryButtonClass} shrink-0`}
+              onClick={() => {
+                if (pendingId !== row.id) void toggleVisibility(row);
+              }}
+              aria-disabled={pendingId === row.id || undefined}
+              className={`${secondaryButtonClass} shrink-0 aria-disabled:cursor-not-allowed aria-disabled:opacity-50`}
             >
               {pendingId === row.id ? "Saving…" : row.visibility === "visible" ? "Hide" : "Unhide"}
             </button>

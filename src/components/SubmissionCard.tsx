@@ -95,16 +95,23 @@ type ActionState = { status: "idle" } | { status: "submitting" } | { status: "er
 
 export default function SubmissionCard({ submission }: SubmissionCardProps) {
   const router = useRouter();
-  // Focus goes to the reason box on open and back to the button on Cancel (#926).
-  const { open: rejectOpen, openStep: openReject, closeStep: closeReject, triggerRef: rejectRef, fieldRef: reasonRef } =
-    useAdminStep();
   const [reason, setReason] = useState("");
   const [rejectState, setRejectState] = useState<ActionState>({ status: "idle" });
+  // Focus goes to the reason box on open and back to the button on Cancel
+  // (#926); Escape does what Cancel does, except while the reject is being sent.
+  const { open: rejectOpen, openStep: openReject, closeStep: closeReject, triggerRef: rejectRef, fieldRef: reasonRef } =
+    useAdminStep({ busy: rejectState.status === "submitting", onCancel: cancelReject });
   const [doneState, setDoneState] = useState<ActionState>({ status: "idle" });
 
   const badge = KIND_BADGE[submission.kind];
   const reasonFieldId = `reject-reason-${submission.id}`;
   const rejectFailMessage = `This ${submission.kind === "new_venue" ? "suggestion" : "report"} was not rejected. Try again.`;
+
+  function cancelReject() {
+    setReason("");
+    setRejectState({ status: "idle" });
+    closeReject();
+  }
 
   async function handleConfirmReject() {
     setRejectState({ status: "submitting" });
@@ -205,11 +212,7 @@ export default function SubmissionCard({ submission }: SubmissionCardProps) {
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => {
-                setReason("");
-                setRejectState({ status: "idle" });
-                closeReject();
-              }}
+              onClick={cancelReject}
               disabled={rejectState.status === "submitting"}
               className={secondaryButtonClass}
             >

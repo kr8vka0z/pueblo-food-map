@@ -219,11 +219,13 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
         </p>
       )}
 
-      {/* items-end: the two labels can wrap differently; keep the boxes level. */}
+      {/* items-end: the two labels can wrap differently; keep the boxes level.
+          "Read out by screen readers" lives in the line under the pair, so the
+          two labels are the same length and sit on one line each from 640. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
         <div>
           <label htmlFor="event-flyer-alt" className={labelClass}>
-            Describe the picture (English) <span className={hintClass}>for screen readers</span>
+            Describe the picture (English)
           </label>
           <input id="event-flyer-alt" type="text" value={alt} maxLength={200} onChange={(e) => setAlt(e.target.value)} className={inputClass} />
         </div>
@@ -235,7 +237,7 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
         </div>
       </div>
       <p className="text-xs text-[var(--color-ink-500)]">
-        If left blank, the event name is read out instead. Descriptions are saved with the picture or the Save description button, not the Save buttons below.
+        Screen readers read this description out. If left blank, the event name is read out instead. Descriptions are saved with the picture or the Save description button, not the Save buttons below.
       </p>
       {flyer && (
         <button

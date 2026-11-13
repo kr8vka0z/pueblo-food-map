@@ -37,6 +37,7 @@ import {
 } from "@/lib/adminCardStyles";
 import { inputBase, inputBorder } from "@/components/formClasses";
 import AdminSegmented from "@/components/AdminSegmented";
+import { openRowLink } from "@/lib/rowLinkClick";
 
 export interface AllBoxesTableProps {
   entries: BoxHealthEntry[];
@@ -310,6 +311,7 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
             options={SPONSOR_OPTIONS}
             value={sponsorFilter}
             onChange={(v) => setSponsorFilter(v === "has" || v === "needs" ? v : "any")}
+            fullWidth
           />
         </div>
         <div>
@@ -335,7 +337,7 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
         Showing {filtered.length} of {entries.length} boxes
       </p>
 
-      {/* Nothing matches: its own box, not a cell of the 560-wide table, so
+      {/* Nothing matches: its own box, not a cell of the 720-wide table, so
           the message and Clear filters are never cut off on a phone. */}
       {filtered.length === 0 ? (
         <div className={emptyStateClass}>
@@ -346,10 +348,14 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
         </div>
       ) : (
         <div className={tableWrapClass}>
-          <table className="w-full min-w-[560px] text-left text-sm">
+          {/* WHY these minimums: at 560 the Box column was squeezed to 103 px
+              on a phone and names wrapped to three or four lines. 240 (with
+              its 32 px padding) keeps a name to two lines; the table scrolls
+              sideways inside its box instead (#926). */}
+          <table className="w-full min-w-[720px] text-left text-sm">
             <thead>
               <tr className={tableHeadRowClass}>
-                <th scope="col" className={tableHeadCellClass}>
+                <th scope="col" className={`${tableHeadCellClass} min-w-[240px]`}>
                   Box
                 </th>
                 <th scope="col" className={tableHeadCellClass}>
@@ -371,12 +377,13 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
                 const badge = STATUS_BADGE[entry.health.status];
                 const review = reviewByVenueId[entry.venueId];
                 return (
-                  <tr key={entry.venueId} className={tableLinkRowClass}>
+                  <tr key={entry.venueId} className={tableLinkRowClass} onClick={openRowLink}>
                     <td className={tableCellClass}>
                       {/* Box name IS the edit link (#671, same "name = edit link"
                           change #672 made to the Places tab) — the separate
-                          trailing Edit column/link is gone. */}
-                      <Link href={`/admin/venues/${entry.venueId}/edit`} className={linkClass}>
+                          trailing Edit column/link is gone. A click anywhere
+                          on the row opens it too (src/lib/rowLinkClick.ts). */}
+                      <Link href={`/admin/venues/${entry.venueId}/edit`} data-row-link className={linkClass}>
                         {entry.name}
                       </Link>
                       <p className="text-xs text-[var(--color-ink-500)]">{entry.address}</p>

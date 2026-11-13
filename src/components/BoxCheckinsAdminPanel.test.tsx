@@ -179,6 +179,25 @@ describe("BoxCheckinsAdminPanel — toggling visibility", () => {
     await waitFor(() => expect(screen.getByText("The check-in was not hidden. Try again.")).toBeDefined());
   });
 
+  // #926: keyboard focus must not fall to the top of the page while Hide works.
+  test("the pressed button keeps focus while it works and after, and a second press sends nothing", async () => {
+    let resolve: (v: { status: number }) => void = () => {};
+    mockFetch.mockImplementationOnce(() => new Promise((r) => (resolve = r)));
+    const user = userEvent.setup();
+    render(<BoxCheckinsAdminPanel checkins={[makeRow({ id: 1 })]} />);
+
+    const button = screen.getByRole("button", { name: /^Hide / });
+    button.focus();
+    await user.keyboard("{Enter}");
+    expect(button).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    resolve({ status: 500 });
+    await waitFor(() => expect(screen.getByRole("alert")).toBeDefined());
+    expect(button).toHaveFocus();
+  });
+
   test("toggling one row's button does not disable a different row's button", async () => {
     mockFetch.mockImplementation(() => new Promise(() => {})); // never resolves
     const user = userEvent.setup();

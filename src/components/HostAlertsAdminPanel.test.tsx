@@ -104,4 +104,44 @@ describe("HostAlertsAdminPanel", () => {
     expect(url).toBe("/api/admin/blessing-boxes/box-1/host-alerts");
     expect(init.method).toBe("DELETE");
   });
+
+  // #926: no browser bubble; the box itself says what is wrong and takes focus, and nothing is sent.
+  test.each([
+    ["empty", ""],
+    ["not an email", "not-an-email"],
+  ])("Add host with an %s box sends nothing, marks the box and puts focus in it", async (_label, typed) => {
+    const user = userEvent.setup();
+    render(<HostAlertsAdminPanel venueId="box-1" initialHosts={[]} />);
+    const box = screen.getByLabelText("Add a host email");
+    if (typed) await user.type(box, typed);
+
+    await user.click(screen.getByRole("button", { name: "Add host" }));
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(box).toHaveAttribute("aria-invalid", "true");
+    expect(box).toHaveAccessibleDescription(/email address/);
+    expect(box).toHaveFocus();
+  });
+
+  // #926: focus never falls to the top of the page after a Remove.
+  test.each([
+    ["the next host's Remove", 0, "Remove b@example.com"],
+    ["the add box when no host follows", 1, null],
+  ])("after a Remove, focus goes to %s", async (_label, index, nextName) => {
+    const hosts = [
+      { id: 1, email: "a@example.com" },
+      { id: 2, email: "b@example.com" },
+    ];
+    const user = userEvent.setup();
+    const left = hosts.filter((_, i) => i !== index);
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, hosts: left }), { status: 200 }));
+    render(<HostAlertsAdminPanel venueId="box-1" initialHosts={hosts} />);
+
+    await user.click(screen.getByRole("button", { name: `Remove ${hosts[index].email}` }));
+
+    await waitFor(() => expect(screen.queryByText(hosts[index].email)).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(nextName ? screen.getByRole("button", { name: nextName }) : screen.getByLabelText("Add a host email")).toHaveFocus(),
+    );
+  });
 });

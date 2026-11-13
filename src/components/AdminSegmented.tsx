@@ -11,6 +11,9 @@
  *   options   { value, label }[], 2 or 3 of them
  *   value     the chosen value
  *   onChange  called with the newly chosen value
+ *   fullWidth optional; the track fills its container (equal segments)
+ *             instead of hugging its words, to line up with full-width
+ *             fields above and below it on a phone
  *
  * The look is LanguageToggle's (src/components/LanguageToggle.tsx): a bone
  * 200 track, here fully round; a sage 600 thumb behind the chosen word that
@@ -30,6 +33,7 @@ type AdminSegmentedProps = {
   options: { value: string; label: string }[];
   value: string;
   onChange: (value: string) => void;
+  fullWidth?: boolean;
 };
 
 // Full literals so Tailwind's scanner sees them: columns and thumb width by
@@ -47,7 +51,7 @@ const SEGMENT_CLASS =
   " has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--color-sage-500)] " +
   "has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-[var(--color-bone-200)] ";
 
-export default function AdminSegmented({ name, legend, options, value, onChange }: AdminSegmentedProps) {
+export default function AdminSegmented({ name, legend, options, value, onChange, fullWidth = false }: AdminSegmentedProps) {
   const n = options.length;
   const at = Math.max(
     0,
@@ -56,7 +60,13 @@ export default function AdminSegmented({ name, legend, options, value, onChange 
   return (
     <fieldset className="min-w-0">
       <legend className="sr-only">{legend}</legend>
-      <div className={"relative inline-grid rounded-full bg-[var(--color-bone-200)] p-1 " + (COLS[n] ?? "grid-flow-col")}>
+      <div
+        className={
+          "relative rounded-full bg-[var(--color-bone-200)] p-1 " +
+          (fullWidth ? "grid w-full " : "inline-grid ") +
+          (COLS[n] ?? "grid-flow-col")
+        }
+      >
         <span
           aria-hidden
           className={

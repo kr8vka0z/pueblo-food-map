@@ -36,7 +36,7 @@
  * Better Auth session this form creates (AGENTS.md "Admin authentication").
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/authClient";
@@ -101,6 +101,17 @@ export default function AdminLoginForm() {
 
   const router = useRouter();
   const hasPasskey = (passkeys?.length ?? 0) > 0;
+  // Focus only (#926): a problem moves focus to the box that has it, and
+  // "Use a different email" puts it in the email box once that step shows.
+  const emailRef = useRef<HTMLInputElement>(null);
+  const codeRef = useRef<HTMLInputElement>(null);
+  const focusEmailNext = useRef(false);
+  useEffect(() => {
+    if (formStatus === "idle" && focusEmailNext.current) {
+      focusEmailNext.current = false;
+      emailRef.current?.focus();
+    }
+  }, [formStatus]);
 
   // Signed in AND this account already has a passkey → nothing to do on this
   // page, go straight into the admin app. Covers both a passkey sign-in and
@@ -151,6 +162,7 @@ export default function AdminLoginForm() {
     const trimmed = email.trim();
     if (!EMAIL_RE.test(trimmed)) {
       setFieldError("Enter a valid email address.");
+      emailRef.current?.focus();
       return;
     }
     setFieldError(null);
@@ -184,6 +196,7 @@ export default function AdminLoginForm() {
     if (value.length !== CODE_LENGTH) {
       setCodeStatus("error");
       setCodeError(`Enter the ${CODE_LENGTH}-digit code from the email.`);
+      codeRef.current?.focus();
       return;
     }
     setCodeStatus("verifying");
@@ -193,6 +206,7 @@ export default function AdminLoginForm() {
       if (result?.error) {
         setCodeStatus("error");
         setCodeError(codeErrorMessage(result.error));
+        codeRef.current?.focus();
         return;
       }
       // Signed in: useSession() flips and the signed-in view takes over.
@@ -200,6 +214,7 @@ export default function AdminLoginForm() {
     } catch {
       setCodeStatus("error");
       setCodeError(codeErrorMessage(null));
+      codeRef.current?.focus();
     }
   }
 
@@ -311,6 +326,7 @@ export default function AdminLoginForm() {
               Sign-in code
             </label>
             <input
+              ref={codeRef}
               id="admin-login-code"
               type="text"
               inputMode="numeric"
@@ -335,18 +351,22 @@ export default function AdminLoginForm() {
               {codeStatus === "verifying" ? "Signing in…" : "Sign in"}
             </button>
           </form>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+          {/* WHY stacked at every width and tabular digits: side by side they
+              wrapped to two rows and jumped back to one as the countdown's
+              digits narrowed (the card moved 56 px). Stacked, neither moves. */}
+          <div className="mt-4 flex flex-col items-start gap-2">
             <button
               type="button"
               onClick={handleResend}
               disabled={resendIn > 0}
-              className={textButtonClass}
+              className={`${textButtonClass} tabular-nums`}
             >
               {resendIn > 0 ? `Resend code (${resendIn}s)` : "Resend code"}
             </button>
             <button
               type="button"
               onClick={() => {
+                focusEmailNext.current = true;
                 setFormStatus("idle");
                 setEmail("");
                 setCode("");
@@ -366,6 +386,7 @@ export default function AdminLoginForm() {
             Email
           </label>
           <input
+            ref={emailRef}
             id="admin-login-email"
             type="email"
             autoComplete="email webauthn"

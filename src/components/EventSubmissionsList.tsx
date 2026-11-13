@@ -60,56 +60,17 @@ function SubmissionCard({ item }: { item: PendingEventSubmission }) {
 
   return (
     <li className={cardClass}>
-      <div className="flex items-start gap-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row">
-          {item.hasFlyer && (
-            // eslint-disable-next-line @next/next/no-img-element -- a session-only admin route; next/image would need it as a remote pattern
-            <img
-              src={`/api/admin/event-submissions/${encodeURIComponent(item.id)}/flyer`}
-              alt={p ? `Flyer for ${p.name}` : "Flyer"}
-              className="h-auto w-full max-w-[160px] self-start rounded-[var(--radius-md)] border border-[var(--color-bone-200)]"
-            />
-          )}
-          <div className="min-w-0 flex-1 space-y-2 text-sm text-[var(--color-ink-700)]">
-            {p ? (
-              <>
-                <h4 id={nameId} className={cardNameClass}>
-                  {p.name}
-                </h4>
-                <p>Hosted by {p.host}</p>
-                <p>
-                  <span className="font-medium text-[var(--color-ink-900)]">{formatEventWhen(p.startsAt)}</span> to{" "}
-                  {formatEventWhen(p.endsAt)} (Pueblo time)
-                </p>
-                <p>
-                  {p.venueName && <span className="font-medium text-[var(--color-ink-900)]">{p.venueName}, </span>}
-                  {p.address}
-                </p>
-                <p className="whitespace-pre-line">{p.description}</p>
-                {p.whatToBring && (
-                  <p className="whitespace-pre-line">
-                    <span className={fieldLabelClass}>Bring </span>
-                    {p.whatToBring}
-                  </p>
-                )}
-                {p.linkUrl && (
-                  <p className="break-all">
-                    <span className={fieldLabelClass}>Link ({p.linkLabel}) </span>
-                    {p.linkUrl}
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="text-[var(--color-danger)]">This submission can&rsquo;t be read. Dismiss it.</p>
-            )}
-            {/* break-words: an unbroken email address must not push the card wider than a phone. */}
-            <p className="break-words text-[var(--color-ink-500)]">
-              Sent by {item.submitterName} &lt;{item.submitterEmail}&gt; on {formatEventWhen(item.createdAt)}
-            </p>
-          </div>
-        </div>
-        {p && (
-          // disabled: while one choice runs, the three-dot button itself is off.
+      {/* The name and the three-dot button share one header row (the name
+          wraps beside the button); everything under it uses the card's full
+          width, so the button no longer reserves a strip down the card (#926). */}
+      {p && (
+        <div className="flex items-start gap-3">
+          {/* py-3 centres the name's first 24 px line on the 48 px button and
+              leaves 12 px above the details, whether the name wraps or not. */}
+          <h4 id={nameId} className={`${cardNameClass} min-w-0 flex-1 py-3`}>
+            {p.name}
+          </h4>
+          {/* disabled: while one choice runs, the three-dot button itself is off. */}
           <AdminRowMenu
             labelledBy={nameId}
             disabled={busy}
@@ -118,7 +79,52 @@ function SubmissionCard({ item }: { item: PendingEventSubmission }) {
               { label: "Dismiss", onSelect: () => void act("dismiss"), danger: true },
             ]}
           />
+        </div>
+      )}
+      <div className="flex flex-col gap-4 sm:flex-row">
+        {item.hasFlyer && (
+          // eslint-disable-next-line @next/next/no-img-element -- a session-only admin route; next/image would need it as a remote pattern
+          <img
+            src={`/api/admin/event-submissions/${encodeURIComponent(item.id)}/flyer`}
+            alt={p ? `Flyer for ${p.name}` : "Flyer"}
+            className="h-auto w-full max-w-[160px] self-start rounded-[var(--radius-md)] border border-[var(--color-bone-200)]"
+          />
         )}
+        <div className="min-w-0 flex-1 space-y-2 text-sm text-[var(--color-ink-700)]">
+          {p ? (
+            <>
+              <p>Hosted by {p.host}</p>
+              <p>
+                <span className="font-medium text-[var(--color-ink-900)]">{formatEventWhen(p.startsAt)}</span> to{" "}
+                {formatEventWhen(p.endsAt)} (Pueblo time)
+              </p>
+              <p>
+                {p.venueName && <span className="font-medium text-[var(--color-ink-900)]">{p.venueName}, </span>}
+                {p.address}
+              </p>
+              <p className="whitespace-pre-line">{p.description}</p>
+              {p.whatToBring && (
+                <p className="whitespace-pre-line">
+                  <span className={fieldLabelClass}>Bring </span>
+                  {p.whatToBring}
+                </p>
+              )}
+              {p.linkUrl && (
+                <p>
+                  <span className={fieldLabelClass}>Link ({p.linkLabel}) </span>
+                  {/* A web address may wrap anywhere; the words beside it are not broken mid-word. */}
+                  <span className="[overflow-wrap:anywhere]">{p.linkUrl}</span>
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-[var(--color-danger)]">This submission can&rsquo;t be read. Dismiss it.</p>
+          )}
+          {/* overflow-wrap:anywhere: an unbroken email address must not push the card wider than a phone. */}
+          <p className="[overflow-wrap:anywhere] text-[var(--color-ink-500)]">
+            Sent by {item.submitterName} &lt;{item.submitterEmail}&gt; on {formatEventWhen(item.createdAt)}
+          </p>
+        </div>
       </div>
       {message && (
         <p role="alert" className={`mt-3 ${failureLineClass}`}>

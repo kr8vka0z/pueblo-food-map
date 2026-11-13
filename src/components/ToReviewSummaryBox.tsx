@@ -70,7 +70,10 @@ export default function ToReviewSummaryBox({ reviewRowCount, proposals, submissi
         .slice(0, BULK_APPROVE_MAX_IDS),
     [proposals],
   );
-  const allOrCount = dateOnlyIds.length < BULK_APPROVE_MAX_IDS ? `all ${dateOnlyIds.length}` : String(BULK_APPROVE_MAX_IDS);
+  // One update reads "Approve 1 date-only update", never "all 1 … updates".
+  const one = dateOnlyIds.length === 1;
+  const allOrCount = one ? "1" : dateOnlyIds.length < BULK_APPROVE_MAX_IDS ? `all ${dateOnlyIds.length}` : String(BULK_APPROVE_MAX_IDS);
+  const updatesWord = one ? "update" : "updates";
 
   if (reviewRowCount === 0) return null;
 
@@ -136,22 +139,22 @@ export default function ToReviewSummaryBox({ reviewRowCount, proposals, submissi
             disabled={submitting}
             className={primaryButtonClass}
           >
-            {`Approve ${allOrCount} date-only updates`}
+            {`Approve ${allOrCount} date-only ${updatesWord}`}
           </button>
         )}
       </div>
       {asking && dateOnlyIds.length > 0 && (
         <div className="mt-3">
           <AdminConfirm
-            title={`Approve ${allOrCount} date-only updates?`}
-            confirmLabel={`Approve ${dateOnlyIds.length} updates`}
+            title={`Approve ${allOrCount} date-only ${updatesWord}?`}
+            confirmLabel={`Approve ${dateOnlyIds.length} ${updatesWord}`}
             busyLabel="Approving…"
             tone="primary"
             busy={submitting}
             onConfirm={() => handleBulkApprove(dateOnlyIds)}
             onCancel={cancel}
           >
-            These only update the last-verified date. Real changes are not included.
+            {one ? "This only updates" : "These only update"} the last-verified date. Real changes are not included.
           </AdminConfirm>
         </div>
       )}

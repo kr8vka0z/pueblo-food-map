@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, test } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import ActivityLog from "@/components/ActivityLog";
 import { buildActivityDays, parseActivityFilters, type AuditActionRow, type AuthEventRow } from "@/lib/activityLog";
 
@@ -77,13 +77,15 @@ describe("ActivityLog", () => {
   });
 
   test("an empty page says so, and offers Clear filters only when a filter is set", () => {
+    // Scoped to the empty box: the filter form above it carries its own
+    // Clear filters at all times (#926 A16, renamed from Reset).
+    const emptyBox = () => screen.getByText("No activity matches these filters.").parentElement!;
     const { unmount } = render(<ActivityLog days={[]} filters={filters} people={[]} olderHref={null} />);
-    expect(screen.getByText("No activity matches these filters.")).toBeDefined();
-    expect(screen.queryByRole("link", { name: "Clear filters" })).toBeNull();
+    expect(within(emptyBox()).queryByRole("link", { name: "Clear filters" })).toBeNull();
     unmount();
 
     render(<ActivityLog days={[]} filters={{ ...filters, q: "pantry" }} people={[]} olderHref={null} filtered />);
-    expect(screen.getByRole("link", { name: "Clear filters" }).getAttribute("href")).toBe("/admin/activity");
+    expect(within(emptyBox()).getByRole("link", { name: "Clear filters" }).getAttribute("href")).toBe("/admin/activity");
   });
 
   test("labels both automatic refresh actors readably", () => {

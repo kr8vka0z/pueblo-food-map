@@ -30,10 +30,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** Opens the on-page confirm, then presses its own Approve button (the second press). */
+/** Opens the on-page confirm, then presses its own Approve button (the second press). Every caller has one date-only update, so the words are singular (#926 A19). */
 async function approveViaConfirm(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: /Approve all/i }));
-  await user.click(screen.getByRole("button", { name: /^Approve \d+ updates$/ }));
+  await user.click(screen.getByRole("button", { name: "Approve 1 date-only update" }));
+  await user.click(screen.getByRole("button", { name: "Approve 1 update" }));
 }
 
 /** The one shape POST /api/admin/proposals/approve-date-only ever bulk-approves. */
@@ -97,7 +97,7 @@ describe("ToReviewSummaryBox — summary line", () => {
 describe("ToReviewSummaryBox — bulk approve date-only updates", () => {
   test("no button when nothing pending is date-only", () => {
     render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeUpdateProposal()]} submissionCount={0} />);
-    expect(screen.queryByRole("button", { name: /Approve all/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /date-only/i })).toBeNull();
   });
 
   test("shows the button with the correct count when date-only proposals are present", () => {
@@ -119,13 +119,13 @@ describe("ToReviewSummaryBox — bulk approve date-only updates", () => {
     const user = userEvent.setup();
     render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeDateOnlyProposal()]} submissionCount={0} />);
 
-    await user.click(screen.getByRole("button", { name: /Approve all/i }));
+    await user.click(screen.getByRole("button", { name: "Approve 1 date-only update" }));
     expect(screen.getByText(/Real changes are not included/)).toBeDefined();
     expect(mockFetch).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(mockFetch).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: /Approve all/i })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Approve 1 date-only update" })).toHaveFocus();
   });
 
   test("confirming POSTs the exact date-only ids and refreshes on success", async () => {

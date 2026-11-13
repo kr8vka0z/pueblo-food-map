@@ -128,6 +128,11 @@ function formatPct(pct: number | null): string {
   return pct === null ? "—" : `${pct}%`;
 }
 
+/** "1 ask", "2 asks": a count with its word in the right number (#926). */
+function countOf(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
   const { period: rawPeriod } = await searchParams;
   const period: DashboardPeriod = parsePeriod(rawPeriod);
@@ -274,7 +279,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       label: "Box photos & sponsor requests",
       count: photos.length + adopters.length,
       href: "/admin/boxes?show=review",
-      detail: `${photos.length} photos, ${adopters.length} sponsor requests`,
+      detail: `${countOf(photos.length, "photo")}, ${countOf(adopters.length, "sponsor request")}`,
     },
     {
       key: "box-help",
@@ -369,9 +374,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 <DailyBars points={visitors.dailyVisitors.map((d) => ({ date: d.date, value: d.visits }))} emptyMessage="No visitor data yet for this period." />
               </div>
               <div>
-                <h4 className={groupTitleClass}>How people found the site</h4>
+                <h4 className={`${groupTitleClass} mb-1`}>How people found the site</h4>
                 <BarList
-                  items={visitors.referrers.map((r) => ({ label: r.label, value: r.visits, displayValue: `${r.visits} visits` }))}
+                  items={visitors.referrers.map((r) => ({ label: r.label, value: r.visits, displayValue: countOf(r.visits, "visit") }))}
                   emptyMessage="No referrer data yet for this period."
                 />
               </div>
@@ -405,7 +410,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 <KpiCard label="Place cards opened" displayValue={String(mapUsage.headline.cardsOpened)} value={mapUsage.headline.cardsOpened} previousValue={mapUsage.headline.previousCardsOpened} />
                 <KpiCard
                   label="Switched to Spanish"
-                  displayValue={cfVisits === null ? `${mapUsage.headline.localeSwitchedToEs} switches` : formatPct(localeEsPct)}
+                  displayValue={cfVisits === null ? countOf(mapUsage.headline.localeSwitchedToEs, "switch", "switches") : formatPct(localeEsPct)}
                   value={cfVisits === null ? mapUsage.headline.localeSwitchedToEs : (localeEsPct ?? 0)}
                   previousValue={cfVisits === null ? mapUsage.headline.previousLocaleSwitchedToEs : (previousLocaleEsPct ?? undefined)}
                 />
@@ -413,19 +418,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <h4 className={groupTitleClass}>Most opened places</h4>
+                  <h4 className={`${groupTitleClass} mb-1`}>Most opened places</h4>
                   <BarList
                     items={placeUsage.slice(0, 6).map((p) => ({
                       label: p.name ?? "Removed place",
                       value: p.count,
-                      displayValue: `${p.count} opens`,
+                      displayValue: countOf(p.count, "open"),
                       href: p.href ?? undefined,
                     }))}
                     emptyMessage="No place cards opened yet this period."
                   />
                 </div>
                 <div>
-                  <h4 className={groupTitleClass}>Top searches</h4>
+                  <h4 className={`${groupTitleClass} mb-1`}>Top searches</h4>
                   <BarList
                     items={mapUsage.topSearches.map((s) => ({
                       label: s.term,
@@ -442,7 +447,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <h4 className={groupTitleClass}>After opening a card, people…</h4>
+                  <h4 className={`${groupTitleClass} mb-1`}>After opening a card, people…</h4>
                   <BarList
                     items={[
                       { label: "Directions (walk)", value: mapUsage.cardActions.directionsWalk, displayValue: formatPct(pctOf(mapUsage.cardActions.directionsWalk, mapUsage.headline.cardsOpened)) },
@@ -458,7 +463,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   />
                   <p className="mt-1 text-xs text-[var(--color-ink-500)]">Share of cards opened this period.</p>
                   {/* #919: taps on a place's own page, as plain counts: that page isn't a card, so a share of cards opened would mislead. */}
-                  <h4 className={`${groupTitleClass} mt-4`}>On a place&apos;s own page, people…</h4>
+                  <h4 className={`${groupTitleClass} mb-1 mt-4`}>On a place&apos;s own page, people…</h4>
                   <BarList
                     items={[
                       { label: "Directions", value: mapUsage.cardActions.venuePageDirections },
@@ -468,12 +473,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   />
                 </div>
                 <div>
-                  <h4 className={groupTitleClass}>Filters people use</h4>
+                  <h4 className={`${groupTitleClass} mb-1`}>Filters people use</h4>
                   <BarList
                     items={mapUsage.filters.map((f) => ({
                       label: filterLabel(f.filter),
                       value: f.count,
-                      displayValue: cfVisits === null ? `${f.count} toggles` : formatPct(pctOf(f.count, cfVisits)),
+                      displayValue: cfVisits === null ? countOf(f.count, "toggle") : formatPct(pctOf(f.count, cfVisits)),
                     }))}
                     emptyMessage="No filters toggled on yet this period."
                   />
@@ -482,7 +487,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <h4 className={groupTitleClass}>Location shared?</h4>
+                  <h4 className={`${groupTitleClass} mb-1`}>Location shared?</h4>
                   <BarList
                     items={[
                       { label: "Granted", value: mapUsage.location.granted, displayValue: `${mapUsage.location.granted}` },
@@ -495,12 +500,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   />
                 </div>
                 <div>
-                  <h4 className={groupTitleClass}>Came from a flyer or link tag</h4>
+                  <h4 className={`${groupTitleClass} mb-1`}>Came from a flyer or link tag</h4>
                   <BarList
                     items={mapUsage.utmSources.map((u) => ({
                       label: u.campaign ? `${u.source} · ${u.campaign}` : u.source,
                       value: u.sessions,
-                      displayValue: `${u.sessions} sessions`,
+                      displayValue: countOf(u.sessions, "session"),
                     }))}
                     emptyMessage="No tagged flyer or link visits yet this period."
                   />
@@ -539,7 +544,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           )}
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <h4 className={groupTitleClass}>Longest since last filled</h4>
+              <h4 className={`${groupTitleClass} mb-1`}>Longest since last filled</h4>
               <BarList
                 items={longestSinceFill.map((b) => ({
                   label: b.name,
@@ -550,9 +555,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               />
             </div>
             <div>
-              <h4 className={groupTitleClass}>Most-needed items</h4>
+              <h4 className={`${groupTitleClass} mb-1`}>Most-needed items</h4>
               <BarList
-                items={mostNeeded.map((n) => ({ label: t(`box.needs.${n.key}`, "en"), value: n.count, displayValue: `${n.count} asks` }))}
+                items={mostNeeded.map((n) => ({ label: t(`box.needs.${n.key}`, "en"), value: n.count, displayValue: countOf(n.count, "ask") }))}
                 emptyMessage="Not enough check-ins yet to say."
               />
             </div>
@@ -573,7 +578,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             {latestRefresh ? (
               <>
                 Last data refresh {new Date(latestRefresh.createdAt).toLocaleDateString("en-US", { timeZone: TIME_ZONE })}:{" "}
-                {latestRefresh.suggestedCount} suggested changes.{" "}
+                {countOf(latestRefresh.suggestedCount, "suggested change")}.{" "}
                 <Link href="/admin/places?show=review" className={linkClass}>
                   Review →
                 </Link>

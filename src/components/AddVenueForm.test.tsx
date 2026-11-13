@@ -98,6 +98,17 @@ describe("AddVenueForm — client-side validation", () => {
     expect(await screen.findByText(/Name is required/i)).toBeDefined();
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  // #926: the errors sit above the fold, so focus goes to the first box that is wrong, not left on the button.
+  test("a refused save puts focus in the first box that is wrong", async () => {
+    const user = userEvent.setup();
+    render(<AddVenueForm />);
+    await user.type(screen.getByLabelText(/^Name/i), "Eastside Pantry");
+
+    await user.click(screen.getByRole("button", { name: /Add venue/i }));
+
+    await waitFor(() => expect(screen.getByLabelText(/^Category/i)).toHaveFocus());
+  });
 });
 
 describe("AddVenueForm — submit", () => {

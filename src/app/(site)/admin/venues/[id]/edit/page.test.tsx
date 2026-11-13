@@ -166,6 +166,8 @@ describe("EditVenuePage — auth guard, not-found, and prop wiring", () => {
     );
 
     expect(screen.getByTestId("archive-button-stub").getAttribute("data-already-archived")).toBe("true");
+    // Nothing dangerous is left on a removed place, so no Danger zone heading over the line.
+    expect(screen.queryByRole("heading", { name: "Danger zone" })).toBeNull();
   });
 
   test("no venue with that id -> notFound() fires", async () => {

@@ -7,7 +7,34 @@
 import { describe, test, expect, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import AdminConfirm, { useAdminConfirm } from "@/components/AdminConfirm";
+import { useState } from "react";
+import AdminConfirm, { useAdminConfirm, useAdminStep } from "@/components/AdminConfirm";
+
+/** A reject-style step: a reason box, Cancel that clears it, and a busy flag. */
+function StepHarness({ busy = false }: { busy?: boolean }) {
+  const [reason, setReason] = useState("");
+  function cancelStep() {
+    setReason("");
+    closeStep();
+  }
+  const { open, openStep, closeStep, triggerRef, fieldRef } = useAdminStep({ busy, onCancel: cancelStep });
+  return (
+    <div>
+      <button type="button" ref={triggerRef} hidden={open} onClick={openStep}>
+        Reject
+      </button>
+      {open && (
+        <div>
+          <label htmlFor="reason">Reason</label>
+          <textarea id="reason" ref={fieldRef} value={reason} onChange={(e) => setReason(e.target.value)} />
+          <button type="button" disabled={busy} onClick={cancelStep}>
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Harness({
   onConfirm,
@@ -88,6 +115,34 @@ describe("AdminConfirm", () => {
     expect(trigger).toBeVisible();
     expect(trigger).toHaveFocus();
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  // A Reject / Remove photo / Decline step closes the same two ways, and
+  // leaves no half-typed reason behind for the next time it opens.
+  test.each([
+    ["Cancel", async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("button", { name: "Cancel" }))],
+    ["Escape", async (user: ReturnType<typeof userEvent.setup>) => user.keyboard("{Escape}")],
+  ])("%s closes a reason step, returns focus to its trigger and clears the reason", async (_name, close) => {
+    const user = userEvent.setup();
+    render(<StepHarness />);
+    await user.click(screen.getByRole("button", { name: "Reject" }));
+    const box = screen.getByRole("textbox", { name: "Reason" });
+    expect(box).toHaveFocus();
+    await user.type(box, "dup");
+    await close(user);
+    expect(screen.queryByRole("textbox", { name: "Reason" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Reject" })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "Reject" }));
+    expect(screen.getByRole("textbox", { name: "Reason" })).toHaveValue("");
+  });
+
+  test("Escape does not close a reason step while its request runs", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<StepHarness />);
+    await user.click(screen.getByRole("button", { name: "Reject" }));
+    rerender(<StepHarness busy />);
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Reason" }), { key: "Escape" });
+    expect(screen.getByRole("textbox", { name: "Reason" })).toBeInTheDocument();
   });
 
   test("busy disables both buttons, shows the busy label, and Escape does not close", async () => {

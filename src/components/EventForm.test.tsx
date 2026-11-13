@@ -84,6 +84,43 @@ describe("EventForm validation", () => {
     expect(invalid(screen.getByLabelText(/^Note \(English\)/))).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  // #926: the errors can sit above the fold, so focus goes to the first wrong box, not left on the button.
+  test("a refused save puts focus in the first box that is wrong", async () => {
+    render(<EventForm venues={VENUES} />);
+    await userEvent.type(nameInput(), "Turkey drive");
+
+    await userEvent.click(screen.getByRole("button", { name: /save draft/i }));
+
+    await waitFor(() => expect(startsInput()).toHaveFocus());
+  });
+
+  // #926: Cancel event is a step with a way back. Keep event sends nothing,
+  // drops the half-typed note, and hands focus back to "Cancel event".
+  test("Keep event closes the cancel step, sends nothing, clears the note and returns focus", async () => {
+    render(
+      <EventForm
+        venues={VENUES}
+        eventId="e1"
+        status="published"
+        expectedUpdatedAt="2026-10-01T00:00:00.000Z"
+        initialValues={{ name: "Turkey drive", startsLocal: "2026-11-21T10:00", endsLocal: "2026-11-21T14:00", address: "1 Main", lat: "38.2", lng: "-104.6" }}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: /^cancel event$/i }));
+    const note = screen.getByLabelText(/^Note \(English\)/);
+    expect(note).toHaveFocus();
+    await userEvent.type(note, "Rained out");
+
+    await userEvent.click(screen.getByRole("button", { name: /^keep event$/i }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText(/^Note \(English\)/)).toBeNull();
+    const reopen = screen.getByRole("button", { name: /^cancel event$/i });
+    expect(reopen).toHaveFocus();
+    await userEvent.click(reopen);
+    expect(screen.getByLabelText(/^Note \(English\)/)).toHaveValue("");
+  });
 });
 
 describe("EventForm place and time handling", () => {

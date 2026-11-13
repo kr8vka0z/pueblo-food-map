@@ -22,6 +22,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminStep } from "@/components/AdminConfirm";
+import { KIND_LABEL } from "@/components/BoxCheckinsAdminPanel";
 import type { AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import {
   cardClass,
@@ -113,7 +114,8 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
           {photo.checkin_kind && (
             <p className="text-sm text-[var(--color-ink-700)]">
               <span className={fieldLabelClass}>Attached to check-in: </span>
-              {photo.checkin_kind}
+              {/* The Check-ins list's own words ("Problem report"), never the stored code. */}
+              {KIND_LABEL[photo.checkin_kind as keyof typeof KIND_LABEL] ?? photo.checkin_kind}
             </p>
           )}
           {isFlagged && (

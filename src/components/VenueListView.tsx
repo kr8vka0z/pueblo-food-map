@@ -46,7 +46,7 @@
  * Presentational + interactive only: no data fetching (that's the Server
  * Component page, src/app/(site)/admin/places/page.tsx) and no mutation of its
  * own beyond what ProposalCard/SubmissionCard (rendered nowhere in this
- * file directly, but SOURCE_BADGE/LANE_BADGE/fieldLabel and
+ * file directly, but SOURCE_BADGE/LANE_BADGE and
  * summarizeSubmissionForRow are reused from them) already own.
  * `statusByVenueId` is computed there rather than here because it
  * needs src/data/published-venues.ts (the ~2000-entry public-map snapshot)
@@ -84,7 +84,9 @@ import {
   type TagTone,
 } from "@/lib/adminCardStyles";
 import { DISPLAY_STATUS_KEY, DISPLAY_STATUS_LABELS, formatLastVerified, type AdminDisplayStatus } from "@/lib/adminVenues";
-import { SOURCE_BADGE, LANE_BADGE, fieldLabel } from "@/components/ProposalCard";
+import { SOURCE_BADGE, LANE_BADGE } from "@/components/ProposalCard";
+import { fieldLabel } from "@/lib/fieldLabels";
+import { openRowLink } from "@/lib/rowLinkClick";
 import { summarizeSubmissionForRow } from "@/components/SubmissionCard";
 import { renameMetaOf, reviewableDiffFields, reviewLaneOf } from "@/lib/adminProposals";
 import type { ProposalSourceValue, ReviewLane } from "@/lib/adminProposals";
@@ -227,7 +229,7 @@ function rowNeedsReview(row: Row): boolean {
  * removal", "website link broken", "listed under a new name") are
  * illustrative, not a literal spec; this covers every change_type/source
  * shape ProposalCard.tsx itself branches on, using the SAME field-label map
- * (fieldLabel, imported from ProposalCard.tsx) so a field name never reads
+ * (fieldLabel, src/lib/fieldLabels.ts) so a field name never reads
  * differently in the two places it's shown.
  */
 const REVIEW_FIELD_WORD: Record<string, string> = {
@@ -235,6 +237,10 @@ const REVIEW_FIELD_WORD: Record<string, string> = {
   url: "website",
   address: "address",
   hours_weekly: "hours",
+  hours_irregular: "monthly hours",
+  // fieldLabel's "Accepts SNAP" lowercased would read "New accepts snap".
+  accepts_snap: "SNAP status",
+  accepts_wic: "WIC status",
   category: "category",
   name: "name",
   operator: "operator",
@@ -407,58 +413,55 @@ export default function VenueListView({
           queue; only shown once there's more than one value present, same
           "don't clutter an all-noise or all-one-source queue" rule that
           queue's own filter row followed. #675: "public" (any submission
-          item) is one more value in the SAME chip row, not a separate
-          filter group — an admin filtering "where did this come from"
-          shouldn't have to look in two places for the answer. */}
-      {(presentSources.length > 1 || presentLanes.length > 1) && (
-        <div role="group" aria-label="Filter by source or lane" className="mb-3 flex flex-wrap items-center gap-2">
-          {presentSources.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={() => setSourceFilter("all")}
-                aria-pressed={sourceFilter === "all"}
-                className={chipClass(sourceFilter === "all")}
-              >
-                All sources
-              </button>
-              {presentSources.map((source) => (
-                <button
-                  key={source}
-                  type="button"
-                  onClick={() => setSourceFilter(source)}
-                  aria-pressed={sourceFilter === source}
-                  className={chipClass(sourceFilter === source)}
-                >
-                  {source === "public" ? "The public" : (SOURCE_BADGE[source as ProposalSourceValue]?.label ?? source)}
-                </button>
-              ))}
-            </>
-          )}
-          {presentLanes.length > 1 && (
-            <>
-              <span className="mx-1 h-4 w-px bg-[var(--color-bone-300)]" aria-hidden />
-              <button
-                type="button"
-                onClick={() => setLaneFilter("all")}
-                aria-pressed={laneFilter === "all"}
-                className={chipClass(laneFilter === "all")}
-              >
-                All lanes
-              </button>
-              {presentLanes.map((lane) => (
-                <button
-                  key={lane}
-                  type="button"
-                  onClick={() => setLaneFilter(lane)}
-                  aria-pressed={laneFilter === lane}
-                  className={chipClass(laneFilter === lane)}
-                >
-                  {LANE_BADGE[lane].label}
-                </button>
-              ))}
-            </>
-          )}
+          item) is one more value in the source row, not a separate filter
+          group — an admin filtering "where did this come from" shouldn't
+          have to look in two places for the answer. Sources and lanes are
+          two rows that wrap on their own (#926), not one row split by a
+          divider that ended up orphaned or mid-row. */}
+      {presentSources.length > 1 && (
+        <div role="group" aria-label="Filter by source" className="mb-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSourceFilter("all")}
+            aria-pressed={sourceFilter === "all"}
+            className={chipClass(sourceFilter === "all")}
+          >
+            All sources
+          </button>
+          {presentSources.map((source) => (
+            <button
+              key={source}
+              type="button"
+              onClick={() => setSourceFilter(source)}
+              aria-pressed={sourceFilter === source}
+              className={chipClass(sourceFilter === source)}
+            >
+              {source === "public" ? "The public" : (SOURCE_BADGE[source as ProposalSourceValue]?.label ?? source)}
+            </button>
+          ))}
+        </div>
+      )}
+      {presentLanes.length > 1 && (
+        <div role="group" aria-label="Filter by lane" className="mb-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setLaneFilter("all")}
+            aria-pressed={laneFilter === "all"}
+            className={chipClass(laneFilter === "all")}
+          >
+            All lanes
+          </button>
+          {presentLanes.map((lane) => (
+            <button
+              key={lane}
+              type="button"
+              onClick={() => setLaneFilter(lane)}
+              aria-pressed={laneFilter === lane}
+              className={chipClass(laneFilter === lane)}
+            >
+              {LANE_BADGE[lane].label}
+            </button>
+          ))}
         </div>
       )}
 
@@ -559,9 +562,9 @@ function VenueRow({ row, statusByVenueId }: { row: Row; statusByVenueId: Record<
   if (row.kind === "new") {
     const { item } = row;
     return (
-      <tr className={tableLinkRowClass}>
+      <tr className={tableLinkRowClass} onClick={openRowLink}>
         <td className={`${tableCellClass} font-medium`}>
-          <Link href={newItemHref(item)} className={linkClass}>
+          <Link href={newItemHref(item)} data-row-link className={linkClass}>
             {rowName(row)}
           </Link>
         </td>
@@ -595,11 +598,15 @@ function VenueRow({ row, statusByVenueId }: { row: Row; statusByVenueId: Record<
   const isArchivedRowLinkable = venue.status !== "archived" || items.length > 0;
 
   return (
-    // The row tint under the pointer only where the name links somewhere (#926 decision 1).
-    <tr className={isArchivedRowLinkable ? tableLinkRowClass : tableRowClass}>
+    // The row tint, and a click anywhere on the row, only where the name
+    // links somewhere (#926 decision 1; src/lib/rowLinkClick.ts).
+    <tr
+      className={isArchivedRowLinkable ? tableLinkRowClass : tableRowClass}
+      onClick={isArchivedRowLinkable ? openRowLink : undefined}
+    >
       <td className={`${tableCellClass} font-medium`}>
         {isArchivedRowLinkable ? (
-          <Link href={`/admin/venues/${venue.id}/edit`} className={linkClass}>
+          <Link href={`/admin/venues/${venue.id}/edit`} data-row-link className={linkClass}>
             {venue.name}
           </Link>
         ) : (
@@ -616,7 +623,7 @@ function VenueRow({ row, statusByVenueId }: { row: Row; statusByVenueId: Record<
         <ReviewCell items={items} />
       </td>
       <td className={`${tableCellClass} text-[var(--color-ink-500)]`}>{venue.address}</td>
-      <td className={`${tableCellClass} text-[var(--color-ink-500)]`}>{formatLastVerified(venue.last_verified)}</td>
+      <td className={`${tableCellClass} whitespace-nowrap text-[var(--color-ink-500)]`}>{formatLastVerified(venue.last_verified)}</td>
     </tr>
   );
 }

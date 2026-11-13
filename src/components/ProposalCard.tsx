@@ -39,6 +39,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { categoryLabels } from "@/lib/categories";
 import { formatLastVerified } from "@/lib/adminVenues";
+import { fieldLabel } from "@/lib/fieldLabels";
 import { describeIrregularSchedule, formatSlot } from "@/lib/hours";
 import { t } from "@/lib/i18n";
 import { safeUrl } from "@/lib/safeUrl";
@@ -133,25 +134,9 @@ const CHANGE_TYPE_LABEL: Record<ProposalChangeType, string> = {
   remove: "Remove",
 };
 
-const FIELD_LABELS: Record<string, string> = {
-  name: "Name",
-  category: "Category",
-  lat: "Latitude",
-  lng: "Longitude",
-  address: "Address",
-  phone: "Phone",
-  url: "Website",
-  hours_weekly: "Hours",
-  hours_irregular: "Monthly hours",
-  notes: "Notes",
-  operator: "Operator",
-  last_verified: "Last verified",
-};
-
-// Exported for the same reuse reason as SOURCE_BADGE above.
-export function fieldLabel(field: string): string {
-  return FIELD_LABELS[field] ?? field;
-}
+// The field-label map lives in src/lib/fieldLabels.ts (the Activity page, a
+// server component, needs it too); re-exported here for existing callers.
+export { fieldLabel };
 
 function capitalizeDay(day: string): string {
   return day.charAt(0).toUpperCase() + day.slice(1);
@@ -210,11 +195,12 @@ export interface ProposalCardProps {
 
 export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
   const router = useRouter();
-  // Focus goes to the reason box on open and back to the button on Cancel (#926).
-  const { open: rejectOpen, openStep: openReject, closeStep: closeReject, triggerRef: rejectRef, fieldRef: reasonRef } =
-    useAdminStep();
   const [reason, setReason] = useState("");
   const [rejectState, setRejectState] = useState<ActionState>({ status: "idle" });
+  // Focus goes to the reason box on open and back to the button on Cancel
+  // (#926); Escape does what Cancel does, except while the reject is being sent.
+  const { open: rejectOpen, openStep: openReject, closeStep: closeReject, triggerRef: rejectRef, fieldRef: reasonRef } =
+    useAdminStep({ busy: rejectState.status === "submitting", onCancel: cancelReject });
   const [approveState, setApproveState] = useState<ActionState>({ status: "idle" });
   // The removal approve asks on the page first (#926 decision 7): nothing is
   // posted until the confirm's own "Archive this venue" is pressed.
@@ -275,6 +261,12 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
     await act("approve", undefined, setApproveState, failMessage);
   }
 
+  function cancelReject() {
+    setReason("");
+    setRejectState({ status: "idle" });
+    closeReject();
+  }
+
   async function handleConfirmReject() {
     // #675 fix: this used to post an empty {} body, silently dropping the
     // reason typed into the textarea just above — SubmissionCard.tsx's own
@@ -317,7 +309,7 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
           <p className="text-xs text-[var(--color-ink-400)]">{row.target_venue_id}</p>
           {rename && (
             <p className="mt-2 text-sm text-[var(--color-ink-700)]">
-              {sourceBadge.label} stopped listing this place and started listing <span className="break-all">{rename.to_id}</span> at
+              {sourceBadge.label} stopped listing this place and started listing <span className="[overflow-wrap:anywhere]">{rename.to_id}</span> at
               the same spot or phone. Approving updates this venue in place, on the same page and link, with the new details below.
             </p>
           )}
@@ -431,11 +423,7 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => {
-                setReason("");
-                setRejectState({ status: "idle" });
-                closeReject();
-              }}
+              onClick={cancelReject}
               disabled={rejectState.status === "submitting"}
               className={secondaryButtonClass}
             >
@@ -474,19 +462,17 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
  * data comes from the exact same untrusted OSM/Plentiful sources. `phone`
  * is skipped when the value is the "(empty)" sentinel formatFieldValue
  * produces for a null/undefined/empty field — a `tel:(empty)` link would be
- * worse than no link. `break-all` on the url anchor lets a long link wrap
- * instead of blowing out the card width (the same reason VenueCard's own
- * distance readout uses a fixed-width font rather than letting layout
- * jitter — different fix, same "don't let one value's length break the
- * layout" concern).
+ * worse than no link. A web address may wrap anywhere (it has no spaces),
+ * so it never blows out the card width; overflow-wrap:anywhere, not
+ * break-all, so ordinary words beside it are not broken mid-word (#926).
+ * A phone number never breaks (whitespace-nowrap).
  */
 function renderFieldValue(field: string | undefined, formatted: string): React.ReactNode {
-  const valueLinkClass = `${linkClass} break-all`;
   if (field === "url") {
     const href = safeUrl(formatted);
     if (href) {
       return (
-        <a href={href} target="_blank" rel="noopener noreferrer" className={valueLinkClass}>
+        <a href={href} target="_blank" rel="noopener noreferrer" className={`${linkClass} [overflow-wrap:anywhere]`}>
           {formatted}
         </a>
       );
@@ -494,7 +480,7 @@ function renderFieldValue(field: string | undefined, formatted: string): React.R
   }
   if (field === "phone" && formatted !== "(empty)") {
     return (
-      <a href={`tel:${formatted}`} className={valueLinkClass}>
+      <a href={`tel:${formatted}`} className={`${linkClass} whitespace-nowrap`}>
         {formatted}
       </a>
     );

@@ -103,6 +103,21 @@ describe("ArchiveVenueButton — confirm gate", () => {
   });
 });
 
+// The confirm must tell the truth: a box is live and leaves the map at once;
+// a place waits for the next publish.
+describe("ArchiveVenueButton — what the confirm promises", () => {
+  test.each([
+    [undefined, /next publish/],
+    ["place" as const, /next publish/],
+    ["box" as const, /right away/],
+  ])("kind %s says %s", async (kind, promise) => {
+    const user = userEvent.setup();
+    render(<ArchiveVenueButton venueId="manual-abc" venueName="Eastside Pantry" alreadyArchived={false} kind={kind} />);
+    await user.click(screen.getByRole("button", { name: /Remove from map/i }));
+    expect(within(screen.getByRole("group", { name: /Eastside Pantry/ })).getByText(promise)).toBeDefined();
+  });
+});
+
 describe("ArchiveVenueButton — already archived", () => {
   test("renders an informational message, no actionable button, when already archived", () => {
     render(<ArchiveVenueButton venueId="manual-abc" venueName="Eastside Pantry" alreadyArchived={true} />);

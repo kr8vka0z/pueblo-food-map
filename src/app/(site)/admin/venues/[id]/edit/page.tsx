@@ -416,12 +416,14 @@ export default async function EditVenuePage({
           </>
         )}
 
+        {/* A removed place has nothing dangerous left to do: just the line, no heading. */}
         <section className={sectionDividerClass}>
-          <h3 className={`mb-3 ${sectionTitleClass}`}>Danger zone</h3>
+          {venue.status !== "archived" && <h3 className={`mb-3 ${sectionTitleClass}`}>Danger zone</h3>}
           <ArchiveVenueButton
             venueId={venue.id}
             venueName={venue.name}
             alreadyArchived={venue.status === "archived"}
+            kind={isBox ? "box" : "place"}
           />
         </section>
       </div>

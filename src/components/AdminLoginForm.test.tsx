@@ -86,6 +86,8 @@ describe("AdminLoginForm — signed-out: email code (#684)", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/valid email/i);
     expect(mockSendCode).not.toHaveBeenCalled();
+    // #926: focus moves to the box with the problem, not left on the button.
+    expect(screen.getByLabelText(/^email$/i)).toHaveFocus();
   });
 
   test("a send shows the same code step for any address (anti-enumeration), on the same page", async () => {
@@ -119,6 +121,7 @@ describe("AdminLoginForm — signed-out: email code (#684)", () => {
     await user.type(screen.getByLabelText(/sign-in code/i), "123456");
 
     expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(screen.getByLabelText(/sign-in code/i)).toHaveFocus();
   });
 
   test("a short code isn't sent; the Sign in button explains", async () => {
@@ -129,6 +132,7 @@ describe("AdminLoginForm — signed-out: email code (#684)", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/6-digit code/i);
     expect(mockSignInEmailOtp).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/sign-in code/i)).toHaveFocus();
   });
 
   test("Resend code is disabled for 30 seconds after a send, then sends a new code", async () => {
@@ -162,6 +166,8 @@ describe("AdminLoginForm — signed-out: email code (#684)", () => {
 
     expect(screen.queryByTestId("admin-login-sent")).toBeNull();
     expect((screen.getByLabelText(/^email$/i) as HTMLInputElement).value).toBe("");
+    // #926: a keyboard user lands in the email box, not at the top of the page.
+    expect(screen.getByLabelText(/^email$/i)).toHaveFocus();
   });
 
   test("an API-level error sending the code (result.error, no thrown exception) shows the error state", async () => {

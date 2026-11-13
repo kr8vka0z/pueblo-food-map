@@ -26,10 +26,11 @@
  * receives renders in ONLY that language.
  */
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import AdminSegmented from "@/components/AdminSegmented";
-import { inputBase, inputBorder } from "@/components/formClasses";
-import { controlLabelClass, dangerButtonClass, emptyStateClass, failureLineClass, primaryButtonClass } from "@/lib/adminCardStyles";
+import { errorClass, inputBase, inputBorder, labelClass } from "@/components/formClasses";
+import { dangerButtonClass, emptyStateClass, failureLineClass, primaryButtonClass } from "@/lib/adminCardStyles";
+import { EMAIL_RE } from "@/lib/email";
 
 interface HostRow {
   id: number;
@@ -60,6 +61,20 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
   const [email, setEmail] = useState("");
   const [lang, setLang] = useState<"en" | "es">("en");
   const [state, setState] = useState<PanelState>({ status: "idle" });
+  // The add box's own problem (empty or not an email), shown under the box.
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const removeRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  // The row index a Remove was pressed on. Its button is disabled while the
+  // request runs, which drops focus, so once it settles focus goes to the row
+  // now in that place (the next host), or to the add box if none is left.
+  const focusAfterRemove = useRef<number | null>(null);
+  useEffect(() => {
+    if (focusAfterRemove.current === null || state.status === "submitting") return;
+    const index = focusAfterRemove.current;
+    focusAfterRemove.current = null;
+    (removeRefs.current[index] ?? emailRef.current)?.focus();
+  }, [hosts, state]);
 
   // #926 decision 15: an error says what did NOT happen, then what to do.
   const failedMessage = {
@@ -94,12 +109,26 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
     }
   }
 
+  // The browser's own bubble is off (noValidate): the box says what to put
+  // in, the settled way (red edge, a line under it, focus in the box).
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
+    const trimmed = email.trim();
+    const problem = !trimmed
+      ? "Type the host's email address."
+      : !EMAIL_RE.test(trimmed)
+        ? "Type a full email address, like host@example.com."
+        : null;
+    setEmailError(problem);
+    if (problem) {
+      emailRef.current?.focus();
+      return;
+    }
     void mutate("POST", { email, lang }, () => setEmail(""));
   }
 
-  function handleRemove(hostEmail: string) {
+  function handleRemove(hostEmail: string, index: number) {
+    focusAfterRemove.current = index;
     void mutate("DELETE", { email: hostEmail });
   }
 
@@ -111,23 +140,32 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
           <p>Add one below to email the host when this box is reported empty, filled or with a problem.</p>
         </div>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {hosts.map((h) => {
+        // The same list shape as Check-ins above it (BoxCheckinsAdminPanel):
+        // lines between rows, the button full width under the row on a
+        // phone and at the right from 640.
+        <ul className="divide-y divide-[var(--color-bone-200)]">
+          {hosts.map((h, index) => {
             // The button's name is "Remove <that email>" through
             // aria-labelledby on the visible address, never an aria-label.
             const buttonId = `${idPrefix}-${h.id}-remove`;
             const emailId = `${idPrefix}-${h.id}-email`;
             const removingThis = state.status === "submitting" && state.removing === h.email;
             return (
-              <li key={h.id} className="flex items-center justify-between gap-2 text-sm text-[var(--color-ink-700)]">
+              <li
+                key={h.id}
+                className="flex flex-col gap-2 py-3 text-sm text-[var(--color-ink-700)] sm:flex-row sm:items-center sm:justify-between"
+              >
                 <span id={emailId} className="min-w-0 break-words">
                   {h.email}
                 </span>
                 <button
+                  ref={(el) => {
+                    removeRefs.current[index] = el;
+                  }}
                   id={buttonId}
                   type="button"
                   aria-labelledby={`${buttonId} ${emailId}`}
-                  onClick={() => handleRemove(h.email)}
+                  onClick={() => handleRemove(h.email, index)}
                   disabled={state.status === "submitting"}
                   className={`${dangerButtonClass} shrink-0`}
                 >
@@ -139,38 +177,54 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
         </ul>
       )}
 
-      <form onSubmit={handleAdd} className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="min-w-0 flex-1">
-          <label htmlFor="host-alert-email" className={controlLabelClass}>
-            Add a host email
-          </label>
-          <input
-            id="host-alert-email"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="host@example.com"
-            className={`${inputBase} ${inputBorder(false)}`}
-          />
+      {/* Top-aligned from 640, so a problem line under the email box never
+          lifts the box out of line with the slider; the button drops by one
+          label line (labelClass: 20 line + 4 under = 24) to sit level with both. */}
+      <form onSubmit={handleAdd} noValidate className="mt-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          <div className="min-w-0 flex-1">
+            <label htmlFor="host-alert-email" className={labelClass}>
+              Add a host email
+            </label>
+            <input
+              ref={emailRef}
+              id="host-alert-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setEmailError(null);
+              }}
+              placeholder="host@example.com"
+              aria-invalid={emailError ? "true" : undefined}
+              aria-describedby={emailError ? "host-alert-email-error" : undefined}
+              className={`${inputBase} ${inputBorder(!!emailError)}`}
+            />
+            {emailError && (
+              <p id="host-alert-email-error" role="alert" className={errorClass}>
+                {emailError}
+              </p>
+            )}
+          </div>
+          <div>
+            {/* The slider's legend is read by screen readers; this caption is
+                its visible twin, so it is hidden from them. */}
+            <p aria-hidden="true" className={labelClass}>
+              Email language
+            </p>
+            <AdminSegmented
+              name="host-alert-lang"
+              legend="Email language"
+              options={LANG_OPTIONS}
+              value={lang}
+              onChange={(v) => setLang(v === "es" ? "es" : "en")}
+            />
+          </div>
+          <button type="submit" disabled={state.status === "submitting"} className={`${primaryButtonClass} sm:mt-[24px]`}>
+            {state.status === "submitting" && state.removing === null ? "Adding…" : "Add host"}
+          </button>
         </div>
-        <div>
-          {/* The slider's legend is read by screen readers; this caption is
-              its visible twin, so it is hidden from them. */}
-          <p aria-hidden="true" className={controlLabelClass}>
-            Email language
-          </p>
-          <AdminSegmented
-            name="host-alert-lang"
-            legend="Email language"
-            options={LANG_OPTIONS}
-            value={lang}
-            onChange={(v) => setLang(v === "es" ? "es" : "en")}
-          />
-        </div>
-        <button type="submit" disabled={state.status === "submitting"} className={primaryButtonClass}>
-          {state.status === "submitting" && state.removing === null ? "Adding…" : "Add host"}
-        </button>
       </form>
 
       {state.status === "error" && (

@@ -5,7 +5,8 @@
  * admin (#926 decision 7; picture: `.pa-confirm` / ruleConfirm in
  * docs/design/design-system/pages/03c-components-admin.ts). It opens where
  * the asking button was, names the thing, says what happens and what does
- * not, and puts Cancel FIRST, then the action button, half the row each.
+ * not, and puts Cancel FIRST, then the action button: half the row each
+ * from 640 up, stacked full width (Cancel on top) on a phone.
  * Nothing is sent until the action button is pressed: that press is the
  * gate window.confirm used to be.
  *
@@ -20,7 +21,7 @@
  *     triggerRef  put on the trigger button. Keep the trigger MOUNTED with
  *                 hidden={asking} (not unmounted), or focus has nowhere to
  *                 return to.
- *   useAdminStep()     -> { open, openStep, closeStep, triggerRef, fieldRef }
+ *   useAdminStep({ busy?, onCancel? }) -> { open, openStep, closeStep, triggerRef, fieldRef }
  *                 the same for an inline reason step that is not a confirm:
  *                 opening focuses fieldRef, closing returns to the trigger.
  *   <AdminConfirm title body confirmLabel busyLabel tone busy error onConfirm onCancel />
@@ -86,20 +87,49 @@ export function useAdminConfirm<T extends HTMLElement = HTMLButtonElement>(): {
  * Decline reason steps on the change cards). Opening moves focus to the
  * step's first field (fieldRef); closeStep() hands it back to the trigger.
  * As with useAdminConfirm, keep the trigger MOUNTED with hidden={open}.
- *   const { open, openStep, closeStep, triggerRef, fieldRef } = useAdminStep();
+ *   const { open, openStep, closeStep, triggerRef, fieldRef } = useAdminStep({ busy, onCancel });
+ *
+ * Escape closes the step the way it closes a confirm, while focus is inside
+ * the step: the nearest ancestor of fieldRef marked data-admin-step, else
+ * the element that directly holds fieldRef. Mark the step's box with
+ * data-admin-step when the field sits in its own wrapper (a TextField), so
+ * Escape also works from the step's buttons. Options, both optional:
+ *   busy      true while the step's request runs: Escape then does nothing.
+ *   onCancel  what the step's own Cancel button does (clear the reason,
+ *             then closeStep()), so Escape leaves the same state behind.
+ *             Without it Escape only calls closeStep().
  */
-export function useAdminStep<F extends HTMLElement = HTMLTextAreaElement>(): {
+export function useAdminStep<F extends HTMLElement = HTMLTextAreaElement>(
+  options: { busy?: boolean; onCancel?: () => void } = {},
+): {
   open: boolean;
   openStep: () => void;
   closeStep: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
   fieldRef: RefObject<F | null>;
 } {
+  const { busy = false, onCancel } = options;
   const { asking, ask, cancel, triggerRef } = useAdminConfirm();
   const fieldRef = useRef<F | null>(null);
   useEffect(() => {
     if (asking) fieldRef.current?.focus();
   }, [asking]);
+  // A native listener on the step's box, not on the document: a page can
+  // hold several open steps, and Escape must close only the one it was
+  // pressed in. Re-attached when busy or onCancel change, so it never acts
+  // on a stale value.
+  useEffect(() => {
+    const field = asking ? fieldRef.current : null;
+    const box = field?.closest<HTMLElement>("[data-admin-step]") ?? field?.parentElement;
+    if (!box) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || busy) return;
+      e.preventDefault();
+      (onCancel ?? cancel)();
+    };
+    box.addEventListener("keydown", onKeyDown);
+    return () => box.removeEventListener("keydown", onKeyDown);
+  }, [asking, busy, onCancel, cancel]);
   return { open: asking, openStep: ask, closeStep: cancel, triggerRef, fieldRef };
 }
 
@@ -153,7 +183,9 @@ export default function AdminConfirm({
         {title}
       </p>
       {children && <div className="text-sm text-[var(--color-ink-700)]">{children}</div>}
-      <div className="mt-1 grid grid-cols-2 gap-2">
+      {/* WHY stacked under 640: at half a phone's width the action's words
+          wrapped ("Remove from / map"). Full width, Cancel stays on top. */}
+      <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <button ref={cancelRef} type="button" disabled={busy} onClick={onCancel} className={secondaryButtonClass}>
           Cancel
         </button>

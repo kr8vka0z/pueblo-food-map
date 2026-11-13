@@ -35,6 +35,7 @@ import {
 import { ADMIN_PRIMARY_BUTTON } from "@/components/formClasses";
 import type { EventListItem } from "@/lib/adminEventReads";
 import type { EventStatus } from "@/lib/adminEventValidation";
+import { openRowLink } from "@/lib/rowLinkClick";
 
 interface EventsListProps {
   /** null = the read failed. */
@@ -101,10 +102,14 @@ export default function EventsList({ events }: EventsListProps) {
         </Link>
       </div>
       <div className={tableWrapClass}>
-        <table className="w-full min-w-[32rem] text-left text-sm">
+        {/* WHY these minimums: at 512 the Event column was squeezed to 132 px
+            on a phone and names wrapped to three or four lines. 240 (with its
+            32 px padding) keeps a name to two lines beside the one-line date;
+            the table scrolls sideways inside its box instead (#926). */}
+        <table className="w-full min-w-[640px] text-left text-sm">
           <thead>
             <tr className={tableHeadRowClass}>
-              <th scope="col" className={tableHeadCellClass}>Event</th>
+              <th scope="col" className={`${tableHeadCellClass} min-w-[240px]`}>Event</th>
               <th scope="col" className={tableHeadCellClass}>Starts (Pueblo time)</th>
               <th scope="col" className={tableHeadCellClass}>Status</th>
               <th scope="col" className={tableHeadCellClass}><span className="sr-only">Edit</span></th>
@@ -112,7 +117,8 @@ export default function EventsList({ events }: EventsListProps) {
           </thead>
           <tbody>
             {events.map((e, i) => (
-              <tr key={e.id} className={tableLinkRowClass}>
+              // A click anywhere on the row opens its Edit link (src/lib/rowLinkClick.ts).
+              <tr key={e.id} className={tableLinkRowClass} onClick={openRowLink}>
                 <td id={`${rowId}-${i}-name`} className={`${tableCellClass} font-medium text-[var(--color-ink-900)]`}>
                   {e.name}
                 </td>
@@ -126,6 +132,7 @@ export default function EventsList({ events }: EventsListProps) {
                   <Link
                     id={`${rowId}-${i}-edit`}
                     href={`/admin/events/${e.id}/edit`}
+                    data-row-link
                     className={linkClass}
                     aria-labelledby={`${rowId}-${i}-edit ${rowId}-${i}-name`}
                   >

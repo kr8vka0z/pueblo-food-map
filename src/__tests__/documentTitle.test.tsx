@@ -220,7 +220,7 @@ import BoxHistoryContent from "@/components/BoxHistoryContent";
 // so this test is a real spec against the actual production title, not a
 // tautology that only checks the implementation agrees with itself.
 const EXPECTED_ES = {
-  home: "Pueblo Food Map — Recursos de alimentos en el Condado de Pueblo, CO",
+  home: "Pueblo Food Map · Comida gratis, despensas y tiendas con SNAP en el Condado de Pueblo, CO",
   about: "Acerca de · Pueblo Food Map",
   privacy: "Privacidad · Pueblo Food Map",
   resources: "Programas de ayuda alimentaria · Pueblo Food Map",

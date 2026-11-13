@@ -228,71 +228,10 @@ describe("#527 — Escape closes only the topmost overlay; scroll lock is shared
   });
 });
 
-// ─── BottomSheet (Escape routed through vaul's onEscapeKeyDown prop) ──────────
-//
-// React drops an `onEscapeKeyDown` prop spread onto a plain <div> (it looks
-// like a DOM event-handler prop, "EscapeKeyDown" isn't a real DOM event, so
-// React warns and discards it rather than setting it as a node property) —
-// spreading `...rest` the way BottomSheet.test.tsx's own vaul mock does
-// isn't enough to recover the callback here. `vi.hoisted` shares a plain
-// mutable box between this factory and the test bodies below, working
-// around vi.mock's own hoisting so DrawerContent can stash the callback
-// vaul would have called, for the tests to invoke directly.
-const { getEscapeHandler, setEscapeHandler } = vi.hoisted(() => {
-  let handler: ((e: { preventDefault: () => void }) => void) | undefined;
-  return {
-    setEscapeHandler: (h: typeof handler) => {
-      handler = h;
-    },
-    getEscapeHandler: () => handler,
-  };
-});
-
-vi.mock("vaul", () => {
-  const DrawerRoot = ({ children, open }: { children: React.ReactNode; open: boolean }) =>
-    open ? <div data-testid="vaul-root">{children}</div> : null;
-  const DrawerPortal = ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="vaul-portal">{children}</div>
-  );
-  const DrawerContent = ({
-    children,
-    onEscapeKeyDown,
-    ...rest
-  }: React.HTMLAttributes<HTMLDivElement> & {
-    children: React.ReactNode;
-    onEscapeKeyDown?: (e: { preventDefault: () => void }) => void;
-  }) => {
-    setEscapeHandler(onEscapeKeyDown);
-    return (
-      <div data-testid="vaul-content" {...rest}>
-        {children}
-      </div>
-    );
-  };
-  const DrawerTitle = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <h2 data-testid="vaul-title" className={className}>
-      {children}
-    </h2>
-  );
-  // #601: BottomSheet.tsx now also renders Drawer.Description (Radix's
-  // missing-Description a11y warning fix) — omitting it from this mock would
-  // make `Drawer.Description` undefined, crashing the render with "element
-  // type is invalid" the moment BottomSheet.tsx's real JSX reaches it.
-  const DrawerDescription = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <p data-testid="vaul-description" className={className}>
-      {children}
-    </p>
-  );
-  return {
-    Drawer: {
-      Root: DrawerRoot,
-      Portal: DrawerPortal,
-      Content: DrawerContent,
-      Title: DrawerTitle,
-      Description: DrawerDescription,
-    },
-  };
-});
+// ─── BottomSheet (its own document capture-phase Escape listener) ──────────
+// The phone card is the native scroll sheet (ScrollSheet.tsx, #923), which
+// listens for Escape on `document` in the capture phase, where Radix's
+// listener sat under vaul, so a real keydown drives it here.
 
 import BottomSheet from "@/components/BottomSheet";
 
@@ -310,7 +249,7 @@ function makeSheetVenue(): Venue & { distanceMiles?: number } {
 }
 
 describe("#527 — BottomSheet participates in the same overlay-escape stack", () => {
-  test("Filters open on top of the sheet: onEscapeKeyDown prevents vaul's own dismiss", async () => {
+  test("Filters open on top of the sheet: Escape closes Filters, not the sheet", async () => {
     stubMatchMedia(true);
     const onClose = vi.fn();
 
@@ -331,27 +270,19 @@ describe("#527 — BottomSheet participates in the same overlay-escape stack", (
     fireEvent.click(screen.getByRole("button", { name: "Toggle filters" }));
     await waitFor(() => expect(screen.getByRole("dialog", { name: /filters/i })).toBeDefined());
 
-    const onEscapeKeyDown = getEscapeHandler();
-    expect(onEscapeKeyDown).toBeTypeOf("function");
+    fireEvent.keyDown(document, { key: "Escape" });
 
-    const preventDefault = vi.fn();
-    onEscapeKeyDown!({ preventDefault });
-
-    // Filters is topmost, not the sheet — vaul's own dismiss must be blocked.
-    expect(preventDefault).toHaveBeenCalledTimes(1);
+    // Filters is topmost, not the sheet: only Filters closes.
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /filters/i })).toBeNull());
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  test("no higher overlay: onEscapeKeyDown does NOT preventDefault, letting vaul dismiss normally", () => {
+  test("no higher overlay: Escape closes the sheet", () => {
     const onClose = vi.fn();
     render(<BottomSheet venue={makeSheetVenue()} onClose={onClose} />);
 
-    const onEscapeKeyDown = getEscapeHandler();
-    const preventDefault = vi.fn();
-    onEscapeKeyDown!({ preventDefault });
+    fireEvent.keyDown(document, { key: "Escape" });
 
-    // Sheet is the only (topmost) overlay — not blocked here; vaul's own
-    // onOpenChange->onClose flow (untouched by this fix) handles the dismiss.
-    expect(preventDefault).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

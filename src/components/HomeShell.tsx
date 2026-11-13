@@ -13,8 +13,8 @@
  * WHY one shell for both trees: the two homepages were the same JSX apart
  * from their strings and locale (#689 design decision 4: no page logic is
  * duplicated per tree). Everything locale-facing here comes from `locale` —
- * the JSON-LD URLs, the <h1> (the same meta.home.title string the page's
- * <title> uses), the nav label and the crawl-link labels below.
+ * the JSON-LD URLs, the <h1> (its own home.h1 string: #921 changed only the
+ * <title>), the nav label and the crawl-link labels below.
  *
  * Synchronous on purpose (NOT async): src/__tests__/page.test.tsx and
  * esHomeNav.test.tsx render the pages directly with `render(<HomePage />)`,
@@ -98,7 +98,7 @@ export default function HomeShell({ locale }: { locale: Locale }) {
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(itemListJsonLd) }}
       />
       {/* sr-only: gives crawlers/AT a real <h1> without changing the splash/map visual design */}
-      <h1 className="sr-only">{t("meta.home.title", locale)}</h1>
+      <h1 className="sr-only">{t("home.h1", locale)}</h1>
       {/* Server-rendered links (SEO/AEO plan Phase 0). Before this, the
           homepage's server HTML had zero <a> links, so crawlers that don't run
           JS couldn't get from / to /venues (and from there every venue page).

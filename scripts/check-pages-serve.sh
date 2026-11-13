@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # scripts/check-pages-serve.sh — builds the real Worker bundle with `vite build` (vinext), serves it in the local
 # workerd preview and asserts the venue pages answer: a real /venue/<id>, /es/venue/<id> and /report/<id> are 200 with
-# the venue's name in the body, an unknown id on each is a 404, and / and /sitemap.xml are 200. Run by ci.yml; run it
+# the venue's name in the body, an unknown id on each is a 404, and / (with its font preload) and /sitemap.xml are
+# 200. Run by ci.yml; run it
 # by hand after any next / vinext / vite bump.
 #
 # WHY this exists: a green build does not prove these pages serve. Under OpenNext (before vinext) every /venue/<id>
@@ -71,7 +72,9 @@ expect() {
   fi
 }
 
-expect "/" 200
+# The font preload must be a real <link> in the HTML (#921): vinext once dropped react-dom's preload() hint from it,
+# the font swapped in after first paint and the homepage shifted on short phones.
+expect "/" 200 '<link rel="preload" href="/fonts/PublicSans-Variable.woff2"'
 expect "/sitemap.xml" 200 "/venue/${VENUE_ID}"
 expect "/venue/${VENUE_ID}" 200 "$VENUE_NAME"
 expect "/es/venue/${VENUE_ID}" 200 "$VENUE_NAME"

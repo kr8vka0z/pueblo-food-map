@@ -75,7 +75,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   { id: "pin", target: null },
   // BottomSheet (phone) / DesktopVenueWindow (desktop) — both already carry
   // these attributes; no tour-only hook needed on either.
-  { id: "card", target: '[data-bottom-sheet], [aria-labelledby^="venue-window-title-"]', showsCard: true },
+  { id: "card", target: '[data-sheet-surface], [aria-labelledby^="venue-window-title-"]', showsCard: true },
   // Blessing Boxes, after the place card (BottomNav is back once the card
   // closes on a phone) and before the other nav items. The tour only points
   // at the box card's buttons: its full-screen layer swallows every tap, so

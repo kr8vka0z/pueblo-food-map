@@ -383,7 +383,9 @@ describe("buildVenueMetaDescription — length budget over all published venues"
     });
     const description = buildVenueMetaDescription(v);
     expect(description).not.toContain("Hours:"); // too long to fit — skipped
-    expect(description).toContain("It accepts SNAP/EBT.");
+    // #921: a SNAP store's description opens with the named SNAP sentence.
+    expect(description).toContain("accepts SNAP/EBT.");
+    expect(description).toContain("Last verified"); // a later, shorter sentence still fits
   });
 });
 

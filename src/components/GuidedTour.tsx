@@ -410,10 +410,15 @@ export default function GuidedTour({
         <div
           aria-hidden
           data-testid="tour-highlight"
-          className="absolute pointer-events-none rounded-[var(--radius-lg)] ring-2 ring-[var(--color-sage-500)] transition-[top,left,width,height] duration-200"
+          className="absolute top-0 left-0 pointer-events-none rounded-[var(--radius-lg)] ring-2 ring-[var(--color-sage-500)] transition-[transform,width,height] duration-200"
           style={{
-            top: target.top,
-            left: target.left,
+            // WHY transform, not top/left (#921): the highlight follows a
+            // target that settles after the tap (a card sliding in, results
+            // growing), so it often moves more than 500 ms after the tap.
+            // A top/left move then counts as a layout shift, and its 9999px
+            // shadow made each one cover the whole screen (tour CLS ~0.2).
+            // A transform move looks the same and is never counted.
+            transform: `translate(${target.left}px, ${target.top}px)`,
             width: target.width,
             height: target.height,
             boxShadow: "0 0 0 9999px rgba(26,24,23,0.55)",
@@ -441,11 +446,11 @@ export default function GuidedTour({
         // and role lookups (found on real Android Chrome, PR #785).
         aria-live="polite"
         onKeyDown={onDialogKeyDown}
-        className="absolute flex flex-col gap-2 p-4 bg-[var(--color-bone-50)] border border-[var(--color-bone-200)] rounded-[var(--radius-lg)] elevation-2 text-[var(--color-ink-700)]"
+        className="absolute top-0 left-0 flex flex-col gap-2 p-4 bg-[var(--color-bone-50)] border border-[var(--color-bone-200)] rounded-[var(--radius-lg)] elevation-2 text-[var(--color-ink-700)]"
         style={{
           width: tipWidth,
-          top: place ? place.top : 0,
-          left: place ? place.left : 0,
+          // Transform for the same layout-shift reason as the highlight above.
+          transform: place ? `translate(${place.left}px, ${place.top}px)` : undefined,
           // Hidden until measured, so it never flashes in the wrong spot.
           visibility: place ? "visible" : "hidden",
         }}

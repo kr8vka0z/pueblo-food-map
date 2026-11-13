@@ -199,12 +199,12 @@ describe("map Near me tap", () => {
     expect(await screen.findByRole("heading", { name: "Location is off" })).toBeTruthy();
   });
 
-  test("a timeout (after #738's retry) shows 'We couldn't find you'", async () => {
+  test("a timeout shows 'We couldn't find you' after one try (#921)", async () => {
     stubGeolocation(fail(3));
     await renderMap();
     fireEvent.click(nearMe());
     expect(await screen.findByRole("heading", { name: "We couldn't find you" })).toBeTruthy();
-    expect(getCurrentPosition).toHaveBeenCalledTimes(2);
+    expect(getCurrentPosition).toHaveBeenCalledTimes(1);
   });
 
   test("a success shows no card", async () => {

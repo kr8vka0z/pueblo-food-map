@@ -159,6 +159,8 @@ export function serializeJsonLd(value: unknown): string {
  * `description` is the same verified-fact summary sentence(s) JSON-LD's
  * `description` uses (buildVenueJsonLd below), cut at a sentence boundary
  * to stay ≤ 160 chars — never a separate, drifting description string.
+ * #921: a SNAP store's title is "{Name}, {City}, CO: Accepts SNAP/EBT" and
+ * its description opens with a named SNAP/WIC sentence instead.
  */
 export function venuePageMetadataFields(
   venue: Venue,

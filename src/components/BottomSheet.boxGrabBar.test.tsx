@@ -4,7 +4,8 @@
  * address, most needed, the whole check-in panel) fills the sheet, so the
  * sheet measures ONE resting height; the bar used to go `invisible` then, and
  * Kyle saw box cards with no bar while places had one. jsdom has no layout,
- * so the geometry is stubbed the same way BottomSheet.snap.test.tsx does it.
+ * so the geometry is stubbed the same way BottomSheet.snap.test.tsx does it
+ * (the native scroll sheet's track and sheet).
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -13,26 +14,6 @@ import BottomSheet from "@/components/BottomSheet";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 import { waitForBoxCard } from "@/lib/testing/waitForBoxCard.testutil";
-
-const rootProps = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
-
-vi.mock("vaul", () => {
-  const passthrough = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
-  return {
-    Drawer: {
-      Root: ({ children, ...rest }: { children: React.ReactNode; [key: string]: unknown }) => {
-        rootProps.current = rest;
-        return <div>{children}</div>;
-      },
-      Portal: passthrough,
-      Content: ({ children, ref, ...rest }: React.HTMLAttributes<HTMLDivElement> & { ref?: React.Ref<HTMLDivElement> }) => (
-        <div ref={ref} {...rest}>{children}</div>
-      ),
-      Title: passthrough,
-      Description: passthrough,
-    },
-  };
-});
 
 const boxVenue: Venue = {
   id: "box-1",
@@ -68,13 +49,12 @@ const box: PublicBlessingBox = {
   },
 };
 
-// Window 740 tall, sheet 640 with its top at 100. The box's detail section
-// starts at 650, so first view + 96px peek runs past the card's own bottom:
-// one resting height, the case a real phone hits.
+// Track 640 tall with its top at 100 (the native scroll sheet). The box's
+// detail section starts at 650, so first view + 96px peek runs past the
+// track: one resting height, the case a real phone hits.
 function rectOf(el: HTMLElement): { top: number; bottom: number } {
-  if (el.hasAttribute("data-bottom-sheet")) return { top: 100, bottom: 740 };
-  if (el.hasAttribute("data-sheet-scroller")) return { top: 160, bottom: 740 };
-  if (el.hasAttribute("data-sheet-content")) return { top: 160, bottom: 160 + 600 };
+  if (el.hasAttribute("data-scroll-sheet")) return { top: 100, bottom: 740 };
+  if (el.hasAttribute("data-sheet")) return { top: 100, bottom: 800 };
   if (el.id === "bottomsheet-detail") return { top: 650, bottom: 650 };
   return { top: 0, bottom: 0 };
 }
@@ -90,13 +70,12 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn());
   vi.stubGlobal("turnstile", { render: vi.fn(() => "widget-id-1"), reset: vi.fn(), remove: vi.fn() });
   vi.stubGlobal("ResizeObserver", FakeResizeObserver);
-  vi.spyOn(window, "innerHeight", "get").mockReturnValue(740);
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
     const r = rectOf(this);
     return { top: r.top, bottom: r.bottom, height: r.bottom - r.top } as DOMRect;
   });
-  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
-    return this.hasAttribute("data-bottom-sheet") ? 640 : 0;
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.hasAttribute("data-scroll-sheet") ? 640 : 0;
   });
 });
 afterEach(() => {
@@ -110,7 +89,8 @@ describe("BottomSheet box card grab bar", () => {
     await waitForBoxCard();
 
     // One resting height, so the bar has nothing to toggle...
-    expect((rootProps.current.snapPoints as unknown[]).length).toBe(1);
+    // (one snap marker besides closed: the full height).
+    expect(document.querySelectorAll("[data-snap]").length).toBe(2);
     const bar = document.querySelector<HTMLButtonElement>("[data-bottom-sheet] button[aria-controls='bottomsheet-detail']");
     expect(bar).not.toBeNull();
     expect(bar!.disabled).toBe(true);

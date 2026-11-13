@@ -1,50 +1,62 @@
 /**
- * sheetSnap.ts — the phone sheet's two resting heights as vaul snap points
- * (#882 preview feedback, Maps-style sheet: it follows the finger between
- * collapsed and fully open and settles to the nearer one).
+ * sheetSnap.ts — the phone sheet's resting heights (detents) for the native
+ * scroll sheet (ScrollSheet.tsx, #923, 2026-11: the sheet's movement is
+ * the browser's own scrolling, with CSS scroll snap for the resting heights).
  *
- * WHY the `base` offset: vaul turns a px snap point S into a translate of
- * `window.innerHeight - S` (vaul useSnapPoints). The sheet's own height H is
- * `100dvh - map peek - safe area` (the #549 formula, already proven for the
- * route strip), so what is visible at that translate is S - (innerHeight - H).
- * Adding `base = innerHeight - H` to the height we want visible cancels it.
- * A card taller than the sheet is fully open at `1` (no translate, the whole
- * sheet showing, content scrolls inside); a shorter one stops at its own height.
+ * In that model a detent is a scrollTop of the sheet's track, and the
+ * scrollTop IS the visible height of the sheet: 0 is closed, `collapsed` is
+ * the first view plus the peek, `full` is the whole card or the whole track
+ * (whichever is shorter). Past `full` the same scroll carries on into the
+ * card's content, which is what makes one swipe grow the sheet and then
+ * scroll the details.
  */
 
-/** vaul snap point: a fraction of the window, or an exact "Npx" string. */
-export type SnapPoint = number | `${number}px`;
-
 export interface SheetMeasure {
-  /** window.innerHeight. */
-  innerHeight: number;
-  /** The sheet element's own height (fixed). */
-  drawerHeight: number;
+  /** The track's own height: the most of the sheet that can show (100dvh - map peek - safe area). */
+  trackHeight: number;
   /** Height from the sheet's top to the bottom of the collapsed view (first view + peek); null when the card has no detail section. */
   firstView: number | null;
-  /** Height from the sheet's top to the end of its content. */
+  /** The sheet's whole height (grab bar + card). */
   content: number;
 }
 
-export interface SheetSnaps {
-  collapsed: SnapPoint;
-  full: SnapPoint;
-  /** What vaul gets: [collapsed, full], or just [full] when there is nothing to expand into. */
-  points: SnapPoint[];
-  /** False before the sheet has a laid-out height (the first frame, jsdom): `points` is then a placeholder. */
+export interface SheetDetents {
+  /** scrollTop (= visible height) at rest, collapsed. Equals `full` when `single`. */
+  collapsed: number;
+  /** scrollTop at rest, fully open. Anything above it is the card's content scrolling. */
+  full: number;
+  /** One resting height: nothing to expand into, so the grab bar toggles nothing. */
+  single: boolean;
+  /** False before the track has a laid-out height (the first frame, jsdom). */
   measured: boolean;
 }
 
-const px = (n: number): SnapPoint => `${Math.round(n)}px`;
+/** Less than ~a finger's nudge between the two heights: treat it as one. */
+const MIN_GAP_PX = 24;
 
-export function sheetSnapPoints({ innerHeight, drawerHeight, firstView, content }: SheetMeasure): SheetSnaps {
-  const measured = drawerHeight > 0;
-  const base = innerHeight - drawerHeight;
-  const fullVisible = Math.min(content, drawerHeight);
-  const full: SnapPoint = content >= drawerHeight - 0.5 ? 1 : px(fullVisible + base);
-  const collapsedVisible = firstView === null ? fullVisible : Math.min(firstView, fullVisible);
-  // Less than ~a finger's nudge between the two: one resting height, nothing to expand.
-  if (fullVisible - collapsedVisible < 24) return { collapsed: full, full, points: [full], measured };
-  const collapsed = px(collapsedVisible + base);
-  return { collapsed, full, points: [collapsed, full], measured };
+export function sheetDetents({ trackHeight, firstView, content }: SheetMeasure): SheetDetents {
+  const measured = trackHeight > 0;
+  const full = Math.round(Math.min(content, trackHeight));
+  const collapsed = Math.round(firstView === null ? full : Math.min(firstView, full));
+  if (full - collapsed < MIN_GAP_PX) return { collapsed: full, full, single: true, measured };
+  return { collapsed, full, single: false, measured };
+}
+
+export type Resting = "closed" | "collapsed" | "full";
+
+/**
+ * Which detent a settled scrollTop is at. Scrolled into the content counts as
+ * full. Otherwise the nearest of the three: scroll snap only rests on a
+ * detent, so this just absorbs sub-pixel rounding.
+ */
+export function restingAt(scrollTop: number, d: SheetDetents): Resting {
+  if (scrollTop >= d.full - 2) return "full";
+  const candidates: [Resting, number][] = [
+    ["closed", 0],
+    ["collapsed", d.collapsed],
+    ["full", d.full],
+  ];
+  let best = candidates[0];
+  for (const c of candidates) if (Math.abs(scrollTop - c[1]) < Math.abs(scrollTop - best[1])) best = c;
+  return best[0];
 }

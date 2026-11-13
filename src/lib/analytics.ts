@@ -2,16 +2,20 @@
  * analytics.ts — PostHog core (#485): the init gate, the event allowlist
  * and the sanitizer. Components call `track(EVENTS.X)`.
  *
- * WHY persistence: "memory" + person_profiles: "never", not cookieless_mode
- * (Kyle, 2026-09-26, "option B"): the issue originally chose
- * cookieless_mode: "always", but posthog-js creates no session manager in
- * that mode, so Session Replay never records (verified in iOS Simulator
- * Safari: only /ingest/e/ uploads, never replay snapshots). Memory
- * persistence keeps the privacy page's promises (no cookie, nothing stored
- * on the device) and lets replay work. Cost: every page load is a new
- * anonymous PostHog visitor, so **unique-visitor counts always come from
- * Cloudflare Web Analytics, never PostHog** (Kyle's condition for option B;
- * see #680/#681).
+ * WHY persistence: "sessionStorage" + person_profiles: "never", not
+ * cookieless_mode: posthog-js creates no session manager in cookieless mode,
+ * so Session Replay never records (verified in iOS Simulator Safari,
+ * 2026-09-26). It was "memory" until #919, which made every page load a new
+ * visit; Kyle (2026-11-13) approved a tab-only visit ID instead, so a walk
+ * from the homepage to a place page to Spanish is one `$session_id`, and
+ * closing the tab ends it. Still no cookie and no person profile, and the ID
+ * never outlives the tab, so **unique-visitor counts always come from
+ * Cloudflare Web Analytics, never PostHog** (#680/#681). The privacy page's
+ * `privacy.analytics` text says exactly this; change both together.
+ *
+ * WHY the `returning` flag (#919): a bare "1" under RETURNING_STORAGE_KEY in
+ * localStorage, no ID and no date, so PostHog can split first visits from
+ * repeat ones without anything that tells one browser from another.
  *
  * WHY api_host: "/ingest": PostHog's own SDK bytes and API calls are proxied
  * same-origin through custom-worker.ts's /ingest handler (src/lib/
@@ -28,10 +32,18 @@
  */
 
 const INTERNAL_DEVICE_STORAGE_KEY = "pfm_internal";
+const RETURNING_STORAGE_KEY = "pfm_returning";
+
+// The build's short commit, set by vite.config.ts's `define`. Undefined under
+// vitest, whose config is separate, hence the typeof check.
+declare const __SITE_VERSION__: string | undefined;
+const SITE_VERSION = typeof __SITE_VERSION__ === "string" ? __SITE_VERSION__ : "dev";
 
 type PostHogClient = {
   init: (key: string, config: Record<string, unknown>) => void;
   capture: (name: string, props?: Record<string, unknown>) => void;
+  register: (props: Record<string, unknown>) => void;
+  register_once: (props: Record<string, unknown>) => void;
   stopSessionRecording: () => void;
 };
 
@@ -54,8 +66,8 @@ function isAdminPath(pathname: string): boolean {
 /**
  * True if this browser is flagged as one of Kyle's own — set by the admin
  * sign-in success path (AdminLoginForm.tsx) via markInternalDevice(), since
- * memory-only persistence leaves no other durable, cross-network way to recognize
- * "this is Kyle's phone on cellular" (#485 comment, 2026-09-26).
+ * PostHog's tab-only persistence leaves no other durable, cross-network way
+ * to recognize "this is Kyle's phone on cellular" (#485 comment, 2026-09-26).
  */
 export function isInternalDevice(): boolean {
   if (typeof window === "undefined") return false;
@@ -89,6 +101,36 @@ export function clearInternalDeviceFlag(): void {
 }
 
 export { INTERNAL_DEVICE_STORAGE_KEY };
+
+/** Whether this browser has visited before, then notes that it has. See the header's `returning` WHY. */
+function readAndMarkReturning(): boolean {
+  try {
+    const seen = window.localStorage.getItem(RETURNING_STORAGE_KEY) === "1";
+    if (!seen) window.localStorage.setItem(RETURNING_STORAGE_KEY, "1");
+    return seen;
+  } catch {
+    return false; // Private mode can refuse storage — count it as a first visit.
+  }
+}
+
+/** Facts sent on every event (#919): the build, the connection and the display settings. Nothing about the person. */
+function deviceFacts(): Record<string, unknown> {
+  const nav = navigator as Navigator & {
+    connection?: { effectiveType?: string; saveData?: boolean };
+    standalone?: boolean; // iOS Safari's home-screen flag
+  };
+  const media = (query: string) => window.matchMedia?.(query).matches ?? false;
+  const facts: Record<string, unknown> = {
+    site_version: SITE_VERSION,
+    standalone: media("(display-mode: standalone)") || nav.standalone === true,
+    dark_mode: media("(prefers-color-scheme: dark)"),
+    reduced_motion: media("(prefers-reduced-motion: reduce)"),
+  };
+  // Chromium only; Safari and Firefox have no navigator.connection.
+  if (nav.connection?.effectiveType) facts.effective_type = nav.connection.effectiveType;
+  if (typeof nav.connection?.saveData === "boolean") facts.save_data = nav.connection.saveData;
+  return facts;
+}
 
 /**
  * The full named-event allowlist (#485 + its 2026-09-26 amendment comment,
@@ -235,8 +277,8 @@ export async function initAnalytics(options: InitAnalyticsOptions = {}): Promise
   const posthog = (await import("posthog-js")).default as unknown as PostHogClient;
   posthog.init(key, {
     api_host: "/ingest",
-    // Memory only: no cookie, no localStorage/sessionStorage (see header).
-    persistence: "memory",
+    // Tab-only: the visit ID lives in sessionStorage, never a cookie (see header).
+    persistence: "sessionStorage",
     person_profiles: "never",
     autocapture: true,
     // No PostHog surveys exist (project 630731 has zero, checked 2026-09-29) and
@@ -278,6 +320,21 @@ export async function initAnalytics(options: InitAnalyticsOptions = {}): Promise
       sampleRate: SESSION_REPLAY_SAMPLE_RATE,
       blockSelector: REPLAY_BLOCK_SELECTOR,
     },
+    // Exception and dead-click autocapture are switched on in the PostHog
+    // project settings (#919); posthog-js follows the project when these
+    // options are left unset, so they are deliberately absent here.
   });
+  // Registered straight after init(): posthog-js sends the first pageview on
+  // a timer, so these ride on it too.
+  posthog.register(deviceFacts());
+  // register_once keeps the tab's first answer (it persists in
+  // sessionStorage), so a first visit's second page doesn't flip to true.
+  posthog.register_once({ returning: readAndMarkReturning() });
+  // Location permission as it stands before any prompt; query() never asks.
+  // Async, so the first pageview may go without it.
+  navigator.permissions
+    ?.query({ name: "geolocation" })
+    .then((status) => posthog.register({ geo_permission: status.state }))
+    .catch(() => {});
   client = posthog;
 }

@@ -11,11 +11,15 @@ import { describe, test, expect, vi, beforeEach } from "vitest";
 const capture = vi.fn();
 const init = vi.fn();
 const stopSessionRecording = vi.fn();
+const register = vi.fn();
+const register_once = vi.fn();
 
 vi.mock("posthog-js", () => ({
   default: {
     init,
     capture,
+    register,
+    register_once,
     opt_out_capturing: vi.fn(),
     stopSessionRecording,
   },
@@ -175,18 +179,31 @@ describe("initAnalytics — init options (session replay, masking)", () => {
     );
   });
 
-  test("memory-only persistence (no cookie, nothing stored) and no cookieless_mode, which would disable replay", async () => {
+  // #919: "persistence: "sessionStorage", person_profiles: "never" unchanged".
+  test("tab-only persistence (sessionStorage, never a cookie), no person profiles, and no cookieless_mode, which would disable replay", async () => {
     await initAnalytics({ key: "test-key", pathname: "/" });
     expect(init).toHaveBeenCalledWith(
       "test-key",
       expect.objectContaining({
         api_host: "/ingest",
-        persistence: "memory",
+        persistence: "sessionStorage",
         person_profiles: "never",
       }),
     );
     const [, config] = init.mock.calls[0] as [string, Record<string, unknown>];
     expect(config).not.toHaveProperty("cookieless_mode");
+  });
+
+  // #919: the returning flag is a bare yes in localStorage, pinned for the
+  // tab with register_once so a first visit's later pages don't flip to true.
+  test("returning: false on a first visit, true on the next, and the stored note is only a yes", async () => {
+    await initAnalytics({ key: "test-key", pathname: "/" });
+    expect(register_once).toHaveBeenLastCalledWith({ returning: false });
+    expect(Object.entries(window.localStorage)).toEqual([["pfm_returning", "1"]]);
+
+    _resetAnalyticsStateForTest();
+    await initAnalytics({ key: "test-key", pathname: "/" });
+    expect(register_once).toHaveBeenLastCalledWith({ returning: true });
   });
 
   test("does not override autocapture/heatmaps/web-vitals off — leaves them to PostHog remote config", async () => {

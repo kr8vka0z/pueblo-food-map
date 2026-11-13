@@ -8,11 +8,13 @@
  * here: the panel's `starting:` classes (CSS @starting-style) give it a first
  * frame off screen.
  *
- * WHY only when the browser says motion is welcome (`no-preference`), not
- * merely "not reduce": a reduced-motion visitor gets no slide, so holding the
- * panel would just leave it on screen for a beat; and jsdom (no matchMedia,
- * or a test stub that answers only the breakpoints it knows) keeps the old
- * close-then-gone behavior the existing panel tests assert.
+ * WHY only when the browser says motion is welcome (`no-preference` matches
+ * and `reduce` doesn't), not merely "not reduce": a reduced-motion visitor
+ * gets no slide, so holding the panel would just leave it on screen for a
+ * beat. A real browser answers exactly one of the two. jsdom has no
+ * matchMedia, and the test stubs either answer only the breakpoints they know
+ * or answer every query alike (both true reads as reduced), so the existing
+ * suites keep the close-then-gone behavior they assert.
  */
 
 import { useEffect, useState } from "react";
@@ -21,7 +23,8 @@ import { useEffect, useState } from "react";
 function motionWelcome(): boolean {
   return (
     typeof window !== "undefined" &&
-    window.matchMedia?.("(prefers-reduced-motion: no-preference)")?.matches === true
+    window.matchMedia?.("(prefers-reduced-motion: no-preference)")?.matches === true &&
+    window.matchMedia("(prefers-reduced-motion: reduce)")?.matches !== true
   );
 }
 

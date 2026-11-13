@@ -218,16 +218,19 @@ export default function VenueCardBody({
         </p>
       )}
 
-      {/* Distance + hours today */}
-      <div className={`flex ${sheet ? "items-center gap-4 text-sm" : "flex-wrap items-center gap-3 text-xs"} text-[var(--color-ink-500)]`}>
+      {/* Distance + hours today. Each item stays on one line and the row wraps
+          as a unit (#917 round 3, Kyle: "these are dropping lines"): at 390 in
+          Spanish "1.2 mi de ti" and "Horario desconocido — llama antes" each
+          broke onto two lines; now a long one drops whole to the next line. */}
+      <div className={`flex flex-wrap items-center ${sheet ? "gap-x-4 gap-y-1 text-sm" : "gap-x-3 gap-y-1 text-xs"} text-[var(--color-ink-500)]`}>
         {venue.distanceMiles !== undefined && (
-          <span className={`flex items-center ${sheet ? "gap-1.5" : "gap-1"}`}>
+          <span className={`flex items-center whitespace-nowrap ${sheet ? "gap-1.5" : "gap-1"}`}>
             <MapPin size={iconSm} aria-hidden className="text-[var(--color-ink-400)]" />
             {formatMiles(venue.distanceMiles)} {t("distance.fromYou", locale)}
           </span>
         )}
         {status && status.state !== "no_hours" && (
-          <span className={`flex items-center ${sheet ? "gap-1.5" : "gap-1"}`}>
+          <span className={`flex items-center whitespace-nowrap ${sheet ? "gap-1.5" : "gap-1"}`}>
             <Clock size={iconSm} aria-hidden className="text-[var(--color-ink-400)]" />
             {status.state === "open"
               ? `${t("badge.openNow", locale)} · ${t("badge.closesAt", locale, { time: status.time })}`
@@ -240,7 +243,7 @@ export default function VenueCardBody({
             filter — this label says why there's no open/closed read, with a
             different icon (not Clock) so it's never mistaken for "open". */}
         {status && status.state === "no_hours" && (
-          <span className={`flex items-center ${sheet ? "gap-1.5" : "gap-1"} text-[var(--color-ink-700)] font-medium`}>
+          <span className={`flex items-center whitespace-nowrap ${sheet ? "gap-1.5" : "gap-1"} text-[var(--color-ink-700)] font-medium`}>
             <CircleHelp size={iconSm} aria-hidden className="text-[var(--color-ink-700)]" />
             {t("badge.hoursUnknown", locale)}
           </span>

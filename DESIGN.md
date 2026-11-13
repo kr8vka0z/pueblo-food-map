@@ -499,7 +499,7 @@ These five rulings apply to the whole site. All five are live on the public site
 - **Use something else when:** it's a blessing box (Box card), an event (Event card), or several places (the list).
 - **States:** hours line Open now · Closes 6pm, Opens at 2pm, Closed today, or Hours unknown with its own icon (`circle-question-mark`), so no hours is never read as open. On the phone, everything below the direction buttons starts below the screen edge with its top showing.
 - **Sizes:** phone: 24 pixels in from the sides (`px-5`, the trap) and no top padding: the action row's tap boxes meet the grab bar's, 12 between blocks, name Fraunces 20, the rest 14 (labels 11, operator line 12). Every control taps at 48. Computer: 16 padding, words 12, labels 10, icons a size smaller, notes in full.
-- **Wording:** hours today as a short sentence, times lower case with no :00; distance to one decimal, "0.8 mi from you"; section labels in capitals (HOURS).
+- **Wording:** hours today as a short sentence, times lower case with no :00; distance to one decimal, "0.8 mi from you"; the distance and hours-today items each stay on one line (`whitespace-nowrap`) and the row wraps between them (`flex-wrap`, 4 between lines), so a long Spanish item drops whole to the next line instead of breaking in two; section labels in capitals (HOURS).
 - **Everyone:** the name is the card's heading; Hours is a labelled section; today's row is marked as the current date, not only by color; Bus and Drive say they open a new tab; the star says Add to saved or Remove from saved and whether it's pressed.
 
 ### Search bar (SearchBar)

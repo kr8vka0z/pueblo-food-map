@@ -27,6 +27,7 @@ const boxVenue: Venue = {
 
 const box: PublicBlessingBox = {
   ...boxVenue,
+  category: "blessing_box",
   last_verified: "2026-09-01T00:00:00.000Z",
   box: {
     hostName: null,

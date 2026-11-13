@@ -24,11 +24,11 @@ import { useRouter } from "next/navigation";
 import type { AdminBoxAdopterRow } from "@/lib/boxAdopters";
 import {
   cardClass,
-  dangerButtonTallClass as dangerButtonClass,
+  dangerButtonClass,
   fieldLabelClass,
   formatSubmittedAt,
-  primaryButtonTallClass as primaryButtonClass,
-  secondaryButtonTallClass as secondaryButtonClass,
+  primaryButtonClass,
+  secondaryButtonClass,
 } from "@/lib/adminCardStyles";
 
 export interface SponsorRequestCardProps {

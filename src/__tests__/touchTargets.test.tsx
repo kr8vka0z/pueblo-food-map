@@ -37,6 +37,10 @@ import AdoptBoxForm from "@/components/AdoptBoxForm";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { makeWalk } from "@/__tests__/helpers/walkTestHelpers";
 import { t } from "@/lib/i18n";
+import * as adminStyles from "@/lib/adminCardStyles";
+import * as formClasses from "@/components/formClasses";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 // Box cards mount BoxCheckinPanel's Turnstile widget — same stub as the
 // BoxCardBody/DesktopVenueWindow tests.
@@ -447,5 +451,53 @@ describe("44px leftovers reach the 48px floor (#827)", () => {
     ],
   ])("%s", (_name, find, expected) => {
     expect(classes(find())).toEqual(expect.arrayContaining(expected));
+  });
+});
+
+// #926: the admin's shared class strings are the one place the admin's
+// look is set, so this is the one place they are asserted. Every pressable
+// string keeps the 48 px floor, and none brings back a grey or brightening
+// hover (DESIGN.md R1, R2).
+describe("admin shared class strings", () => {
+  const pressable: [string, string][] = [
+    ["primaryButtonClass", adminStyles.primaryButtonClass],
+    ["secondaryButtonClass", adminStyles.secondaryButtonClass],
+    ["dangerButtonClass", adminStyles.dangerButtonClass],
+    ["ADMIN_PRIMARY_BUTTON", formClasses.ADMIN_PRIMARY_BUTTON],
+    ["ADMIN_SECONDARY_BUTTON", formClasses.ADMIN_SECONDARY_BUTTON],
+    ["chipClass(true)", adminStyles.chipClass(true)],
+    ["chipClass(false)", adminStyles.chipClass(false)],
+    ["tapLinkClass", adminStyles.tapLinkClass],
+    ["inputBase", formClasses.inputBase],
+    ["checkboxRowClass", formClasses.checkboxRowClass],
+  ];
+  test.each(pressable)("%s is at least 48 tall", (_name, value) => {
+    expect(value.split(/\s+/)).toContain("min-h-12");
+  });
+
+  const tones = ["calm", "attention", "quiet", "neutral", "caution", "danger"] as const;
+  const everyString: [string, string][] = [
+    ...Object.entries({ ...adminStyles, ...formClasses }).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+    ["inputBorder(false)", formClasses.inputBorder(false)],
+    ["inputBorder(true)", formClasses.inputBorder(true)],
+    ["chipClass(true)", adminStyles.chipClass(true)],
+    ["chipClass(false)", adminStyles.chipClass(false)],
+    ...tones.map((tone): [string, string] => [`tagClass(${tone})`, adminStyles.tagClass(tone)]),
+    ...["AdminConfirm.tsx", "AdminRowMenu.tsx", "AdminSegmented.tsx"].map((f): [string, string] => [
+      f,
+      readFileSync(join(process.cwd(), "src", "components", f), "utf-8"),
+    ]),
+  ];
+  test.each(everyString)("%s has no grey or brightening hover", (_name, value) => {
+    for (const banned of [
+      "hover:bg-[var(--color-bone-100)]",
+      "hover:bg-[var(--color-bone-200)]",
+      "hover:bg-[var(--color-sage-50)]",
+      "hover:brightness",
+    ]) {
+      expect(value).not.toContain(banned);
+    }
   });
 });

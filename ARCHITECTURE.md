@@ -43,7 +43,9 @@ Browser
         ├── EventListSection.tsx  (events above the places in ListView)
         ├── EventCardBody.tsx  (the event card, lazy; phone = inside BottomSheet,
         │     desktop = inside DesktopSidePanel via EventPanel.tsx — "Event card")
-        ├── BottomSheet.tsx  (mobile: vaul bottom sheet)
+        ├── BottomSheet.tsx  (mobile: the card sheet; ScrollSheet.tsx moves it,
+        │     vaul only while a walking route is on — "Phone card sheet")
+        ├── ScrollSheet.tsx  (the native-scroll sheet with CSS scroll snap, #923)
         ├── VenueCardBody.tsx  (the place card's content, one copy for both
         │     shells — variant "sheet" in BottomSheet, "panel" in
         │     DesktopVenueWindow, which always shows full details, #732;
@@ -1395,7 +1397,7 @@ review** (see "Shared events" below).
 
 - **One body, two shells.** `EventCardBody.tsx` is the card; it is rendered in
   the phone `BottomSheet` (new optional `event` prop, `layout="sheet"`, same
-  vaul sheet, grab bar, Escape and swipe paths as the place card) and, on
+  sheet, grab bar, Escape and swipe paths as the place card) and, on
   desktop, in `DesktopSidePanel` through the small `EventPanel.tsx` wrapper
   (dialog role + scroller). `DesktopVenueWindow` is the *place* card and needs
   a place, so it is not used (refactoring it is #725). Both entry points load
@@ -1422,61 +1424,66 @@ review** (see "Shared events" below).
   re-measures (see "Maps-style sheet"). On a phone the flyer sits
   at the top of the below-the-fold section, not above the badge, so nothing
   above the fold ever moves.
-- **Maps-style sheet** (#882 preview feedback: a swipe dragged the sheet,
-  bounced, then the rest of the card popped in). Every phone card (venue,
-  box, event) now rides vaul snap points: the sheet follows the finger
-  between collapsed and fully open and settles to the nearer one, velocity
-  counting, with vaul's 0.5s ease; a further pull down from collapsed closes
-  (vaul closes on a fast pull; `onRelease` adds the slow one past 100px,
-  restoring the release position first so the slide starts there). The card
-  content is the same at every height: the detail sections keep their full
-  height (no clip, no fade; `inert` while collapsed), and the collapsed snap
+- **Phone card sheet** (#923, replacing #882's vaul snap points; Kyle:
+  "the card slide up/slide down is still just not good"). Every phone card
+  (place, box, event) sits in `ScrollSheet.tsx`, whose movement is the
+  browser's own scrolling: a fixed, transparent, `pointer-events: none`
+  scroll container (the track, `100dvh − 100px peek − safe area`) holds a
+  spacer as tall as itself and then the sheet, so `scrollTop` is the visible
+  height of the sheet. 1px markers at the detents carry `scroll-snap-align`
+  (`snap-mandatory`; the collapsed one is `scroll-snap-stop: always`, so a
+  flick from full rests there), and past fully open the same scroll carries
+  on through the card with native momentum: one swipe grows the sheet and
+  scrolls the details. It is the pure-web-bottom-sheet technique, hand-built
+  (its dismiss needs the Popover API and its shadow DOM sits between our
+  focus, `inert` and Escape handling and the card). `sheetDetents`
+  (`src/lib/sheetSnap.ts`) turns the measurements into scrollTops: collapsed
   is "top of `#bottomsheet-detail` + its `data-peek-px`", read only while
   collapsed (expanded, "Read more" can make the first view taller than it
   will be once collapsed; reading it then left one snap point, so a flick
-  down sprang back, found on the iOS simulator). `sheetSnapPoints`
-  (`src/lib/sheetSnap.ts`) turns the measurements into px snap points
-  (adding `innerHeight − sheet height`, the #549 offset), fully open being
-  the content's own height or `1` when it is taller than the sheet. The
-  content height is the persistent `[data-sheet-content]` wrapper's (not the
-  `flex-1` scroller's, which always fills the sheet), and a ResizeObserver on
-  that wrapper re-measures, so a lazily loaded card body arriving later still
-  counts (never while a finger is down). When the measurement leaves one
-  resting height (a short screen, or a first view taller than the sheet), the
-  card is laid out as expanded: nothing `inert`, the content scrolls, and the
-  grab bar stays drawn as the swipe handle but its button is disabled,
-  `aria-hidden` and `pointer-events-none`, so a touch on it drags the sheet
-  (#917 round 3: a box card's check-in fills the sheet on most phones, and the
-  bar used to go invisible there). It keeps its space either way (removing it
-  moved the content, which flipped the measurement back: a render loop). Clamped text
-  in the sheet (About, a place's notes) is `pointer-events: none`: on iOS
-  Safari a flick that starts on text whose overflow is clipped never scrolls
-  the sheet's content (found on the simulator).
-  Scrolling: the scroller is `overflow-y: hidden` + `touch-action: none`
-  until fully open, so a drag below that always moves the sheet; fully open,
-  vaul's own `shouldDrag` lets a drag up scroll and a drag down move the
-  sheet only at `scrollTop 0`. A non-passive `touchmove` guard cancels the
-  browser's pull-down overscroll at `scrollTop 0` so it can't steal that drag
-  (vaul's own iOS guard is off because `modal`/`repositionInputs` are, #530).
-  `snapToSequentialPoint` keeps a pull from fully open at collapsed. The
-  sheet's height is now `100dvh − peek − safe area` for every card (the
-  route strip's #549 formula), so the #530 toolbar-resize residual
-  documented on `snapPoints` (a smooth re-snap, not a jump) applies to all
-  cards; the map page's document never scrolls, so Safari's toolbar changes
-  only on rotation. Not v2's retired model: v2 swapped content across three
-  snap points; this has two and never changes the content.
+  down sprang back, found on the iOS simulator); full is the sheet's own
+  height or the track's, whichever is shorter. A ResizeObserver on the track
+  and the sheet re-measures, so a lazily loaded card body still counts
+  (never while a finger is down). `restingAt` names the detent a settled
+  scroll (150 ms with no scroll and no finger) is at, and that sets
+  `expanded`; a change of `expanded` from the grab bar, "Read more", the peek
+  or the tour scrolls the track there. Swipe to close: a swipe from collapsed
+  that snaps to 0 closes; a slow pull more than 100px down from collapsed is
+  finished by a scroll to 0 (snap alone would spring back); a swipe that
+  started fully open is floored at collapsed. Scrolled into the content, snap
+  alignment is switched off (`data-deep`), so a layout change in the card
+  can't make Safari re-snap to the sheet's top. WebKit doesn't scroll a
+  `pointer-events: none` container from a touch on its `pointer-events: auto`
+  child, so each part of the sheet gets a 1px sideways overflow (globals.css,
+  iOS only). The track clips the sheet's shadow where their tops meet, so
+  `[data-sheet-edge]`, a sibling outside the track clipped to the strip
+  above it, draws that edge while `data-at-top` is set. When the measurement
+  leaves one resting height (a short card, or a first view taller than the
+  sheet), the card is laid out as expanded: nothing `inert`, and the grab
+  bar stays drawn as the swipe handle but its button is disabled,
+  `aria-hidden` and `pointer-events-none`, so a touch on it scrolls the
+  track (#917 round 3: a box card's check-in fills the sheet on most phones,
+  and the bar used to go invisible there). It keeps its space either way
+  (removing it moved the content, which flipped the measurement back: a
+  render loop). Clamped text in the sheet (About, a place's notes) is
+  `pointer-events: none`: on iOS Safari a flick that starts on text whose
+  overflow is clipped never scrolls (found on the simulator). The map page's
+  document never scrolls. Walking-route mode (#509) is still the vaul drawer
+  (`snapPoints` strip / full card, `dismissible={false}`) until the route
+  strip moves too.
 - **Animated close** (#882 preview feedback: the card "disappeared super
   fast"). Closing clears the selection, and `MapWrapper` used to key the
-  sheet on the selected id or `"empty"`, so a close remounted it and vaul's
-  slide-off never ran. The key is now `sheet-<n>`, bumped only when a card
+  sheet on the selected id or `"empty"`, so a close remounted it and the
+  slide never ran. The key is now `sheet-<n>`, bumped only when a card
   opens (from nothing, or a different item), so switching pins still gets a
   fresh sheet and a close keeps the same one. `BottomSheet` derives `open`
   from its props but renders the last non-null venue / event / box /
-  event-here line, held until vaul's `onAnimationEnd(false)`, then dropped;
-  while closing the content is `inert`. Swipe-down, × and Escape all close
-  through vaul's own slide (0.5s, its ease). The sheet is `modal={false}`,
-  so there is no scrim to fade. While a walk route is active nothing
-  changed: clearing the route flips `Drawer.Root`'s route/card key as before.
+  event-here line, held until the close is over (`SHEET_CLOSE_MS`, or vaul's
+  `onAnimationEnd(false)` in route mode), then dropped; while closing the
+  content is `inert`. Swipe-down, Close and Escape all end in the track's
+  smooth scroll to 0. There is no scrim to fade. While a walk route is
+  active nothing changed: clearing the route flips back from vaul to the
+  scroll sheet.
 - **Action button** (#882, replaced the "More information" link).
   `eventAction()` (`src/lib/eventCard.ts`, pure) turns `link_url` +
   `link_label(_custom/_es)` into the href (only if `safeUrl()` accepts it; no

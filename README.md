@@ -89,7 +89,7 @@ scripts/           Data pipeline, seed, and lint scripts (never imported by the 
 - **Next.js 16** (App Router) + TypeScript
 - **Tailwind CSS v4**
 - **Mapbox GL JS v3** + `react-map-gl` v8 (vector tiles, `streets-v12` basemap)
-- **vaul** (bottom sheet on mobile)
+- **vaul** (the phone sheet while a walking route is on; every other phone card moves by native scrolling, `ScrollSheet.tsx`)
 - **lucide-react** (icons)
 - **Cloudflare Turnstile** (bot protection on submission forms)
 - **Resend** (transactional email for form submissions)

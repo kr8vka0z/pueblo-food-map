@@ -6,7 +6,7 @@
  *
  * Exports:
  *   inputBase                text box / select / textarea: 48 tall, 16 px words on phones (14 from md)
- *   inputBorder(hasError)    its edge and focus colour: ink 400 at rest (3:1 on white) with a sage focus;
+ *   inputBorder(hasError)    its edge and focus colour: ink 400 at rest (5.9:1 on white, clears the 3:1 floor) with a sage focus;
  *                            on error red at rest AND in focus. Always pair it with inputBase.
  *   labelClass, errorClass   the label above a field and the red line under it
  *   hintClass                the "(optional)" hint inside a label, ink 400 (DESIGN.md Forms)
@@ -33,7 +33,7 @@ export const inputBase =
   "bg-white placeholder:text-[var(--color-ink-400)] " +
   "focus-visible:outline-none focus-visible:ring-2";
 // WHY ink 400 and not bone 300: a text box's edge is the only thing that
-// shows where to type, so it needs the 3:1 non-text floor (ink 400 is 5.8:1
+// shows where to type, so it needs the 3:1 non-text floor (ink 400 is 5.9:1
 // on white; bone 300 was 1.6:1). Outline BUTTON edges stay bone 300.
 // WHY the focus colours live here and not in inputBase: a wrong value must
 // stay red while its box has focus, and a second focus colour appended to

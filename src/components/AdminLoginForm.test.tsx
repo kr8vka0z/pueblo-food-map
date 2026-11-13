@@ -135,13 +135,18 @@ describe("AdminLoginForm — signed-out: email code (#684)", () => {
     expect(screen.getByLabelText(/sign-in code/i)).toHaveFocus();
   });
 
-  test("Resend code is disabled for 30 seconds after a send, then sends a new code", async () => {
+  // #926: Resend is marked busy (aria-disabled), not natively disabled, so a
+  // keyboard user's focus stays on it after pressing; presses during the
+  // countdown send nothing.
+  test("Resend code is blocked for 30 seconds after a send, then sends a new code and keeps focus", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       const user = await reachCodeStep();
       const resend = screen.getByRole("button", { name: /resend code/i });
-      expect(resend).toBeDisabled();
+      expect(resend).toHaveAttribute("aria-disabled", "true");
       expect(resend).toHaveTextContent("Resend code (30s)");
+      await user.click(resend);
+      expect(mockSendCode).toHaveBeenCalledTimes(1);
 
       // One tick per second, each flushed through React (the ticker chains timeouts).
       for (let i = 0; i < 31; i++) {
@@ -149,11 +154,15 @@ describe("AdminLoginForm — signed-out: email code (#684)", () => {
           await vi.advanceTimersByTimeAsync(1000);
         });
       }
-      await waitFor(() => expect(screen.getByRole("button", { name: /resend code/i })).not.toBeDisabled());
-      await user.click(screen.getByRole("button", { name: /resend code/i }));
+      await waitFor(() => expect(screen.getByRole("button", { name: /resend code/i })).not.toHaveAttribute("aria-disabled"));
+      screen.getByRole("button", { name: /resend code/i }).focus();
+      await user.keyboard("{Enter}");
 
       expect(mockSendCode).toHaveBeenCalledTimes(2);
-      expect(screen.getByRole("button", { name: /resend code/i })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /resend code/i })).toHaveAttribute("aria-disabled", "true");
+      expect(screen.getByRole("button", { name: /resend code/i })).toHaveFocus();
+      await user.keyboard("{Enter}");
+      expect(mockSendCode).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }

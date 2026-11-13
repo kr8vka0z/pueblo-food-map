@@ -49,7 +49,8 @@ const LANG_OPTIONS = [
 
 // `removing` names the host being removed, so only that row says
 // "Removing…" and the Add button only says "Adding…" while adding. Every
-// button stays disabled during any request, as before.
+// button is off during any request: the Remove buttons natively disabled,
+// Add host marked busy (aria-disabled) so keyboard focus stays on it.
 type PanelState =
   | { status: "idle" }
   | { status: "submitting"; removing: string | null }
@@ -113,6 +114,7 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
   // in, the settled way (red edge, a line under it, focus in the box).
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
+    if (state.status === "submitting") return;
     const trimmed = email.trim();
     const problem = !trimmed
       ? "Type the host's email address."
@@ -124,7 +126,11 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
       emailRef.current?.focus();
       return;
     }
-    void mutate("POST", { email, lang }, () => setEmail(""));
+    // Focus back in the empty box, so a second host can be typed at once.
+    void mutate("POST", { email, lang }, () => {
+      setEmail("");
+      emailRef.current?.focus();
+    });
   }
 
   function handleRemove(hostEmail: string, index: number) {
@@ -221,7 +227,14 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
               onChange={(v) => setLang(v === "es" ? "es" : "en")}
             />
           </div>
-          <button type="submit" disabled={state.status === "submitting"} className={`${primaryButtonClass} sm:mt-[24px]`}>
+          {/* WHY aria-disabled, not disabled: a natively disabled button
+              drops keyboard focus to the top of the page while it adds;
+              handleAdd ignores presses while a request runs. */}
+          <button
+            type="submit"
+            aria-disabled={state.status === "submitting" || undefined}
+            className={`${primaryButtonClass} sm:mt-[24px] aria-disabled:cursor-not-allowed aria-disabled:opacity-50`}
+          >
             {state.status === "submitting" && state.removing === null ? "Adding…" : "Add host"}
           </button>
         </div>

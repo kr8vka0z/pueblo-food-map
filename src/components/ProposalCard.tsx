@@ -142,6 +142,10 @@ function capitalizeDay(day: string): string {
   return day.charAt(0).toUpperCase() + day.slice(1);
 }
 
+function lowerFirst(words: string): string {
+  return words.charAt(0).toLowerCase() + words.slice(1);
+}
+
 /**
  * Per-day hours summary shared by formatFieldValue (update diffs) and
  * AddDetails (new-venue proposals) — routes every slot through
@@ -698,7 +702,8 @@ function ProposalSourceNotes({ diff, showSummary }: { diff: ProposedDiff; showSu
           key={p.field}
           className="rounded-[var(--radius-md)] bg-[var(--color-clay-100)] px-2 py-1.5 text-sm text-[var(--color-clay-700)]"
         >
-          <span className="font-medium">The venue told us the {fieldLabel(p.field).toLowerCase()}</span> on{" "}
+          {/* Only the first letter is lowered, so "Accepts SNAP" reads "the accepts SNAP", never "accepts snap". */}
+          <span className="font-medium">The venue told us the {lowerFirst(fieldLabel(p.field))}</span> on{" "}
           {formatLastVerified(p.pinned_at.slice(0, 10))}
           {p.note ? ` (${p.note})` : ""}.
           {p.stale ? " That was over a year ago, so this change may be right; renew the pin if the venue confirms again." : " Approve only if you trust this source over the venue."}

@@ -51,11 +51,18 @@ type ActionState =
 
 export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
   const router = useRouter();
-  // Focus goes to the reason box on open and back to the button on Cancel (#926).
-  const { open: rejectOpen, openStep: openReject, closeStep: closeReject, triggerRef: rejectRef, fieldRef: reasonRef } =
-    useAdminStep();
   const [reason, setReason] = useState("");
   const [state, setState] = useState<ActionState>({ status: "idle" });
+  // Focus goes to the reason box on open and back to the button on Cancel (#926).
+  const { open: rejectOpen, openStep: openReject, closeStep: closeReject, triggerRef: rejectRef, fieldRef: reasonRef } =
+    useAdminStep({ busy: state.status === "submitting", onCancel: cancelReject });
+
+  // The step's Cancel; Escape runs it too, so the typed reason is cleared either way.
+  function cancelReject() {
+    setReason("");
+    setState({ status: "idle" });
+    closeReject();
+  }
 
   const isFlagged = photo.status === "flagged";
   const reasonFieldId = `photo-reject-reason-${photo.id}`;
@@ -166,11 +173,7 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => {
-                setReason("");
-                setState({ status: "idle" });
-                closeReject();
-              }}
+              onClick={cancelReject}
               disabled={state.status === "submitting"}
               className={secondaryButtonClass}
             >

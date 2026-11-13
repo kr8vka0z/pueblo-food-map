@@ -63,6 +63,30 @@ describe("HostAlertsAdminPanel", () => {
     expect(JSON.parse(init.body as string)).toEqual({ email: "new@example.com", lang: "en" });
   });
 
+  // #926: Add host keeps keyboard focus while it adds (a natively disabled
+  // button would drop it to the top of the page), a second press sends
+  // nothing, and after the add focus is back in the empty box for the next host.
+  test("Add host keeps focus while adding, ignores a second press, then puts focus back in the box", async () => {
+    let resolve: (v: Response) => void = () => {};
+    mockFetch.mockImplementationOnce(() => new Promise((r) => (resolve = r)));
+    const user = userEvent.setup();
+    render(<HostAlertsAdminPanel venueId="box-1" initialHosts={[]} />);
+
+    const box = screen.getByLabelText("Add a host email");
+    await user.type(box, "new@example.com");
+    const add = screen.getByRole("button", { name: "Add host" });
+    add.focus();
+    await user.keyboard("{Enter}");
+    expect(add).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    resolve(new Response(JSON.stringify({ ok: true, result: "added", hosts: [{ id: 1, email: "new@example.com" }] }), { status: 200 }));
+    await waitFor(() => expect(screen.getByText("new@example.com")).toBeInTheDocument());
+    expect(box).toHaveValue("");
+    expect(box).toHaveFocus();
+  });
+
   test("picking Spanish on the language slider sends lang 'es'", async () => {
     const user = userEvent.setup();
     mockFetch.mockResolvedValueOnce(

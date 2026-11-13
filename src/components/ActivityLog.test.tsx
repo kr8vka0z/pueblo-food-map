@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, test } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import ActivityLog from "@/components/ActivityLog";
 import { buildActivityDays, parseActivityFilters, type AuditActionRow, type AuthEventRow } from "@/lib/activityLog";
 
@@ -76,16 +76,17 @@ describe("ActivityLog", () => {
     expect(screen.getByRole("link", { name: "Show older" }).getAttribute("href")).toBe("/admin/activity?until=x");
   });
 
-  test("an empty page says so, and offers Clear filters only when a filter is set", () => {
-    // Scoped to the empty box: the filter form above it carries its own
-    // Clear filters at all times (#926 A16, renamed from Reset).
-    const emptyBox = () => screen.getByText("No activity matches these filters.").parentElement!;
-    const { unmount } = render(<ActivityLog days={[]} filters={filters} people={[]} olderHref={null} />);
-    expect(within(emptyBox()).queryByRole("link", { name: "Clear filters" })).toBeNull();
-    unmount();
-
-    render(<ActivityLog days={[]} filters={{ ...filters, q: "pantry" }} people={[]} olderHref={null} filtered />);
-    expect(within(emptyBox()).getByRole("link", { name: "Clear filters" }).getAttribute("href")).toBe("/admin/activity");
+  // #926: one Clear filters on the page (in the form), and the empty line
+  // only speaks of filters when a filter is set.
+  test.each([
+    ["no filter set", false, "No activity yet."],
+    ["a filter set", true, "No activity matches these filters."],
+  ])("an empty page with %s says so and shows one Clear filters", (_case, filtered, line) => {
+    render(<ActivityLog days={[]} filters={filtered ? { ...filters, q: "pantry" } : filters} people={[]} olderHref={null} filtered={filtered} />);
+    expect(screen.getByText(line)).toBeDefined();
+    const clear = screen.getAllByRole("link", { name: "Clear filters" });
+    expect(clear).toHaveLength(1);
+    expect(clear[0].getAttribute("href")).toBe("/admin/activity");
   });
 
   test("labels both automatic refresh actors readably", () => {

@@ -52,6 +52,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
+import { focusFirstProblem } from "@/lib/focusFirstProblem";
 import {
   ADMIN_PRIMARY_BUTTON,
   ADMIN_SECONDARY_BUTTON,
@@ -201,22 +202,6 @@ function TextField({ id, label, value, onChange, max, error, required, multiline
   );
 }
 
-/**
- * Puts focus in the first box marked wrong (aria-invalid) and scrolls it to
- * the middle of the screen; when the only problem is a line with no box (the
- * server's `_form` error), scrolls to that line instead.
- * SHARED-GAP: the same helper sits in AddVenueForm.tsx; it belongs in one
- * shared file (formClasses.ts holds only class strings today).
- */
-function focusFirstProblem(form: HTMLFormElement | null) {
-  const target =
-    form?.querySelector<HTMLElement>('[aria-invalid="true"]') ?? form?.querySelector<HTMLElement>('[role="alert"]');
-  if (!target) return;
-  target.focus({ preventScroll: true });
-  // Optional call: jsdom has no scrollIntoView.
-  target.scrollIntoView?.({ block: "center" });
-}
-
 /** Client-side mirror of the server rules, for instant feedback only (the route re-checks everything). */
 function validateClient(v: EventFormValues, cancelling: boolean): FieldErrors {
   const e: FieldErrors = {};
@@ -248,14 +233,15 @@ export default function EventForm({ venues, eventId, initialValues, status: init
   const [version, setVersion] = useState(expectedUpdatedAt);
   // Cancel event is a step (#926): "Cancel event" stays mounted and hidden
   // while it is open, focus goes to the English note box, and Keep event
-  // hands focus back to "Cancel event".
+  // hands focus back to "Cancel event". Escape does what Keep event does,
+  // and nothing while a request runs.
   const {
     open: cancelling,
     openStep: openCancelStep,
     closeStep: closeCancelStep,
     triggerRef: cancelEventRef,
     fieldRef: cancelNoteRef,
-  } = useAdminStep();
+  } = useAdminStep({ busy, onCancel: keepEvent });
   // #926: after a Save with problems, focus (and so the scroll) goes to the
   // first box marked wrong. Bumped on every refusal, so a second one moves focus again.
   const formRef = useRef<HTMLFormElement>(null);
@@ -483,7 +469,9 @@ export default function EventForm({ venues, eventId, initialValues, status: init
   }
 
   const cancelNoteFields = (
-    <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] p-4">
+    // data-admin-step: the note sits in its own TextField wrapper, so the
+    // step's Escape listener goes on this box to work from both buttons too.
+    <fieldset data-admin-step className="rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] p-4">
       <legend className={`${labelClass} px-1`}>Cancellation note</legend>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <TextField id="event-cancel-note" multiline required label="Note (English)" value={values.cancelNote} onChange={(v) => set("cancelNote", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note} fieldRef={cancelling ? cancelNoteRef : undefined} />

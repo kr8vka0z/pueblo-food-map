@@ -123,7 +123,7 @@ function ActionLine({ item }: { item: ActivityItem }) {
                 {c.after}
               </li>
             ))}
-            {summary.moreChanges > 0 && <li className="text-[var(--color-ink-500)]">+{summary.moreChanges} more fields</li>}
+            {summary.moreChanges > 0 && <li className="text-[var(--color-ink-500)]">+{summary.moreChanges} more {summary.moreChanges === 1 ? "field" : "fields"}</li>}
           </ul>
         )}
       </div>
@@ -225,7 +225,7 @@ export interface ActivityLogProps {
   people: string[];
   /** href for the next "Show older" page, or null. */
   olderHref: string | null;
-  /** True when the address carried any filter, so an empty result offers Clear filters. */
+  /** True when the address carried any filter: an empty result then says no activity matches, else "No activity yet." */
   filtered?: boolean;
 }
 
@@ -282,7 +282,7 @@ export default function ActivityLog({ days, filters, people, olderHref, filtered
           <button type="submit" className={`${ADMIN_PRIMARY_BUTTON} flex-1`}>
             Show activity
           </button>
-          {/* Same name and size as the empty box's Clear filters: one job, one name (#926). */}
+          {/* The page's one Clear filters, always here, so an empty result needs no second one (#926). */}
           <Link href="/admin/activity" className={secondaryButtonClass}>
             Clear filters
           </Link>
@@ -290,13 +290,9 @@ export default function ActivityLog({ days, filters, people, olderHref, filtered
       </form>
 
       {days.length === 0 ? (
+        // No second Clear filters here: the form above always has one (#926).
         <div className={emptyStateClass}>
-          <p>No activity matches these filters.</p>
-          {filtered && (
-            <Link href="/admin/activity" className={secondaryButtonClass}>
-              Clear filters
-            </Link>
-          )}
+          <p>{filtered ? "No activity matches these filters." : "No activity yet."}</p>
         </div>
       ) : (
         days.map((day) => (

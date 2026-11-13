@@ -44,7 +44,8 @@ describe("AllBoxesTable — empty states", () => {
     render(<AllBoxesTable entries={[entryWithStatus("a", "ok", 1)]} />);
     await user.type(screen.getByLabelText("Search boxes"), "no such box");
     expect(screen.getByText("No boxes match these filters.")).toBeDefined();
-    expect(screen.getByText("Showing 0 of 1 boxes")).toBeDefined();
+    // #926: one box in all is "box", not "boxes".
+    expect(screen.getByText("Showing 0 of 1 box")).toBeDefined();
   });
 
   // DESIGN.md "Empty states" step 3: Clear filters clears the status, the

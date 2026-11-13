@@ -2,7 +2,8 @@
  * rejectStepFocus.test.tsx — the four change cards' reason step (Reject,
  * Remove photo, Decline) keeps keyboard focus (#926): opening it moves focus
  * to the reason box, and Cancel hands it back to the button that opened it,
- * which stays mounted while the step is open. Cards are built from the same
+ * which stays mounted while the step is open; Escape does what Cancel does
+ * and clears the typed reason. Cards are built from the same
  * row parsers the admin pages use.
  */
 
@@ -67,7 +68,7 @@ const submission = parseSubmissionRow({
   review_reason: null,
 });
 
-test.each<[string, string, () => ReactElement]>([
+const CARDS: [string, string, () => ReactElement][] = [
   [
     "PhotoReviewCard",
     "Reject",
@@ -107,7 +108,9 @@ test.each<[string, string, () => ReactElement]>([
   ],
   ["ProposalCard", "Reject", () => <ProposalCard proposal={proposal} />],
   ["SubmissionCard", "Reject", () => <SubmissionCard submission={submission} />],
-])("%s: opening the step focuses the reason box; Cancel returns focus to %s", async (_card, trigger, card) => {
+];
+
+test.each(CARDS)("%s: opening the step focuses the reason box; Cancel returns focus to %s", async (_card, trigger, card) => {
   const user = userEvent.setup();
   render(card());
   const opener = screen.getByRole("button", { name: trigger });
@@ -119,5 +122,23 @@ test.each<[string, string, () => ReactElement]>([
   expect(screen.queryByRole("textbox", { name: /^Reason/ })).toBeNull();
   expect(screen.getByRole("button", { name: trigger })).toBe(opener); // the same element, never remounted
   expect(opener).toHaveFocus();
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+// #926: Escape leaves the same state behind as Cancel: the step closes, the
+// typed reason is gone when it reopens, focus is back on the opener, nothing sent.
+test.each(CARDS)("%s: Escape closes the step and clears the typed reason", async (_card, trigger, card) => {
+  const user = userEvent.setup();
+  render(card());
+  const opener = screen.getByRole("button", { name: trigger });
+
+  await user.click(opener);
+  await user.type(screen.getByRole("textbox", { name: /^Reason/ }), "Duplicate");
+  await user.keyboard("{Escape}");
+
+  expect(screen.queryByRole("textbox", { name: /^Reason/ })).toBeNull();
+  expect(opener).toHaveFocus();
+  await user.click(opener);
+  expect(screen.getByRole("textbox", { name: /^Reason/ })).toHaveValue("");
   expect(fetchMock).not.toHaveBeenCalled();
 });

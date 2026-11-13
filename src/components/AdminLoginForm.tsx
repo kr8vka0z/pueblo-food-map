@@ -13,7 +13,8 @@
  *    (`inputmode="numeric"`, `autocomplete="one-time-code"` so iOS/Android
  *    can fill it from the email) → "Sign in" (authClient.signIn.emailOtp).
  *    Six digits submit on their own, so an autofilled code signs straight
- *    in. "Resend code" is disabled for 30 s after each send.
+ *    in. "Resend code" can't be pressed for 30 s after each send (marked
+ *    aria-disabled, not disabled, so keyboard focus stays on it).
  * A successful sign-in flips `authClient.useSession()` (Better Auth's
  * client refetches the session after a /sign-in call), which renders the
  * signed-in view below — exactly what a link sign-in used to land on.
@@ -79,7 +80,7 @@ function codeErrorMessage(error: { code?: string; status?: number } | null | und
 const primaryButtonClass = `${ADMIN_PRIMARY_BUTTON} w-full`;
 const secondaryButtonClass = `${ADMIN_SECONDARY_BUTTON} w-full`;
 // The small text buttons under the code box: 48 tall tap area plus the ring.
-const textButtonClass = `${tapLinkClass} text-sm disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60`;
+const textButtonClass = `${tapLinkClass} text-sm aria-disabled:cursor-not-allowed aria-disabled:no-underline aria-disabled:opacity-60`;
 
 export default function AdminLoginForm() {
   const { data: session, isPending: sessionPending } = authClient.useSession();
@@ -355,10 +356,14 @@ export default function AdminLoginForm() {
               wrapped to two rows and jumped back to one as the countdown's
               digits narrowed (the card moved 56 px). Stacked, neither moves. */}
           <div className="mt-4 flex flex-col items-start gap-2">
+            {/* WHY aria-disabled, not disabled: a natively disabled button
+                drops keyboard focus to the top of the page the moment it is
+                pressed; this one keeps it, and handleResend ignores presses
+                while the countdown runs. */}
             <button
               type="button"
               onClick={handleResend}
-              disabled={resendIn > 0}
+              aria-disabled={resendIn > 0 || undefined}
               className={`${textButtonClass} tabular-nums`}
             >
               {resendIn > 0 ? `Resend code (${resendIn}s)` : "Resend code"}

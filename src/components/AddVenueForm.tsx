@@ -95,6 +95,7 @@ import {
 } from "@/components/formClasses";
 import { dangerButtonClass, failureBoxClass, failureLineClass, secondaryButtonClass } from "@/lib/adminCardStyles";
 import { EMAIL_RE } from "@/lib/email";
+import { focusFirstProblem } from "@/lib/focusFirstProblem";
 import type { IrregularSchedule, VenueCategory, WeeklyHours } from "@/types/venue";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -388,22 +389,6 @@ function validateClient(values: AddVenueFormValues): FieldErrors {
     errors.email = "Enter a valid email address.";
   }
   return errors;
-}
-
-/**
- * Puts focus in the first box marked wrong (aria-invalid) and scrolls it to
- * the middle of the screen; when the only problem is a line with no box of
- * its own (the server's hours error), scrolls to that line instead.
- * SHARED-GAP: the same helper sits in EventForm.tsx; it belongs in one
- * shared file (formClasses.ts holds only class strings today).
- */
-function focusFirstProblem(form: HTMLFormElement | null) {
-  const target =
-    form?.querySelector<HTMLElement>('[aria-invalid="true"]') ?? form?.querySelector<HTMLElement>('[role="alert"]');
-  if (!target) return;
-  target.focus({ preventScroll: true });
-  // Optional call: jsdom has no scrollIntoView.
-  target.scrollIntoView?.({ block: "center" });
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────

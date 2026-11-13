@@ -334,7 +334,7 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
       </div>
 
       <p aria-live="polite" className="mb-2 text-sm text-[var(--color-ink-500)]">
-        Showing {filtered.length} of {entries.length} boxes
+        Showing {filtered.length} of {entries.length} {entries.length === 1 ? "box" : "boxes"}
       </p>
 
       {/* Nothing matches: its own box, not a cell of the 720-wide table, so

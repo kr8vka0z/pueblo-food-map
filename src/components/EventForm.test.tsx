@@ -95,9 +95,20 @@ describe("EventForm validation", () => {
     await waitFor(() => expect(startsInput()).toHaveFocus());
   });
 
-  // #926: Cancel event is a step with a way back. Keep event sends nothing,
-  // drops the half-typed note, and hands focus back to "Cancel event".
-  test("Keep event closes the cancel step, sends nothing, clears the note and returns focus", async () => {
+  // #926: Cancel event is a step with a way back. Keep event, or Escape from
+  // anywhere in the step (here the red button, outside the note's own
+  // wrapper), sends nothing, drops the half-typed note, and hands focus back
+  // to "Cancel event".
+  test.each<[string, () => Promise<void>]>([
+    ["Keep event", () => userEvent.click(screen.getByRole("button", { name: /^keep event$/i }))],
+    [
+      "Escape",
+      async () => {
+        screen.getByRole("button", { name: /^confirm cancel event$/i }).focus();
+        await userEvent.keyboard("{Escape}");
+      },
+    ],
+  ])("%s closes the cancel step, sends nothing, clears the note and returns focus", async (_way, close) => {
     render(
       <EventForm
         venues={VENUES}
@@ -112,7 +123,7 @@ describe("EventForm validation", () => {
     expect(note).toHaveFocus();
     await userEvent.type(note, "Rained out");
 
-    await userEvent.click(screen.getByRole("button", { name: /^keep event$/i }));
+    await close();
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.queryByLabelText(/^Note \(English\)/)).toBeNull();

@@ -17,7 +17,7 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, within, act } from "@testing-library/react";
+import { render, screen, within, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import MapWrapper from "@/components/MapWrapper";
 import { LocaleProvider } from "@/lib/LocaleContext";
@@ -178,7 +178,11 @@ describe("MapWrapper — no-WebGL box card (#524)", () => {
     expect(mockPush).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
 
-    const card = await screen.findByTestId("vaul-content");
+    const card = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>("[data-scroll-sheet]");
+      if (!el) throw new Error("card sheet not open yet");
+      return el;
+    });
 
     // Check-in control present (exact wording per REVIEW.md's standing rule).
     expect(within(card).getByRole("button", { name: /i used this box/i })).toBeTruthy();

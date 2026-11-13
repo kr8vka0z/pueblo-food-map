@@ -1,38 +1,35 @@
 "use client";
 
 /**
- * BottomSheet v5 — vaul-based mobile-only sheet, Maps-style (#666 grab bar,
- * #882 snap-point drag).
+ * BottomSheet v6 (#923) — the phone card
+ * sheet, Maps-style (#666 grab bar).
  *
- * A boolean `expanded` with two resting heights:
- *   collapsed: venue summary — name, category badge, distance, hours-today,
- *              SNAP/WIC pills, two-line notes, Get directions, then the top
- *              of the detail section showing at the screen edge (the "peek")
- *   expanded:  the whole card (address, full hours table, phone, report)
+ * Two containers:
+ *   - every card, no route: ScrollSheet.tsx, whose movement is the browser's
+ *     own scrolling with CSS scroll snap at the resting heights, so one swipe
+ *     grows the sheet and then keeps scrolling the details with native
+ *     momentum (see that file's header for why and how);
+ *   - a walking route on (#509): the vaul drawer as before, strip / full card.
  *
- * Since #882 the sheet is ONE element that follows the finger between those
- * two heights on vaul snap points and settles to the nearer one; the card's
- * content is the same at every height (see "Maps-style sheet" below for the
- * gesture and scroll rules, and why this is not v2's retired model). The
- * grab bar (#666, Kyle's Maps-app-style pick, 2026-09-26) is a real 48×48
- * `<button>` whose accessible name reuses `detail.showDetails` /
- * `detail.hideDetails`. vaul settling on a snap point, a tap on the bar, a
- * tap on the peek and "Read more" all drive the SAME `expanded` state. The
- * detail section is ALWAYS mounted at full height (`inert` while collapsed),
- * so BottomSheet.test.tsx asserts `aria-expanded` rather than visibility.
+ * A boolean `expanded` with two resting heights plus closed:
+ *   collapsed: the card's first view plus the top of the detail section at
+ *              the screen edge (the "peek": 64px for a place, 96 for a box or
+ *              event, the detail section's `data-peek-px`)
+ *   expanded:  fully open, leaving MAP_PEEK_PX of map above it
  *
- * A blessing-box card gets the SAME bar and drag, but its own reordered
- * layout (#667) — `layout="sheet"` on `BoxCardBody` below, see that
- * component's own header for the split between its first view and its
- * below-the-fold section (photo/sponsor/footer).
+ * The grab bar is a real 48×48 `<button>` named Show details / Hide details
+ * with `aria-expanded`. The sheet coming to rest, a tap on the bar, a tap on
+ * the peek, "Read more" and the tour's `forceExpanded` all drive the SAME
+ * `expanded` state. The detail section is ALWAYS mounted (`inert` while
+ * collapsed), so the tests assert `aria-expanded` rather than visibility.
  *
- * vaul is the drawer container for the drag, Escape and the a11y
- * Dialog.Title, in two snap-point modes: the card (collapsed / fully open,
- * measured from the card) and the route strip (#509 below, strip / full card).
+ * A blessing-box card gets the SAME bar, but its own reordered layout (#667),
+ * `layout="sheet"` on `BoxCardBody` below.
  *
  * Three dismissal paths:
- *   1. Escape key (vaul handles natively via onOpenChange) — #527: gated on
- *      `claimEscape()` inside `onEscapeKeyDown` below, so Escape with a
+ *   1. Escape key (ScrollSheet's document capture listener; vaul's
+ *      `onEscapeKeyDown` in route mode) — #527: gated on
+ *      `claimEscape()`, so Escape with a
  *      higher overlay open on top of this sheet (Filters, the Menu) no
  *      longer ALSO closes the card underneath — see overlayRegistry.ts.
  *      `claimEscape`, not a plain `isTopmostOverlay` check: real-browser
@@ -42,9 +39,9 @@
  *      `claimEscape` marks the Event object itself as spoken for, so a
  *      later listener is rejected regardless of what the stack looks like
  *      by then. See overlayRegistry.ts's own header on `claimEscape`.
- *   2. Swipe down from the collapsed card (#882; vaul on a fast pull, our
- *      `onRelease` on a slow one). There is no scrim (`modal={false}`), and a
- *      tap on the map behind the sheet does not close it.
+ *   2. Swipe down from the collapsed card (ScrollSheet: the sheet scrolled
+ *      to its closed position, or a slow pull past 100px). There is no scrim,
+ *      and a tap on the map behind the sheet does not close it.
  *   3. The close button: since #882 hidden on the phone until it gets keyboard
  *      focus (HIDDEN_UNTIL_FOCUS), so keyboard and screen-reader users keep it
  *      as a dismiss path.
@@ -53,10 +50,8 @@
  * walking route (a box's address tap, or an ordinary place's Walk button —
  * both call the SAME `walk.onWalk`) shrinks this sheet to a short `RouteStrip`
  * instead of leaving the full card covering the map. It has its own two snap
- * points (full card / strip), never v2's three-point content-swapping drag;
- * since #882 the card mode has two snap points of its own too (collapsed /
- * fully open), and the Root's `key` keeps the two modes apart. `dismissible={false}` while a
- * route is active is what makes vaul rest at the strip instead of closing on
+ * points (full card / strip), never v2's three-point content-swapping drag.
+ * `dismissible={false}` while a route is active is what makes vaul rest at the strip instead of closing on
  * a drag-down (vaul's own contract: with snapPoints + dismissible=false,
  * dragging down from the lowest snap point is a no-op — see vaul's
  * `onDrag`/`noCloseSnapPointsPreCondition`); the same flag also blocks
@@ -67,16 +62,12 @@
  * explicit × button (an imperative `onClose()` call, never routed through
  * vaul's dismissible gate) still closes everything, unchanged.
  *
- * `key={isWalkRouteActive ? "route" : "card"}` on `Drawer.Root` remounts vaul
- * fresh across that transition rather than mutating `snapPoints`/`dismissible`
- * on a live instance — vaul's internal transform/offset state from the
- * pre-transition mode isn't guaranteed to reset otherwise (advisor()-reviewed
- * 2026-09-19). The trade-off: the shrink-to-strip transition is a fresh open
- * (a slide-in), not a morph of the outgoing full card — acceptable, and
- * simpler than vaul's snap-point internals to get provably right.
+ * Starting or clearing a route swaps the container (ScrollSheet ⇄ vaul), so
+ * each mode mounts fresh: the shrink-to-strip transition is a fresh open (a
+ * slide-in), not a morph of the outgoing full card.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { Drawer } from "vaul";
 import { X } from "lucide-react";
@@ -87,8 +78,8 @@ import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { HIDDEN_UNTIL_FOCUS } from "@/lib/interactionStyles";
 import { isNativeDialogOpen } from "@/lib/dialogGuard";
 import { claimEscape, useOverlayStackId } from "@/lib/overlayRegistry";
-import { sheetSnapPoints, type SheetSnaps } from "@/lib/sheetSnap";
-import { prefersReducedMotion } from "@/lib/useMediaQuery";
+import type { Resting } from "@/lib/sheetSnap";
+import ScrollSheet, { MAP_PEEK_PX } from "@/components/ScrollSheet";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import VenueCardBody from "@/components/VenueCardBody";
@@ -128,18 +119,10 @@ const BoxCardBody = dynamic(() => import("@/components/BoxCardBody"), {
   loading: () => <BoxCardLoading />,
 });
 
-// #549: the map-peek gap deliberately left visible above the drawer at rest
-// (100px, matches the non-route maxHeight below). Named so the height calc
-// and the strip snap point (ROUTE_STRIP_SNAP, which must be
-// ROUTE_STRIP_HEIGHT_PX + this) can't drift apart — see the `style` prop
-// below for the full derivation.
-const MAP_PEEK_PX = 100;
-// vaul's close slide is 0.5s (its TRANSITIONS.DURATION); the held card is dropped a little after.
+// MAP_PEEK_PX (#549, ScrollSheet.tsx): the map left showing above the fully
+// open sheet; the route strip's snap point below must add it back in.
+// The close slide (smooth scroll, or vaul's 0.5s in route mode); the held card is dropped a little after.
 const SHEET_CLOSE_MS = 600;
-// A pointer that moved further than this was a drag, not a tap.
-const DRAG_SLOP_PX = 8;
-// A slow pull down from the collapsed card this far closes it (vaul alone only closes on a fast one).
-const SLOW_CLOSE_PX = 100;
 // vaul's px snapPoints can't use calc() — a literal string, computed once.
 // #549: this is ROUTE_STRIP_HEIGHT_PX + MAP_PEEK_PX, not ROUTE_STRIP_HEIGHT_PX
 // alone — see the `style` prop below for why the map peek has to be added
@@ -280,202 +263,29 @@ export default function BottomSheet({
   // reusing it as BoxCardBody's own below-the-fold section id too.
   const DETAIL_SECTION_ID = "bottomsheet-detail";
 
-  // ── Maps-style sheet: vaul snap points (#882 preview feedback) ──────────
-  // The sheet follows the finger between collapsed and fully open and
-  // settles to the nearer one (velocity counts); a further pull down from
-  // collapsed closes it. That is vaul's own snap-point drag, so the sheet is
-  // ONE moving element and the content never changes mid-motion: the detail
-  // section is always rendered at full height, and collapsed just means it
-  // sits below the screen edge. vaul's `shouldDrag` also gives the scroll
-  // rules (read in node_modules/vaul/dist/index.mjs): below fully open any
-  // vertical drag moves the sheet; fully open, a drag up scrolls the content
-  // and a drag down moves the sheet only once the content is back at its
-  // top. Our part: the scroller is `overflow-y: hidden` until fully open, so
-  // nothing scrolls early; the two snap heights are measured from the card
-  // (sheetSnap.ts); and a slow pull down from collapsed closes, because vaul
-  // only closes on a fast one (`onRelease` below).
-  //
-  // WHY this is not v2's retired model: v2 (#32, retired in #135 for #122)
-  // swapped the card's CONTENT per snap point across three of them; here the
-  // content is the same at every height and there are two. The #530
-  // trade-off is the route strip's, now for every card: the sheet is
-  // `100dvh`-based and vaul positions it from window.innerHeight, so an iOS
-  // toolbar resize re-snaps it (a smooth slide, not a jump). The map page's
-  // document never scrolls, so that toolbar changes only on rotation.
-  const drawerContentRef = useRef<HTMLDivElement | null>(null);
-  const [snap, setSnap] = useState<SheetSnaps>(() =>
-    sheetSnapPoints({
-      innerHeight: typeof window === "undefined" ? 0 : window.innerHeight,
-      drawerHeight: 0,
-      firstView: null,
-      content: 0,
-    }),
-  );
-  const [snapMeasured, setSnapMeasured] = useState(false);
-  const pointerDownY = useRef<number | null>(null);
-  const lastDragDy = useRef(0);
-  const releaseTransform = useRef("");
-  // A mouse fires `click` after a drag that ends on the same element; touch
-  // doesn't. Set for one tick after a real drag so that click can't toggle.
-  const justDragged = useRef(false);
-  const measurePending = useRef(false);
-  const expandedRef = useRef(expanded);
-  // Layout effect: up to date before the measuring effects below run.
-  useLayoutEffect(() => {
-    expandedRef.current = expanded;
-  });
-  // undefined = not measured yet; null = the card has no detail section.
-  const collapsedFirstView = useRef<number | null | undefined>(undefined);
-  const measureSnap = useCallback(() => {
-    const el = drawerContentRef.current;
-    const scroller = el?.querySelector<HTMLElement>("[data-sheet-scroller]");
-    const content = scroller?.querySelector<HTMLElement>("[data-sheet-content]");
-    if (!el || !scroller || !content) return;
-    if (pointerDownY.current !== null) {
-      // Re-snapping under the finger would fight it; measure on release.
-      measurePending.current = true;
-      return;
-    }
-    const top = el.getBoundingClientRect().top;
-    const detail = scroller.querySelector<HTMLElement>(`#${DETAIL_SECTION_ID}`);
-    // The collapsed height is read only while collapsed. Expanded, the first
-    // view can be taller than it will be once collapsed (About opened with
-    // "Read more" re-clamps on collapse), and reading it then made the
-    // collapsed height reach the fully-open one: one snap point, so a flick
-    // down sprang back instead of collapsing (iOS simulator, #882).
-    if (!expandedRef.current || collapsedFirstView.current === undefined) {
-      collapsedFirstView.current = detail
-        ? detail.getBoundingClientRect().top - top + scroller.scrollTop + Number(detail.dataset.peekPx ?? 64)
-        : null;
-    }
-    const next = sheetSnapPoints({
-      innerHeight: window.innerHeight,
-      drawerHeight: el.offsetHeight,
-      firstView: collapsedFirstView.current,
-      // The card's own bottom, not the scroller's: the `flex-1` scroller fills
-      // the fixed-height sheet, so its scrollHeight is never below the sheet's
-      // and every short card measured as full height (PR #884 review).
-      content: content.getBoundingClientRect().bottom - top + scroller.scrollTop,
-    });
-    // Same points: keep the same object, so vaul isn't handed a new
-    // `snapPoints` array (which makes it re-snap). `measured` only ever turns
-    // true, and is tracked on its own for the same reason: replacing the snap
-    // object for it alone broke scrolling back up on the iOS simulator.
-    setSnap((prev) => (prev.points.join() === next.points.join() ? prev : next));
-    if (next.measured) setSnapMeasured(true);
-  }, []);
-  const resizeObserver = useRef<ResizeObserver | null>(null);
-  // Callback ref: vaul's portal mounts this node after BottomSheet commits;
-  // measuring here (layout phase) sets the snap points before the first paint.
-  const setDrawerContent = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (node === null || node === drawerContentRef.current) return;
-      drawerContentRef.current = node;
-      // Fully open with the content at its top, a finger moving DOWN must
-      // drag the sheet, but the browser would start a native (over)scroll of
-      // the scroller and cancel the pointer events vaul drags with (seen with
-      // CDP touch: the sheet moved ~30px, then sprang back). vaul has this
-      // exact guard (its iOS `preventScrollMobileSafari`) but only with
-      // modal + repositionInputs, both off here for #530. Cancelling that one
-      // touchmove keeps the gesture a drag; upward moves and moves inside
-      // scrolled content are left alone, so they still scroll natively.
-      let lastY = 0;
-      node.addEventListener(
-        "touchstart",
-        (e) => {
-          lastY = e.touches[0]?.clientY ?? 0;
-        },
-        { passive: true },
-      );
-      node.addEventListener(
-        "touchmove",
-        (e) => {
-          const y = e.touches[0]?.clientY ?? lastY;
-          const scroller = (e.target as Element).closest?.("[data-sheet-scroller]") as HTMLElement | null;
-          if (scroller && scroller.scrollTop <= 0 && y > lastY && e.cancelable) e.preventDefault();
-          lastY = y;
-        },
-        { passive: false },
-      );
-      resizeObserver.current?.disconnect();
-      resizeObserver.current = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => measureSnap());
-      resizeObserver.current?.observe(node);
-      measureSnap();
-    },
-    [measureSnap],
-  );
-  useEffect(() => () => resizeObserver.current?.disconnect(), []);
-  // Watch the persistent `[data-sheet-content]` wrapper: it is ours and always
-  // there, so a lazily loaded card body that arrives later (with no render of
-  // this component) still resizes something observed and re-measures (PR #884
-  // review: observing the scroller's first child missed a late chunk). Re-run
-  // each render because the wrapper changes with the branch (event / place).
-  useEffect(() => {
-    const content = drawerContentRef.current?.querySelector("[data-sheet-content]");
-    if (content) resizeObserver.current?.observe(content);
-    measureSnap();
-  });
-  // Collapsing while the content is scrolled: back to the top as the sheet slides down.
-  useEffect(() => {
-    if (expanded) return;
-    drawerContentRef.current
-      ?.querySelector<HTMLElement>("[data-sheet-scroller]")
-      ?.scrollTo?.({ top: 0, behavior: prefersReducedMotion() ? "auto" : "smooth" });
-  }, [expanded]);
-  // Pointer bookkeeping only (vaul runs the drag). vaul calls these composed
-  // handlers BEFORE its own (confirmed in its Content source).
-  function handleContentPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    pointerDownY.current = event.clientY;
-    lastDragDy.current = 0;
-  }
-  function handleContentPointerUp(event: React.PointerEvent<HTMLDivElement>) {
-    const start = pointerDownY.current;
-    pointerDownY.current = null;
-    if (start !== null) lastDragDy.current = event.clientY - start;
-    // Where the drag left the sheet, read before vaul's own release handler moves it.
-    releaseTransform.current = drawerContentRef.current?.style.transform ?? "";
-    if (Math.abs(lastDragDy.current) > DRAG_SLOP_PX) {
-      justDragged.current = true;
-      setTimeout(() => {
-        justDragged.current = false;
-      }, 0);
-    }
-    if (measurePending.current) {
-      measurePending.current = false;
-      measureSnap();
-    }
-  }
-  function handleContentPointerCancel() {
-    pointerDownY.current = null;
-    if (measurePending.current) {
-      measurePending.current = false;
-      measureSnap();
-    }
+  // ── Card mode: the native scroll sheet (ScrollSheet.tsx, #923) ──────────
+  // The sheet's movement is the browser's own scrolling; ScrollSheet reports
+  // where it came to rest and follows `expanded` when the grab bar, the peek,
+  // "Read more" or the tour change it. One measured resting height (a short
+  // card, or a first view taller than the sheet): every card body is laid out
+  // as expanded and the grab bar, which would toggle nothing, is drawn but
+  // disabled (see the bar below).
+  const [singleSnap, setSingleSnap] = useState(false);
+  function handleRest(resting: Resting) {
+    if (resting === "closed") onClose();
+    else setExpandedState(resting === "full");
   }
   function requestExpand() {
-    if (!justDragged.current) setExpandedState(true);
+    setExpandedState(true);
   }
   function toggleExpanded() {
-    if (!justDragged.current) setExpandedState(!expanded);
+    setExpandedState(!expanded);
   }
-  // The content scrolls only once the sheet is fully open (or has only one
-  // height, or is the route card), so a drag below that always moves the sheet.
-  // `overscroll-contain` (#553) is kept either way; see the scroller's note below.
-  // One measured snap point (a short screen, or a first view taller than the
-  // sheet): the sheet is always fully open, so every card body is laid out as
-  // expanded (nothing `inert`, content scrolls) and the grab bar, which would
-  // toggle nothing, is drawn but disabled (see the bar below). Unmeasured
-  // (jsdom, the first frame) doesn't count.
-  const singleSnap = snapMeasured && snap.points.length === 1;
   const cardExpanded = expanded || singleSnap;
-  const scrollerScrolls = cardExpanded || isWalkRouteActive;
-  // `touch-none` below fully open: an overflow-hidden box is still a scroll
-  // container, so the browser would claim a vertical touch as a pan and
-  // cancel the pointer events vaul drags with (seen with CDP touch: the
-  // sheet followed for ~20px, then sprang back).
-  const scrollerClass = scrollerScrolls
-    ? "flex-1 overscroll-contain overflow-y-auto"
-    : "flex-1 overscroll-contain overflow-y-hidden touch-none";
+  // Route mode (vaul) scrolls its own inner scroller; in card mode the whole
+  // track scrolls, so the inner wrapper must NOT be a scroll container or the
+  // hand-off from moving the sheet into scrolling the card is lost.
+  const scrollerClass = isWalkRouteActive ? "flex-1 overscroll-contain overflow-y-auto" : "";
 
   // ── Route strip (#509) ──────────────────────────────────────────────────
   // cardRevealed: true = full card showing, false = strip. Defaults to the
@@ -520,328 +330,45 @@ export default function BottomSheet({
   // toggles nothing).
   const showGrabBar = (venue !== null || event !== null) && !showStrip && (!isBox || box != null);
 
-  function handleOpenChange(isOpen: boolean) {
-    // A drag never reaches here from fully open: `snapToSequentialPoint`
-    // makes vaul step down one snap point at a time, so only a drag from the
-    // collapsed snap (or Escape / a scrim tap) closes.
-    if (!isOpen) onClose();
-  }
+  // ── Pieces shared by both containers ─────────────────────────────────────
+  // Grab bar (#666): a real 48×48 button. A tap toggles; in card mode a drag
+  // that starts on it is just the sheet's own scroll (no click fires). Sits
+  // OUTSIDE the card body so it never scrolls away (ScrollSheet pins it).
+  const grabBar = showGrabBar && (
+          // One resting height (a card whose first view fills the sheet, which a
+          // blessing box's check-in does on a real phone): the bar toggles
+          // nothing, so the button is disabled and hidden from screen readers,
+          // but it stays DRAWN. It is still the handle a swipe down closes the
+          // sheet from, and Kyle saw box cards without it while places had it
+          // (#917 round 3). It keeps its space either way: removing it moved
+          // the content up, which changed the measurement back to two heights,
+          // which brought the bar back: a render loop ("Maximum update depth",
+          // iOS simulator). `pointer-events-none` while disabled: a touch on the
+          // bar then lands on the sheet itself, so the swipe down still scrolls
+          // the track (a disabled control may swallow touch events in some
+          // browsers, and ScrollSheet needs the touchstart/touchend).
+          <div className="flex shrink-0 justify-center pt-2 pb-1" aria-hidden={singleSnap || undefined}>
+            <button
+              type="button"
+              disabled={singleSnap}
+              aria-expanded={expanded}
+              aria-controls={DETAIL_SECTION_ID}
+              aria-label={t(expanded ? "detail.hideDetails" : "detail.showDetails", locale)}
+              onClick={toggleExpanded}
+              className={
+                "flex h-12 w-12 items-center justify-center rounded-md " +
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
+                PRESS_FEEDBACK +
+                (singleSnap ? " pointer-events-none" : "")
+              }
+            >
+              <span aria-hidden className="h-[5px] w-10 rounded-full bg-[var(--color-bone-300)]" />
+            </button>
+          </div>
+        );
 
-  // ── Render ───────────────────────────────────────────────────────────────
-
-  return (
-    <Drawer.Root
-      key={isWalkRouteActive ? "route" : "card"}
-      open={open}
-      onOpenChange={handleOpenChange}
-      onAnimationEnd={handleAnimationEnd}
-      // vaul's snap-point release only closes on a FAST pull down from the
-      // lowest snap; a slow one springs back. A slow pull from collapsed past
-      // SLOW_CLOSE_PX closes too ("another swipe down from collapsed closes
-      // it"). `stillOpen` false means vaul already closed it.
-      onRelease={(_event, stillOpen) => {
-        const el = drawerContentRef.current;
-        if (!stillOpen || isWalkRouteActive || expanded || lastDragDy.current <= SLOW_CLOSE_PX || !el) return;
-        // vaul has just set the transform back to the collapsed snap (its
-        // spring-back). Put it back where the finger let go, so the close
-        // slide starts there instead of jumping up first (seen with CDP touch).
-        el.style.transition = "none";
-        el.style.transform = releaseTransform.current;
-        onClose();
-      }}
-      // One step per release: from fully open a pull down settles at
-      // collapsed, never straight to closed (vaul's velocity shortcut).
-      snapToSequentialPoint={!isWalkRouteActive}
-      modal={false}
-      // #530 review round 3 (BLOCKER, invisible to every test here — every
-      // BottomSheet test mocks vaul): vaul defaults `repositionInputs` to
-      // true, which listens for visualViewport resize (the keyboard
-      // opening/closing) and writes an inline `drawerRef.current.style
-      // .bottom` — and never clears it (vaul/dist/index.mjs's own
-      // onVisualViewportChange effect, ~line 1153). BoxCheckinPanel (inside
-      // this sheet via BoxCardBody) has real input/textarea fields, so
-      // focusing one fires that effect; an inline style always outranks
-      // globals.css's `[data-bottom-sheet]` rule for the life of the
-      // instance, and after the keyboard closes vaul leaves it at literally
-      // `bottom: 0px` — reintroducing the exact #530 slice bug in the check-
-      // in flow. `repositionInputs={false}` turns the whole effect off at
-      // its own early-return guard. Safe here: nothing in this sheet is a
-      // bottom-docked input relying on vaul's keyboard-avoidance resize —
-      // BoxCheckinPanel's fields sit in the sheet's own normal scrollable
-      // flow (`overflow-y-auto`), which the browser's native
-      // focus-scroll-into-view already handles.
-      repositionInputs={false}
-      dismissible={!isWalkRouteActive}
-      // #530 review round 3 (IMPORTANT, KNOWN RESIDUAL, not fixed here):
-      // vaul's useSnapPoints measures `window.innerHeight` for these two px
-      // snap points (unless a `container` prop is passed to Drawer.Root)
-      // and re-runs snapToPoint — an ANIMATED transform — on every window
-      // resize (vaul/dist/index.mjs ~lines 517-524, 540-548, 608-613). iOS
-      // Safari fires a resize event when its toolbar collapses/expands on
-      // scroll, so the route strip (or full card, while a route is active)
-      // can still visibly re-animate to a new snapped position mid-scroll —
-      // in tension with this issue's "must not jump" criterion, though it's
-      // a smooth transition rather than an instant cut.
-      //
-      // Considered passing a `container` element sized from
-      // `var(--viewport-small)` to make vaul's own size reference stable.
-      // Rejected: `container` is ALSO handed straight to `Drawer.Portal`
-      // as its React-portal render target (defaults from context — see
-      // vaul's `Portal()`) and flips `data-vaul-custom-container`, which
-      // disables vaul's own `::after` background-fill rule for the
-      // rubber-band overscroll area. Fixing this one animation would mean
-      // relocating where the sheet portals to AND losing its overscroll
-      // background fill — both unverifiable here (every BottomSheet test
-      // mocks vaul; there's no real Safari touch/drag/overscroll rig on
-      // this machine) and each a plausible regression of its own. Left as
-      // a known residual rather than trading one unverified bug for two.
-      // Route mode: strip / full card (#509). Card mode: collapsed / fully
-      // open, measured from the card (see "Maps-style sheet" above).
-      snapPoints={isWalkRouteActive ? [ROUTE_STRIP_SNAP, FULL_CARD_SNAP] : snap.points}
-      activeSnapPoint={
-        isWalkRouteActive
-          ? cardRevealed
-            ? FULL_CARD_SNAP
-            : ROUTE_STRIP_SNAP
-          : expanded && snap.points.length > 1
-            ? snap.full
-            : snap.collapsed
-      }
-      setActiveSnapPoint={(point) => {
-        if (isWalkRouteActive) {
-          setCardRevealed(point === FULL_CARD_SNAP);
-          return;
-        }
-        if (snap.points.length > 1) setExpandedState(point === snap.full);
-      }}
-    >
-      <Drawer.Portal>
-        <Drawer.Content
-          key={venue?.id ?? event?.id ?? "empty"}
-          // Closing (`!open`): the held card is still sliding away; nothing on it may take focus or be read.
-          inert={inert || !open || undefined}
-          // Composed with vaul's OWN internal `drawerRef` (vaul's `Content`
-          // does `useComposedRefs(ref, drawerRef)` — confirmed in source, so
-          // passing a ref here doesn't replace vaul's, it runs alongside
-          // it), giving `onRelease` above a real DOM node to clear the
-          // leftover drag transform from when we veto a dismiss.
-          ref={setDrawerContent}
-          // Composed the same way — vaul calls `rest.onPointerDown/Up` FIRST,
-          // then its own drag logic (confirmed in source), so these always
-          // fire regardless of whether vaul itself decides to drag. This is
-          // what makes "swipe up anywhere on the collapsed card" possible
-          // without a second competing recognizer on vaul's own gesture.
-          onPointerDown={handleContentPointerDown}
-          onPointerUp={handleContentPointerUp}
-          onPointerCancel={handleContentPointerCancel}
-          // #530 review round 2: no `bottom-0` Tailwind class — Safari's own
-          // toolbar was slicing the sheet's resting edge off the same way it
-          // sliced BottomNav's pill (root cause: a `position:fixed`
-          // element's containing block is always sized to the LARGE
-          // viewport, as if the toolbar were collapsed, so a literal
-          // `bottom: 0` lands under the toolbar once it's actually
-          // expanded). `data-bottom-sheet` hooks the real `bottom` value —
-          // see globals.css's own comment for the formula and why it never
-          // jumps as the toolbar animates.
-          data-bottom-sheet=""
-          className={
-            "fixed left-0 right-0 z-[800] flex flex-col " +
-            "bg-[var(--color-bone-50)] " +
-            "rounded-t-[var(--radius-xl)] " +
-            "elevation-2 " +
-            "focus:outline-none"
-          }
-          // A route-active sheet needs a FIXED height (not maxHeight) for
-          // vaul's px snap point math to land where expected — snapPointsOffset
-          // is computed against the drawer's actual rendered height (see
-          // vaul's useSnapPoints), so a content-hugging maxHeight would put
-          // the "104px from the bottom" strip snap partway through whatever
-          // content happens to render, not at a real fixed strip. Same numeric
-          // value as the non-route maxHeight, so the full-card view (snap
-          // FULL_CARD_SNAP) looks the same size as before; the one visible
-          // change is that the full-card view is now a fixed height rather
-          // than hugging its (usually shorter) content while a route is
-          // active — accepted trade-off, only while a route is active.
-          // #549: vaul computes a px snap point's transform offset as
-          // `offset = window.innerHeight - snapPx` (vaul/dist/index.mjs
-          // ~line 540). For a drawer with `bottom: S` and `height: H`, the
-          // resulting visible height at that snap is
-          //   visible = S + H - window.innerHeight + snapPx
-          // — which only equals `snapPx` (the strip's own height) when
-          // `S + H === window.innerHeight`. This drawer's `bottom` is
-          // `env(safe-area-inset-bottom)` (0 on the test device), so H alone
-          // has to equal window.innerHeight, or the strip snap lands short
-          // (partly or fully off-screen — this issue's bug).
-          // `var(--viewport-small)` (100svh, #530's fix, kept below for the
-          // NON-route branch) is deliberately SHORTER than innerHeight — it
-          // is pinned to the smallest possible viewport specifically so a
-          // bottom-pinned bar never resizes as Safari's toolbar animates —
-          // so using it here under-sizes H by however much svh trails
-          // innerHeight, and vaul's math pushes the strip that far off the
-          // bottom edge. `100dvh` tracks the CURRENT viewport instead, which
-          // Kyle measured equal to `window.innerHeight` on the real device
-          // in both toolbar states (iOS 26, 2026-09-20: Safari 714/714,
-          // Chrome 683/683) — exactly the reference vaul's snap math needs.
-          // KNOWN RESIDUAL, honestly stated because an unmeasured claim in a
-          // comment here hardens into fact for the next agent: this trades
-          // #530's "never jumps" property for correctness at rest, and the
-          // trade is not free. `100svh` was chosen in #530 precisely because
-          // it is INVARIANT through the toolbar animation, so it could never
-          // desync from anything. `100dvh` is the opposite — it tracks the
-          // toolbar continuously, while vaul's own `innerHeight` is cached
-          // and refreshed only on a `window` resize event (index.mjs
-          // ~518-527). If iOS Safari doesn't fire resize continuously through
-          // that animation, the two references can drift apart mid-scroll and
-          // the strip can visibly move, which is the artifact #530 set out to
-          // kill. Kyle's measurement proves the two are EQUAL once the
-          // toolbar settles (both states, both browsers) — it says nothing
-          // about the frames in between, and jsdom cannot test it.
-          //
-          // Accepted anyway, because the alternative is strictly worse, not
-          // merely different: on `--viewport-small` the strip was wrong AT
-          // REST by however far svh trails innerHeight (12px visible instead
-          // of 112, or fully off-screen with the toolbar collapsed). A
-          // possible transient wobble during a toolbar animation beats a
-          // permanently unreachable control. Note also that vaul ALREADY
-          // re-animates to a new snapped position on every resize (see the
-          // `snapPoints` prop's own comment above) — a mid-scroll transition
-          // is pre-existing here, not introduced by this unit change.
-          // If a real device shows the strip jumping while scrolling with a
-          // route up, the next thing to try is vaul's `container` prop, which
-          // replaces `window.innerHeight` as its size reference outright —
-          // read that same comment first for the two side effects that
-          // carries.
-          //
-          // The 100px map peek is carved out of H and added back into the
-          // snap point instead (MAP_PEEK_PX, folded into ROUTE_STRIP_SNAP
-          // above) — that keeps the drawer's resting top edge a constant
-          // MAP_PEEK_PX below the window top in both toolbar states, and
-          // the strip's own visible height pinned at exactly
-          // ROUTE_STRIP_HEIGHT_PX regardless of toolbar collapse.
-          //
-          // #882: the card branch now uses snap points too (the Maps-style
-          // sheet), so it takes the same height for the same reason: vaul's px
-          // offsets only land right when the sheet's height tracks
-          // window.innerHeight. It used `var(--viewport-small)` max-height
-          // before; the trade-off above now applies to every card.
-          style={{ height: `calc(100dvh - ${MAP_PEEK_PX}px - env(safe-area-inset-bottom))` }}
-          aria-label={t("detail.venueDetailsPanel", locale)}
-          // #508 fix pass: Escape while a box's PhotoViewer is open must
-          // close ONLY the photo, not this whole sheet. vaul forwards this
-          // prop straight through to Radix's DismissableLayer, which only
-          // dismisses `if (!event.defaultPrevented)` — see dialogGuard.ts's
-          // own header for why this is the one race-free interception
-          // point (Radix's Escape listener is a document-level CAPTURE
-          // listener; nothing inside the photo dialog can out-race it).
-          onEscapeKeyDown={(event) => {
-            if (isNativeDialogOpen()) {
-              event.preventDefault();
-              return;
-            }
-            // #527/#604: a higher overlay (Filters, the Menu) is open on top
-            // of this sheet — block vaul's own dismiss so Escape doesn't
-            // close BOTH; the topmost overlay's own Escape handling (a
-            // separate, bubble-phase `document` listener — this prop is
-            // Radix's CAPTURE-phase interception point, see dialogGuard.ts's
-            // header) still runs for the same keydown and closes itself
-            // instead. `claimEscape`, not a bare `isTopmostOverlay` check —
-            // see overlayRegistry.ts's own header on why a plain topmost
-            // check isn't race-free across a single keydown's multiple
-            // listeners in a real browser.
-            if (!claimEscape(overlayId, event)) {
-              event.preventDefault();
-              return;
-            }
-            // #509: dismissible={false} while a route is active means vaul's
-            // own onOpenChange short-circuits Escape (and scrim-tap) before
-            // it ever reaches handleOpenChange above — silently blocking
-            // BOTH would make Escape a dead key with a route active. Collapse
-            // to the strip instead (same outcome as a drag-down), so Escape
-            // still does something; only the full card can be collapsed —
-            // pressing it again while the strip is already showing is a
-            // no-op (nothing further to collapse to except closing, which
-            // stays × ‑only per the issue's "unchanged" close behavior).
-            if (isWalkRouteActive && cardRevealed) {
-              event.preventDefault();
-              setCardRevealed(false);
-            }
-          }}
-        >
-          {/* Drawer.Title — required by Radix to fix a11y missing-title violation */}
-          <Drawer.Title className="sr-only">
-            {venue
-              ? `${venue.name} ${t("detail.venueDetails", locale)}`
-              : event
-              ? eventText(event.name, event.name_es, locale)
-              : t("detail.venueDetailsPanel", locale)}
-          </Drawer.Title>
-
-          {/* Drawer.Description (#590 follow-up): vaul's Drawer.Content forwards
-              straight to Radix's Dialog.Content, which logs "Missing
-              `Description` or `aria-describedby={undefined}` for {DialogContent}"
-              whenever one isn't wired via context — confirmed live (agent-browser
-              console) firing here, not on the splash, when a venue card opens.
-              Reuses the category badge's own existing copy (`category.full.*`,
-              already EN+ES, rendered visibly below at the badge) rather than
-              adding new strings — same principle as #590's splash fix: point at
-              real content, don't invent hidden copy. Rendered unconditionally
-              (like Drawer.Title above) so every branch — box, ordinary venue,
-              route-strip-only, no venue yet — has SOME description, never a
-              dangling reference.
-              Same OSM placeholder guard as the visible address line
-              (venueSummary.ts's displayAddress) — a screen reader must never hear the literal "Address not in
-              OpenStreetMap" string either. */}
-          <Drawer.Description className="sr-only">
-            {venue
-              ? `${t(`category.full.${venue.category}`, locale)}, ${displayAddress(venue)}`
-              : event
-              ? event.address
-              : t("detail.venueDetailsPanel", locale)}
-          </Drawer.Description>
-
-          {/* Grab bar (#666): a real 48×48 button. Since #882 a drag that
-              starts on it is vaul's snap-point drag like anywhere else on the
-              sheet (it used to be `data-vaul-no-drag` with its own swipe
-              handler); a tap toggles, unless it ends a drag (`justDragged`).
-              Sits OUTSIDE the scrollable body below so it never scrolls away, matching every
-              iOS/Android sheet's own fixed-handle convention. #122's old
-              "no drag handle, a grabber wrongly implies swipe" note is
-              exactly what #666 reverses — Kyle's own comparison of four
-              mockups picked the Maps-app bar specifically because the cut-off
-              preview (rendered inside the scrollable body below) now tells
-              people there's more, so a real handle no longer lies about what
-              it does. */}
-          {showGrabBar && (
-            // One resting height (a card whose first view fills the sheet, which a
-            // blessing box's check-in does on a real phone): the bar toggles
-            // nothing, so the button is disabled and hidden from screen readers,
-            // but it stays DRAWN. It is still the handle a swipe down closes the
-            // sheet from, and Kyle saw box cards without it while places had it
-            // (#917 round 3). It keeps its space either way: removing it moved
-            // the content up, which changed the measurement back to two heights,
-            // which brought the bar back: a render loop ("Maximum update depth",
-            // iOS simulator). `pointer-events-none` while disabled: a touch on the
-            // bar then lands on the sheet itself, so the swipe down still drags
-            // it (a disabled control may swallow pointer events in some browsers).
-            <div className="flex shrink-0 justify-center pt-2 pb-1" aria-hidden={singleSnap || undefined}>
-              <button
-                type="button"
-                disabled={singleSnap}
-                aria-expanded={expanded}
-                aria-controls={DETAIL_SECTION_ID}
-                aria-label={t(expanded ? "detail.hideDetails" : "detail.showDetails", locale)}
-                onClick={toggleExpanded}
-                className={
-                  "flex h-12 w-12 items-center justify-center rounded-md " +
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-                  PRESS_FEEDBACK +
-                  (singleSnap ? " pointer-events-none" : "")
-                }
-              >
-                <span aria-hidden className="h-[5px] w-10 rounded-full bg-[var(--color-bone-300)]" />
-              </button>
-            </div>
-          )}
+  const cardBody = (
+    <>
           {venue && showStrip && (
             // #509: strip replaces the full card entirely while a route is
             // active and not revealed — same `walk` object (onWalk /
@@ -859,7 +386,7 @@ export default function BottomSheet({
               onStepChange={walk?.onStepChange}
             />
           )}
-
+    
           {event && !venue && (
             // Special-event card (#759). Same scroller as the place card
             // below, so the swipe/overscroll behavior (#553) is identical.
@@ -883,7 +410,7 @@ export default function BottomSheet({
               </div>
             </div>
           )}
-
+    
           {venue && !showStrip && (
             // `overscroll-contain` (#553): without it, a downward drag that
             // starts inside this scroller while it is already at scrollTop 0
@@ -973,6 +500,290 @@ export default function BottomSheet({
               </div>
             </div>
           )}
+        </>
+  );
+
+  if (!isWalkRouteActive) {
+    return (
+      <ScrollSheet
+        open={open}
+        expanded={expanded}
+        onRest={handleRest}
+        onSingleChange={setSingleSnap}
+        onEscape={(e) => {
+          // #508: a box photo open: Escape closes only the photo.
+          if (isNativeDialogOpen()) return;
+          // #527/#604: a higher overlay (Filters, the Menu) takes this Escape.
+          if (!claimEscape(overlayId, e)) return;
+          onClose();
+        }}
+        detailId={DETAIL_SECTION_ID}
+        contentKey={venue?.id ?? event?.id ?? "empty"}
+        // The event card moves focus to its own heading (EventCardBody).
+        focusName={!event || venue !== null}
+        inert={inert}
+        label={
+          venue
+            ? `${venue.name} ${t("detail.venueDetails", locale)}`
+            : event
+              ? eventText(event.name, event.name_es, locale)
+              : t("detail.venueDetailsPanel", locale)
+        }
+        // Same OSM placeholder guard as the visible address line (#590).
+        description={
+          venue
+            ? `${t(`category.full.${venue.category}`, locale)}, ${displayAddress(venue)}`
+            : event
+              ? event.address
+              : t("detail.venueDetailsPanel", locale)
+        }
+        header={grabBar}
+      >
+        {cardBody}
+      </ScrollSheet>
+    );
+  }
+
+  function handleOpenChange(isOpen: boolean) {
+    // Route mode is not dismissible, so only the × closes; kept for safety.
+    if (!isOpen) onClose();
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+
+  return (
+    <Drawer.Root
+      open={open}
+      onOpenChange={handleOpenChange}
+      onAnimationEnd={handleAnimationEnd}
+      modal={false}
+      // #530 review round 3 (BLOCKER, invisible to every test here — every
+      // BottomSheet test mocks vaul): vaul defaults `repositionInputs` to
+      // true, which listens for visualViewport resize (the keyboard
+      // opening/closing) and writes an inline `drawerRef.current.style
+      // .bottom` — and never clears it (vaul/dist/index.mjs's own
+      // onVisualViewportChange effect, ~line 1153). BoxCheckinPanel (inside
+      // this sheet via BoxCardBody) has real input/textarea fields, so
+      // focusing one fires that effect; an inline style always outranks
+      // globals.css's `[data-bottom-sheet]` rule for the life of the
+      // instance, and after the keyboard closes vaul leaves it at literally
+      // `bottom: 0px` — reintroducing the exact #530 slice bug in the check-
+      // in flow. `repositionInputs={false}` turns the whole effect off at
+      // its own early-return guard. Safe here: nothing in this sheet is a
+      // bottom-docked input relying on vaul's keyboard-avoidance resize —
+      // BoxCheckinPanel's fields sit in the sheet's own normal scrollable
+      // flow (`overflow-y-auto`), which the browser's native
+      // focus-scroll-into-view already handles.
+      repositionInputs={false}
+      dismissible={false}
+      // #530 review round 3 (IMPORTANT, KNOWN RESIDUAL, not fixed here):
+      // vaul's useSnapPoints measures `window.innerHeight` for these two px
+      // snap points (unless a `container` prop is passed to Drawer.Root)
+      // and re-runs snapToPoint — an ANIMATED transform — on every window
+      // resize (vaul/dist/index.mjs ~lines 517-524, 540-548, 608-613). iOS
+      // Safari fires a resize event when its toolbar collapses/expands on
+      // scroll, so the route strip (or full card, while a route is active)
+      // can still visibly re-animate to a new snapped position mid-scroll —
+      // in tension with this issue's "must not jump" criterion, though it's
+      // a smooth transition rather than an instant cut.
+      //
+      // Considered passing a `container` element sized from
+      // `var(--viewport-small)` to make vaul's own size reference stable.
+      // Rejected: `container` is ALSO handed straight to `Drawer.Portal`
+      // as its React-portal render target (defaults from context — see
+      // vaul's `Portal()`) and flips `data-vaul-custom-container`, which
+      // disables vaul's own `::after` background-fill rule for the
+      // rubber-band overscroll area. Fixing this one animation would mean
+      // relocating where the sheet portals to AND losing its overscroll
+      // background fill — both unverifiable here (every BottomSheet test
+      // mocks vaul; there's no real Safari touch/drag/overscroll rig on
+      // this machine) and each a plausible regression of its own. Left as
+      // a known residual rather than trading one unverified bug for two.
+      // Route mode: strip / full card (#509).
+      snapPoints={[ROUTE_STRIP_SNAP, FULL_CARD_SNAP]}
+      activeSnapPoint={cardRevealed ? FULL_CARD_SNAP : ROUTE_STRIP_SNAP}
+      setActiveSnapPoint={(point) => setCardRevealed(point === FULL_CARD_SNAP)}
+    >
+      <Drawer.Portal>
+        <Drawer.Content
+          key={venue?.id ?? event?.id ?? "empty"}
+          // Closing (`!open`): the held card is still sliding away; nothing on it may take focus or be read.
+          inert={inert || !open || undefined}
+          // #530 review round 2: no `bottom-0` Tailwind class — Safari's own
+          // toolbar was slicing the sheet's resting edge off the same way it
+          // sliced BottomNav's pill (root cause: a `position:fixed`
+          // element's containing block is always sized to the LARGE
+          // viewport, as if the toolbar were collapsed, so a literal
+          // `bottom: 0` lands under the toolbar once it's actually
+          // expanded). `data-bottom-sheet` hooks the real `bottom` value —
+          // see globals.css's own comment for the formula and why it never
+          // jumps as the toolbar animates.
+          data-bottom-sheet=""
+          data-sheet-surface=""
+          className={
+            "fixed left-0 right-0 z-[800] flex flex-col " +
+            "bg-[var(--color-bone-50)] " +
+            "rounded-t-[var(--radius-xl)] " +
+            "elevation-2 " +
+            "focus:outline-none"
+          }
+          // A route-active sheet needs a FIXED height (not maxHeight) for
+          // vaul's px snap point math to land where expected — snapPointsOffset
+          // is computed against the drawer's actual rendered height (see
+          // vaul's useSnapPoints), so a content-hugging maxHeight would put
+          // the "104px from the bottom" strip snap partway through whatever
+          // content happens to render, not at a real fixed strip. Same numeric
+          // value as the non-route maxHeight, so the full-card view (snap
+          // FULL_CARD_SNAP) looks the same size as before; the one visible
+          // change is that the full-card view is now a fixed height rather
+          // than hugging its (usually shorter) content while a route is
+          // active — accepted trade-off, only while a route is active.
+          // #549: vaul computes a px snap point's transform offset as
+          // `offset = window.innerHeight - snapPx` (vaul/dist/index.mjs
+          // ~line 540). For a drawer with `bottom: S` and `height: H`, the
+          // resulting visible height at that snap is
+          //   visible = S + H - window.innerHeight + snapPx
+          // — which only equals `snapPx` (the strip's own height) when
+          // `S + H === window.innerHeight`. This drawer's `bottom` is
+          // `env(safe-area-inset-bottom)` (0 on the test device), so H alone
+          // has to equal window.innerHeight, or the strip snap lands short
+          // (partly or fully off-screen — this issue's bug).
+          // `var(--viewport-small)` (100svh, #530's fix, kept below for the
+          // NON-route branch) is deliberately SHORTER than innerHeight — it
+          // is pinned to the smallest possible viewport specifically so a
+          // bottom-pinned bar never resizes as Safari's toolbar animates —
+          // so using it here under-sizes H by however much svh trails
+          // innerHeight, and vaul's math pushes the strip that far off the
+          // bottom edge. `100dvh` tracks the CURRENT viewport instead, which
+          // Kyle measured equal to `window.innerHeight` on the real device
+          // in both toolbar states (iOS 26, 2026-09-20: Safari 714/714,
+          // Chrome 683/683) — exactly the reference vaul's snap math needs.
+          // KNOWN RESIDUAL, honestly stated because an unmeasured claim in a
+          // comment here hardens into fact for the next agent: this trades
+          // #530's "never jumps" property for correctness at rest, and the
+          // trade is not free. `100svh` was chosen in #530 precisely because
+          // it is INVARIANT through the toolbar animation, so it could never
+          // desync from anything. `100dvh` is the opposite — it tracks the
+          // toolbar continuously, while vaul's own `innerHeight` is cached
+          // and refreshed only on a `window` resize event (index.mjs
+          // ~518-527). If iOS Safari doesn't fire resize continuously through
+          // that animation, the two references can drift apart mid-scroll and
+          // the strip can visibly move, which is the artifact #530 set out to
+          // kill. Kyle's measurement proves the two are EQUAL once the
+          // toolbar settles (both states, both browsers) — it says nothing
+          // about the frames in between, and jsdom cannot test it.
+          //
+          // Accepted anyway, because the alternative is strictly worse, not
+          // merely different: on `--viewport-small` the strip was wrong AT
+          // REST by however far svh trails innerHeight (12px visible instead
+          // of 112, or fully off-screen with the toolbar collapsed). A
+          // possible transient wobble during a toolbar animation beats a
+          // permanently unreachable control. Note also that vaul ALREADY
+          // re-animates to a new snapped position on every resize (see the
+          // `snapPoints` prop's own comment above) — a mid-scroll transition
+          // is pre-existing here, not introduced by this unit change.
+          // If a real device shows the strip jumping while scrolling with a
+          // route up, the next thing to try is vaul's `container` prop, which
+          // replaces `window.innerHeight` as its size reference outright —
+          // read that same comment first for the two side effects that
+          // carries.
+          //
+          // The 100px map peek is carved out of H and added back into the
+          // snap point instead (MAP_PEEK_PX, folded into ROUTE_STRIP_SNAP
+          // above) — that keeps the drawer's resting top edge a constant
+          // MAP_PEEK_PX below the window top in both toolbar states, and
+          // the strip's own visible height pinned at exactly
+          // ROUTE_STRIP_HEIGHT_PX regardless of toolbar collapse.
+
+          style={{ height: `calc(100dvh - ${MAP_PEEK_PX}px - env(safe-area-inset-bottom))` }}
+          aria-label={t("detail.venueDetailsPanel", locale)}
+          // #508 fix pass: Escape while a box's PhotoViewer is open must
+          // close ONLY the photo, not this whole sheet. vaul forwards this
+          // prop straight through to Radix's DismissableLayer, which only
+          // dismisses `if (!event.defaultPrevented)` — see dialogGuard.ts's
+          // own header for why this is the one race-free interception
+          // point (Radix's Escape listener is a document-level CAPTURE
+          // listener; nothing inside the photo dialog can out-race it).
+          onEscapeKeyDown={(event) => {
+            if (isNativeDialogOpen()) {
+              event.preventDefault();
+              return;
+            }
+            // #527/#604: a higher overlay (Filters, the Menu) is open on top
+            // of this sheet — block vaul's own dismiss so Escape doesn't
+            // close BOTH; the topmost overlay's own Escape handling (a
+            // separate, bubble-phase `document` listener — this prop is
+            // Radix's CAPTURE-phase interception point, see dialogGuard.ts's
+            // header) still runs for the same keydown and closes itself
+            // instead. `claimEscape`, not a bare `isTopmostOverlay` check —
+            // see overlayRegistry.ts's own header on why a plain topmost
+            // check isn't race-free across a single keydown's multiple
+            // listeners in a real browser.
+            if (!claimEscape(overlayId, event)) {
+              event.preventDefault();
+              return;
+            }
+            // #509: dismissible={false} while a route is active means vaul's
+            // own onOpenChange short-circuits Escape (and scrim-tap) before
+            // it ever reaches handleOpenChange above — silently blocking
+            // BOTH would make Escape a dead key with a route active. Collapse
+            // to the strip instead (same outcome as a drag-down), so Escape
+            // still does something; only the full card can be collapsed —
+            // pressing it again while the strip is already showing is a
+            // no-op (nothing further to collapse to except closing, which
+            // stays × ‑only per the issue's "unchanged" close behavior).
+            if (cardRevealed) {
+              event.preventDefault();
+              setCardRevealed(false);
+            }
+          }}
+        >
+          {/* Drawer.Title — required by Radix to fix a11y missing-title violation */}
+          <Drawer.Title className="sr-only">
+            {venue
+              ? `${venue.name} ${t("detail.venueDetails", locale)}`
+              : event
+              ? eventText(event.name, event.name_es, locale)
+              : t("detail.venueDetailsPanel", locale)}
+          </Drawer.Title>
+
+          {/* Drawer.Description (#590 follow-up): vaul's Drawer.Content forwards
+              straight to Radix's Dialog.Content, which logs "Missing
+              `Description` or `aria-describedby={undefined}` for {DialogContent}"
+              whenever one isn't wired via context — confirmed live (agent-browser
+              console) firing here, not on the splash, when a venue card opens.
+              Reuses the category badge's own existing copy (`category.full.*`,
+              already EN+ES, rendered visibly below at the badge) rather than
+              adding new strings — same principle as #590's splash fix: point at
+              real content, don't invent hidden copy. Rendered unconditionally
+              (like Drawer.Title above) so every branch — box, ordinary venue,
+              route-strip-only, no venue yet — has SOME description, never a
+              dangling reference.
+              Same OSM placeholder guard as the visible address line
+              (venueSummary.ts's displayAddress) — a screen reader must never hear the literal "Address not in
+              OpenStreetMap" string either. */}
+          <Drawer.Description className="sr-only">
+            {venue
+              ? `${t(`category.full.${venue.category}`, locale)}, ${displayAddress(venue)}`
+              : event
+              ? event.address
+              : t("detail.venueDetailsPanel", locale)}
+          </Drawer.Description>
+
+          {/* Grab bar (#666): a real 48×48 button. Since #882 a drag that
+              starts on it is vaul's snap-point drag like anywhere else on the
+              sheet (it used to be `data-vaul-no-drag` with its own swipe
+              handler); a tap toggles, unless it ends a drag (`justDragged`).
+              Sits OUTSIDE the scrollable body below so it never scrolls away, matching every
+              iOS/Android sheet's own fixed-handle convention. #122's old
+              "no drag handle, a grabber wrongly implies swipe" note is
+              exactly what #666 reverses — Kyle's own comparison of four
+              mockups picked the Maps-app bar specifically because the cut-off
+              preview (rendered inside the scrollable body below) now tells
+              people there's more, so a real handle no longer lies about what
+              it does. */}
+          {grabBar}
+          {cardBody}
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>

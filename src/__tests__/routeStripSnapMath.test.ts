@@ -22,8 +22,9 @@ const readSrc = (relPath: string) => readFileSync(join(process.cwd(), relPath), 
 describe("#549 — route-active BottomSheet height matches vaul's window.innerHeight reference", () => {
   const src = readSrc("src/components/BottomSheet.tsx");
 
-  test("MAP_PEEK_PX is defined as a named constant (100)", () => {
-    expect(src).toMatch(/const MAP_PEEK_PX = 100;/);
+  test("MAP_PEEK_PX is defined as a named constant (100), shared with the card sheet", () => {
+    expect(readSrc("src/components/ScrollSheet.tsx")).toMatch(/export const MAP_PEEK_PX = 100;/);
+    expect(src).toMatch(/import ScrollSheet, \{ MAP_PEEK_PX \} from "@\/components\/ScrollSheet";/);
   });
 
   // #882: the card mode uses vaul snap points too (Maps-style sheet), so the

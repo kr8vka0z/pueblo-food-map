@@ -326,6 +326,57 @@ body {
   bottom: env(safe-area-inset-bottom);
 }
 
+/* ─── ScrollSheet (#923): the sheet moves by native scrolling ──────────────
+   See ScrollSheet.tsx's header. Detents are 1px markers placed at a scrollTop;
+   the sheet itself is a snap area too, so content taller than the track can
+   be scrolled freely once it covers the track. */
+[data-scroll-sheet] {
+  scrollbar-width: none;
+}
+[data-scroll-sheet]::-webkit-scrollbar {
+  display: none;
+}
+[data-scroll-sheet] [data-snap] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  scroll-snap-align: start;
+}
+[data-scroll-sheet] [data-snap-stop] {
+  scroll-snap-stop: always;
+}
+[data-scroll-sheet] [data-sheet] {
+  scroll-snap-align: start;
+}
+[data-scroll-sheet] [data-snap-end] {
+  height: 1px;
+  scroll-snap-align: end;
+}
+[data-scroll-sheet][data-deep] :is([data-snap], [data-sheet], [data-snap-end]) {
+  scroll-snap-align: none;
+}
+/* WebKit bug: under a `pointer-events: none` scroll container, a touch on a
+   `pointer-events: auto` child doesn't scroll the container. A 1px sideways
+   overflow on the child works around it (pure-web-bottom-sheet, after J.J.
+   Johnson). Applied to the header and body separately, never the sheet, so
+   the sticky grab bar still sticks to the track. */
+@supports (-webkit-touch-callout: none) {
+  [data-scroll-sheet] [data-sheet-part] {
+    overflow-x: scroll;
+    overscroll-behavior-x: none;
+    scrollbar-width: none;
+    touch-action: pan-y pinch-zoom;
+  }
+  [data-scroll-sheet] [data-sheet-part]::after {
+    display: block;
+    width: calc(100% + 1px);
+    height: 1px;
+    margin-top: -1px;
+    content: "";
+  }
+}
+
 /* ─── Hover tooltip popups (venue name + category, "You are here") ─────────── */
 /* Strip default Mapbox popup chrome; render a minimal sage-bordered chip. */
 .pfm-tooltip .mapboxgl-popup-content {

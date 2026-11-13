@@ -40,6 +40,7 @@ All work merges to `dev`. A release starts when Kyle says "cut the release", and
 - **`env.staging` inherits almost nothing** from the top level of `wrangler.jsonc`. Every new binding, var or secret needs its staging twin. `triggers` is the exception: it does inherit (see Scheduled jobs).
 - The Worker env types are hand-written in `cloudflare-env.d.ts`: add every new binding, var or secret there. Don't run `wrangler types`; its runtime types corrupt the DOM types, and without them it can't type the bindings.
 - Local preview: `npm run preview` (`vite build`, then the built Worker in local workerd at http://127.0.0.1:8788, local D1/R2 under `.wrangler/state`). `vite.config.ts` keeps remote bindings off, so nothing local reaches Cloudflare.
+- Admin preview for the owner (signed in, made-up data, one public link): `scripts/admin-preview/start.sh`; rules in [docs/agents/admin-preview.md](docs/agents/admin-preview.md).
 - **One environment per build.** `vite build` reads `wrangler.jsonc` and writes a flattened `dist/server/wrangler.json` for ONE environment (`CLOUDFLARE_ENV=staging` picks staging) plus `.wrangler/deploy/config.json` pointing at it, so `wrangler deploy` takes no `--env`. `wrangler d1 ...` still reads `wrangler.jsonc`.
 
 ### Rollback

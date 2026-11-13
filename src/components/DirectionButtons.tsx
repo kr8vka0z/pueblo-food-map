@@ -669,7 +669,7 @@ export default function DirectionButtons({
     } else {
       // #485 PR 2: only the START of a route counts as "directions clicked" —
       // clearing an active route isn't a new directions request.
-      void track(EVENTS.DIRECTIONS_CLICKED, { mode: "walk", venueId: venue.id });
+      void track(EVENTS.DIRECTIONS_CLICKED, { mode: "walk", venueId: venue.id, surface: "map" });
       onWalk(venue);
     }
   }
@@ -702,7 +702,7 @@ export default function DirectionButtons({
           href={busUrl}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={() => void track(EVENTS.DIRECTIONS_CLICKED, { mode: "bus", venueId: venue.id })}
+          onClick={() => void track(EVENTS.DIRECTIONS_CLICKED, { mode: "bus", venueId: venue.id, surface: "map" })}
           aria-label={t("directions.busAriaLabel", locale, { name: venue.name })}
           className={externalClass}
         >
@@ -714,7 +714,7 @@ export default function DirectionButtons({
           href={driveUrl}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={() => void track(EVENTS.DIRECTIONS_CLICKED, { mode: "drive", venueId: venue.id })}
+          onClick={() => void track(EVENTS.DIRECTIONS_CLICKED, { mode: "drive", venueId: venue.id, surface: "map" })}
           aria-label={t("directions.driveAriaLabel", locale, { name: venue.name })}
           className={externalClass}
         >

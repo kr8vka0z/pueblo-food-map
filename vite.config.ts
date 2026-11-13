@@ -4,6 +4,10 @@ import vinext from "vinext";
 import { cloudflare } from "@cloudflare/vite-plugin";
 
 export default defineConfig({
+  // The build's short commit, sent with every PostHog event as `site_version` (src/lib/analytics.ts, #919) so a
+  // change in behaviour can be pinned to a release. ponytail: deploys only build in Actions, so GITHUB_SHA is
+  // always set there; local builds say "dev".
+  define: { __SITE_VERSION__: JSON.stringify(process.env.GITHUB_SHA?.slice(0, 7) ?? "dev") },
   // WHY: the local preview (`npm run preview`) refuses unknown Host headers by default (localhost and IPs always
   // pass). The real hosts let a local run be asked as them, so the noindex rule in custom-worker.ts can be checked;
   // ".trycloudflare.com" (leading dot = any subdomain, Vite's only wildcard form) lets a quick Cloudflare tunnel put

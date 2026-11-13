@@ -30,6 +30,7 @@ import type { Venue } from "@/types/venue";
 import type { Locale } from "@/lib/i18n";
 import { prefersReducedMotion } from "@/lib/useMediaQuery";
 import { t } from "@/lib/i18n";
+import { track, EVENTS } from "@/lib/analytics";
 import VenueMarker from "@/components/VenueMarker";
 import EventLayer from "@/components/EventLayer";
 import type { PublicEvent } from "@/lib/events";
@@ -449,8 +450,22 @@ export default function Map({
   );
 
   // ── moveend: notify MapWrapper so it can update drift detection (#108) ────
+  // map_moved (#919): one event once a visitor's pan or zoom settles. Mapbox
+  // sets `originalEvent` only on moves a person made, so flyTo/fitBounds (Near
+  // me, opening a card) never count. The 1 s wait folds a quick drag-then-
+  // pinch into one stop. Only the zoom level, rounded, leaves: never a
+  // coordinate.
+  const moveTrackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (moveTrackTimerRef.current) clearTimeout(moveTrackTimerRef.current);
+  }, []);
   const handleMoveEnd = useCallback(
-    (e: { target: mapboxgl.Map }) => {
+    (e: { target: mapboxgl.Map; originalEvent?: unknown }) => {
+      if (e.originalEvent) {
+        if (moveTrackTimerRef.current) clearTimeout(moveTrackTimerRef.current);
+        const zoom = Math.round(e.target.getZoom());
+        moveTrackTimerRef.current = setTimeout(() => void track(EVENTS.MAP_MOVED, { zoom }), 1000);
+      }
       if (!onMoveEnd) return;
       const bounds = e.target.getBounds();
       if (bounds) onMoveEnd(bounds);

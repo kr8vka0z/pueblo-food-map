@@ -21,6 +21,7 @@ import { categoryLabels } from "@/lib/categories";
 import type { VenueCategory } from "@/types/venue";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import PublicForm, { Field, LABEL_CLASS, PrivacyNote, type FieldErrors } from "@/components/PublicForm";
+import { track, EVENTS } from "@/lib/analytics";
 
 const { SUGGEST_VENUE_NAME, SUGGEST_ADDRESS, SUGGEST_HOURS, SUGGEST_CONTACT, SUGGEST_NOTES, EMAIL } = FIELD_LIMITS;
 
@@ -76,6 +77,7 @@ export default function SuggestForm() {
       fieldIds={FIELD_IDS}
       rateLimitField="venueName"
       validate={validate}
+      onSuccess={() => void track(EVENTS.SUGGESTION_SENT)}
       body={() => ({
         venueName: venueName.trim(),
         address: address.trim(),

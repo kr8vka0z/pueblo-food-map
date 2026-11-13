@@ -79,6 +79,8 @@ import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBo
 import { useMapUI, type ViewMode } from "@/lib/useMapUI";
 import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
 import { track, EVENTS } from "@/lib/analytics";
+import { nearestFoodProps } from "@/lib/nearestFood";
+import { computeVenueOpenStatus } from "@/lib/hours";
 import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY, prefersReducedMotion } from "@/lib/useMediaQuery";
 import type { SplashViewport } from "@/lib/splashGate";
 
@@ -1110,6 +1112,18 @@ export default function MapWrapper({
   // Ended/cancelled events never reach `events`, so they get no pin.
   const { event: selectedEvent } = useEventDetail(selectedEventId, events, eventsLoaded);
 
+  // event_opened (#919): keyed off the resolved event, not selectEvent(), so a
+  // `/?event=<id>` link (selected through useMapUI, never selectEvent) counts
+  // too. Same last-tracked ref as venue_opened below, so a re-render of the
+  // same open card doesn't fire again.
+  const lastTrackedEventIdRef = useRef<string | null>(null);
+  const selectedEventIdResolved = selectedEvent?.id ?? null;
+  useEffect(() => {
+    if (selectedEventIdResolved === lastTrackedEventIdRef.current) return;
+    lastTrackedEventIdRef.current = selectedEventIdResolved;
+    if (selectedEventIdResolved !== null) void track(EVENTS.EVENT_OPENED, { eventId: selectedEventIdResolved });
+  }, [selectedEventIdResolved]);
+
   // The phone sheet's React key (#882 preview feedback). It used to be the
   // selected id or "empty", so closing flipped it to "empty" and remounted the
   // sheet mid-close: vaul's slide-off never played. Now it changes only when a
@@ -1163,11 +1177,25 @@ export default function MapWrapper({
     }
     if (lastTrackedVenueIdRef.current === selectedVenue.id) return;
     lastTrackedVenueIdRef.current = selectedVenue.id;
+    const openState = computeVenueOpenStatus(selectedVenue).state;
     void track(EVENTS.VENUE_OPENED, {
       category: selectedVenue.category,
       venueId: selectedVenue.id,
+      open_now: openState === "open",
+      has_hours: openState !== "no_hours",
     });
   }, [selectedVenue]);
+
+  // nearest_food (#919): once per page load, the first time a real location
+  // is known (never the PUEBLO_CENTER fallback `origin` uses). Only distances
+  // leave; see nearestFoodProps. Waits for the box feed so the count includes
+  // boxes, which load after the pantries.
+  const nearestFoodSentRef = useRef(false);
+  useEffect(() => {
+    if (nearestFoodSentRef.current || userLocation === null || liveBoxesLoading) return;
+    nearestFoodSentRef.current = true;
+    void track(EVENTS.NEAREST_FOOD, nearestFoodProps(venuesWithDistance));
+  }, [userLocation, liveBoxesLoading, venuesWithDistance]);
 
   // ── Typeahead popover handlers (issue #67) ───────────────────────────────────
   // These come after filteredVenues / isMobile are declared so closures are valid.
@@ -1390,9 +1418,12 @@ export default function MapWrapper({
   // own suggestion row and results row, #514, "Near me" below, and the Menu
   // line) must honor the same mapUnavailable guard (selecting "map" while the
   // map can't mount would show a blank screen, #165).
+  // `source` names the control a visitor used (#919 view_switched). Near me and the guided tour switch views
+  // themselves and pass none, so they are never counted as a visitor's choice.
   const handleViewModeChange = useCallback(
-    (mode: ViewMode) => {
+    (mode: ViewMode, source?: string) => {
       if (mapUnavailable && mode === "map") return;
+      if (source) void track(EVENTS.VIEW_SWITCHED, { to: mode, source });
       setViewMode(mode);
     },
     [mapUnavailable, setViewMode],
@@ -1418,7 +1449,7 @@ export default function MapWrapper({
    */
   const handleViewSuggestionSelect = useCallback(
     (mode: ViewMode) => {
-      handleViewModeChange(mode);
+      handleViewModeChange(mode, "search_suggestion");
       setIsPopoverOpen(false);
       setActiveIndex(-1);
       if (document.activeElement instanceof HTMLElement) {
@@ -1884,7 +1915,7 @@ export default function MapWrapper({
           events={events}
           locale={locale}
           onOpen={selectEvent}
-          onMore={() => handleViewModeChange("list")}
+          onMore={() => handleViewModeChange("list", "event_strip")}
           rightInset={desktopPanelOpen ? DESKTOP_PANEL_RIGHT_CLEARANCE_PX : 0}
         />
       )}
@@ -1953,7 +1984,7 @@ export default function MapWrapper({
           view={menuSection ?? "top"}
           ignoreOutsideRef={navRef}
           viewMode={viewMode}
-          onToggleView={() => handleViewModeChange(viewMode === "map" ? "list" : "map")}
+          onToggleView={() => handleViewModeChange(viewMode === "map" ? "list" : "map", "menu")}
           mapDisabled={mapUnavailable}
           onStartTour={handleMenuStartTour}
         />
@@ -2001,7 +2032,7 @@ export default function MapWrapper({
           // (possibly with a new reason), if it works the same effect clears it.
           onRetry={handleLocateRequest}
           onShowList={() => {
-            handleViewModeChange("list");
+            handleViewModeChange("list", "location_help");
             setLocationFailure(null);
           }}
           onDismiss={() => setLocationFailure(null)}
@@ -2106,7 +2137,7 @@ export default function MapWrapper({
                 locale={locale}
                 onShowWelcome={onShowWelcome}
                 viewMode={viewMode}
-                onToggleView={() => handleViewModeChange(viewMode === "map" ? "list" : "map")}
+                onToggleView={() => handleViewModeChange(viewMode === "map" ? "list" : "map", "menu")}
                 mapDisabled={mapUnavailable}
                 onClose={close}
                 headingId={panelHeadingId}

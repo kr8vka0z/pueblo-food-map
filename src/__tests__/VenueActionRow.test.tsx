@@ -35,7 +35,7 @@ describe("Call and Website when the place has them", () => {
     const call = screen.getByRole("link", { name: `Call ${withBoth.phone}` });
     expect(call.getAttribute("href")).toBe(`tel:${withBoth.phone}`);
     fireEvent.click(call);
-    expect(track).toHaveBeenCalledWith(EVENTS.CALL_CLICKED, { venueId: withBoth.id });
+    expect(track).toHaveBeenCalledWith(EVENTS.CALL_CLICKED, { venueId: withBoth.id, surface: "map" });
   });
 
   test("Website opens the place's own site in a new tab and fires WEBSITE_CLICKED", () => {
@@ -45,7 +45,7 @@ describe("Call and Website when the place has them", () => {
     expect(web.getAttribute("target")).toBe("_blank");
     expect(web.getAttribute("rel")).toContain("noopener");
     fireEvent.click(web);
-    expect(track).toHaveBeenCalledWith(EVENTS.WEBSITE_CLICKED, { venueId: withBoth.id });
+    expect(track).toHaveBeenCalledWith(EVENTS.WEBSITE_CLICKED, { venueId: withBoth.id, surface: "map" });
   });
 
   test("the phone number line in CONTACT is gone: the number's only link is Call", () => {

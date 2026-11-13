@@ -2,8 +2,8 @@
  * cfAnalytics.ts — server-only Cloudflare Web Analytics reader for the
  * admin Dashboard's Visitors section (#680). Cloudflare's GraphQL Analytics
  * API is the ONLY source of unique-visitor numbers in this app (Kyle,
- * 2026-09-26, issue #680 comment): PostHog runs in memory-only mode (#485,
- * AGENTS.md "PostHog") and counts every page load as a new visitor, so its
+ * 2026-09-26, issue #680 comment): PostHog keeps no ID past the browser tab
+ * and makes no person profiles (#485, #919, AGENTS.md "PostHog"), so its
  * numbers must never appear here.
  *
  * WHY these exact query shapes — verified live against the real GraphQL

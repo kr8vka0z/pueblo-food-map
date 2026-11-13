@@ -87,7 +87,7 @@ export default function VenueActionRow({ venue, locale, compact = false, close }
       {venue.phone ? (
         <a
           href={`tel:${venue.phone}`}
-          onClick={() => void track(EVENTS.CALL_CLICKED, { venueId: venue.id })}
+          onClick={() => void track(EVENTS.CALL_CLICKED, { venueId: venue.id, surface: "map" })}
           aria-label={t("action.call", locale, { phone: venue.phone })}
           className={LIVE}
         >
@@ -102,7 +102,7 @@ export default function VenueActionRow({ venue, locale, compact = false, close }
           href={website}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={() => void track(EVENTS.WEBSITE_CLICKED, { venueId: venue.id })}
+          onClick={() => void track(EVENTS.WEBSITE_CLICKED, { venueId: venue.id, surface: "map" })}
           aria-label={t("action.website", locale, { name: venue.name })}
           title={t("action.website", locale, { name: venue.name })}
           className={LIVE}

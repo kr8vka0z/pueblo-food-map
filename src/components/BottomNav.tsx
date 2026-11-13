@@ -39,6 +39,7 @@ import { BoxHeartIcon, ICON_CLASS, ITEM_CLASS, NAV_CLASS, colorFor } from "@/com
 import { useAnyOverlayOpen } from "@/lib/overlayRegistry";
 import { useLocale } from "@/lib/LocaleContext";
 import { localizedHref } from "@/lib/localizedHref";
+import { track, EVENTS } from "@/lib/analytics";
 
 /**
  * Space the nav takes off the bottom of the screen below 2xl, excluding the
@@ -134,7 +135,10 @@ export default function BottomNav({
       <li className="flex flex-1 2xl:flex-none 2xl:h-11">
         <button
           type="button"
-          onClick={() => onSectionTap(section)}
+          onClick={() => {
+            void track(EVENTS.NAV_TAB, { tab: section === "top" ? "menu" : section });
+            onSectionTap(section);
+          }}
           aria-current={active ? "true" : undefined}
           data-testid={`nav-${section}`}
           className={ITEM_CLASS + " " + colorFor(active)}
@@ -171,7 +175,10 @@ export default function BottomNav({
         <li className="flex flex-1 2xl:flex-none 2xl:h-11">
           <button
             type="button"
-            onClick={onNearMe}
+            onClick={() => {
+              void track(EVENTS.NAV_TAB, { tab: "near_me" });
+              onNearMe();
+            }}
             disabled={isLocating}
             aria-busy={isLocating}
             data-testid="nav-near-me"
@@ -193,7 +200,10 @@ export default function BottomNav({
         <li className="flex flex-1 2xl:flex-none 2xl:h-11">
           <button
             type="button"
-            onClick={onBoxesToggle}
+            onClick={() => {
+              void track(EVENTS.NAV_TAB, { tab: "boxes" });
+              onBoxesToggle();
+            }}
             aria-pressed={boxesActive}
             data-testid="nav-boxes"
             className={
@@ -214,6 +224,7 @@ export default function BottomNav({
             // the default viewport prefetch fetched /resources' data and code
             // in the background for every visitor, most of whom never tap it.
             prefetch={false}
+            onClick={() => void track(EVENTS.NAV_TAB, { tab: "help" })}
             data-testid="nav-resources"
             aria-current={onResourcesPage ? "page" : undefined}
             className={ITEM_CLASS + " " + colorFor(onResourcesPage)}

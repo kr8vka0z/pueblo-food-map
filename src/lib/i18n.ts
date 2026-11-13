@@ -582,19 +582,15 @@ const enClient: Record<string, string> = {
   // described without naming (Turnstile) or didn't mention at all (Mapbox).
   "privacy.other.heading": "Other services we use",
   "privacy.other.body": "We use Mapbox to show the map. Loading it shares your IP address with Mapbox, and if you get walking directions, your location too. We use Cloudflare Turnstile on our forms and box check-ins to block spam; it checks some information about your device and browser.",
-  // Rewritten (#485, PostHog analytics core): PostHog joins Cloudflare Web
-  // Analytics (which stays on as an independent visit count — AGENTS.md
-  // "Observability"). PostHog's memory-only persistence (analytics.ts) and
-  // "Discard client IP data" project setting keep two of this page's
-  // promises (no cookies/nothing stored, IP discarded); this paragraph is
-  // rewritten to also disclose the new
-  // named taps/search tracking (#485 comment, 2026-09-26) truthfully.
-  // Session replay (screen-recording of how a page was used) was turned
-  // back ON (Kyle, 2026-09-26, reversing the issue's original "replay OFF")
-  // after seeing the #681 admin dashboard mockup — this paragraph discloses
-  // it, and that everything typed is hidden from it (analytics.ts's
-  // session_recording.maskAllInputs).
-  "privacy.analytics": "We use PostHog and Cloudflare Web Analytics to see how people use the map: which pages are viewed, taps on the map and its filters, the words people search for (only searches used often are ever looked at, never a single search — this helps us find places we're missing), and a recording of on-screen activity to help us improve the site. Anything you type is always hidden from that recording. Neither service sets a cookie or stores anything on your device, and your exact IP address is thrown away before it's used for anything. We never see what you type into a form, your exact location, or who you are.",
+  // PostHog + Cloudflare Web Analytics disclosure (#485, rewritten for #919;
+  // wording approved by Kyle 2026-11-13). Each promise maps to code: the
+  // tab-only visit ID is posthog-js's sessionStorage persistence and the
+  // yes/no note is the `pfm_returning` localStorage flag (analytics.ts);
+  // "IP used only for the city" is the /ingest relay sending CF-Connecting-IP
+  // (ingestTarget.ts) plus PostHog's "Discard client IP data" setting; "only
+  // how far" is nearest_food sending distances alone; typing is hidden by
+  // replay's maskAllInputs. Change the code and this text together.
+  "privacy.analytics": "We use PostHog and Cloudflare Web Analytics to see how people use the map: which pages are viewed, taps on the map and its filters, the words people search for (only searches used often are ever looked at, never a single search, so we can find places we're missing), errors that break the page, and a recording of on-screen activity to help us improve the site. Anything you type is always hidden from that recording. PostHog keeps a random number in your browser until you close the tab, so it can tell which pages were one visit, and a yes or no note that this browser has visited before. Neither one holds your name or anything about you, and neither is a cookie. Your IP address is used only to look up your city, then thrown away. If you share your location, we record only how far the nearest open place is, never where you are. We never see what you type into a form or who you are.",
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
   "directions.walk": "Walk",

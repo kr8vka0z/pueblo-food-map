@@ -459,6 +459,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     emptyMessage="No card actions yet this period."
                   />
                   <p className="mt-1 text-xs text-[var(--color-ink-500)]">Share of cards opened this period.</p>
+                  {/* #919: taps on a place's own page, as plain counts: that page isn't a card, so a share of cards opened would mislead. */}
+                  <h3 className="mt-4 text-sm font-medium text-[var(--color-ink-700)]">On a place&apos;s own page, people…</h3>
+                  <BarList
+                    items={[
+                      { label: "Directions", value: mapUsage.cardActions.venuePageDirections },
+                      { label: "Call", value: mapUsage.cardActions.venuePageCall },
+                    ]}
+                    emptyMessage="No taps on place pages yet this period."
+                  />
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Filters people use</h3>

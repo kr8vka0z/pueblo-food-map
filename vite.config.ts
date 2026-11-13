@@ -25,6 +25,11 @@ export default defineConfig({
       // `vite preview` open a remote proxy session to the Cloudflare account (and fail without an API token). Local
       // runs must never reach real Cloudflare resources. Affects dev/preview only, not the deployed Worker.
       remoteBindings: false,
+      // WHY: scripts/admin-preview/start.sh serves a signed-in preview over a public link, so its local D1/R2
+      // must be a store of its own, emptied every start, never the ordinary `.wrangler/state`. The plugin takes
+      // its storage folder only from this option (no flag or env var), so the tool sets this one variable;
+      // unset (every other run), the plugin's default `.wrangler/state` applies unchanged.
+      persistState: process.env.PFM_ADMIN_PREVIEW_PERSIST ? { path: process.env.PFM_ADMIN_PREVIEW_PERSIST } : true,
       viteEnvironment: {
         name: "rsc",
         childEnvironments: ["ssr"],

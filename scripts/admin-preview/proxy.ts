@@ -13,9 +13,10 @@
 // seed-session.sh put in the LOCAL database for the made-up admin. This proxy never requests, reads or works out
 // an emailed sign-in code. The cookie is signed the way better-auth (better-call's signCookieValue) signs it:
 // encodeURIComponent(token + "." + base64(HMAC-SHA256(BETTER_AUTH_SECRET, token))), with the LOCAL secret that
-// start.sh wrote to the repo's gitignored .dev.vars. The app checks it exactly as it checks a real one.
+// start.sh generates fresh on every start (.wrangler/admin-preview/worker.dev.vars, the same file the Worker
+// loads). The app checks it exactly as it checks a real one.
 //
-// Env: UPSTREAM (default http://127.0.0.1:8791), PORT (8792), DEV_VARS (path to .dev.vars), STATE_DIR (the
+// Env: UPSTREAM (default http://127.0.0.1:8791), PORT (8792), DEV_VARS (path to that file), STATE_DIR (the
 // folder holding session.token, .wrangler/admin-preview/).
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";

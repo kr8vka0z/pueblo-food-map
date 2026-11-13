@@ -1,34 +1,17 @@
 -- scripts/admin-preview/seed-preview.sql — made-up rows for the LOCAL admin preview only (never staging, never
--- production; start.sh only ever runs it with `wrangler d1 execute --local`). Not a migration: it sits outside
--- migrations/, so no migration tool picks it up.
+-- production; start.sh only ever runs it with `wrangler d1 execute --local --persist-to` the preview's own
+-- store). Not a migration: it sits outside migrations/, so no migration tool picks it up.
 -- Loaded by start.sh after scripts/seed-dev.sql (which gives the 'test-' places) and the generated
 -- live-venues.sql (gen-live-venues.ts), then seed-session.sh adds the made-up admin's sign-in rows.
 -- Every name says "Preview" or "Test", emails are example.org / example.com, phones are 719-555-01xx,
 -- IPs are documentation ranges (203.0.113.x, 198.51.100.x). Dates are relative to "now" so box health,
 -- the 8-week chart and the 30-day Activity window always have something in them.
 --
--- RE-RUNNABLE: deletes its own rows first. Text ids start with 'pv-'; integer ids use the reserved range
--- 900000-900999 (those tables have AUTOINCREMENT ids, so a text prefix isn't possible). WHY a reserved range:
--- the wipe below must leave seed-dev.sql's rows (low ids) alone, and fixed ids let selfcheck.sh and the image
--- keys in start.sh point at known rows. Rows the app adds while you click around follow the highest id, so they
--- can land inside the range; the next start wipes them, which is fine because every start resets the data.
+-- Runs once per start into an EMPTY store (start.sh recreates it), so it deletes nothing first. Text ids start
+-- with 'pv-'; integer ids use the reserved range 900000-900999 (those tables have AUTOINCREMENT ids, so a text
+-- prefix isn't possible). WHY fixed ids: selfcheck.sh and the image keys in start.sh point at known rows, and
+-- the range stays clear of seed-dev.sql's low ids.
 -- Proposal 900099 is SACRIFICIAL: selfcheck.sh rejects it to prove an admin write passes the origin check.
-
--- ── wipe ────────────────────────────────────────────────────────────────────
-DELETE FROM change_proposals    WHERE id BETWEEN 900000 AND 900999;
-DELETE FROM public_submissions  WHERE id BETWEEN 900000 AND 900999;
-DELETE FROM box_checkins        WHERE id BETWEEN 900000 AND 900999;
-DELETE FROM box_photos          WHERE id BETWEEN 900000 AND 900999;
-DELETE FROM box_adopters        WHERE id BETWEEN 900000 AND 900999;
-DELETE FROM alert_subscriptions WHERE id BETWEEN 900000 AND 900999;
-DELETE FROM box_events          WHERE id BETWEEN 900000 AND 900999;
-DELETE FROM audit_log           WHERE id BETWEEN 900000 AND 900999;
-DELETE FROM auth_events         WHERE id BETWEEN 900000 AND 900999;
-DELETE FROM venue_observations  WHERE id BETWEEN 900000 AND 900999;
-DELETE FROM blessing_boxes      WHERE venue_id LIKE 'pv-%';
-DELETE FROM venues              WHERE id LIKE 'pv-%';
-DELETE FROM events              WHERE id LIKE 'pv-%';
-DELETE FROM event_submissions   WHERE id LIKE 'pv-%';
 
 -- ── Places: one extra draft and one archived-after-publish (counts as "removed" on the Publish bar) ──
 INSERT INTO venues (id, name, category, lat, lng, address, hours_weekly, accepts_snap, accepts_wic, phone, email, url, notes, operator, source, last_verified, status, source_type, outside_county, created_at, created_by, updated_at, updated_by, published_at, published_by) VALUES

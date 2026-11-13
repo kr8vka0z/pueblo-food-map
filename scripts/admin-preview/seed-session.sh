@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # scripts/admin-preview/seed-session.sh — writes the made-up admin's user row and one long-lived session row into
-# the LOCAL database, so the proxy can hand the browser a ready session cookie. Called by start.sh after the other
-# seed files; safe to run on its own (re-runnable).
+# the preview's own LOCAL database (.wrangler/admin-preview/state, never the ordinary .wrangler/state), so the
+# proxy can hand the browser a ready session cookie. Called by start.sh after the other seed files; safe to run on
+# its own (re-runnable).
 #   seed-session.sh            production-flavour local database
 #   seed-session.sh --staging  staging-flavour local database
 # WHY plain seed rows: the preview owns its local database and its local BETTER_AUTH_SECRET, so it creates the
@@ -20,7 +21,8 @@ SQL="$STATE/session-seed.sql"
 mkdir -p "$STATE"
 umask 077
 
-# Same shape better-auth makes (32 letters/digits). Kept across re-seeds so open browsers stay signed in.
+# Same shape better-auth makes (32 letters/digits). Kept across re-seeds so a running proxy's cookie still
+# matches when this script is run on its own.
 grep -qxE '[A-Za-z0-9]{32}' "$TOKEN_FILE" 2>/dev/null || openssl rand -hex 16 > "$TOKEN_FILE"
 TOKEN=$(cat "$TOKEN_FILE")
 
@@ -43,5 +45,5 @@ SQL
 cd "$REPO"
 # Empty environment, as in start.sh: no CLOUDFLARE_* token or stored wrangler login can reach this call.
 env -i HOME="$HOME" PATH="$PATH" WRANGLER_SEND_METRICS=false XDG_CONFIG_HOME="$STATE/xdg" NO_COLOR=1 \
-  "$REPO/node_modules/.bin/wrangler" d1 execute "$DB" --local ${ENVFLAG[@]+"${ENVFLAG[@]}"} --file "$SQL" >>"$STATE/start.log" 2>&1 \
+  "$REPO/node_modules/.bin/wrangler" d1 execute "$DB" --local --persist-to "$STATE/state" ${ENVFLAG[@]+"${ENVFLAG[@]}"} --file "$SQL" >>"$STATE/start.log" 2>&1 \
   || { tail -20 "$STATE/start.log"; exit 1; }

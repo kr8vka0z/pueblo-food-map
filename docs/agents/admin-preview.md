@@ -10,13 +10,17 @@ in, one public link. Public pages need none of this.
 
 **The command** (from the worktree that holds the change):
 
-    scripts/admin-preview/start.sh                # build, reset data, start, self-check, print the links
-    scripts/admin-preview/start.sh --no-tunnel    # local only
+    scripts/admin-preview/start.sh                # build, empty and reseed its own storage, start, self-check, links
+    scripts/admin-preview/start.sh --no-tunnel    # local only; also stops a tunnel left by an earlier start
     scripts/admin-preview/start.sh --staging      # test-site flavour
     scripts/admin-preview/start.sh --foreground   # no systemd or sudo (a Mac)
     scripts/admin-preview/stop.sh
+    scripts/admin-preview/selfcheck.sh --lifecycle  # after changing start.sh/stop.sh: the start/stop proofs
 
-`start.sh` must end with `SELF-CHECK OK`. If it doesn't, the link is not ready: fix it before sending anything.
+`start.sh` must exit 0 after `SELF-CHECK OK` and, with a tunnel, print a `Public:` line. A failure once it has
+started (build, seed, secrets check, self-check, tunnel not answering) exits non-zero, prints no public link and
+stops the tunnel; a refusal before that (bad flag, missing tool, a `.env` refusal) changes nothing. Fix it before
+sending anything.
 
 **Hard rules:**
 
@@ -27,8 +31,13 @@ in, one public link. Public pages need none of this.
 - Local only: never `wrangler deploy`, never `--remote`, never read 1Password or any `CLOUDFLARE_*` token for it.
 - The public link is a signed-in sandbox on made-up data. Send it to the owner in chat only, never into a pull
   request, an issue or a commit.
-- Never commit what it writes: `.dev.vars` and `.wrangler/admin-preview/` are gitignored. If `start.sh` refuses
-  because a `.dev.vars` exists that it did not write, ask before moving that file.
+- Its own storage and secrets, by construction: the Worker and every wrangler call use
+  `.wrangler/admin-preview/state` (recreated empty each start, never the ordinary `.wrangler/state`), and the
+  Worker loads only the tool's fresh three-key secrets file, copied over whatever the build left beside it. Never
+  add a key to that list, point the preview at the ordinary store, or skip the check before the Worker starts.
+- It never changes your `.dev.vars` / `.env` files, and their values never reach the preview's Worker. If it refuses because a repo-root `.env` file sets a
+  `CLOUDFLARE_*` or `WRANGLER_*` variable, ask before moving that file.
+- Never commit what it writes: `.wrangler/admin-preview/` and `dist/` are gitignored.
 - Stop it (`stop.sh`) when the owner is done; the link stays open while the tunnel runs.
 
 **After the change merges into `dev`:** the preview ran on made-up data, local storage and a rewritten address,

@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 # scripts/admin-preview/stop.sh — stops the admin preview, however start.sh started it: the systemd units
 # (pfm-admin-preview-*) and any --foreground processes, by the PIDs start.sh saved. The public link dies with the
-# tunnel; the next start gets a new one. The local data and .dev.vars stay until the next start.
+# tunnel; the next start gets a new one. Stopping the Worker also deletes the preview's secrets (its generated
+# file and the copy beside the built Worker); the made-up data stays in .wrangler/admin-preview/state until the
+# next start empties it.
 #   stop.sh                  stop the tunnel, the proxy and the Worker
 #   stop.sh worker proxy     stop only those parts (start.sh uses this, keeping the tunnel and its address)
+#   stop.sh tunnel           stop only the tunnel (start.sh --no-tunnel uses this)
 # WHY saved PIDs and never pkill: a name match could hit someone else's vite or bun on a shared machine.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-STATE="$(cd "$HERE/../.." && pwd)/.wrangler/admin-preview"
+REPO="$(cd "$HERE/../.." && pwd)"
+STATE="$REPO/.wrangler/admin-preview"
 [ $# -gt 0 ] && PARTS=("$@") || PARTS=(tunnel proxy worker)
 
 for part in "${PARTS[@]}"; do
@@ -44,5 +48,11 @@ for part in "${PARTS[@]}"; do
   fi
 
   [ "$stopped" = 1 ] || echo "$part was not running"
+
+  # Only the copy start.sh put beside the built Worker (byte-identical), never a file someone else wrote there.
+  if [ "$part" = worker ] && [ -f "$STATE/worker.dev.vars" ]; then
+    cmp -s "$STATE/worker.dev.vars" "$REPO/dist/server/.dev.vars" && rm -f "$REPO/dist/server/.dev.vars"
+    rm -f "$STATE/worker.dev.vars"
+  fi
 done
 exit 0

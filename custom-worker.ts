@@ -44,7 +44,8 @@ export default {
       // Forward the method and body as-is, to the PostHog host+path, with only
       // the allowlisted headers (#858): every incoming header used to go along,
       // the sign-in cookie included. ingestRequest (src/lib/ingestTarget.ts)
-      // holds the list and its test. `redirect: "manual"` isn't needed —
+      // holds the list and its test, and adds our Origin and the visitor IP
+      // (from CF-Connecting-IP) that replay and the city lookup need (#919). `redirect: "manual"` isn't needed —
       // PostHog's ingest/assets endpoints don't redirect under normal operation.
       //
       // WHY the cast: `request` is typed via @cloudflare/workers-types (see

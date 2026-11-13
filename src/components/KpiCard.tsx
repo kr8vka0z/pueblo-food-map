@@ -13,6 +13,8 @@
  * browser state.
  */
 
+import { tileCardClass, tileLabelClass } from "@/lib/adminCardStyles";
+
 export interface KpiCardProps {
   label: string;
   /** Formatted for display already (e.g. "1,204", "42%", "2.1s") — this component never formats the value itself, only the delta. */
@@ -91,16 +93,29 @@ function Sparkline({ points }: { points: readonly number[] }) {
 export default function KpiCard({ label, displayValue, value, previousValue, sparkline, approximate }: KpiCardProps) {
   const delta = computeKpiDelta(value, previousValue);
   return (
-    <div className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-500)]">{label}</p>
-      <div className="mt-1 flex items-baseline gap-2">
-        <p className="text-2xl font-semibold text-[var(--color-ink-900)]">
-          {approximate && <span className="mr-1 text-sm font-normal text-[var(--color-ink-500)]">about</span>}
-          {displayValue}
-        </p>
-        {previousValue !== undefined && <DeltaBadge delta={delta} />}
+    // WHY a column with the number pushed down (mt-auto): cards in one grid row
+    // are stretched to the same height, so when one label wraps to two lines
+    // and its neighbour's does not, both numbers still sit on one line (#926).
+    <div className={`${tileCardClass} flex flex-col`}>
+      <p className={tileLabelClass}>{label}</p>
+      <div className="mt-auto pt-1">
+        {/* WHY flex-wrap and a real space after "about": two cards across a
+            360 px phone leave about 110 px, so the change drops under the
+            number and "about" may sit on its own line, instead of running past
+            the card's edge. */}
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <p className="text-2xl font-semibold text-[var(--color-ink-900)]">
+            {approximate && (
+              <>
+                <span className="text-sm font-normal text-[var(--color-ink-500)]">about</span>{" "}
+              </>
+            )}
+            {displayValue}
+          </p>
+          {previousValue !== undefined && <DeltaBadge delta={delta} />}
+        </div>
+        {sparkline && <Sparkline points={sparkline} />}
       </div>
-      {sparkline && <Sparkline points={sparkline} />}
     </div>
   );
 }

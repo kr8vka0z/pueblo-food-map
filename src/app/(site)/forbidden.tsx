@@ -13,6 +13,7 @@
  */
 
 import Link from "next/link";
+import { tapLinkClass } from "@/lib/adminCardStyles";
 
 export default function Forbidden() {
   return (
@@ -23,10 +24,7 @@ export default function Forbidden() {
       <p className="text-[var(--color-ink-500)]">
         You do not have access to this page.
       </p>
-      <Link
-        href="/"
-        className="text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
-      >
+      <Link href="/" className={`${tapLinkClass} text-sm`}>
         Return to the map
       </Link>
     </main>

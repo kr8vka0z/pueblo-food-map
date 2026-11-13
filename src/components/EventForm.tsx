@@ -27,9 +27,12 @@
  * built-in wordings (Spanish built in) or Custom with English and Spanish
  * boxes. Suggest Spanish includes the custom words only when Custom is chosen.
  *
- * Status actions: create = Save draft / Publish; edit = Save (+ Publish for a
- * draft, Cancel event for a published one — which reveals the required
- * cancel note) and Archive. The `updated_at` precondition (`expectedUpdatedAt`)
+ * Status actions (#926 layout): the save row is Cancel (a link back to the
+ * list, saves nothing, off while a save runs) beside Save draft / Publish on create and on a draft,
+ * or beside Save changes otherwise. Cancel event (published only; a step,
+ * useAdminStep: it opens the required cancel note with Keep event first and
+ * the red Confirm cancel event second) and Archive event (asks on the page first,
+ * AdminConfirm) sit apart in a Danger zone at the foot. The `updated_at` precondition (`expectedUpdatedAt`)
  * is refreshed from each successful save, so consecutive saves don't 409
  * against the admin's own previous save; a real 409 shows the server message
  * and a Reload button, leaving the admin's unsaved edits on screen.
@@ -45,11 +48,37 @@
  * Spanish someone wrote is never overwritten. Nothing is saved by it.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
-import { ADMIN_PRIMARY_BUTTON, errorClass, inputBase, inputBorder, labelClass } from "@/components/formClasses";
+import { focusFirstProblem } from "@/lib/focusFirstProblem";
+import {
+  ADMIN_PRIMARY_BUTTON,
+  ADMIN_SECONDARY_BUTTON,
+  busyButtonProps,
+  cancelLinkProps,
+  errorClass,
+  fieldGroupClass,
+  hintClass,
+  inputBase,
+  inputBorder,
+  labelClass,
+  requiredMarkClass,
+  saveRowClass,
+} from "@/components/formClasses";
+import {
+  cardSlimClass,
+  dangerButtonClass,
+  failureBoxClass,
+  failureLineClass,
+  pickerOptionClass,
+  secondaryButtonClass,
+  sectionTitleClass,
+  tapLinkClass,
+} from "@/lib/adminCardStyles";
+import AdminConfirm, { useAdminConfirm, useAdminStep } from "@/components/AdminConfirm";
+import AdminSegmented from "@/components/AdminSegmented";
 import EventFlyerField from "@/components/EventFlyerField";
 import type { PublicFlyer } from "@/lib/events";
 import type { VenueChoice } from "@/lib/adminEventReads";
@@ -97,6 +126,8 @@ export interface EventFormProps {
   initialFlyer?: PublicFlyer | null;
   /** Create mode only: the public submission this draft comes from (#883). */
   submissionId?: string;
+  /** A short instruction shown in a box at the top of the form (the ?from= submission flow). */
+  notice?: string;
 }
 
 // Keys match the server's error map (adminEventValidation.ts): snake_case field names, `place`, `starts_at`, `ends_at`, `_form`.
@@ -120,17 +151,6 @@ const LINK_LABEL_OPTIONS: [EventLinkLabel, string][] = [
   ["custom", "Custom (type your own)"],
 ];
 
-const hintClass = "font-normal text-[var(--color-ink-400)]";
-const secondaryButtonClass =
-  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
-  "px-4 text-sm font-medium text-[var(--color-sage-600)] bg-transparent transition-colors duration-150 " +
-  "hover:bg-[var(--color-sage-50)] focus-visible:outline-none focus-visible:ring-2 " +
-  "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
-const dangerButtonClass =
-  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] px-4 " +
-  "text-sm font-medium text-[var(--color-danger)] bg-transparent transition-colors duration-150 " +
-  "hover:bg-[var(--color-danger)] hover:text-[var(--color-bone-50)] focus-visible:outline-none focus-visible:ring-2 " +
-  "focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
 
 interface TextFieldProps {
   id: string;
@@ -145,9 +165,11 @@ interface TextFieldProps {
   hint?: string;
   type?: string;
   placeholder?: string;
+  /** Lets a step put focus in this box when it opens (the cancellation note). */
+  fieldRef?: React.Ref<HTMLTextAreaElement>;
 }
 
-function TextField({ id, label, value, onChange, max, error, required, multiline, lang, hint, type = "text", placeholder }: TextFieldProps) {
+function TextField({ id, label, value, onChange, max, error, required, multiline, lang, hint, type = "text", placeholder, fieldRef }: TextFieldProps) {
   const common = {
     id,
     value,
@@ -165,13 +187,13 @@ function TextField({ id, label, value, onChange, max, error, required, multiline
       <label htmlFor={id} className={labelClass}>
         {label}
         {required && (
-          <span aria-hidden className="text-[var(--color-danger)]">
+          <span aria-hidden className={requiredMarkClass}>
             {" "}*
           </span>
         )}
         {hint && <span className={hintClass}> {hint}</span>}
       </label>
-      {multiline ? <textarea rows={3} {...common} /> : <input type={type} {...common} />}
+      {multiline ? <textarea ref={fieldRef} rows={3} {...common} /> : <input type={type} {...common} />}
       {error && (
         <p id={`${id}-error`} role="alert" className={errorClass}>
           {error}
@@ -195,7 +217,7 @@ function validateClient(v: EventFormValues, cancelling: boolean): FieldErrors {
   return e;
 }
 
-export default function EventForm({ venues, eventId, initialValues, status: initialStatus, expectedUpdatedAt, justSaved, initialFlyer, submissionId }: EventFormProps) {
+export default function EventForm({ venues, eventId, initialValues, status: initialStatus, expectedUpdatedAt, justSaved, initialFlyer, submissionId, notice }: EventFormProps) {
   const router = useRouter();
   const isEdit = eventId !== undefined;
   const [values, setValues] = useState<EventFormValues>(() => {
@@ -210,7 +232,27 @@ export default function EventForm({ venues, eventId, initialValues, status: init
   const [saved, setSaved] = useState<{ id: string } | null>(justSaved && eventId ? { id: eventId } : null);
   const [status, setStatus] = useState<EventStatus>(initialStatus ?? "draft");
   const [version, setVersion] = useState(expectedUpdatedAt);
-  const [cancelling, setCancelling] = useState(false);
+  // Cancel event is a step (#926): "Cancel event" stays mounted and hidden
+  // while it is open, focus goes to the English note box, and Keep event
+  // hands focus back to "Cancel event". Escape does what Keep event does,
+  // and nothing while a request runs.
+  const {
+    open: cancelling,
+    openStep: openCancelStep,
+    closeStep: closeCancelStep,
+    triggerRef: cancelEventRef,
+    fieldRef: cancelNoteRef,
+  } = useAdminStep({ busy, onCancel: keepEvent });
+  // #926: after a Save with problems, focus (and so the scroll) goes to the
+  // first box marked wrong. Bumped on every refusal, so a second one moves focus again.
+  const formRef = useRef<HTMLFormElement>(null);
+  const [errorFocusTick, setErrorFocusTick] = useState(0);
+  useEffect(() => {
+    if (errorFocusTick > 0) focusFirstProblem(formRef.current);
+  }, [errorFocusTick]);
+  // Shown inside the archive confirm, so a failure is seen where the admin pressed (a conflict goes to the top box, with Reload, instead).
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const { asking: askingArchive, ask: askArchive, cancel: cancelArchive, triggerRef: archiveRef } = useAdminConfirm();
   const [suggest, setSuggest] = useState<"idle" | "busy" | "done" | "none" | "full" | "error">("idle");
   const [placeMode, setPlaceMode] = useState<"venue" | "address">(initialValues?.venueId ? "venue" : "address");
   const [venueQuery, setVenueQuery] = useState("");
@@ -219,6 +261,19 @@ export default function EventForm({ venues, eventId, initialValues, status: init
     message: "",
     options: [],
   });
+
+  // When a press removes the pressed control (a picked place, Change), focus
+  // goes to what replaced it once that has rendered, not to the page body (#926).
+  const changePlaceRef = useRef<HTMLButtonElement>(null);
+  const venueSearchRef = useRef<HTMLInputElement>(null);
+  const findLocationRef = useRef<HTMLButtonElement>(null);
+  const focusNext = useRef<"change" | "search" | null>(null);
+  useEffect(() => {
+    if (!focusNext.current) return;
+    const target = focusNext.current === "change" ? changePlaceRef.current : venueSearchRef.current;
+    focusNext.current = null;
+    target?.focus();
+  }, [values.venueId]);
 
   const set = <K extends keyof EventFormValues>(key: K, value: EventFormValues[K]) => setValues((p) => ({ ...p, [key]: value }));
   const showCancelNote = cancelling || status === "cancelled";
@@ -251,7 +306,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
 
   async function findLocation() {
     const q = values.address.trim();
-    if (!q) return;
+    if (!q || geo.state === "loading") return;
     setGeo({ state: "loading", message: "Looking up…", options: [] });
     try {
       const res = await fetch(`/api/admin/geocode?q=${encodeURIComponent(q)}`);
@@ -266,9 +321,14 @@ export default function EventForm({ venues, eventId, initialValues, status: init
   }
 
   async function send(action: "save_draft" | "save" | "publish" | "cancel") {
+    // One write at a time across Save draft, Publish, Save, Confirm cancel
+    // and Archive (they share `busy`): the buttons are aria-disabled, not
+    // disabled, so the handler is the gate (#926).
+    if (busy) return;
     const clientErrors = validateClient(values, action === "cancel");
     if (Object.keys(clientErrors).length > 0) {
       setErrors(clientErrors);
+      setErrorFocusTick((n) => n + 1);
       return;
     }
     setErrors({});
@@ -302,6 +362,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       });
       if (res.status === 422) {
         setErrors(((await res.json()) as { errors: FieldErrors }).errors);
+        setErrorFocusTick((n) => n + 1);
       } else if (res.status === 200 || res.status === 201) {
         const data = (await res.json()) as { id?: string; status: EventStatus; updated_at: string };
         if (!isEdit && data.id) {
@@ -310,20 +371,22 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         }
         setStatus(data.status);
         setVersion(data.updated_at);
-        setCancelling(false);
+        // Any successful save closes the cancel step, as before.
+        if (cancelling) closeCancelStep();
         setSaved({ id: eventId as string });
       } else {
         const data = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
-        setFailure({ message: data?.message ?? "Something went wrong. The event was not saved. Try again.", code: data?.error ?? null });
+        setFailure({ message: data?.message ?? "The event was not saved. Try again.", code: data?.error ?? null });
       }
     } catch {
-      setFailure({ message: "Something went wrong. The event was not saved. Try again.", code: null });
+      setFailure({ message: "The event was not saved. Try again.", code: null });
     } finally {
       setBusy(false);
     }
   }
 
   async function suggestSpanish() {
+    if (suggest === "busy") return;
     // Only fields with English text and a still-empty Spanish box are worth asking for.
     const pairs: [string, keyof EventFormValues, keyof EventFormValues][] = [
       ["name", "name", "nameEs"],
@@ -368,10 +431,18 @@ export default function EventForm({ venues, eventId, initialValues, status: init
     }
   }
 
+  // Runs only from the on-page confirm's Archive event button: that second press is the gate.
   async function archive() {
-    if (!window.confirm("Archive this event? It leaves the map and the list of live events, and stays in the admin history.")) return;
+    if (busy) return;
     setBusy(true);
     setFailure(null);
+    setArchiveError(null);
+    // Shown once: inside the confirm, where the admin pressed; a conflict
+    // goes only to the top box instead, the one that carries Reload.
+    const fail = (message: string, code: string | null) => {
+      if (code === "conflict") setFailure({ message, code });
+      else setArchiveError(message);
+    };
     try {
       const res = await fetch(`/api/admin/events/${eventId}/archive`, {
         method: "POST",
@@ -384,9 +455,9 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         return;
       }
       const data = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
-      setFailure({ message: data?.message ?? "Something went wrong. The event was not archived. Try again.", code: data?.error ?? null });
+      fail(data?.message ?? "The event was not archived. Try again.", data?.error ?? null);
     } catch {
-      setFailure({ message: "Something went wrong. The event was not archived. Try again.", code: null });
+      fail("The event was not archived. Try again.", null);
     } finally {
       setBusy(false);
     }
@@ -397,24 +468,81 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       ? venues.filter((x) => `${x.name} ${x.address}`.toLowerCase().includes(venueQuery.trim().toLowerCase())).slice(0, 8)
       : [];
 
+  // Save draft gets Publish beside it on a new event (not one from a submission: the route refuses
+  // Publish then) and on a draft; otherwise the save button stands alone.
+  const hasPublish = isEdit ? status === "draft" : !submissionId;
+
+  // The place's problem line sits directly under the red-edged box it is
+  // about (#926), so each place mode renders it right after its own box.
+  const placeError = errors.place ? (
+    <p id="event-place-error" role="alert" className={errorClass}>
+      {errors.place}
+    </p>
+  ) : null;
+
+  // Closes the cancel step without sending anything: the half-typed note and
+  // its error go too, so a reopened step starts clean.
+  function keepEvent() {
+    setValues((p) => ({ ...p, cancelNote: "", cancelNoteEs: "" }));
+    setErrors((p) => ({ ...p, cancel_note: undefined, cancel_note_es: undefined }));
+    closeCancelStep();
+  }
+
+  const cancelNoteFields = (
+    // data-admin-step: the note sits in its own TextField wrapper, so the
+    // step's Escape listener goes on this box to work from both buttons too.
+    // While cancelling it is a step beside the Archive confirm, so it takes the
+    // confirm's look (AdminConfirm: 1 px red edge, 10 px corners, white) and
+    // its button row. A cancelled event's note, edited later, keeps the clay group.
+    <fieldset
+      data-admin-step
+      className={
+        cancelling
+          ? "rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white p-4"
+          : "rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] p-4"
+      }
+    >
+      <legend className={`${labelClass} px-1`}>Cancellation note</legend>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <TextField id="event-cancel-note" multiline required label="Note (English)" value={values.cancelNote} onChange={(v) => set("cancelNote", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note} fieldRef={cancelling ? cancelNoteRef : undefined} />
+        <TextField id="event-cancel-note-es" multiline lang="es" label="Note (Spanish)" value={values.cancelNoteEs} onChange={(v) => set("cancelNoteEs", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note_es} />
+      </div>
+      {/* #926 decision 8: the safe button first, then the red one. "Keep event",
+          not "Cancel": this form already has a Cancel that leaves the page. */}
+      {cancelling && (
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <button type="button" disabled={busy} onClick={keepEvent} className={secondaryButtonClass}>
+            Keep event
+          </button>
+          <button type="button" onClick={() => void send("cancel")} {...busyButtonProps(busy)} className={dangerButtonClass}>
+            {busy ? "Cancelling…" : "Confirm cancel event"}
+          </button>
+        </div>
+      )}
+    </fieldset>
+  );
+
   return (
     <form
+      ref={formRef}
       onSubmit={(e) => {
         e.preventDefault();
         void send(isEdit ? "save" : "save_draft");
       }}
       noValidate
-      className="max-w-2xl space-y-5"
+      className="space-y-5"
     >
+      {notice && <p className={`${cardSlimClass} text-sm text-[var(--color-ink-700)]`}>{notice}</p>}
+
       {saved && (
         <div role="status" className="rounded-[var(--radius-md)] border border-[var(--color-sage-500)] bg-[var(--color-sage-50)] px-4 py-3 text-sm text-[var(--color-sage-700)]">
           <p className="font-medium">Saved.</p>
-          <p className="mt-1 flex flex-wrap gap-x-4">
+          <p className="flex flex-wrap gap-x-4">
             {/* ?event=<id> opens this event's card on the map (#758). */}
-            <Link href={`/?event=${saved.id}`} className="font-medium underline underline-offset-2">
+            <Link href={`/?event=${saved.id}`} className={tapLinkClass}>
               View on map
             </Link>
-            <Link href="/admin/events" className="font-medium underline underline-offset-2">
+            <Link href="/admin/events" className={tapLinkClass}>
               Back to events
             </Link>
           </p>
@@ -422,8 +550,8 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       )}
 
       {failure && (
-        <div role="alert" className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 py-3">
-          <p className="text-sm font-medium text-[var(--color-danger)]">{failure.message}</p>
+        <div role="alert" className={failureBoxClass}>
+          <p className={`${failureLineClass} font-medium`}>{failure.message}</p>
           {failure.code === "conflict" && (
             <button type="button" onClick={() => window.location.reload()} className={`mt-2 ${dangerButtonClass}`}>
               Reload
@@ -437,7 +565,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" disabled={suggest === "busy"} onClick={() => void suggestSpanish()} className={secondaryButtonClass}>
+        <button type="button" onClick={() => void suggestSpanish()} {...busyButtonProps(suggest === "busy")} className={secondaryButtonClass}>
           {suggest === "busy" ? "Suggesting…" : "Suggest Spanish"}
         </button>
         <p aria-live="polite" className={`text-sm ${suggest === "error" ? "text-[var(--color-danger)]" : "text-[var(--color-ink-500)]"}`}>
@@ -452,12 +580,12 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <TextField id="event-name" label="Name (English)" required value={values.name} onChange={(v) => set("name", v)} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.name} />
         <TextField id="event-name-es" label="Name (Spanish)" lang="es" value={values.nameEs} onChange={(v) => set("nameEs", v)} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.name_es} />
-        <TextField id="event-host" label="Host (English)" hint="who is running it" value={values.host} onChange={(v) => set("host", v)} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.host} />
+        <TextField id="event-host" label="Host (English)" hint="(optional) who is running it" value={values.host} onChange={(v) => set("host", v)} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.host} />
         <TextField id="event-host-es" label="Host (Spanish)" lang="es" value={values.hostEs} onChange={(v) => set("hostEs", v)} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.host_es} />
       </div>
 
       {/* Start / end — Pueblo time, converted to UTC by the server. */}
-      <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4">
+      <fieldset className={fieldGroupClass}>
         <legend className={`${labelClass} px-1`}>
           When <span className={hintClass}>(Pueblo time, Mountain Time)</span>
         </legend>
@@ -468,31 +596,46 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       </fieldset>
 
       {/* Place — pick an existing venue, or type an address and find its location. */}
-      <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4">
+      <fieldset className={fieldGroupClass}>
         <legend className={`${labelClass} px-1`}>
-          Where <span aria-hidden className="text-[var(--color-danger)]">*</span>
+          Where <span aria-hidden className={requiredMarkClass}>*</span>
         </legend>
-        <div className="mb-3 flex flex-wrap gap-4 text-sm text-[var(--color-ink-700)]">
-          <label className="flex min-h-12 cursor-pointer items-center gap-2">
-            <input type="radio" name="place-mode" checked={placeMode === "venue"} onChange={() => { setPlaceMode("venue"); clearPlace(); }} />
-            A place already on the map
-          </label>
-          <label className="flex min-h-12 cursor-pointer items-center gap-2">
-            <input type="radio" name="place-mode" checked={placeMode === "address"} onChange={() => { setPlaceMode("address"); clearPlace(); }} />
-            A different address
-          </label>
+        {/* WHY short words: the slider's two halves are equal and never wrap, so at 360 wide the
+            longer "A place already on the map" would push the page sideways. The legend carries the meaning. */}
+        <div className="mb-3">
+          <AdminSegmented
+            name="place-mode"
+            legend="Choose a place already on the map, or type a different address"
+            options={[
+              { value: "venue", label: "On the map" },
+              { value: "address", label: "Other address" },
+            ]}
+            value={placeMode}
+            onChange={(v) => {
+              setPlaceMode(v as "venue" | "address");
+              clearPlace();
+            }}
+          />
         </div>
 
         {placeMode === "venue" ? (
           <div>
             {values.venueId ? (
-              <div className="flex items-start justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white p-3">
+              <div className={`flex items-start justify-between gap-3 bg-white ${fieldGroupClass}`}>
                 <p className="text-sm text-[var(--color-ink-700)]">
                   <span className="font-medium text-[var(--color-ink-900)]">{pickedVenue?.name ?? "Selected place"}</span>
                   <br />
                   {values.address}
                 </p>
-                <button type="button" onClick={clearPlace} className={secondaryButtonClass}>
+                <button
+                  ref={changePlaceRef}
+                  type="button"
+                  onClick={() => {
+                    focusNext.current = "search";
+                    clearPlace();
+                  }}
+                  className={secondaryButtonClass}
+                >
                   Change
                 </button>
               </div>
@@ -502,6 +645,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
                   Search places by name or address
                 </label>
                 <input
+                  ref={venueSearchRef}
                   id="event-venue-search"
                   type="text"
                   value={venueQuery}
@@ -510,14 +654,18 @@ export default function EventForm({ venues, eventId, initialValues, status: init
                   aria-describedby={errors.place ? "event-place-error" : undefined}
                   className={`${inputBase} ${inputBorder(!!errors.place)}`}
                 />
+                {placeError}
                 {matches.length > 0 && (
                   <ul className="mt-2 space-y-1.5">
                     {matches.map((m) => (
                       <li key={m.id}>
                         <button
                           type="button"
-                          onClick={() => pickVenue(m)}
-                          className="w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-left text-sm text-[var(--color-ink-700)] hover:border-[var(--color-sage-500)] hover:bg-[var(--color-sage-50)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                          onClick={() => {
+                            focusNext.current = "change";
+                            pickVenue(m);
+                          }}
+                          className={pickerOptionClass}
                         >
                           <span className="font-medium text-[var(--color-ink-900)]">{m.name}</span>
                           <br />
@@ -548,12 +696,35 @@ export default function EventForm({ venues, eventId, initialValues, status: init
                 aria-describedby={errors.place ? "event-place-error" : undefined}
                 className={`${inputBase} ${inputBorder(!!errors.place)}`}
               />
+              {placeError}
             </div>
-            <button type="button" onClick={() => void findLocation()} disabled={!values.address.trim() || geo.state === "loading"} className={secondaryButtonClass}>
-              {geo.state === "loading" ? "Looking up…" : "Find location from address"}
+            <button
+              ref={findLocationRef}
+              type="button"
+              disabled={!values.address.trim()}
+              onClick={() => void findLocation()}
+              {...busyButtonProps(geo.state === "loading")}
+              className={`${secondaryButtonClass} whitespace-nowrap`}
+            >
+              {/* Both words in one grid cell, so the button keeps its width while
+                  "Looking up…" shows; the unseen one is aria-hidden. */}
+              <span className="grid">
+                <span aria-hidden={geo.state === "loading" || undefined} className={`[grid-area:1/1] ${geo.state === "loading" ? "invisible" : ""}`}>
+                  Find location from address
+                </span>
+                <span aria-hidden={geo.state !== "loading" || undefined} className={`[grid-area:1/1] ${geo.state === "loading" ? "" : "invisible"}`}>
+                  Looking up…
+                </span>
+              </span>
             </button>
+            {/* "Looking up…" shows once, in the button; mounted while empty so the result is still announced. */}
             {geo.message && (
-              <p aria-live="polite" className="text-sm text-[var(--color-ink-500)]">{geo.message}</p>
+              <p
+                aria-live="polite"
+                className={geo.state === "none" || geo.state === "error" ? errorClass : "text-sm text-[var(--color-ink-500)]"}
+              >
+                {geo.state === "loading" ? "" : geo.message}
+              </p>
             )}
             {values.lat !== "" && values.lng !== "" && geo.state !== "found" && (
               <p className="text-sm text-[var(--color-sage-600)]">Location set.</p>
@@ -564,8 +735,12 @@ export default function EventForm({ venues, eventId, initialValues, status: init
                   <li key={`${m.lat}-${m.lng}-${i}`}>
                     <button
                       type="button"
-                      onClick={() => applyMatch(m)}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-left text-sm text-[var(--color-ink-700)] hover:border-[var(--color-sage-500)] hover:bg-[var(--color-sage-50)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                      onClick={() => {
+                        applyMatch(m);
+                        // The list goes away with the pressed match in it: focus goes back to Find location.
+                        findLocationRef.current?.focus();
+                      }}
+                      className={pickerOptionClass}
                     >
                       {m.matchedAddress}
                     </button>
@@ -575,16 +750,13 @@ export default function EventForm({ venues, eventId, initialValues, status: init
             )}
           </div>
         )}
-        {errors.place && (
-          <p id="event-place-error" role="alert" className={errorClass}>
-            {errors.place}
-          </p>
-        )}
+        {/* Only when there is no box to sit under (a place is already chosen). */}
+        {placeMode === "venue" && values.venueId && placeError}
         <div className="mt-4">
           <TextField
             id="event-venue-name"
             label="Venue name"
-            hint="optional, shown in bold above the address"
+            hint="(optional) shown in bold above the address"
             value={values.venueName}
             onChange={(v) => set("venueName", v)}
             max={FIELD_LIMITS.SUGGEST_VENUE_NAME}
@@ -594,17 +766,17 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       </fieldset>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <TextField id="event-description" multiline label="Description (English)" value={values.description} onChange={(v) => set("description", v)} max={FIELD_LIMITS.SUGGEST_NOTES} error={errors.description} />
+        <TextField id="event-description" multiline label="Description (English)" hint="(optional)" value={values.description} onChange={(v) => set("description", v)} max={FIELD_LIMITS.SUGGEST_NOTES} error={errors.description} />
         <TextField id="event-description-es" multiline lang="es" label="Description (Spanish)" value={values.descriptionEs} onChange={(v) => set("descriptionEs", v)} max={FIELD_LIMITS.SUGGEST_NOTES} error={errors.description_es} />
-        <TextField id="event-bring" multiline label="What to bring (English)" value={values.whatToBring} onChange={(v) => set("whatToBring", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.what_to_bring} />
+        <TextField id="event-bring" multiline label="What to bring (English)" hint="(optional)" value={values.whatToBring} onChange={(v) => set("whatToBring", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.what_to_bring} />
         <TextField id="event-bring-es" multiline lang="es" label="What to bring (Spanish)" value={values.whatToBringEs} onChange={(v) => set("whatToBringEs", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.what_to_bring_es} />
       </div>
 
       {/* The link becomes the card's green action button (#882); no link, no button. */}
-      <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4">
+      <fieldset className={fieldGroupClass}>
         <legend className={`${labelClass} px-1`}>Action button</legend>
         <div className="space-y-4">
-          <TextField id="event-link" type="url" label="Link" hint="optional, starts with https://" value={values.linkUrl} onChange={(v) => set("linkUrl", v)} max={FIELD_LIMITS.SUGGEST_CONTACT} error={errors.link_url} />
+          <TextField id="event-link" type="url" label="Link" hint="(optional) starts with https://" value={values.linkUrl} onChange={(v) => set("linkUrl", v)} max={FIELD_LIMITS.SUGGEST_CONTACT} error={errors.link_url} />
           <div>
             <label htmlFor="event-link-label" className={labelClass}>Button says</label>
             <select
@@ -613,7 +785,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
               onChange={(e) => set("linkLabel", e.target.value)}
               aria-invalid={errors.link_label ? "true" : undefined}
               aria-describedby={errors.link_label ? "event-link-label-error" : undefined}
-              className={`${inputBase} ${inputBorder(!!errors.link_label)} min-h-12`}
+              className={`${inputBase} ${inputBorder(!!errors.link_label)}`}
             >
               {LINK_LABEL_OPTIONS.map(([key, label]) => (
                 <option key={key} value={key}>{label}</option>
@@ -637,20 +809,9 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       {/* Saves on its own; hands the new `updated_at` up so the next Save doesn't 409 (#760). */}
       <EventFlyerField eventId={eventId} version={version} onVersion={setVersion} initialFlyer={initialFlyer} />
 
-      {showCancelNote && (
-        <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] p-4">
-          <legend className={`${labelClass} px-1`}>Cancellation note</legend>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <TextField id="event-cancel-note" multiline required label="Note (English)" value={values.cancelNote} onChange={(v) => set("cancelNote", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note} />
-            <TextField id="event-cancel-note-es" multiline lang="es" label="Note (Spanish)" value={values.cancelNoteEs} onChange={(v) => set("cancelNoteEs", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note_es} />
-          </div>
-          {cancelling && (
-            <button type="button" disabled={busy} onClick={() => void send("cancel")} className={`mt-3 ${dangerButtonClass}`}>
-              {busy ? "Cancelling…" : "Confirm cancel event"}
-            </button>
-          )}
-        </fieldset>
-      )}
+      {/* A cancelled event's note is edited here and saved with Save changes. While cancelling a
+          published one, the same fields open in the lower section instead (never both at once: same ids). */}
+      {status === "cancelled" && !cancelling && cancelNoteFields}
 
       {errors._form && (
         <p role="alert" className={errorClass}>
@@ -658,49 +819,86 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         </p>
       )}
 
-      {/* Actions */}
-      <div className="flex flex-wrap items-center gap-3">
-        {!isEdit && (
-          <>
-            <button type="submit" disabled={busy} className={secondaryButtonClass}>
+      {/* Cancel (a link: saves nothing) then the save buttons. Save draft / Save changes stays the
+          form's first type="submit", so Enter in a box saves. */}
+      <div className={saveRowClass}>
+        {/* The list, where Archive lands too (a save stays on the form). Off while a save runs. */}
+        <Link href="/admin/events" className={ADMIN_SECONDARY_BUTTON} {...cancelLinkProps(busy)}>
+          Cancel
+        </Link>
+        {hasPublish ? (
+          // WHY 8 px sides (px-2!, important so it wins over the shared
+          // px-4) and nowrap: at 360 each of these two is 103 wide, and with
+          // 16 px sides "Save draft" broke onto two lines. 87 of room holds it.
+          <div className="grid grid-cols-2 gap-2">
+            <button type="submit" {...busyButtonProps(busy)} className={`${ADMIN_SECONDARY_BUTTON} w-full whitespace-nowrap px-2!`}>
               {busy ? "Saving…" : "Save draft"}
             </button>
-            {!submissionId && (
-              <button type="button" disabled={busy} onClick={() => void send("publish")} className={ADMIN_PRIMARY_BUTTON}>
-                Publish
-              </button>
-            )}
-          </>
-        )}
-        {isEdit && (
-          <>
-            <button type="submit" disabled={busy} className={status === "draft" ? secondaryButtonClass : ADMIN_PRIMARY_BUTTON}>
-              {busy ? "Saving…" : status === "draft" ? "Save draft" : "Save changes"}
+            <button type="button" onClick={() => void send("publish")} {...busyButtonProps(busy)} className={`${ADMIN_PRIMARY_BUTTON} w-full whitespace-nowrap px-2!`}>
+              Publish
             </button>
-            {status === "draft" && (
-              <button type="button" disabled={busy} onClick={() => void send("publish")} className={ADMIN_PRIMARY_BUTTON}>
-                Publish
-              </button>
-            )}
-            {status === "published" && !cancelling && (
-              <button type="button" disabled={busy} onClick={() => setCancelling(true)} className={dangerButtonClass}>
-                Cancel event
-              </button>
-            )}
-          </>
+          </div>
+        ) : (
+          <button type="submit" {...busyButtonProps(busy)} className={`${ADMIN_PRIMARY_BUTTON} w-full`}>
+            {busy ? "Saving…" : isEdit && status !== "draft" ? "Save changes" : "Save draft"}
+          </button>
         )}
-        <Link href="/admin/events" className="inline-flex min-h-12 items-center text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2">
-          Back to events
-        </Link>
       </div>
 
+      {/* WHY Cancel event lives down here, apart from the save row: it marks the EVENT cancelled,
+          and beside Save it would read as "leave this form". */}
       {isEdit && (
-        <div className="border-t border-[var(--color-bone-200)] pt-5">
-          <h3 className="mb-2 text-sm font-semibold text-[var(--color-ink-700)]">Danger zone</h3>
-          <button type="button" disabled={busy} onClick={() => void archive()} className={dangerButtonClass}>
-            Archive event
-          </button>
-        </div>
+        <section aria-labelledby="event-danger-zone" className="space-y-3 border-t border-[var(--color-bone-200)] pt-5">
+          <h3 id="event-danger-zone" className={sectionTitleClass}>
+            Danger zone
+          </h3>
+          {/* Kept mounted (hidden) while the step is open, so Keep event can hand focus back. */}
+          {status === "published" && (
+            <button
+              ref={cancelEventRef}
+              type="button"
+              hidden={cancelling}
+              disabled={busy}
+              onClick={openCancelStep}
+              className={dangerButtonClass}
+            >
+              Cancel event
+            </button>
+          )}
+          {cancelling && cancelNoteFields}
+          <div>
+            <button
+              ref={archiveRef}
+              type="button"
+              hidden={askingArchive}
+              disabled={busy}
+              onClick={() => {
+                setArchiveError(null);
+                askArchive();
+              }}
+              className={dangerButtonClass}
+            >
+              Archive event
+            </button>
+            {askingArchive && (
+              <AdminConfirm
+                title="Archive this event?"
+                confirmLabel="Archive event"
+                busyLabel="Archiving…"
+                tone="danger"
+                busy={busy}
+                error={archiveError}
+                onConfirm={() => void archive()}
+                onCancel={() => {
+                  setArchiveError(null);
+                  cancelArchive();
+                }}
+              >
+                It leaves the map and the list of live events, and stays in the admin history.
+              </AdminConfirm>
+            )}
+          </div>
+        </section>
       )}
     </form>
   );

@@ -24,6 +24,7 @@ import PhotoReviewCard from "@/components/PhotoReviewCard";
 import SponsorRequestCard from "@/components/SponsorRequestCard";
 import type { AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import type { AdminBoxAdopterRow } from "@/lib/boxAdopters";
+import { sectionTitleClass } from "@/lib/adminCardStyles";
 
 export interface BoxReviewBoxProps {
   photos: AdminBoxPhotoRow[];
@@ -35,8 +36,9 @@ export default function BoxReviewBox({ photos, adopters }: BoxReviewBoxProps) {
   if (total === 0) return null;
 
   return (
-    <div className="max-w-2xl">
-      <h2 className="mb-2 text-sm font-semibold text-[var(--color-ink-700)]">Things to review ({total})</h2>
+    <section>
+      {/* h3: the edit page's own title is the h2 (#926 decision 5). */}
+      <h3 className={`${sectionTitleClass} mb-3`}>Things to review ({total})</h3>
       <ul className="flex flex-col gap-4">
         {photos.map((photo) => (
           <li key={`photo-${photo.id}`}>
@@ -49,6 +51,6 @@ export default function BoxReviewBox({ photos, adopters }: BoxReviewBoxProps) {
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   );
 }

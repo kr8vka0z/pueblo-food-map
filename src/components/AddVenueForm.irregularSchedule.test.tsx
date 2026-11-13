@@ -51,7 +51,7 @@ describe("AddVenueForm — monthly schedule fieldset", () => {
     render(<AddVenueForm />);
     await user.click(screen.getByRole("button", { name: /Add monthly schedule/i }));
 
-    const kindSelect = screen.getByLabelText(/^Schedule 1$/i);
+    const kindSelect = screen.getByRole("combobox", { name: /^Schedule 1$/i });
     await user.selectOptions(kindSelect, "monthly_ordinal");
 
     expect(screen.getByLabelText(/Schedule 1 ordinal/i)).toBeDefined();
@@ -63,7 +63,7 @@ describe("AddVenueForm — monthly schedule fieldset", () => {
     const user = userEvent.setup();
     render(<AddVenueForm />);
     await user.click(screen.getByRole("button", { name: /Add monthly schedule/i }));
-    await user.selectOptions(screen.getByLabelText(/^Schedule 1$/i), "monthly_date");
+    await user.selectOptions(screen.getByRole("combobox", { name: /^Schedule 1$/i }), "monthly_date");
 
     expect(screen.getByLabelText(/Schedule 1 day of month/i)).toBeDefined();
     expect(screen.queryByLabelText(/Schedule 1 ordinal/i)).toBeNull();
@@ -80,6 +80,24 @@ describe("AddVenueForm — monthly schedule fieldset", () => {
     expect(screen.getAllByText(/^Remove$/i)).toHaveLength(1);
   });
 
+  // #926: each Remove is named by its own "Schedule N", and focus never falls
+  // to the top of the page: it goes to the Remove now in that place, or to
+  // the add button when none follows.
+  test("each Remove is named by its schedule, and focus moves on after a Remove", async () => {
+    const user = userEvent.setup();
+    render(<AddVenueForm />);
+    const add = screen.getByRole("button", { name: /Add monthly schedule/i });
+    await user.click(add);
+    await user.click(add);
+    expect(screen.getByRole("button", { name: "Remove Schedule 2" })).toBeDefined();
+
+    await user.click(screen.getByRole("button", { name: "Remove Schedule 1" }));
+    expect(screen.getByRole("button", { name: "Remove Schedule 1" })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Remove Schedule 1" }));
+    expect(add).toHaveFocus();
+  });
+
   test("a filled monthly_ordinal row submits in the hours_irregular payload", async () => {
     mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ id: "manual-abc" }) });
     const user = userEvent.setup();
@@ -87,7 +105,7 @@ describe("AddVenueForm — monthly schedule fieldset", () => {
     await fillRequiredFields(user);
 
     await user.click(screen.getByRole("button", { name: /Add monthly schedule/i }));
-    await user.selectOptions(screen.getByLabelText(/^Schedule 1$/i), "monthly_ordinal");
+    await user.selectOptions(screen.getByRole("combobox", { name: /^Schedule 1$/i }), "monthly_ordinal");
     await user.selectOptions(screen.getByLabelText(/Schedule 1 ordinal/i), "4");
     await user.selectOptions(screen.getByLabelText(/Schedule 1 weekday/i), "tue");
     fireEvent.change(screen.getByLabelText(/Schedule 1 time ranges/i), { target: { value: "11:00 AM - 12:00 PM" } });
@@ -109,7 +127,7 @@ describe("AddVenueForm — monthly schedule fieldset", () => {
     await fillRequiredFields(user);
 
     await user.click(screen.getByRole("button", { name: /Add monthly schedule/i }));
-    await user.selectOptions(screen.getByLabelText(/^Schedule 1$/i), "monthly_ordinal");
+    await user.selectOptions(screen.getByRole("combobox", { name: /^Schedule 1$/i }), "monthly_ordinal");
     // ordinal/weekday/slots left blank
 
     await user.click(screen.getByRole("button", { name: /Add venue/i }));
@@ -126,7 +144,7 @@ describe("AddVenueForm — monthly schedule fieldset", () => {
     await fillRequiredFields(user);
 
     await user.click(screen.getByRole("button", { name: /Add monthly schedule/i }));
-    await user.selectOptions(screen.getByLabelText(/^Schedule 1$/i), "other");
+    await user.selectOptions(screen.getByRole("combobox", { name: /^Schedule 1$/i }), "other");
     await user.type(screen.getByLabelText(/Schedule 1 note/i), "3rd weekend, call ahead");
 
     await user.click(screen.getByRole("button", { name: /Add venue/i }));
@@ -147,7 +165,7 @@ describe("AddVenueForm — monthly schedule fieldset", () => {
         }}
       />,
     );
-    expect(screen.getByLabelText(/^Schedule 1$/i)).toHaveValue("monthly_ordinal");
+    expect(screen.getByRole("combobox", { name: /^Schedule 1$/i })).toHaveValue("monthly_ordinal");
     expect(screen.getByLabelText(/Schedule 1 ordinal/i)).toHaveValue("4");
     expect(screen.getByLabelText(/Schedule 1 weekday/i)).toHaveValue("tue");
   });

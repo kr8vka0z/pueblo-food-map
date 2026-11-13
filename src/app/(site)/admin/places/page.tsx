@@ -99,6 +99,7 @@ import ToReviewSummaryBox from "@/components/ToReviewSummaryBox";
 import SourceSwitchPanel from "@/components/SourceSwitchPanel";
 import PublishPanel from "@/components/PublishPanel";
 import AdminNav from "@/components/AdminNav";
+import { clayNoticeClass, pageBodyClass, pageTitleClass } from "@/lib/adminCardStyles";
 import type { AdminVenueRow } from "@/types/venue";
 
 /**
@@ -176,7 +177,8 @@ export default async function PlacesPage({
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="places" counts={navCounts} showActivity={identity.isOwner === true} />
-      <div className="px-4 py-6 sm:px-6">
+      <div className={pageBodyClass}>
+        <h2 className={pageTitleClass}>Places</h2>
         <ToReviewSummaryBox reviewRowCount={reviewRowCount} proposals={proposals} submissionCount={submissions.length} />
         <SourceSwitchPanel />
         {isStaging ? (
@@ -184,7 +186,7 @@ export default async function PlacesPage({
           // false there) — a Publish panel that always no-ops, next to
           // status badges that could never legitimately read "edits
           // waiting," would only teach an admin to distrust this screen.
-          <p className="mb-6 rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]">
+          <p className={clayNoticeClass}>
             Test site: publishing is turned off here.
           </p>
         ) : (

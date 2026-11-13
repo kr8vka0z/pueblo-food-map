@@ -103,6 +103,14 @@ import ArchiveVenueButton from "@/components/ArchiveVenueButton";
 import BoxCheckinsAdminPanel from "@/components/BoxCheckinsAdminPanel";
 import HostAlertsAdminPanel from "@/components/HostAlertsAdminPanel";
 import WaitingToPublishBox, { type WaitingToPublishChange } from "@/components/WaitingToPublishBox";
+import {
+  clayNoticeClass,
+  formPageBodyClass,
+  pageTitleClass,
+  sectionDividerClass,
+  sectionTitleClass,
+  tapLinkClass,
+} from "@/lib/adminCardStyles";
 import SuggestionsBox from "@/components/SuggestionsBox";
 import BoxReviewBox from "@/components/BoxReviewBox";
 import { mapVenueRowToFormValues } from "@/lib/adminVenueForm";
@@ -365,15 +373,15 @@ export default async function EditVenuePage({
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="places" counts={navCounts} showActivity={identity.isOwner === true} />
-      <div className="px-4 py-6 sm:px-6 space-y-6">
-        <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Edit {venue.name}</h2>
+      <div className={formPageBodyClass}>
+        <h2 className={pageTitleClass}>Edit {venue.name}</h2>
         {isBox && <BoxReviewBox photos={boxReview.photos} adopters={boxReview.adopters} />}
         {suggestionItems.length > 0 && suggestionsVenue && (
           <SuggestionsBox items={suggestionItems} venue={suggestionsVenue} />
         )}
         <WaitingToPublishBox changes={waitingToPublish} />
         {linkHealthContext && (
-          <div className="max-w-2xl rounded-[var(--radius-lg)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]">
+          <div className={clayNoticeClass}>
             <p className="font-semibold">Reviewing a dead link</p>
             <p className="mt-1">
               {linkHealthContext.deadUrl
@@ -383,7 +391,7 @@ export default async function EditVenuePage({
                 : "The automated refresh flagged this venue's link as unreachable."}{" "}
               Update or remove the URL below, then save.
             </p>
-            <Link href="/admin/places?show=review" className="mt-2 inline-block font-medium underline underline-offset-2">
+            <Link href="/admin/places?show=review" className={`mt-1 ${tapLinkClass}`}>
               Back to Places
             </Link>
           </div>
@@ -397,25 +405,27 @@ export default async function EditVenuePage({
 
         {isBox && (
           <>
-            <div className="max-w-2xl border-t border-[var(--color-bone-200)] pt-5">
-              <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">Check-ins</h2>
+            <section className={sectionDividerClass}>
+              <h3 className={`mb-3 ${sectionTitleClass}`}>Check-ins</h3>
               <BoxCheckinsAdminPanel checkins={boxCheckins} />
-            </div>
-            <div className="max-w-2xl border-t border-[var(--color-bone-200)] pt-5">
-              <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">Host alert emails</h2>
+            </section>
+            <section className={sectionDividerClass}>
+              <h3 className={`mb-3 ${sectionTitleClass}`}>Host alert emails</h3>
               <HostAlertsAdminPanel venueId={venue.id} initialHosts={hostAlerts} />
-            </div>
+            </section>
           </>
         )}
 
-        <div className="max-w-2xl border-t border-[var(--color-bone-200)] pt-5">
-          <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">Danger zone</h2>
+        {/* A removed place has nothing dangerous left to do: just the line, no heading. */}
+        <section className={sectionDividerClass}>
+          {venue.status !== "archived" && <h3 className={`mb-3 ${sectionTitleClass}`}>Danger zone</h3>}
           <ArchiveVenueButton
             venueId={venue.id}
             venueName={venue.name}
             alreadyArchived={venue.status === "archived"}
+            kind={isBox ? "box" : "place"}
           />
-        </div>
+        </section>
       </div>
     </main>
   );

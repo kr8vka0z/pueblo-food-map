@@ -19,38 +19,63 @@
  * reconcile" convention every other admin queue in this app already uses.
  */
 
+import { busyButtonProps } from "@/components/formClasses";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AdminRejectStep, useAdminStep } from "@/components/AdminConfirm";
+import { KIND_LABEL } from "@/components/BoxCheckinsAdminPanel";
 import type { AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import {
   cardClass,
-  dangerButtonTallClass as dangerButtonClass,
+  cardNameClass,
+  failureLineClass,
   fieldLabelClass,
   formatSubmittedAt,
-  primaryButtonTallClass as primaryButtonClass,
-  secondaryButtonTallClass as secondaryButtonClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+  tagClass,
 } from "@/lib/adminCardStyles";
 
 export interface PhotoReviewCardProps {
   photo: AdminBoxPhotoRow;
 }
 
-type ActionState = { status: "idle" } | { status: "submitting" } | { status: "error"; message: string };
+// `action` says which button is working, so only that one reads "Approving…"
+// or "Saving…" (both stay disabled either way).
+type ActionState =
+  | { status: "idle" }
+  | { status: "submitting"; action: "approve" | "reject" }
+  | { status: "error"; message: string };
 
 export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
   const router = useRouter();
-  const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [state, setState] = useState<ActionState>({ status: "idle" });
+  // Focus goes to the reason box on open and back to the button on Cancel (#926).
+  const { open: rejectOpen, openStep: openReject, closeStep: closeReject, triggerRef: rejectRef, fieldRef: reasonRef } =
+    useAdminStep({ busy: state.status === "submitting", onCancel: cancelReject });
+
+  // The step's Cancel; Escape runs it too, so the typed reason is cleared either way.
+  function cancelReject() {
+    setReason("");
+    setState({ status: "idle" });
+    closeReject();
+  }
 
   const isFlagged = photo.status === "flagged";
   const reasonFieldId = `photo-reject-reason-${photo.id}`;
-  const genericErrorMessage = "Something went wrong. Try again.";
+  const confirmRejectLabel = isFlagged ? "Confirm remove" : "Confirm reject";
+  // #926 decision 15: an error says what did NOT happen, then what to do.
+  const errorMessage = {
+    approve: isFlagged ? "The photo was not kept. Try again." : "The photo was not approved. Try again.",
+    reject: isFlagged ? "The photo was not removed. Try again." : "The photo was not rejected. Try again.",
+  };
 
   // Approve sends no body; reject sends `{ reason }`. Anything but a 200
-  // (or a network error) shows the generic error.
+  // (or a network error) shows that action's error line.
   async function act(path: "approve" | "reject", body?: { reason: string }) {
-    setState({ status: "submitting" });
+    if (state.status === "submitting") return;
+    setState({ status: "submitting", action: path });
     try {
       const res = await fetch(`/api/admin/box-photos/${photo.id}/${path}`, {
         method: "POST",
@@ -63,7 +88,7 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
     } catch {
       // fall through to the error state
     }
-    setState({ status: "error", message: genericErrorMessage });
+    setState({ status: "error", message: errorMessage[path] });
   }
 
   const handleApprove = () => act("approve");
@@ -74,16 +99,8 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           {/* clay-100/700: this codebase's established "informational emphasis" badge pairing — same as SubmissionCard's "Public report" badge. */}
-          {isFlagged && (
-            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-[var(--color-clay-100)] text-[var(--color-clay-700)]">
-              Photo reported ({photo.flag_count}×)
-            </span>
-          )}
-          {photo.status === "pending" && (
-            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-              New photo
-            </span>
-          )}
+          {isFlagged && <span className={tagClass("attention")}>Photo reported ({photo.flag_count}×)</span>}
+          {photo.status === "pending" && <span className={tagClass("calm")}>New photo</span>}
         </div>
         <p className="text-xs text-[var(--color-ink-400)]">{formatSubmittedAt(photo.created_at)}</p>
       </div>
@@ -100,11 +117,12 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
           className="h-56 w-full rounded-[var(--radius-md)] border border-[var(--color-bone-200)] object-cover sm:h-48 sm:w-48 sm:flex-none"
         />
         <div className="space-y-1">
-          <p className="text-base font-semibold text-[var(--color-ink-700)]">{photo.venue_name}</p>
+          <p className={cardNameClass}>{photo.venue_name}</p>
           {photo.checkin_kind && (
             <p className="text-sm text-[var(--color-ink-700)]">
               <span className={fieldLabelClass}>Attached to check-in: </span>
-              {photo.checkin_kind}
+              {/* The Check-ins list's own words ("Problem report"), never the stored code. */}
+              {KIND_LABEL[photo.checkin_kind as keyof typeof KIND_LABEL] ?? photo.checkin_kind}
             </p>
           )}
           {isFlagged && (
@@ -117,67 +135,44 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
         <button
           type="button"
           onClick={handleApprove}
-          disabled={state.status === "submitting"}
+          {...busyButtonProps(state.status === "submitting")}
           className={primaryButtonClass}
         >
-          {state.status === "submitting" ? "Approving…" : isFlagged ? "Keep photo" : "Approve"}
+          {state.status === "submitting" && state.action === "approve"
+            ? "Approving…"
+            : isFlagged
+              ? "Keep photo"
+              : "Approve"}
         </button>
-        {!rejectOpen && (
-          <button
-            type="button"
-            onClick={() => setRejectOpen(true)}
-            disabled={state.status === "submitting"}
-            className={secondaryButtonClass}
-          >
-            {isFlagged ? "Remove photo" : "Reject"}
-          </button>
-        )}
+        <button
+          ref={rejectRef}
+          type="button"
+          hidden={rejectOpen}
+          onClick={openReject}
+          disabled={state.status === "submitting"}
+          className={secondaryButtonClass}
+        >
+          {isFlagged ? "Remove photo" : "Reject"}
+        </button>
       </div>
 
       {rejectOpen && (
-        <div className="mt-4 border-t border-[var(--color-bone-200)] pt-4">
-          <label htmlFor={reasonFieldId} className={`${fieldLabelClass} mb-1 block`}>
-            Reason <span className="font-normal normal-case text-[var(--color-ink-400)]">(optional)</span>
-          </label>
-          <textarea
-            id={reasonFieldId}
-            rows={2}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            className={
-              "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm " +
-              "text-[var(--color-ink-900)] bg-white placeholder:text-[var(--color-ink-400)] " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-              "focus-visible:border-[var(--color-sage-500)]"
-            }
-          />
-          <div className="mt-2 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleConfirmReject}
-              disabled={state.status === "submitting"}
-              className={dangerButtonClass}
-            >
-              {state.status === "submitting" ? "Saving…" : `Confirm ${isFlagged ? "remove" : "reject"}`}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setRejectOpen(false);
-                setReason("");
-                setState({ status: "idle" });
-              }}
-              disabled={state.status === "submitting"}
-              className={secondaryButtonClass}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+        <AdminRejectStep
+          id={reasonFieldId}
+          fieldRef={reasonRef}
+          reason={reason}
+          onReason={setReason}
+          busy={state.status === "submitting"}
+          confirmLabel={confirmRejectLabel}
+          // "Saving…" only while the reject itself runs; an Approve running keeps the plain label.
+          busyLabel={state.status === "submitting" && state.action === "reject" ? "Saving…" : confirmRejectLabel}
+          onCancel={cancelReject}
+          onConfirm={handleConfirmReject}
+        />
       )}
 
       {state.status === "error" && (
-        <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
+        <p role="alert" className={`mt-2 ${failureLineClass}`}>
           {state.message}
         </p>
       )}

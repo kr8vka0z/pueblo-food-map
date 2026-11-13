@@ -36,35 +36,37 @@
  * it under.
  */
 
+import { busyButtonProps } from "@/components/formClasses";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AdminRejectStep, useAdminStep } from "@/components/AdminConfirm";
 import { categoryLabels } from "@/lib/categories";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import type { VenueCategory } from "@/types/venue";
 import type { ClosurePayload, NewVenuePayload, ReviewSubmission } from "@/lib/publicSubmissions";
 import {
   cardClass,
-  dangerButtonClass,
+  cardNameClass,
+  failureLineClass,
   fieldLabelClass,
   formatSubmittedAt,
   primaryButtonClass,
   secondaryButtonClass,
+  tagClass,
+  type TagTone,
 } from "@/lib/adminCardStyles";
 
 export interface SubmissionCardProps {
   submission: ReviewSubmission;
 }
 
-// ─── Styling (existing DESIGN.md tokens only; card and button classes come from adminCardStyles.ts) ───
+// ─── Styling (card, button and tag classes come from adminCardStyles.ts) ───
 
-// sage-100/700: this codebase's established "calm, not urgent" badge
-// pairing (DESIGN.md; VenueCard's Open-now badge uses the same pairing).
-const KIND_BADGE: Record<ReviewSubmission["kind"], { label: string; className: string }> = {
-  new_venue: { label: "New place", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
-  // clay-100/700: the established informational-emphasis pairing (DESIGN.md;
-  // VenueListView's "Unpublished changes" marker, VenueCard's SNAP badge).
-  closure: { label: "Public report", className: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]" },
+// calm: a new place is not urgent; attention: a public report needs a look.
+const KIND_BADGE: Record<ReviewSubmission["kind"], { label: string; tone: TagTone }> = {
+  new_venue: { label: "New place", tone: "calm" },
+  closure: { label: "Public report", tone: "attention" },
 };
 
 function yesNo(value: boolean): string {
@@ -81,7 +83,7 @@ function yesNo(value: boolean): string {
  * detail rendering.
  */
 export function summarizeSubmissionForRow(submission: ReviewSubmission): string {
-  if (submission.parseError) return "Public report — couldn't read details";
+  if (submission.parseError) return "Public report: couldn't read details";
   if (submission.kind === "new_venue") return "Suggested new place";
   const issueLabel = ISSUE_TYPES[submission.payload.issueType as IssueTypeKey] ?? submission.payload.issueType;
   return `"${issueLabel}"`;
@@ -91,15 +93,30 @@ type ActionState = { status: "idle" } | { status: "submitting" } | { status: "er
 
 export default function SubmissionCard({ submission }: SubmissionCardProps) {
   const router = useRouter();
-  const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [rejectState, setRejectState] = useState<ActionState>({ status: "idle" });
+  // Focus goes to the reason box on open and back to the button on Cancel
+  // (#926); Escape does what Cancel does, except while the reject is being sent.
+  const { open: rejectOpen, openStep: openReject, closeStep: closeReject, triggerRef: rejectRef, fieldRef: reasonRef } =
+    useAdminStep({ busy: rejectState.status === "submitting", onCancel: cancelReject });
   const [doneState, setDoneState] = useState<ActionState>({ status: "idle" });
 
   const badge = KIND_BADGE[submission.kind];
   const reasonFieldId = `reject-reason-${submission.id}`;
+  const rejectFailMessage = `This ${submission.kind === "new_venue" ? "suggestion" : "report"} was not rejected. Try again.`;
+
+  function cancelReject() {
+    setReason("");
+    setRejectState({ status: "idle" });
+    closeReject();
+  }
+
+  // Mark done and Confirm reject stay pressable while the other runs, so
+  // each refuses while either is in flight: one decision per report.
+  const working = rejectState.status === "submitting" || doneState.status === "submitting";
 
   async function handleConfirmReject() {
+    if (working) return;
     setRejectState({ status: "submitting" });
     try {
       const res = await fetch(`/api/admin/submissions/${submission.id}/reject`, {
@@ -111,13 +128,14 @@ export default function SubmissionCard({ submission }: SubmissionCardProps) {
         router.refresh();
         return;
       }
-      setRejectState({ status: "error", message: "Something went wrong. This wasn't rejected. Try again." });
+      setRejectState({ status: "error", message: rejectFailMessage });
     } catch {
-      setRejectState({ status: "error", message: "Something went wrong. This wasn't rejected. Try again." });
+      setRejectState({ status: "error", message: rejectFailMessage });
     }
   }
 
   async function handleMarkDone() {
+    if (working) return;
     setDoneState({ status: "submitting" });
     try {
       const res = await fetch(`/api/admin/submissions/${submission.id}/done`, { method: "POST" });
@@ -125,18 +143,16 @@ export default function SubmissionCard({ submission }: SubmissionCardProps) {
         router.refresh();
         return;
       }
-      setDoneState({ status: "error", message: "Something went wrong. This wasn't marked done. Try again." });
+      setDoneState({ status: "error", message: "This report was not marked done. Try again." });
     } catch {
-      setDoneState({ status: "error", message: "Something went wrong. This wasn't marked done. Try again." });
+      setDoneState({ status: "error", message: "This report was not marked done. Try again." });
     }
   }
 
   return (
     <div className={cardClass}>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${badge.className}`}>
-          {badge.label}
-        </span>
+        <span className={tagClass(badge.tone)}>{badge.label}</span>
         <p className="text-xs text-[var(--color-ink-400)]">
           {formatSubmittedAt(submission.createdAt)}
           {submission.submitterEmail && <> · {submission.submitterEmail}</>}
@@ -146,7 +162,7 @@ export default function SubmissionCard({ submission }: SubmissionCardProps) {
       <div className="mt-3">
         {submission.parseError ? (
           <p className="text-sm text-[var(--color-clay-700)]">
-            Couldn&apos;t read details for this submission — the stored data may be malformed. You can still
+            Couldn&apos;t read details for this submission. The stored data may be malformed. You can still
             reject it below.
           </p>
         ) : submission.kind === "new_venue" ? (
@@ -166,71 +182,36 @@ export default function SubmissionCard({ submission }: SubmissionCardProps) {
           <button
             type="button"
             onClick={handleMarkDone}
-            disabled={doneState.status === "submitting"}
+            {...busyButtonProps(doneState.status === "submitting")}
             className={primaryButtonClass}
           >
             {doneState.status === "submitting" ? "Marking done…" : "Mark done"}
           </button>
         )}
-        {!rejectOpen && (
-          <button type="button" onClick={() => setRejectOpen(true)} className={secondaryButtonClass}>
-            Reject
-          </button>
-        )}
+        <button ref={rejectRef} type="button" hidden={rejectOpen} onClick={openReject} className={secondaryButtonClass}>
+          Reject
+        </button>
       </div>
 
       {doneState.status === "error" && (
-        <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
+        <p role="alert" className={`mt-2 ${failureLineClass}`}>
           {doneState.message}
         </p>
       )}
 
       {rejectOpen && (
-        <div className="mt-4 border-t border-[var(--color-bone-200)] pt-4">
-          <label htmlFor={reasonFieldId} className={`${fieldLabelClass} mb-1 block`}>
-            Reason <span className="font-normal normal-case text-[var(--color-ink-400)]">(optional)</span>
-          </label>
-          <textarea
-            id={reasonFieldId}
-            rows={2}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            // text-base on mobile: iOS Safari auto-zooms on focus under 16px.
-            className={
-              "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm " +
-              "text-[var(--color-ink-900)] bg-white placeholder:text-[var(--color-ink-400)] " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-              "focus-visible:border-[var(--color-sage-500)]"
-            }
-          />
-          <div className="mt-2 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleConfirmReject}
-              disabled={rejectState.status === "submitting"}
-              className={dangerButtonClass}
-            >
-              {rejectState.status === "submitting" ? "Rejecting…" : "Confirm reject"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setRejectOpen(false);
-                setReason("");
-                setRejectState({ status: "idle" });
-              }}
-              disabled={rejectState.status === "submitting"}
-              className={secondaryButtonClass}
-            >
-              Cancel
-            </button>
-          </div>
-          {rejectState.status === "error" && (
-            <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
-              {rejectState.message}
-            </p>
-          )}
-        </div>
+        <AdminRejectStep
+          id={reasonFieldId}
+          fieldRef={reasonRef}
+          reason={reason}
+          onReason={setReason}
+          busy={rejectState.status === "submitting"}
+          confirmLabel="Confirm reject"
+          busyLabel="Rejecting…"
+          onCancel={cancelReject}
+          onConfirm={handleConfirmReject}
+          error={rejectState.status === "error" ? rejectState.message : null}
+        />
       )}
     </div>
   );
@@ -253,7 +234,7 @@ function NewVenueDetails({ payload }: { payload: NewVenuePayload }) {
   const categoryLabel = categoryLabels[payload.category as VenueCategory] ?? payload.category;
   return (
     <div className="space-y-1">
-      <p className="text-base font-semibold text-[var(--color-ink-700)]">{payload.venueName}</p>
+      <p className={cardNameClass}>{payload.venueName}</p>
       <DetailRow label="Address" value={payload.address} />
       <DetailRow label="Category" value={categoryLabel} />
       {payload.hours && <DetailRow label="Hours" value={payload.hours} />}
@@ -269,7 +250,7 @@ function ClosureDetails({ payload }: { payload: ClosurePayload }) {
   const issueLabel = ISSUE_TYPES[payload.issueType as IssueTypeKey] ?? payload.issueType;
   return (
     <div className="space-y-1">
-      <p className="text-base font-semibold text-[var(--color-ink-700)]">{payload.venueName}</p>
+      <p className={cardNameClass}>{payload.venueName}</p>
       <DetailRow label="Address" value={payload.venueAddress} />
       <DetailRow label="Issue" value={issueLabel} />
       <DetailRow label="Description" value={payload.description} />

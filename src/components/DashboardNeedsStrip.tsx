@@ -10,6 +10,7 @@
  */
 
 import Link from "next/link";
+import { focusRingClass, tileCardClass, tileLabelClass } from "@/lib/adminCardStyles";
 
 export interface NeedsCardData {
   key: string;
@@ -31,9 +32,9 @@ export default function DashboardNeedsStrip({ cards }: DashboardNeedsStripProps)
         <Link
           key={card.key}
           href={card.href}
-          className="elevation-1 flex min-h-11 flex-col gap-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 transition-colors duration-150 hover:bg-[var(--color-bone-100)]"
+          className={`${tileCardClass} flex min-h-12 flex-col gap-1 transition-colors duration-150 hover:bg-[var(--color-sage-100)] ${focusRingClass}`}
         >
-          <span className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-500)]">{card.label}</span>
+          <span className={tileLabelClass}>{card.label}</span>
           <span
             className={
               card.count > 0

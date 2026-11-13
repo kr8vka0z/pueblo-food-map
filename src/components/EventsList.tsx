@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * EventsList — the body of /admin/events (#757): a table of events (name,
- * date in Pueblo time, status, edit link), the "No events yet" empty state
+ * EventsList — the body of /admin/events (#757): "All events", a table of
+ * events (name, date in Pueblo time, status, edit link) under a title row
+ * with Add event, the "No events yet" empty state
  * with an Add event button, and a "couldn't load" state with Retry.
  *
  * The server page does the read and passes `events` (null when the read
@@ -15,10 +16,28 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useId, useTransition } from "react";
 import { formatEventWhen } from "@/lib/eventTime";
+import {
+  emptyStateClass,
+  failureBoxClass,
+  failureLineClass,
+  linkClass,
+  loadingLineClass,
+  secondaryButtonClass,
+  sectionTitleClass,
+  tableCellClass,
+  tableHeadCellClass,
+  tableHeadRowClass,
+  tableLinkRowClass,
+  tableWrapClass,
+  tagClass,
+  type TagTone,
+} from "@/lib/adminCardStyles";
+import { ADMIN_PRIMARY_BUTTON } from "@/components/formClasses";
 import type { EventListItem } from "@/lib/adminEventReads";
 import type { EventStatus } from "@/lib/adminEventValidation";
+import { openRowLink } from "@/lib/rowLinkClick";
 
 interface EventsListProps {
   /** null = the read failed. */
@@ -32,26 +51,22 @@ const STATUS_LABEL: Record<EventStatus, string> = {
   archived: "Archived",
 };
 
-const STATUS_CLASS: Record<EventStatus, string> = {
-  draft: "bg-[var(--color-bone-200)] text-[var(--color-ink-700)]",
-  published: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]",
-  cancelled: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]",
-  archived: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]",
+const STATUS_TONE: Record<EventStatus, TagTone> = {
+  draft: "neutral",
+  published: "calm",
+  cancelled: "attention",
+  archived: "quiet",
 };
-
-const primaryLinkClass =
-  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] " +
-  "bg-[var(--color-sage-600)] px-4 text-base font-semibold text-[var(--color-bone-50)] " +
-  "transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2";
 
 export default function EventsList({ events }: EventsListProps) {
   const router = useRouter();
   const [isRetrying, startRetry] = useTransition();
+  // Prefix for the per-row ids the Edit links' names point at (above the early returns: hooks rule).
+  const rowId = useId();
 
   if (isRetrying) {
     return (
-      <p role="status" className="text-sm text-[var(--color-ink-400)] motion-safe:animate-pulse">
+      <p role="status" className={loadingLineClass}>
         Loading…
       </p>
     );
@@ -59,19 +74,10 @@ export default function EventsList({ events }: EventsListProps) {
 
   if (events === null) {
     return (
-      <div role="alert" className="max-w-xl rounded-[var(--radius-lg)] border border-[var(--color-danger)] bg-white p-4">
-        <p className="text-sm font-medium text-[var(--color-danger)]">Couldn&rsquo;t load events.</p>
+      <div role="alert" className={failureBoxClass}>
+        <p className={`${failureLineClass} font-medium`}>Couldn&rsquo;t load events.</p>
         <p className="mt-1 text-sm text-[var(--color-ink-500)]">Check your connection and try again.</p>
-        <button
-          type="button"
-          onClick={() => startRetry(() => router.refresh())}
-          className={
-            "mt-3 inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] " +
-            "bg-white px-4 text-sm font-medium text-[var(--color-danger)] transition-colors duration-150 " +
-            "hover:bg-[var(--color-bone-100)] focus-visible:outline-none focus-visible:ring-2 " +
-            "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
-          }
-        >
+        <button type="button" onClick={() => startRetry(() => router.refresh())} className={`mt-3 ${secondaryButtonClass}`}>
           Retry
         </button>
       </div>
@@ -80,12 +86,10 @@ export default function EventsList({ events }: EventsListProps) {
 
   if (events.length === 0) {
     return (
-      <div className="max-w-xl rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-6">
-        <p className="text-base font-medium text-[var(--color-ink-900)]">No events yet</p>
-        <p className="mt-1 text-sm text-[var(--color-ink-500)]">
-          Add a one-day giveaway, a turkey drive or a pop-up distribution.
-        </p>
-        <Link href="/admin/events/new" className={`mt-4 ${primaryLinkClass}`}>
+      <div className={emptyStateClass}>
+        <p>No events yet.</p>
+        <p>Add a one-day giveaway, a turkey drive or a pop-up distribution.</p>
+        <Link href="/admin/events/new" className={ADMIN_PRIMARY_BUTTON}>
           Add event
         </Link>
       </div>
@@ -93,37 +97,51 @@ export default function EventsList({ events }: EventsListProps) {
   }
 
   return (
-    <div>
-      <div className="mb-4">
-        <Link href="/admin/events/new" className={primaryLinkClass}>
+    <section aria-labelledby={`${rowId}-heading`}>
+      {/* The table's title with Add event at its right, as Blessing Boxes titles
+          its table; on a phone the button wraps under the title. */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h3 id={`${rowId}-heading`} className={sectionTitleClass}>
+          All events
+        </h3>
+        <Link href="/admin/events/new" className={ADMIN_PRIMARY_BUTTON}>
           Add event
         </Link>
       </div>
-      <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white">
-        <table className="w-full min-w-[32rem] text-left text-sm">
-          <thead className="border-b border-[var(--color-bone-200)] text-[var(--color-ink-500)]">
-            <tr>
-              <th scope="col" className="px-4 py-3 font-medium">Event</th>
-              <th scope="col" className="px-4 py-3 font-medium">Starts (Pueblo time)</th>
-              <th scope="col" className="px-4 py-3 font-medium">Status</th>
-              <th scope="col" className="px-4 py-3 font-medium"><span className="sr-only">Edit</span></th>
+      <div className={tableWrapClass}>
+        {/* WHY these minimums: at 512 the Event column was squeezed to 132 px
+            on a phone and names wrapped to three or four lines. 240 (with its
+            32 px padding) keeps a name to two lines beside the one-line date;
+            the table scrolls sideways inside its box instead (#926). */}
+        <table className="w-full min-w-[640px] text-left text-sm">
+          <thead>
+            <tr className={tableHeadRowClass}>
+              <th scope="col" className={`${tableHeadCellClass} min-w-[240px]`}>Event</th>
+              <th scope="col" className={tableHeadCellClass}>Starts (Pueblo time)</th>
+              <th scope="col" className={tableHeadCellClass}>Status</th>
+              <th scope="col" className={tableHeadCellClass}><span className="sr-only">Edit</span></th>
             </tr>
           </thead>
           <tbody>
-            {events.map((e) => (
-              <tr key={e.id} className="border-b border-[var(--color-bone-100)] last:border-b-0">
-                <td className="px-4 py-3 font-medium text-[var(--color-ink-900)]">{e.name}</td>
-                <td className="px-4 py-3 text-[var(--color-ink-700)]">{formatEventWhen(e.starts_at)}</td>
-                <td className="px-4 py-3">
-                  <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[e.status]}`}>
-                    {STATUS_LABEL[e.status]}
-                  </span>
+            {events.map((e, i) => (
+              // A click anywhere on the row opens its Edit link (src/lib/rowLinkClick.ts).
+              <tr key={e.id} className={tableLinkRowClass} onClick={openRowLink}>
+                <td id={`${rowId}-${i}-name`} className={`${tableCellClass} font-medium text-[var(--color-ink-900)]`}>
+                  {e.name}
                 </td>
-                <td className="px-4 py-3 text-right">
+                <td className={`${tableCellClass} whitespace-nowrap text-[var(--color-ink-700)]`}>{formatEventWhen(e.starts_at)}</td>
+                <td className={tableCellClass}>
+                  <span className={tagClass(STATUS_TONE[e.status])}>{STATUS_LABEL[e.status]}</span>
+                </td>
+                <td className={`${tableCellClass} text-right`}>
+                  {/* WHY aria-labelledby, not aria-label: the name ("Edit <event>") is built from visible text,
+                      so no stored text goes into an attribute. */}
                   <Link
+                    id={`${rowId}-${i}-edit`}
                     href={`/admin/events/${e.id}/edit`}
-                    className="inline-flex min-h-12 items-center font-medium text-[var(--color-sage-700)] underline underline-offset-2"
-                    aria-label={`Edit ${e.name}`}
+                    data-row-link
+                    className={linkClass}
+                    aria-labelledby={`${rowId}-${i}-edit ${rowId}-${i}-name`}
                   >
                     Edit
                   </Link>
@@ -133,6 +151,6 @@ export default function EventsList({ events }: EventsListProps) {
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
   );
 }

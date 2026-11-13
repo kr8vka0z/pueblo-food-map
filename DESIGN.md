@@ -280,7 +280,7 @@ This file **mirrors** the theme. It is not the source of it.
 - **Source of truth:** the Tailwind v4 `@theme` block in `src/app/globals.css`. If this file and `globals.css` disagree, `globals.css` wins: fix this file. A new token goes into `@theme` first, then into this file's frontmatter.
 - **The drift check:** `npm run design:drift` (`scripts/check-design-drift.mjs`) compares every `--color-*`, `--spacing-*` and `--radius-*` value in `@theme` with the `colors`, `spacing` and `rounded` lists above, and fails on a mismatch. It also fails when code under `src/` names a `var(--color-...)` that `@theme` does not define. It does not check `typography`, `components` or `elevation` above: the type sizes are Tailwind's own (there is no type scale in `@theme`), copied here from what the code uses, so keep them in step by hand.
 - **The format check:** `npm run design:lint` runs `designmd lint` on this file (Google's DESIGN.md format, alpha).
-- **Where the parts live in code:** the public site's components are in `src/components/`, one file each (no shared `ui/` folder yet). Shared class strings live in `src/lib/interactionStyles.ts`, `src/lib/adminCardStyles.ts`, `src/components/formClasses.ts` and `src/components/PublicForm.tsx`. Each component entry below names its file.
+- **Where the parts live in code:** the public site's components are in `src/components/`, one file each (no shared `ui/` folder yet). Shared class strings live in `src/lib/interactionStyles.ts`, `src/lib/adminCardStyles.ts`, `src/components/formClasses.ts` and `src/components/PublicForm.tsx`. The admin has one home for its class strings, `src/lib/adminCardStyles.ts` (titles, page bodies, cards, tables, buttons, links, tags, chips, failure and empty states), one for its fields, `src/components/formClasses.ts`, and three shared components: `src/components/AdminConfirm.tsx`, `src/components/AdminRowMenu.tsx` and `src/components/AdminSegmented.tsx` (#926). Pages import these instead of typing their own (a few one-off strings remain, such as fieldset legends and the error page's spacing); `src/__tests__/touchTargets.test.tsx` guards the 48-pixel floor and the hover rules in them. Each component entry below names its file.
 - **The approved design pages:** Brand, Foundations, Components (three pages: map and cards, pages and forms, admin), Icons and Patterns. Their source is in this repo at `docs/design/design-system/` (`pages/*.ts`). Build them with `cd docs/design/design-system && MOCK_DIST=<a folder whose path contains /scratch/> bun build.ts` (see that folder's `README.md`). This file is written from those pages, which the owner reviewed. Anything the owner did not object to is approved.
 - **Status words:** `Live as is` means the code matches the entry. `Live, changing in the redesign` means the entry is live but the owner approved changes that are not in the code yet; each change is written as **Approved, not built** with exactly what changes. A change gets its code file and drops the tag the day it ships.
 
@@ -333,21 +333,21 @@ Every hex here is copied from `@theme`. Ratios are measured against the real bac
 **Bone is the paper.** Warm cream, never grey.
 
 - `bone-50` `#FBFAF6`: the paper every page sits on.
-- `bone-100` `#F4F1EA`: resting chips, the loading block, the location help card, the status pill without a photo. It is no longer a hover fill on the public site (that is sage 100, R1); a few admin hovers still use it (Known drift).
+- `bone-100` `#F4F1EA`: resting chips, the loading block, the location help card, the status pill without a photo, the admin's quiet tags. It is no longer a hover fill anywhere (that is sage 100, R1).
 - `bone-200` `#E8E3D6`: card borders, dividers, the ended event badge.
-- `bone-300` `#D4CDB8`: edges of the search bar, bottom bar and outline buttons at rest (1.5 to 1, decoration only: the words carry the control). It is also the text-box edge, which fails (see Known drift).
+- `bone-300` `#D4CDB8`: edges of the search bar, bottom bar and outline buttons at rest (1.5 to 1, decoration only: the words carry the control). It is also the public text-box edge, which fails (see Known drift); admin text boxes use ink 400.
 
 **Ink is the words.** Warm charcoal.
 
 - `ink-900` `#1A1817`: place names and headings. 17 to 1 on bone 50.
 - `ink-700` `#2D2A26`: everyday words. 13.7 to 1 on bone 50, past the 7 to 1 AAA level. Body text never goes lighter.
 - `ink-500` `#5F5A52`: second lines (distance, hours today, the bottom bar's words). 6.5 to 1.
-- `ink-400` `#6A645A`: section labels (HOURS), placeholders, small icons, the middle dots in the category label. 5.6 to 1 on bone 50, 5.2 on bone 100, 4.6 on bone 200.
+- `ink-400` `#6A645A`: section labels (HOURS), placeholders, small icons, the middle dots in the category label; the edge of an admin text box (5.9 to 1 on white, #926). 5.6 to 1 on bone 50, 5.2 on bone 100, 4.6 on bone 200.
 
 **Sage is everything you can press.** Every link, focus ring, selected state and filled button. Never blue.
 
 - `sage-50` `#EAF0EC`: the Plentiful link fill, the good-news tag, What to bring, the sponsored band, the row the arrow keys reach in search results.
-- `sage-100` `#D1DDD3`: SNAP and WIC badges, calm admin tags, the sponsor card, and **the hover fill** on anything you can point at that isn't a filled button (R1; the admin still has grey hovers, see its entries). Words on it stay ink 500 or darker (ink 500 4.9 to 1, ink 700 10 to 1, navy 13 to 1); ink 400 is 4.2 to 1 and is never words on it.
+- `sage-100` `#D1DDD3`: SNAP and WIC badges, calm admin tags, the sponsor card, and **the hover fill** on anything you can point at that isn't a filled button (R1). Words on it stay ink 500 or darker (ink 500 4.9 to 1, ink 700 10 to 1, navy 13 to 1); ink 400 is 4.2 to 1 and is never words on it.
 - `sage-500` `#4A8466`: the keyboard ring, the selected pin ring, today's line in the hours, the Plentiful link's edge. 4.2 to 1 on bone 50, 4.4 on white: an edge color only, never words, and never a fill behind words (`npm run lint` refuses `bg-[var(--color-sage-500)]` outside the two non-text marks).
 - `sage-600` `#2C5F4F` (`primary`): the main color. Filled buttons (bone 50 words 7.0 to 1, white 7.4 to 1), Walk, the switch that's on, link hovers.
 - `sage-700` `#1F4639`: link and phone words, SNAP and WIC words, a filled button under the pointer (bone 50 words 10 to 1).
@@ -356,7 +356,7 @@ Every hex here is copied from `@theme`. Ratios are measured against the real bac
 
 - `brand-orange` `#F7943C`: the one main action on a screen, always with navy words (7.8 to 1, AAA). Never words on a light color (it fails). Orange buttons get no hover change. Approved uses: the welcome screen's Find food near me (one button per language, `src/components/SplashScreen.tsx`); Try again on the location help card (`src/components/LocationHelpCard.tsx`); the Filters panel's Show N places button and the Filters count beside the icon (`src/components/FilterPanel.tsx`, `src/components/SearchBar.tsx`); the admin's Add place (`src/components/AdminNav.tsx`, its one main action).
 - `brand-navy` `#190F3F`: the wordmark, words on orange, the bottom bar item whose panel is open, the Share an event page's "Preview" tag (`src/components/ShareEventForm.tsx`, navy pill with bone 50 bold words, no orange).
-- `brand-yellow` `#FFD166`: support and classification badges only, with ink words (ink 700 9.9 to 1); also the admin Places Draft tag (ink 900). Never a button, a state or a background.
+- `brand-yellow` `#FFD166`: support and classification badges only, with ink words (ink 700 9.9 to 1); also the admin's caution tags, Draft on Places and Low on Blessing Boxes (ink 900, 12 to 1). Never a button, a state or a background.
 
 **The event exception.** `event-pin` (`#F7943C`) and `event-outline` (`#190F3F`) are the same hexes as orange and navy with their own names (owner's ruling, 2026-10-10), so an event reads as different from every place and the exception can be found in the code. They cover only: the event star pin (`src/components/EventMarker.tsx`), Get directions on the event card and event page (`src/components/EventCardBody.tsx`, `src/components/EventPage.tsx`), the happening-today strip (`src/components/EventStrip.tsx`: navy bar, orange star and status line 7.8 to 1, white name 18 to 1), and the star on the events list rows and the Filters Events row. Nothing else on an event card is orange.
 
@@ -381,9 +381,9 @@ Every hex here is copied from `@theme`. Ratios are measured against the real bac
 | Meal Site | `cat-meal` | `#6B3FA0` | 7.1 to 1 |
 | Blessing Box | `cat-blessing` | `#C2447B` | 4.6 to 1 (also Boxes in the bottom bar while it's on) |
 
-Category words never sit on the hover fill: on sage 100, pantry and farm are 4.1 to 1, landscape 3.7 and raspberry 3.4. That is why a Boxes-on item gets no hover fill. Raspberry is also 4.2 to 1 on bone 100, so Boxes-on stays on bone 50.
+Category words never sit on the hover fill: on sage 100, pantry and farm are 4.1 to 1, landscape 3.7 and raspberry 3.4. That is why a Boxes-on item gets no hover fill, and why on an admin Places row tinted under the pointer the category words, SNAP, WIC and the middle dots (ink 400 is 4.2 to 1 there) all turn ink 700 (10.2 to 1) and go back to their colours when the pointer leaves, so the fill never carries a category colour. Raspberry is also 4.2 to 1 on bone 100, so Boxes-on stays on bone 50.
 
-**Pairs that fail or are never used for words** (shown so nobody reaches for them): bone 300 edge on white 1.6 to 1 (live, Known drift); warning on clay 100 4.0 to 1 (live, Known drift); sage 500 words on white; orange words on the paper; ink 400 on sage 100; any category word on sage 100.
+**Pairs that fail or are never used for words** (shown so nobody reaches for them): bone 300 edge on white 1.6 to 1 (live on public text boxes, Known drift); warning on clay 100 4.0 to 1 (the old admin Low tag, gone since #926); sage 500 words on white; orange words on the paper; ink 400 on sage 100; any category word on sage 100.
 
 ## Typography
 
@@ -400,11 +400,11 @@ Two typefaces, both self-hosted as variable `.woff2` files, so no page waits on 
 | 60 | `text-6xl` | Fraunces | The wordmark on the welcome screen, 768 wide and up |
 | 36 | `text-4xl` | Fraunces | The wordmark on phones |
 | 30 | `text-3xl` | Fraunces | Page titles on content pages (About, help pages, Not found, a box's history) |
-| 24 | `text-2xl` | Fraunces | Page titles on form pages and a place's own page; an event's name; admin page titles |
-| 20 | `text-xl` | Fraunces | A place's name on its card (`leading-tight`); a thank-you title (semibold); admin section titles |
-| 18 | `text-lg` | Fraunces | The location help card's title; the box check-in question; admin card titles |
-| 16 | `text-base` | Public Sans | Inside every text box on a phone; empty-page titles (semibold); route steps |
-| 14 | `text-sm` | Public Sans | The everyday size: card lines, buttons, menu rows, field labels, the category words (semibold) |
+| 24 | `text-2xl` | Fraunces | Page titles on form pages and a place's own page; an event's name; the admin's name, Pueblo Food Map Admin, the admin's one `h1` (`adminNameClass`) |
+| 20 | `text-xl` | Fraunces | A place's name on its card (`leading-tight`); a thank-you title (semibold); an admin page's title, its `h2` (`pageTitleClass`) |
+| 18 | `text-lg` | Fraunces | The location help card's title; the box check-in question; admin section titles, `h3` (`sectionTitleClass`) |
+| 16 | `text-base` | Public Sans | Inside every text box on a phone; empty-page titles (semibold); route steps; the name of the thing an admin card is about (semibold, `cardNameClass`) |
+| 14 | `text-sm` | Public Sans | The everyday size: card lines, buttons, menu rows, field labels, the category words (semibold); admin group headings inside a section, `h4` (semibold ink 700, `groupTitleClass`) |
 | 12 | `text-xs` | Public Sans | The bottom bar's words (bold), field errors, small second lines, the map's hover tip |
 | 11 | `text-[11px]` | Public Sans | Section labels in capitals (HOURS), tracked wider; the bottom bar's words under 360 wide |
 | 10 | `text-[10px]` | Public Sans | The smallest, in three places: small badges on the computer card, the admin chart's week labels, a label on the report page |
@@ -441,8 +441,8 @@ Design and test at 360 and 375 wide first; 320 must not cut anything off.
 
 A shadow means something floats over the map. Two levels, both tinted with ink 900 (`rgba(26,24,23,...)`), never plain black. Anything sitting flat on the paper gets a `bone-200` line instead.
 
-- **Level 1** (`elevation-1` utility in `src/app/globals.css`): `0 1px 2px rgba(26,24,23,0.04), 0 0 0 1px rgba(26,24,23,0.05)`. A hairline ring and a breath of shadow: the search bar, the admin's cards and tables.
-- **Level 2** (`elevation-2`): `0 4px 12px rgba(26,24,23,0.06), 0 0 0 1px rgba(26,24,23,0.06)`. Lifted: the phone sheet, the search popovers, the happening-today strip, the location help card, the route strip.
+- **Level 1** (`elevation-1` utility in `src/app/globals.css`): `0 1px 2px rgba(26,24,23,0.04), 0 0 0 1px rgba(26,24,23,0.05)`. A hairline ring and a breath of shadow: the search bar, the admin's cards, tables and empty box. The Places status key stays flat on purpose (a `bone-200` hairline, no shadow).
+- **Level 2** (`elevation-2`): `0 4px 12px rgba(26,24,23,0.06), 0 0 0 1px rgba(26,24,23,0.06)`. Lifted: the phone sheet, the search popovers, the happening-today strip, the location help card, the route strip; on the admin, the sign-in card and the three-dot menu.
 - **The bottom bar's own:** `0 4px 16px rgba(26,24,23,0.14)`, deeper because it floats over the busiest part of the map (`src/components/bottomNavShared.tsx`).
 - **Map pins** draw their shadow inside the SVG (`src/components/PinShadow.tsx`): five faint, ever-wider copies of the outline, 2 pixels down. Never a CSS `drop-shadow` filter: a filter was redrawn every frame for about 130 pins while the map moved (#722).
 - **Backdrops** behind the Menu and Filters are ink at 40% (`rgba(26,24,23,0.4)`), never black. The photo viewer's near-black scrim (`rgba(0,0,0,0.92)`) is the one black surface, because it shows photos.
@@ -459,7 +459,7 @@ Rounder as things get bigger. Use one of the five tokens; never a new size.
 | `radius-md` | 10 | The most used: text boxes, buttons, the Plentiful link, error boxes, the event strip |
 | `radius-lg` | 14 | Cards, popovers, the Donate card, the location help card, the Not found card, the computer side panel, admin cards |
 | `radius-xl` | 20 | The top corners of the phone sheet and the steps sheet |
-| `radius-full` | fully round | The search bar, the bottom bar, pills, badges, round icon buttons |
+| `radius-full` | fully round | The search bar, the bottom bar, pills, badges, round icon buttons; every admin tag, filter chip and slider |
 
 The code writes them as `rounded-[var(--radius-md)]` or the named class; both give the token. Off-scale corners in the live code are under Known drift.
 
@@ -469,10 +469,10 @@ One compact entry per shared part, in the order a visitor meets them, then the i
 
 ### The redesign rulings (apply to every entry below)
 
-These five rulings apply to the whole site. All five are live on the public site (#917); the admin entries that still say Approved, not built have yet to take R1. Every public grey hover is now sage 100, including the place card's Report an issue (its mockup picture still shows bone 100).
+These five rulings apply to the whole site. All five are live on the public site (#917) and on the admin (#926). Every grey hover is now sage 100, including the place card's Report an issue (its mockup picture still shows bone 100).
 
 - **R1, the hover fill is sage 100.** Under the pointer, anything you can press that isn't a filled button takes a `sage-100` (`#D1DDD3`) fill, fading in over 150 ms. It replaces every grey hover (`bone-100`, `bone-200`, and `sage-50` on sign-in). Words on it stay ink 500 or darker. Filled sage buttons darken to sage 700. A Boxes-on item gets no hover fill. Orange buttons get no hover change at all.
-- **R2, nothing brightens on hover.** No `filter: brightness()` under the pointer, anywhere: on top of the color fade it made hover stutter. The press dim stays: a slight `brightness(0.95)` while pressed shows a tap landed, and the approved pages keep it. So `PRESS_FEEDBACK = "hover:brightness-105 active:brightness-95"` in `src/lib/interactionStyles.ts` loses its `hover:brightness-105` half and keeps `active:brightness-95`. Hover animates color, opacity or transform only.
+- **R2, nothing brightens on hover.** No `filter: brightness()` under the pointer, anywhere: on top of the color fade it made hover stutter. The press dim stays: a slight `brightness(0.95)` while pressed shows a tap landed, and the approved pages keep it. So `PRESS_FEEDBACK` in `src/lib/interactionStyles.ts` is `active:brightness-95` only (its old `hover:brightness-105` half is gone). Hover animates color, opacity or transform only.
 - **R3, the category label is colored words.** On a card the category is colored words on their own line under the name: the category in its category color, then SNAP, then WIC in sage 700, joined by middle dots in ink 400 (`Food Pantry · SNAP · WIC`). Sentence case as the data names it, 14 pixels, semibold, no fill, no underline, no pill. Screen readers hear a comma for each dot. SNAP or WIC only when the place takes it. The same style anywhere a category with SNAP and WIC shows on a place.
 - **R4, the card action row.** A row of icon buttons at the top left of the place and box cards, above the name, so the name runs the card's full width. Full detail: Card action row.
 - **R5, switches slide in 250 ms** on `--ease-out-circ` (`cubic-bezier(0.32, 0.72, 0, 1)`), knob and fill together (live: 150 ms, too fast to see).
@@ -725,80 +725,132 @@ These five rulings apply to the whole site. All five are live on the public site
 
 `src/components/AdminNav.tsx` (`AdminNav`, `AdminNavSkeleton`), `src/lib/adminNavCounts.ts`, `src/app/(site)/admin/loading.tsx`.
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 (`navLinkInactive`'s `hover:bg-[var(--color-bone-200)]`).
-- **For:** the top of every admin page except sign-in: Pueblo Food Map Admin (Fraunces 24 `ink-900`), Signed in as and the email, one row of tabs (Dashboard, Blessing Boxes, Places, Events; the owner's account also sees Activity) with a `clay-100` / `clay-700` count pill on any tab with work waiting, and Add place, the admin's one orange button, at the end.
+- **Status:** Live as is (#926). R1 on the tabs (the loading skeleton's tabs don't change under the pointer); Add place has no hover change, the press dim and the green keyboard ring (an orange ring was 2.3 to 1 on white).
+- **For:** the top of every admin page except sign-in: Pueblo Food Map Admin (Fraunces 24 `ink-900`, the page's one `h1`, `adminNameClass`), Signed in as and the email, one row of tabs (Dashboard, Blessing Boxes, Places, Events; the owner's account also sees Activity) with a `clay-100` / `clay-700` count pill on any tab with work waiting, and Add place, the admin's one orange button, at the end.
 - **Use something else when:** a step inside one page (a filter, a sort); a queue that belongs to a tab (its count and its To review filter, not a new tab).
-- **Sizes:** white, a `bone-200` line under it; every tab and Add place 48 tall, corners 10; the current tab `sage-600` with `bone-50` words. The row wraps on a phone, never scrolls sideways.
+- **Sizes:** white, a `bone-200` line under it, 16 at the sides on a phone and 32 from 640; every tab and Add place 48 tall, corners 10, 14-pixel words (Add place bold); the current tab `sage-600` with `bone-50` words, the others `ink-500` with the sage 100 hover. The row wraps on a phone, never scrolls sideways.
 - **Everyone:** a navigation landmark called Admin; the current page is announced, not only shown by its fill. The admin is English only.
 
 ### Sign-in (AdminLoginForm)
 
-`src/components/AdminLoginForm.tsx`, `src/app/(site)/admin/login/page.tsx`, `src/components/formClasses.ts`, `src/lib/adminAuthAllowlistPlugin.ts`.
+`src/components/AdminLoginForm.tsx`, `src/app/(site)/admin/login/page.tsx`, `src/components/formClasses.ts`, `src/lib/adminCardStyles.ts` (`signInCardClass`), `src/lib/adminAuthAllowlistPlugin.ts`.
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 on Use a passkey (`secondaryButtonClass`'s `hover:bg-[var(--color-sage-50)]` becomes sage 100).
+- **Status:** Live as is (#926). Use a passkey is the plain outline button (`ADMIN_SECONDARY_BUTTON`: `bone-300` edge, `ink-700` words, sage 100 under the pointer); the boxes take the admin field look (48 tall, `ink-400` edge); Resend code, Use a different email and Continue to admin without a passkey are links with a 48-pixel tap area and the green ring. Resend code and Use a different email stack at every width, with digits of one width, so neither moves while the countdown runs. While Resend code counts down it is faded and a press does nothing, but it stays reachable (`aria-disabled`, not `disabled`), so keyboard focus stays on it after the press; Email me a code, Sign in, Use a passkey and Set up a passkey do the same while they work, so a failed passkey try leaves focus on Use a passkey. Every red line on the card is the field-error look (12 pixels, `danger`): the box errors, The code was not sent and Passkey sign-in didn't work. A missing or wrong email puts focus in the email box; a short, wrong or failed code puts it in the code box; Use a different email puts it in the email box.
 - **For:** the only way in: an email, a 6-digit code, or a passkey once set up. It never says whether an email belongs to an admin.
-- **Sizes:** a white card at most 384 wide on bone 50, 32 padding (48 from 640), corners 14; boxes about 42 tall; Email me a code, Sign in and Use a passkey full width, 48 tall.
-- **Wording:** each step says what happens next ("We sent a 6-digit code to …. It expires in 10 minutes."); errors say what to do (That code didn't match. Try again. That code expired. Send a new one.); working words: Sending…, Signing in…, Waiting for passkey….
+- **Sizes:** a white card at most 384 wide on bone 50, lifted (level 2), 32 padding (48 from 640), corners 14; boxes 48 tall; Email me a code, Sign in and Use a passkey full width, 48 tall, 16-pixel words.
+- **Wording:** each step says what happens next ("We sent a 6-digit code to …. It expires in 10 minutes."); errors say what did not happen or what to do (The code was not sent. Try again. That code didn't match. Try again. That code didn't work. Try again. That code expired. Send a new one.); working words: Sending…, Signing in…, Waiting for passkey….
 
 ### Admin cards and boxes (cardClass, summary boxes)
 
-`src/lib/adminCardStyles.ts` (`cardClass`, `fieldLabelClass`, the button sets), `src/components/ToReviewSummaryBox.tsx`, `src/components/BoxesToReviewBox.tsx`, `src/components/WaitingToPublishBox.tsx`, `src/components/SuggestionsBox.tsx`, `src/components/BoxReviewBox.tsx`.
+`src/lib/adminCardStyles.ts` (`cardClass`, `cardSlimClass`, `clayNoticeClass`, `failureBoxClass`, `emptyStateClass`, `fieldLabelClass`, the three buttons, `linkClass`, `tapLinkClass`), `src/components/ToReviewSummaryBox.tsx`, `src/components/BoxesToReviewBox.tsx`, `src/components/WaitingToPublishBox.tsx`, `src/components/SuggestionsBox.tsx`, `src/components/BoxReviewBox.tsx`, `src/components/SourceSwitchPanel.tsx`; field names in `src/lib/fieldLabels.ts`.
 
-- **Status:** Live as is.
-- **For:** the one white card every admin queue item and summary sits in: `radius-lg`, a `bone-200` hairline, level 1. A summary box is the same card slimmer, with one line saying how much is waiting and one button. The clay box (`clay-100`, `clay-500` edge) is the one exception: saved changes not on the public map yet. A box with nothing in it hides.
-- **Wording:** the total, then where from ("14 to review · 11 from the data refresh, 3 from the public"); the button says how many it acts on.
+- **Status:** Live as is (#926: every admin card, summary box and notice comes from these strings).
+- **For:** the one white card every admin queue item and summary sits in (`cardClass`): `radius-lg`, a `bone-200` hairline, level 1, 16 padding (24 from 640). A summary box is the same card slimmer (`cardSlimClass`, 12 by 16), with one line saying how much is waiting and one green button, 48 tall. The clay box (`clayNoticeClass`: `clay-100`, `clay-500` edge) is the one warm exception: saved changes not on the public map yet, a dead link on a place's edit page, the test site line. A box with nothing in it hides. A group on an edit page (Things to review, Suggestions to review) is a section title over a stack of cards 16 apart.
+- **Waiting to publish** (on a place's edit page) lists each field that differs between the public map and what Publish would send: the category as its own name (Meal Site), hours as readable days and times (Mon: …), never the stored code or JSON. Each "Day: hours" piece stays whole when it fits and a line breaks between pieces first, the dot ending a line, never starting one; the phone value stays whole the same way. Both are typed text (a monthly note runs to 280 characters, a phone field can hold several numbers), so a piece wider than the box wraps inside itself (`keepTogetherClass`), never past the edge: no typed value is ever forced onto one line. A row whose two sides read the same ("WIC: No → No") is left out, and the box hides when nothing is left. Its field names come from its own list in `src/lib/adminVenues.ts`, not from `src/lib/fieldLabels.ts` (Known drift).
+- **Field names** read as plain words everywhere else a field is named: the change cards, the Places To review column ("New phone", "New SNAP status"), the source-switch panel and the Activity change lines all go through `fieldLabel` (`src/lib/fieldLabels.ts`: Accepts SNAP, Website, Hours…; a field with no entry reads as words, "published_at" as "Published at", never the raw key).
+- **Text links:** `linkClass` (a link inside a sentence or a table cell: `sage-700`, underlined, its line height kept) and `tapLinkClass` (a link on its own: the same with a 48-pixel tap area) take the sage 100 hover with the green ring, and a link that wraps onto two lines draws its tint and ring around each line whole (`box-decoration-clone`), not cut open at the line end.
+- **Wording:** the total, then where from ("14 to review · 11 from the data refresh, 3 from the public"); the button says how many it acts on (Approve all 6 date-only updates), and asks first in the on-page confirm.
 
 ### Publish bar (PublishPanel, PublishBotStatusBanner)
 
 `src/components/PublishPanel.tsx`, `src/components/PublishBotStatusBanner.tsx`, `src/app/(site)/admin/page.tsx`, `src/app/(site)/admin/places/page.tsx`.
 
-- **Status:** Live as is.
+- **Status:** Live as is (#926: Publish is the shared green button, 48 tall; it asks in the green on-page confirm, full width under the sentence; Review changes has a 48-pixel tap area; no long dashes in the bar or the banner; the banner's PR link keeps the banner's words colour and takes the sage 100 hover like every link, the stuck banner's `danger` words reading 4.6 to 1 on it).
 - **For:** places reach the public map only when someone presses Publish. The white bar says how many places are new, edited or removed and holds the one Publish button; above it a banner follows the change request until it lands, and turns `danger` if it gets stuck. Boxes and events need no Publish. The test site shows a clay line in its place ("Test site: publishing is turned off here", `isProductionWorker()`).
-- **Wording:** "2 new, 5 edited, 1 removed since the last publish", or "The public map is up to date"; after, what went out and that the map can take a minute; a failure always says whether anything changed.
+- **Wording:** "2 new, 5 edited, 1 removed since the last publish", or "The public map is up to date"; the confirm asks "Publish 2 new places and 5 edited places to the public map?", says "1 place will be removed." when any are, and "This opens a change request on GitHub that merges on its own."; after, "Published: 7 places pushed, 1 place removed to the public map." and that the map can take a minute; a failure always says whether anything changed ("Couldn't reach GitHub to publish. Nothing was changed. Try again in a moment."; when it can't tell: "The publish didn't finish, so we can't tell whether the map changed. Reload the page to see what's still waiting, then try again."). The banner: "Publish in progress: waiting on PR #7." and "Publish is stuck: merge conflict. PR #42 hasn't merged, so…".
 
 ### Change cards (ProposalCard, SubmissionCard, PhotoReviewCard, SponsorRequestCard)
 
-`src/components/ProposalCard.tsx` (`SOURCE_BADGE`, `LANE_BADGE`, the diff, the preview column), `src/components/SubmissionCard.tsx`, `src/components/PhotoReviewCard.tsx`, `src/components/SponsorRequestCard.tsx`, button classes in `src/lib/adminCardStyles.ts`.
+`src/components/ProposalCard.tsx` (`SOURCE_BADGE`, `LANE_BADGE`, the diff, the preview column), `src/components/SubmissionCard.tsx`, `src/components/PhotoReviewCard.tsx`, `src/components/SponsorRequestCard.tsx`; buttons, tags and the name in `src/lib/adminCardStyles.ts`; the reason step is `AdminRejectStep` with its focus in `useAdminStep` (both `src/components/AdminConfirm.tsx`).
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 on Reject, Cancel, Remove photo and Decline (`secondaryButtonClass` and `secondaryButtonTallClass`'s `hover:bg-[var(--color-bone-100)]`). Open: the red Confirm button comes before Cancel in every reject step, against the risky-action ruling; not decided.
+- **Status:** Live as is (#926). One button height, 48, on all four cards; R1 on Reject, Cancel, Remove photo and Decline; in every Reject, Remove photo and Decline step Cancel comes first, then the red Confirm; Archive this venue asks in the red on-page confirm.
 - **For:** one card per thing waiting on a person (a data-check change, a public suggestion or report, a box photo, a sponsor request): tags and when it arrived, what it is, then the decision buttons, yes first.
-- **Parts:** tags 12-pixel, 4-pixel corners: calm `sage-100` / `sage-700`, needs a look `clay-100` / `clay-700`, quiet `bone-100` / `ink-500`. The old value crossed out in `clay-700`, an arrow, the new value in `sage-700`.
-- **Wording:** the yes button says what it does (Approve, Approve rename, Mark done, Keep photo, Approve sponsor, Archive this venue); no is Reject, Remove photo, Decline or Remove, with a Confirm second step; the reason box says "(optional, for your own notes)".
+- **Parts:** tags through `tagClass` (Admin tags and filter chips): calm, attention, quiet, all fully round. The name of the place or box in Public Sans 16 semibold `ink-700` (`cardNameClass`), the address under it 14. The old value crossed out in `clay-700`, an arrow, the new value in `sage-700`. The reason step is one shared part on all four cards (`AdminRejectStep`): a Reason box, then Cancel and the red Confirm. It opens in place of its button (the button stays on the page, hidden): opening puts the cursor in the reason box; Cancel, or Escape anywhere inside the step, closes it, clears what was typed and puts focus back on the button. While the step's request runs, Escape does nothing. A pinned field leads with its own label, as written: "Phone: the venue told us this itself on Oct 1, 2026 (…)", so SNAP and WIC keep their capitals.
+- **Wording:** the yes button says what it does (Approve, Approve rename, Mark done, Keep photo, Approve sponsor, Archive this venue); no is Reject, Remove photo, Decline or Remove, with a Confirm second step; the reason box says "(optional, for your own notes)"; working: only the pressed button changes (Applying…, Approving…, Archiving…), and it keeps keyboard focus while it works. Errors say what did not happen, then Try again: "This change was not applied.", "The place was not archived.", "This suggestion was not rejected.", "This report was not marked done.", "The photo was not removed.", "The request was not declined.", each followed by "Try again.".
 
 ### Admin form fields and the save button (formClasses.ts)
 
-`src/components/formClasses.ts` (`inputBase`, `inputBorder`, `labelClass`, `errorClass`, `ADMIN_PRIMARY_BUTTON`), `src/components/AddVenueForm.tsx`, `src/components/EventForm.tsx`.
+`src/components/formClasses.ts` (`inputBase`, `inputBorder`, `inputClass`, `labelClass`, `errorClass`, `hintClass`, `requiredMarkClass`, `fieldGroupClass`, `checkboxRowClass`, `checkboxClass`, `ADMIN_PRIMARY_BUTTON`, `ADMIN_SECONDARY_BUTTON`, `saveRowClass`, `busyButtonProps`, `cancelLinkProps`), `src/lib/focusFirstProblem.ts`, `src/components/AddVenueForm.tsx`, `src/components/EventForm.tsx`, `src/components/EventFlyerField.tsx`, `src/components/HostAlertsAdminPanel.tsx`.
 
-- **Status:** Live, changing in the redesign. Approved, not built: a Cancel beside Save changes on a place's edit page (`AddVenueForm.tsx`, the submit at line 1368 stands alone today): Cancel takes a third of the row, Save two thirds, both 48 tall; Cancel goes back to Places and saves nothing; `sage-100` under the pointer. Events already pair Save with a Back to events link.
-- **For:** the boxes, labels, errors and green save button every admin form shares (Add a place and its edit page, Events, sign-in).
-- **Sizes:** as the public field; admin forms stop at 672 wide; Save changes full width, 48 tall.
-- **Wording:** Add venue on a new place, Save changes on an existing one, Save draft and Publish on an event; Saving…; "Cancel", never Back or Discard, beside Save.
+- **Status:** Live as is (#926). Cancel sits beside Save on every admin form; text boxes are 48 tall with an `ink-400` edge; tick boxes sit in 48-tall rows; a two- or three-way choice is a slider.
+- **For:** the boxes, labels, errors, tick boxes and the save row every admin form shares (Add a place and its edit page, Add event and Edit event, the flyer, host alert emails, sign-in).
+- **Sizes:** a real label (14 medium `ink-700`, 4 above); the box white, `radius-md`, a 1-pixel `ink-400` edge (5.9 to 1 on white; the public field keeps `bone-300`, Known drift), 12 by 8 padding, at least 48 tall, `ink-900` words, `ink-400` placeholder, 16 on a phone and 14 from 768; focus: `sage-500` edge and ring; error: `danger` edge and a 12-pixel `danger` line, and the edge and ring stay red while the box has focus. Tick box 20 pixels with a `sage-600` tick, in a 48-tall row that takes the sage 100 hover. Form pages are one 672-pixel column, title included. Save row (`saveRowClass`): Cancel a third, Save two thirds, both 48 tall, 16-pixel words; on a new or draft event the two thirds hold Save draft (outline) and Publish (green), half each with 8 at the sides and words that never wrap, so Cancel, Save draft and Publish sit on one row, one line each, at 360. Reload, in the red box when someone else saved first, is the red outline button.
+- **A wrong box:** stays red at rest and in focus. After a refused save, on either admin form (Add a place and its edit page; Add event and Edit event), focus goes to the first box marked wrong and the page scrolls it to the middle of the screen (`focusFirstProblem`, `src/lib/focusFirstProblem.ts`); when the only problem is a line with no box of its own, the page scrolls to that line. Sign-in and Add host do the same with their one box. Add host never shows the browser's own warning bubble: an empty box or a bad address gets the red edge and a line under the box, and nothing is sent.
+- **A working button keeps focus:** every admin button that stays on the page while its own request runs (Save, Add venue, Find location, Suggest Spanish, Approve, Mark done, Remove, a confirm's action, Choose image, and Publish once the map is up to date, since focus lands back on it after a publish) is faded and a press does nothing, but it stays reachable (`aria-disabled`, not `disabled`, through `busyButtonProps`), so keyboard focus does not drop to the top of the page. A press that removes the control it was on hands focus to what replaced it: a picked place to its Change button, Change to the search box, a picked address match back to Find location. Add host does the same; after a successful add, focus goes back to the empty email box for the next host.
+- **Two red lines:** a problem with something typed (a field error, sign-in's red lines, No match found under Find location) is the 12-pixel field line (`errorClass`), right under its box or button; an action on a card or list that failed (Approve, Hide, Publish) is the 14-pixel failure line (`failureLineClass`); a failed save is the red box at the top (`failureBoxClass`).
+- **Hide and Unhide** on a box's check-ins keep one width through Hide, Saving… and Unhide, so the button's edge doesn't jump.
+- **The Location block** on a place's form: the address full width, latitude and longitude side by side under it at every width, then the map under them, at most 420 wide (the map image is made at 420).
+- **Cancel:** a link that saves nothing, never a submit, so Save stays the form's first submit and Enter saves. On a place's form it goes where Save would land (Places, or the To review list when the form was opened from a review); on the event form it goes to Events. While a save runs it is off: dimmed, out of the Tab order, a click does nothing (`cancelLinkProps`).
+- **Wording:** Add venue on a new place, Save changes on an existing one, Save draft and Publish on an event; Saving…; "Cancel", never Back or Discard, beside Save; "(optional)" in the label, in `ink-400`; a red star on required ones; a failed save: "The place was not saved. Try again.".
 
 ### Lists and tables (VenueListView, AllBoxesTable, EventsList, EventSubmissionsList)
 
-`src/components/VenueListView.tsx`, `src/components/AllBoxesTable.tsx`, `src/components/EventsList.tsx`, `src/components/EventSubmissionsList.tsx`, `src/lib/adminVenues.ts` (`DISPLAY_STATUS_LABELS`, `DISPLAY_STATUS_KEY`).
+`src/components/VenueListView.tsx`, `src/components/AllBoxesTable.tsx`, `src/components/EventsList.tsx`, `src/components/EventSubmissionsList.tsx`, `src/lib/adminVenues.ts` (`DISPLAY_STATUS_LABELS`, `DISPLAY_STATUS_KEY`); the table strings (`tableWrapClass`, `tableHeadRowClass`, `tableRowClass`, `tableLinkRowClass`, `tableCellClass`, `tableHeadCellClass`) and `emptyStateClass` in `src/lib/adminCardStyles.ts`.
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 on Places rows and filter chips (live `bone-100`); the public's shared events keep Make it a draft event and Dismiss in one three-dot menu per item, a 48 by 48 button (owner's ruling: per-row actions in one three-dot menu). Open: whether R3 applies to the Places table's Category column (plain `ink-700` words today).
-- **For:** every place, box and event in one table each, with chips to narrow it, a search box, and the name (a `sage-700` link) as the way into its edit page.
-- **Sizes:** 14-pixel words, cells 12 by 16, column headings 11 or 12-pixel `ink-400` capitals, corners 14, a minimum width (680 Places, 560 Boxes, 512 Events) inside a box that scrolls sideways on a phone. Tags 12-pixel; Draft yellow on Places, `bone-200` on Events.
-- **Wording:** filters show their count ("To review (12)"); "No venues match your search."; "No boxes match these filters."
+- **Status:** Live as is (#926). R1 on the filter chips and on every row that links somewhere (Places, Blessing Boxes, Events); Places chips are 48 tall like the Boxes filters (`chipClass`); the Places Category column is the colored category words (R3, `CategoryLabel`), with SNAP and WIC when the place takes them; the public's shared events keep Make it a draft event and Dismiss in one three-dot menu per item; the Boxes Sponsor filter is a slider; every empty list is the shared empty box.
+- **For:** every place, box and event in one table each, with chips to narrow it, a search box, and the name (a `sage-700` link with the green ring) as the way into its edit page.
+- **Sizes:** the three tables share one look: 14-pixel words, cells 12 by 16, column headings 11-pixel `ink-400` capitals over a `bone-200` line, each on one line, `bone-200` row lines, corners 14, level 1, a minimum width (1080 Places, 800 Blessing Boxes, 640 Events) inside a box that scrolls sideways on a phone, so the page itself never does; the Name, Box and Event columns are at least 240 wide, so a name takes two lines at most, the Places Address column at least 200, and the Blessing Boxes Sponsor column at least 160, so "Needs a sponsor" stays on one line. A row tints sage 100 under the pointer only if it links somewhere (an archived Places row with no link gets none), and a plain click anywhere on that row opens its link (`src/lib/rowLinkClick.ts`: clicks on a control inside the row, a click with Ctrl, Cmd, Shift or Alt, a middle click and a click that ends a text selection are left alone); the row is not focusable on purpose, the link stays the keyboard path. On a tinted Places row the Category words (the category, SNAP, WIC and the dots) turn `ink-700` with the row's 150-millisecond fade and take their colours back when the pointer leaves, so no category colour sits on the fill (Colors). Dates (Last verified, Last report, Starts), times and tags stay on one line; anything typed or imported (a name, an address, a phone value, a note) wraps. Places, above its table: the status key (a white box with a `bone-200` hairline, flat on purpose, no shadow), then the filter chips in three rows, status, then source, then lane, each wrapping on its own, with no divider between them. The To review column names the changed field in plain words through `src/lib/fieldLabels.ts`. Tags through `tagClass`: Draft yellow on Places, `bone-200` on Events, Low yellow and Empty red on Boxes. The Events Edit link sits in its cell as an inline link. Blessing Boxes and Events title their table (a section title, All boxes, All events); on Events, Add event sits at the right of that title row and wraps under it on a narrow phone.
+- **Wording:** filters show their count ("To review (12)"); the Boxes Sponsor slider says Any, Has one, Needs one; after a filter: "No places match your search or filters." or "No boxes match these filters.", each with Clear filters (it clears the search words and every chip, not the sort, and puts the cursor in the search box); with nothing at all: "No places yet.", "No blessing boxes yet." with "Add a place with the category Blessing Box and it shows up here.", "No events yet." with a line and Add event.
 
 ### Dashboard numbers (DashboardNeedsStrip, KpiCard, DailyBars, BarList, BoxReportsChart)
 
-`src/components/DashboardNeedsStrip.tsx`, `src/components/KpiCard.tsx`, `src/components/DailyBars.tsx`, `src/components/BarList.tsx`, `src/components/BoxReportsChart.tsx`, `src/app/(site)/admin/page.tsx`.
+`src/components/DashboardNeedsStrip.tsx`, `src/components/KpiCard.tsx`, `src/components/DailyBars.tsx`, `src/components/BarList.tsx`, `src/components/DashboardPeriodPicker.tsx`, `src/app/(site)/admin/page.tsx`; `tileCardClass` and `tileLabelClass` in `src/lib/adminCardStyles.ts`. `src/components/BoxReportsChart.tsx` is on the Blessing Boxes page (`src/app/(site)/admin/boxes/page.tsx`), not the Dashboard.
 
-- **Status:** Live, changing in the redesign. Approved, not built: R1 on the Needs you cards (live `hover:bg-[var(--color-bone-100)]`).
-- **For:** four Needs you cards (each a link into its list), then number cards with the change since the last period, and three small charts: visitors per day, ranked bars, box reports per week.
-- **Sizes:** cards `radius-lg`, 16 padding, 12 apart; labels 12-pixel `ink-500` capitals; numbers 24 semibold `ink-900`; up `sage-700`, down `danger`, always with a + or -; ranked bars `sage-600` on a `bone-100` track; the weekly chart `sage-500` OK and `clay-500` needs attention, week labels 10 pixels.
+- **Status:** Live as is (#926). R1 and the green ring on the Needs you cards; a number card's change wraps under the number on a 360 phone instead of running past the edge; cards in one row are the same height with the label on top and the number pushed to the bottom, so the numbers line up when one label wraps and its neighbour's does not; the time period (7 days, 30 days, 90 days) is a slider, still kept in the address (`?period=`).
+- **For:** under the greeting (the page title) and the period slider: four Needs you cards (each a link into its list), then number cards with the change since the last period, and small charts: visitors per day, ranked bars, and, on Blessing Boxes, box reports per week.
+- **Sizes:** tiles (`tileCardClass`) `radius-lg`, 16 padding at every width, level 1, 12 apart; labels 12-pixel `ink-500` capitals; numbers 24 semibold `ink-900`; up `sage-700`, down `danger`, always with a + or -; ranked bars `sage-600` on a `bone-100` track, linked names with the green ring; the weekly chart `sage-500` OK and `clay-500` needs attention, week labels 10 pixels. Section titles Fraunces 18 (`h3`), group headings Public Sans 14 semibold (`h4`).
 - **Wording:** plain labels (Places to review, Waiting to publish); sampled numbers say "about"; missing numbers show a dash; empty charts say why ("No visitor data yet for this period.").
 
-### Archive confirm (ArchiveVenueButton)
+### On-page confirm (AdminConfirm, useAdminConfirm, useAdminStep, AdminRejectStep)
 
-`src/components/ArchiveVenueButton.tsx`, in the Danger zone of `src/app/(site)/admin/venues/[id]/edit/page.tsx`.
+`src/components/AdminConfirm.tsx` (the box, both hooks and the shared reject step). Used by `src/components/ArchiveVenueButton.tsx` (Remove from map, in the Danger zone of a place's edit page), `src/components/PublishPanel.tsx`, `src/components/ToReviewSummaryBox.tsx`, `src/components/ProposalCard.tsx`, `src/components/EventForm.tsx` and `src/components/EventFlyerField.tsx`; `useAdminStep` by the four change cards (through `AdminRejectStep`) and the event form's Cancel event step.
 
-- **Status:** Live, changing in the redesign. Approved, not built: the browser's `window.confirm` (`ArchiveVenueButton.tsx:58`) becomes a box on the page, right under the button: a 1-pixel `danger` edge, corners 10, 16 padding, the question naming the place in `ink-900` and what happens in `ink-700`, then Cancel first and Remove from map, half the row each, 48 tall. The red button itself stays. The other `window.confirm` sites stay as they are for now and are listed in Known drift.
-- **For:** taking a place off the public map without deleting it. The red outline button (`danger` words and edge, `danger` fill under the pointer) sits alone under Danger zone at the foot of a place's edit page.
-- **Wording:** the button says what it does to the public: Remove from map, never Archive or Delete. Working: Removing…. See the Confirming a risky action pattern.
+- **Status:** Live as is (#926). All six admin browser pop-ups are now this box; the admin has no `window.confirm` left.
+- **For:** asking before an admin action that changes what the public sees or can't easily be undone. The first press hides the button (it stays on the page) and opens the box right where it was: the question naming the thing, a line saying what happens and what doesn't, then Cancel first and the action. Nothing is sent until the action button is pressed.
+- **Use something else when:** the step needs something typed: the Reject, Remove photo and Decline steps are `AdminRejectStep` (a Reason box, Cancel, the red Confirm, under a hairline on the card), and Cancel event's note is its own step with Keep event first and the red Confirm cancel event. `useAdminStep` gives both the same focus handling; Escape anywhere in the step closes it unless a request is running, and Cancel, Keep event or Escape clears what was typed. The Cancel event step sits beside the Archive event confirm, so it takes the confirm's look: white, a 1-pixel `danger` edge, corners 10, its two buttons stacked full width on a phone and half the row each from 640; the action is easy to undo (Hide a check-in, Remove a host email act at once); a public page (the public photo report is still the browser's pop-up, Known drift).
+- **Versions:** red (`tone="danger"`: a `danger` edge and the red outline action) for the removals: Remove from map, Archive this venue, Archive event, Remove flyer. Green (`tone="primary"`: a `sage-500` edge and the green action) for Publish and Approve all date-only updates.
+- **Sizes:** white, a 1-pixel edge, corners 10, 16 padding, 8 between its parts; the question medium `ink-900`, the line under it 14 `ink-700`; both buttons 48 tall, 14-pixel words, stacked full width on a phone with Cancel on top (at half a phone's width "Remove from map" wrapped) and half the row each from 640. A failure shows as a red line under the buttons.
+- **Wording:** the action button names the action, never Yes or OK; on a place's edit page the red button alone under Danger zone says what it does to the public, Remove from map, never Archive or Delete; while it works it says what it is doing (Removing…, Publishing…, Approving…, Archiving…): Cancel is off, and the action button ignores presses but keeps keyboard focus (`busyButtonProps`). Every site's words are in the Confirming a risky action pattern.
+- **Everyone:** a group named by its question; opening puts focus on Cancel, so Enter right away is the safe choice; Escape cancels unless it is working; Cancel puts focus back on the button that opened it. Both buttons are `type="button"`, so the box is safe inside a form.
+
+### Three-dot row menu (AdminRowMenu)
+
+`src/components/AdminRowMenu.tsx`, used by `src/components/EventSubmissionsList.tsx`.
+
+- **Status:** Live as is (#926; the owner's ruling: per-row actions in one three-dot menu).
+- **For:** a list item with two or more actions: each event the public sent in holds Make it a draft event, then Dismiss in red, last, under a line. The menu shows the items in the order the code passes them, so the risky choice is passed last; a line goes above the first risky one.
+- **Use something else when:** the item has one action (a plain button or link); the row sits inside a scrolling table (the menu does not float out of its box, so it gets cut off); a choice needs the on-page confirm (the menu can't hand focus back to it).
+- **Sizes:** the button 48 by 48, corners 10, a 20-pixel `ink-500` three-dot icon, sage 100 under the pointer and while open; the menu under it at its right: white, `bone-200` edge, corners 14, level 2, at least 200 wide; items 48 tall, 14-pixel, `ink-700`, the risky one `danger`; sage 100 under the pointer, and an item reached by keyboard also shows the `sage-500` ring inside its edge, so focus and hover never look the same.
+- **Everyone:** the button is named "More actions for" plus the item's visible name (no sender-typed words in an attribute); Enter, Space or Down open it on the first item, Up on the last; the arrows, Home and End move; Escape and choosing close it and return focus to the button. While the item's own request runs the whole button is off: faded, a press or a key does nothing, and it keeps the focus it was handed back (`aria-disabled`, not `disabled`).
+
+### Slider (AdminSegmented)
+
+`src/components/AdminSegmented.tsx`; the Dashboard's copy is `src/components/DashboardPeriodPicker.tsx`.
+
+- **Status:** Live as is (#926; the owner's ruling: sliders for a two- or three-way switch).
+- **For:** picking one of two or three short choices, all in view: the Dashboard's period (7 days, 30 days, 90 days, kept in `?period=`), SNAP and WIC on a place's form (Unknown, Yes, No), where an event is (On the map, Other address), the Blessing Boxes Sponsor filter (Any, Has one, Needs one), a host email's language (English, Spanish).
+- **Use something else when:** four or more choices (a select, like Sort on Blessing Boxes); several at once (chips, or switches on the public map).
+- **Sizes:** a fully round `bone-200` track, 4 padding, 48 tall overall; a `sage-600` thumb behind the chosen word that slides in 250 ms on `--ease-out-circ` (R5; still with reduced motion); each part 40 tall with a tap area reaching 48, 14-pixel semibold, `bone-50` on the thumb, `ink-700` off it with the sage 100 hover. Full width on a phone (equal parts, lined up with the full-width fields and buttons around it), its own width from 640, always; there is no option for it. Where it needs a visible caption, its own legend is that caption (`legendClass`): the 11-pixel capitals label above a filter (`controlLabelClass`: Sponsor), the form label on a form (`labelClass`: Accepts SNAP, Accepts WIC, Email language). The public Language switch is the same slider with `radius-lg` corners.
+- **Everyone:** real radios in a group named by its legend, shown or hidden (Time period and where an event is keep theirs hidden), so the arrow keys move the choice and screen readers hear which is chosen; the ring shows on the part with keyboard focus.
+
+### Admin tags and filter chips (tagClass, chipClass)
+
+`src/lib/adminCardStyles.ts` (`tagClass(tone)`, `chipClass(on)`), used by every admin list and card.
+
+- **Status:** Live as is (#926: one shape for every admin tag; 48-tall chips everywhere).
+- **Tags:** fully round, 12-pixel medium, 2 by 8 padding, one line. Six tones, each words on a fill: calm `sage-100` / `sage-700` 7.5 to 1 (OK, Live, Published, New place, the data sources); attention `clay-100` / `clay-700` 7.5 to 1 (Needs a human, Public report, Live · edits waiting, Problem, Cancelled, Suggested new place); quiet `bone-100` / `ink-500` 6.1 to 1 (Removed, Quiet, Archived, Likely noise); neutral `bone-200` / `ink-700` 11 to 1 (Draft on Events); caution `brand-yellow` / `ink-900` 12 to 1 (Draft on Places, Low on Blessing Boxes); danger `clay-100` / `danger` 5.2 to 1 (Empty).
+- **Chips:** the quick filters above a list (Places status, source and lane; Blessing Boxes status). 48 tall, fully round, 14-pixel medium, 14 at the sides. Off: white, `bone-300` edge, `ink-700`, sage 100 under the pointer. On: `sage-100` fill, `sage-500` edge, `sage-700` words. One with nothing to show is faded and can't be pressed. They change no address.
+- **Wording:** a tag is one or two words; a chip ends with its count ("To review (12)").
+- **Everyone:** a chip says whether it is pressed (`aria-pressed`); color is never the only sign, every tag is words.
+
+### Admin error page (admin/error.tsx)
+
+`src/app/(site)/admin/error.tsx`.
+
+- **Status:** Live as is (#926).
+- **For:** an admin page that fails to load (a database read that throws, for example). It replaces the whole page, menu included, in the admin's look: "This page didn't load" (Fraunces 20, the page's `h1`), "Nothing was changed. Try again, or go back to the Dashboard.", a green Try again and a Go to the Dashboard link with a 48-pixel tap area.
+- **Use something else when:** an action failed on a page that loaded (its red line or box, on that page); the person is signed out (they are still sent to sign-in; this page never catches that); the address is wrong (Not found).
+- **Behaviour:** Try again reloads the page, because only a reload asks the server again. It never shows the error's own text, which can carry internal details.
 
 ## Do's and Don'ts
 
@@ -870,7 +922,7 @@ Eight icons are flagged as one icon with two meanings or two icons for one: the 
 
 Movement only shows what changed: a color fades, a card slides up, the map flies to a place, a live event pulses. Nothing bounces or moves for decoration.
 
-**The tokens** (`src/app/globals.css` `@theme`): `--ease-out-circ` `cubic-bezier(0.32, 0.72, 0, 1)` (quick to start, gentle to stop; the curve vaul uses for the route strip's 0.5 s slide), `--duration-fast` 150 ms, `--duration-default` 250 ms, `--duration-slow` 400 ms. The switches and the side panels use `--ease-out-circ` by name (the `ease-out-circ` class); the rest of the code uses none of them yet (see Known drift). The switch and side-panel timings are owner rulings: switches slide in 250 ms on `cubic-bezier(0.32, 0.72, 0, 1)` (R5), and the side panels slide in 300 ms and out 250 ms on the same curve (#917 round 3, "way too fast, slow them down a little"). Open, not decided: whether the named tokens become the standard for new work.
+**The tokens** (`src/app/globals.css` `@theme`): `--ease-out-circ` `cubic-bezier(0.32, 0.72, 0, 1)` (quick to start, gentle to stop; the curve vaul uses for the route strip's 0.5 s slide), `--duration-fast` 150 ms, `--duration-default` 250 ms, `--duration-slow` 400 ms. The switches, the side panels and the sliders (the Language switch, the admin's `AdminSegmented`) use `--ease-out-circ` by name (the `ease-out-circ` class); the rest of the code uses none of them yet (see Known drift). The switch and side-panel timings are owner rulings: switches slide in 250 ms on `cubic-bezier(0.32, 0.72, 0, 1)` (R5), and the side panels slide in 300 ms and out 250 ms on the same curve (#917 round 3, "way too fast, slow them down a little"). Open, not decided: whether the named tokens become the standard for new work.
 
 **What moves:**
 
@@ -944,27 +996,32 @@ A pattern is a job that comes up on many pages and uses several components. Word
 
 ### Page layout: admin pages
 
-- **When:** every admin page. Live as is. English only.
-- **Screens:** Dashboard, Blessing Boxes, Places, Events, Activity (owner only); Add a venue, Edit a place, Add event, Edit event; sign-in has its own one-box page.
+- **When:** every admin page. Live as is (#926). English only.
+- **Screens:** Dashboard, Blessing Boxes, Places, Events, Activity (owner only); Add a venue, Edit a place, Add event, Edit event; sign-in has its own one-box page; a page that fails to load shows the admin error page.
 - **Steps:**
-  1. The Admin menu across the top, counts on tabs with work waiting, Add place at the end.
-  2. Page title in Fraunces. No line under the title (owner's ruling).
-  3. Summary boxes (To review, Waiting to publish); an empty one hides.
-  4. The list or the form; forms stop at 672 wide.
-  5. The Publish bar on Places and the Dashboard when saved changes are waiting.
+  1. The Admin menu across the top, counts on tabs with work waiting, Add place at the end. Its Pueblo Food Map Admin is the page's one `h1` (Fraunces 24).
+  2. Every page has a title: Fraunces 20, the `h2` (`pageTitleClass`). Section titles are Fraunces 18 (`h3`), a small group heading inside a section Public Sans 14 semibold (`h4`). No line under the title (owner's ruling).
+  3. One page body (`pageBodyClass`): 16 at the sides on a phone, 32 from 640, 24 between parts. On a form page everything, title included, sits in one 672-pixel column (`formPageBodyClass`); Activity and the public's shared events use the full width.
+  4. Summary boxes (To review, Waiting to publish); an empty one hides.
+  5. The list or the form.
+  6. The Publish bar on Places and the Dashboard when saved changes are waiting (it sits above the title).
 
 | English | Where |
 |---|---|
 | Pueblo Food Map Admin | Top of every admin page (`src/components/AdminNav.tsx`) |
 | Signed in as … | Under it, with the email |
+| Hi <name> | The Dashboard's title |
+| Blessing Boxes · Places · Events · Activity | The other list pages' titles |
 | Edit <place name> | A place's edit page title |
 | Add a venue | The new place page title |
+| Add event · Edit event | The event form titles |
+| This page didn't load | The admin error page (`src/app/(site)/admin/error.tsx`) |
 
 - **Don't:** a line under the title that says nothing new.
 
 ### Forms
 
-- **When:** someone types more than one thing. Live, changing in the redesign: Approved, not built: Cancel beside Save changes on a place's edit page.
+- **When:** someone types more than one thing. Live as is (Cancel beside Save is on every admin form, #926).
 - **Screens:** public Suggest a place, Send us feedback, Report an issue, Share an event; admin Add a venue, a place's edit page, Add event, Edit event.
 - **Steps:**
   1. One box per thing, label above it; "(optional)" in the label, a red star on required ones.
@@ -972,7 +1029,7 @@ A pattern is a job that comes up on many pages and uses several components. Word
   3. The send button says what it sends, reads Verifying… while the human check runs and Sending… while it sends, and can't be pressed twice.
   4. Sent: the form is replaced by Thank you! and what happens next, with Back to map.
   5. Failed: a red box at the top, everything typed stays, Try again under the send button.
-  6. Admin: Cancel beside Save changes (Approved, not built); Cancel goes back to Places and saves nothing.
+  6. Admin: Cancel beside Save, a third of the row, on every form. It saves nothing and goes where Save would land: Places (or the To review list when a place's form was opened from a review), or Events from the event form. While a save runs Cancel is off, so nobody leaves while the save still lands.
   7. Admin, someone else saved first: the red box says so and offers Reload; nothing typed is cleared until Reload.
 
 | English | Spanish | Where |
@@ -985,22 +1042,23 @@ A pattern is a job that comes up on many pages and uses several components. Word
 | Your email is used only to follow up on your submission. It is never sold or shared. | Tu correo solo se usa para darte seguimiento. Nunca lo vendemos ni compartimos. | Under every email box |
 | Save changes | (admin, English only) | A place's edit page (`src/components/AddVenueForm.tsx`) |
 | Saving… | (admin) | Admin save button while it saves |
-| Cancel | (admin) | Beside Save changes (Approved, not built) |
+| Cancel | (admin) | Beside the save buttons on every admin form |
 | Someone else changed this place since you opened it. Reload to see their changes. | (admin) | Red box at the top, with Reload (`src/app/api/admin/venues/[id]/route.ts`) |
 
-- **Don't:** Save on its own, as on a place's edit page today, where the only way out is the browser's back button.
+- **Don't:** Save on its own, where the only way out is the browser's back button.
 
 ### Errors
 
 - **When:** a box is filled in wrong, a send or save failed, the map can't load. Live as is.
-- **Screens:** every public and admin form; the map screen when the map can't load; admin publish, approve, archive, sign-in.
+- **Screens:** every public and admin form; the map screen when the map can't load; admin publish, approve, archive, sign-in; an admin page that fails to load (the admin error page).
 - **Steps:**
-  1. A wrong box: a red edge and a line under it saying what to put in; focus moves to the first.
+  1. A wrong box: a red edge and a line under it saying what to put in; focus moves to the first. On the admin the edge stays red while the box has focus, and the two forms, sign-in and Add host all move focus there (`src/lib/focusFirstProblem.ts` on the forms).
   2. A failed send or save: a red box at the top says it wasn't sent and offers Try again; public forms also give an email address. What was typed stays.
   3. Too many sends: say how long to wait.
   4. Something can't work on this phone: fall back and say so, not as an error. When the map can't load, the list shows with a plain line.
-  5. Admin: the red line says what did not happen, then Try again.
-  6. Never a fading pop-up for a failure, never a code.
+  5. Admin: the red line or box says what did not happen, then what to do (`failureLineClass`, `failureBoxClass`); it stays on screen. A problem with something typed, or a lookup that found nothing, is the smaller field line under its box or button (`errorClass`), like the field errors around it. No admin message says "Something went wrong".
+  6. Admin, the page itself failed to load: the admin error page says nothing was changed and offers Try again (a reload) and the way back to the Dashboard. It never shows the error's text.
+  7. Never a fading pop-up for a failure, never a code.
 
 | English | Spanish | Where |
 |---|---|---|
@@ -1013,21 +1071,26 @@ A pattern is a job that comes up on many pages and uses several components. Word
 | Map unavailable | Mapa no disponible | Over the list when the map can't load |
 | The interactive map can't load on this device, so we're showing the list instead. | El mapa interactivo no se puede cargar en este dispositivo, así que mostramos la lista. | Under it |
 | Map needs a connection | El mapa necesita conexión | Offline, with "The list still works." |
-| Something went wrong. The venue was not saved. Try again. | (admin) | A place's form (`src/components/AddVenueForm.tsx`; vague first line) |
+| The place was not saved. Try again. | (admin) | A place's form (`src/components/AddVenueForm.tsx`) |
+| The place was not removed. Try again. | (admin) | Remove from map, in its confirm (`src/components/ArchiveVenueButton.tsx`) |
+| The code was not sent. Try again. | (admin) | Sign-in (`src/components/AdminLoginForm.tsx`) |
 | Couldn't load events. Check your connection and try again. | (admin) | Events, with Retry (`src/components/EventsList.tsx`) |
+| This page didn't load | (admin) | The admin error page's title |
+| Nothing was changed. Try again, or go back to the Dashboard. | (admin) | Under it, with Try again and Go to the Dashboard |
 
 - **Don't:** a code in a pop-up that fades. Nobody can act on it.
 
 ### Empty states
 
 - **When:** a list has nothing in it, yet or after a search or filter. Live as is.
-- **Screens:** Saved, the list view, the search box, the events list; admin Events, Places, Blessing Boxes, Dashboard charts.
+- **Screens:** Saved, the list view, the search box, the events list; admin Events, Places, Blessing Boxes, Activity, a box's check-ins and host emails, Dashboard charts.
 - **Steps:**
   1. Say what's missing in a short line.
   2. Say how to fill it, or give the one button that does.
   3. After a search or filter, offer the way out: Clear filters, or categories to try.
   4. At most a 28-pixel line icon in `ink-400` above the words. No pictures.
   5. Admin summary boxes with nothing in them hide.
+  6. Admin lists show one shared empty box (`emptyStateClass`: white, level 1 like the cards around it, a `bone-200` edge, centred `ink-500` words, 48 above and below); after a filter, Clear filters sits in it, an outline button. Activity is the exception: its filter form always holds the page's one Clear filters, so its empty box has only its line. Dashboard charts keep a line inside their card.
 
 | English | Spanish | Where |
 |---|---|---|
@@ -1038,8 +1101,12 @@ A pattern is a job that comes up on many pages and uses several components. Word
 | No matches for "…" | Sin resultados para "…" | Under the search box |
 | Try a category instead: | Prueba una categoría: | Above the category buttons |
 | No events coming up | No hay eventos próximos | The events list, with Show places again |
-| No events yet | (admin) | Admin Events, with Add event (`src/components/EventsList.tsx`) |
-| No venues match your search. | (admin) | Admin Places (`src/components/VenueListView.tsx`) |
+| No events yet. | (admin) | Admin Events, with "Add a one-day giveaway, a turkey drive or a pop-up distribution." and Add event (`src/components/EventsList.tsx`) |
+| No places match your search or filters. | (admin) | Admin Places after a filter, with Clear filters (`src/components/VenueListView.tsx`); "No places yet." with none at all |
+| No boxes match these filters. | (admin) | Admin Blessing Boxes after a filter, with Clear filters (`src/components/AllBoxesTable.tsx`) |
+| No blessing boxes yet. | (admin) | With "Add a place with the category Blessing Box and it shows up here." |
+| No activity matches these filters. | (admin) | Activity when the address carries a filter; "No activity yet." with none. Clear filters is in the filter form, not here (`src/components/ActivityLog.tsx`) |
+| No check-ins yet. · No host emails on file yet. | (admin) | A box's edit page, each with a line saying how it fills |
 | No visitor data yet for this period. | (admin) | A Dashboard chart |
 
 - **Don't:** "Results of what? What now?": an empty page with no reason and no way out.
@@ -1070,21 +1137,33 @@ A pattern is a job that comes up on many pages and uses several components. Word
 
 ### Confirming a risky action
 
-- **When:** the action changes what the public sees or can't easily be undone (taking a place off the map, publishing, hiding a photo). Live, changing in the redesign: Approved, not built: Remove from map asks on the page, Cancel first.
-- **Screens:** admin Remove from map (the ruling applies here). Still the browser's pop-up, listed in Known drift: Archive this venue on a change card, Publish, Approve all date-only updates, Archive event, Remove this flyer, and on the public site a box photo's report.
+- **When:** the action changes what the public sees or can't easily be undone (taking a place off the map, publishing, hiding a photo). Live as is on the admin (#926, the On-page confirm entry).
+- **Screens:** every admin site asks on the page: Remove from map, Archive this venue on a change card, Publish, Approve all date-only updates, Archive event, Remove this flyer. The one browser pop-up left is on the public site, a box photo's report (Known drift).
 - **Steps:**
   1. The first tap opens the confirm right where the button was, on the page. Never the browser's pop-up.
   2. It names the thing and says exactly what happens and what doesn't.
-  3. Two buttons side by side, half the row each, 48 tall. Cancel first, so Enter never removes anything.
-  4. The risky button names the action: Remove from map, not Yes or OK.
-  5. While it works it reads Removing… and can't be pressed twice; a failure says nothing was removed.
+  3. Two buttons, 48 tall: half the row each from 640 wide, stacked full width on a phone. Cancel first (on top on a phone), so Enter never removes anything.
+  4. The risky button names the action: Remove from map, not Yes or OK. Removals are red; Publish and Approve all are green.
+  5. While it works it says what it is doing (Removing…) and can't be pressed twice, yet keeps keyboard focus; a failure says what did not happen.
+  6. In a Reject, Remove photo or Decline step, too, Cancel comes first and the red Confirm second; in the Cancel event step, Keep event first, then the red Confirm cancel event, in a box with the confirm's look. Escape closes any of these steps unless its request is running, and Cancel, Keep event or Escape clears what was typed.
 
 | English | Where |
 |---|---|
-| Remove <place name> from the map? | The question (Approved, not built) |
-| It will stop appearing on the next publish. Its record is kept, not deleted, and this can be reviewed later. | Under it |
-| Cancel | The safe button, first |
-| Remove from map | The risky button, and the button that opens the box |
+| Remove <place name> from the map? | Remove from map, on a place's edit page (`src/components/ArchiveVenueButton.tsx`) |
+| It will stop appearing on the next publish. Its record is kept, not deleted, and this can be reviewed later. | Under it; then Cancel and Remove from map (Removing…) |
+| It leaves the map right away. Its record is kept, not deleted, and this can be reviewed later. | Under it instead, for a blessing box (boxes are live, no Publish) |
+| This place is removed from the map. | In place of the button once it is off the map (no Danger zone heading) |
+| Archive <place name>? | Archive this venue, on a data change that removes a place (`src/components/ProposalCard.tsx`) |
+| It stops showing on the public map at the next publish. Its record is kept, not deleted. | Under it; then Cancel and Archive this venue (Archiving…) |
+| Publish 2 new places and 5 edited places to the public map? | Publish (`src/components/PublishPanel.tsx`) |
+| 1 place will be removed. This opens a change request on GitHub that merges on its own. | Under it (the first sentence only when places are removed); then Cancel and Publish (Publishing…) |
+| Approve all 6 date-only updates? | Approve all on Places (`src/components/ToReviewSummaryBox.tsx`; "Approve 200 date-only updates?" at 200 or more, the most one press sends) |
+| These only update the last-verified date. Real changes are not included. | Under it; then Cancel and Approve 6 updates (Approving…) |
+| Archive this event? | Archive event, on an event's edit page (`src/components/EventForm.tsx`) |
+| It leaves the map and the list of live events, and stays in the admin history. | Under it; then Cancel and Archive event (Archiving…) |
+| Remove this flyer? | Remove, under an event's flyer (`src/components/EventFlyerField.tsx`) |
+| The event stays. Only the picture is removed. | Under it; then Cancel and Remove flyer (Removing…) |
+| Cancel | The safe button, always first |
 | Hide this photo and send it for review? (¿Ocultar esta foto y enviarla para revisión?) | Public, reporting a box photo; still a browser pop-up (`src/components/ReportPhotoButton.tsx`) |
 
 - **Don't:** "Are you sure? Yes / No." Nobody knows what Yes does, and the risky button comes first.
@@ -1338,7 +1417,8 @@ These are live but not drawn on the design-system pages. They follow the foundat
 - **The guided tour:** `src/components/GuidedTour.tsx`, `src/lib/guidedTour.ts` (dims to 55%).
 - **Box alert pages:** `src/components/AlertsConfirmContent.tsx`, `src/components/AlertsStopContent.tsx`.
 - **The map loading block and stand-ins:** `src/components/MapLoadingFallback.tsx`, `src/components/MapScreenStandIn.tsx`, `src/components/MapErrorBoundary.tsx`, `src/components/StaticLocationMap.tsx`.
-- **Admin extras:** the owner's activity log (`src/components/ActivityLog.tsx`, `/admin/activity`), `src/components/SourceSwitchPanel.tsx`, `src/components/HostAlertsAdminPanel.tsx`, `src/components/BoxCheckinsAdminPanel.tsx`, `src/components/BoxNeedLoveList.tsx`, `src/components/EventFlyerField.tsx`.
+- **Admin extras:** not drawn on the design pages, but on the shared admin parts since #926 (cards, fields, buttons, tags, the empty box, the slider and the on-page confirm): the owner's activity log (`src/components/ActivityLog.tsx`, `/admin/activity`), `src/components/SourceSwitchPanel.tsx`, `src/components/HostAlertsAdminPanel.tsx`, `src/components/BoxCheckinsAdminPanel.tsx`, `src/components/EventFlyerField.tsx`.
+- **The boxes that need love** list on the public Blessing box activity page: `src/components/BoxNeedLoveList.tsx` (public, not admin).
 
 ## Known drift
 
@@ -1352,15 +1432,13 @@ Where the live code differs from the rules above. Fix an item when you're in its
 **Stale claims in the previous version of this file:**
 
 - Map pins do not use CSS `filter: drop-shadow()`: the shadow is drawn in the SVG (`src/components/PinShadow.tsx`, #722).
-- Submit buttons are not `h-11`: public send buttons are 48 tall; the admin's short button set is about 36 (below).
-- There is not one field style: there are four copies of the same look: `INPUT_BASE` in `src/components/PublicForm.tsx:33-42`, `inputBase` in `src/components/formClasses.ts:8`, `SELECT_CLASS` in `src/components/BoxNumbersPanel.tsx:37`, and the inline field classes in `src/components/AdoptBoxForm.tsx:177` and `src/components/BoxAlertSignupForm.tsx:162`.
+- Submit buttons are not `h-11`: public send buttons are 48 tall, and so is every admin button (#926; the admin's short set is gone).
+- There is not one field style: there are four copies of the same look: `INPUT_BASE` in `src/components/PublicForm.tsx:33-42`, the admin's `inputBase` in `src/components/formClasses.ts` (48 tall with an `ink-400` edge since #926, so it no longer matches the public copies), `SELECT_CLASS` in `src/components/BoxNumbersPanel.tsx:37`, and the inline field classes in `src/components/AdoptBoxForm.tsx:177` and `src/components/BoxAlertSignupForm.tsx:162`.
 - The bottom bar's icons are not 24 and 20: `ICON_CLASS = "shrink-0 size-6 2xl:size-5"` (`src/components/bottomNavShared.tsx:86`) measures 32 on phones and 24 on large screens (the spacing trap; its own comment says 24), and the large-screen bar sits 32 up (`2xl:bottom-6`) where the spec says 24.
 - Two colored edge stripes break the no-stripes rule: today's line in the hours (`src/components/HoursList.tsx`) and the location help card's top band (`src/components/LocationHelpCard.tsx`). The Hours list entry shows them as live; whether to keep them is not decided. The monospace times in the hours list stay.
-- Code comments that point to parts of this file that are gone: "DESIGN.md Forms > Submit" (now Public form fields and buttons) in `src/components/PublishPanel.tsx:23` and `scripts/check-banned.mjs:27`; the `filtersButton` component token (now `buttonPrimary` and `switchOn`) in `src/components/RouteStrip.tsx:50`. Also `src/components/EventCardBody.tsx:39` says the action button shows on ended or cancelled cards; the code at `:412` hides it there.
+- Code comments that point to parts of this file that are gone: "DESIGN.md Forms > Submit" (now Public form fields and buttons) in `scripts/check-banned.mjs:27`; the `filtersButton` component token (now `buttonPrimary` and `switchOn`) in `src/components/RouteStrip.tsx:50`. Also `src/components/EventCardBody.tsx:39` says the action button shows on ended or cancelled cards; the code at `:412` hides it there.
 
 **The spacing trap, live:** `size-6` 32 (`src/components/bottomNavShared.tsx:86`); `h-5 w-5` 24 for route step icons and arrows (`src/components/DirectionButtons.tsx:227`, `:357`); `w-8 h-8` 48 for the Donate heart's circle (`src/components/HamburgerMenuContent.tsx:238`); `h-10` 64 for the thank-you's Back to map (`src/components/PublicForm.tsx:233`); `px-5 pt-5` 24 for the place card's padding (`src/components/VenueCardBody.tsx`).
-
-**Grey hover fills (break R1):** the admin: `bone-100` in `src/lib/adminCardStyles.ts` (secondary buttons); `src/components/VenueListView.tsx` (rows, `filterChipClass`); `src/components/AllBoxesTable.tsx` (filters); `src/components/DashboardNeedsStrip.tsx`; `src/components/AddVenueForm.tsx` (Reload); `bone-200` in `src/components/AdminNav.tsx` (`navLinkInactive`); `sage-50` in `src/components/AdminLoginForm.tsx` (`secondaryButtonClass`).
 
 **Under the 48-pixel floor:**
 
@@ -1368,36 +1446,38 @@ Where the live code differs from the rules above. Fix an item when you're in its
 - See all matches row 46 (`src/components/SearchResultsPopover.tsx:242`).
 - Route strip: Clear walking route and Show card about 32 (`src/components/RouteStrip.tsx:112`), Steps 36 (`:122`), the steps sheet's × 36 by 36 (`:306-308`).
 - The event strip's "+2" is `min-w-9`, 36 wide, under 360 (`src/components/EventStrip.tsx:100`).
-- Public and admin fields about 42 tall on a phone, 38 on a computer (`src/components/PublicForm.tsx:33`, `src/components/formClasses.ts`); the box period select about 42 (`src/components/BoxNumbersPanel.tsx:34-38`).
-- Checkboxes: the phone's own 16-pixel box with a row about 20 tall (`src/components/SuggestForm.tsx:36`; `src/components/AddVenueForm.tsx` `w-4 h-4`).
+- Public fields about 42 tall on a phone, 38 on a computer (`src/components/PublicForm.tsx:33`); the box period select about 42 (`src/components/BoxNumbersPanel.tsx:34-38`). Admin fields are 48 (#926).
+- Checkboxes: the phone's own 16-pixel box with a row about 20 tall (`src/components/SuggestForm.tsx:36`). Admin tick boxes are 20 pixels in 48-tall rows (#926).
 - All places name links about 24 tall, no `min-h-12` (`src/components/VenuesDirectoryContent.tsx:127-133`).
 - Not found button 40 tall (`src/components/NotFoundContent.tsx:47`); on a 360 phone its padding (`p-8` 48 and `p-6` 32, `:33-34`) leaves the words about 200 wide.
-- Admin: `ToReviewSummaryBox` button about 36 (`src/components/ToReviewSummaryBox.tsx`); Publish about 36 and Review changes with no tap area (`src/components/PublishPanel.tsx:89`); `ProposalCard` and `SubmissionCard` short button set (Approve about 36, Reject and Confirm reject about 34; the `src/lib/adminCardStyles.ts` header says the split was kept until someone decides); Remove from map about 34 (`dangerButtonClass`, `src/components/ArchiveVenueButton.tsx:42`); Places filter chips about 26 (`filterChipClass`, `src/components/VenueListView.tsx`).
 
 **Contrast fails:**
 
-- The text-box edge, `bone-300` on white, 1.6 to 1 where an edge needs 3 to 1: `src/components/PublicForm.tsx:81`, `src/components/formClasses.ts` (`inputBorder`), `src/components/VenueListView.tsx` (`controlInputClass`), `src/components/AllBoxesTable.tsx`, `src/components/BoxNumbersPanel.tsx`, the reject reason boxes.
+- The public text-box edge, `bone-300` on white, 1.6 to 1 where an edge needs 3 to 1: `src/components/PublicForm.tsx:81`, `src/components/BoxNumbersPanel.tsx`, the box card forms. The admin's text boxes moved to `ink-400` (5.9 to 1) in #926; the public forms were outside that work, so the two now differ.
 - A Filters switch that's off, `bone-300` on bone 50, 1.5 to 1 (`src/components/FilterPanel.tsx:139`).
-- Orange keyboard rings, 2.2 to 1 on bone 50 (`src/components/FilterPanel.tsx:453`, `src/components/SplashScreen.tsx:218`, `:243`) and 2.3 to 1 on white (Add place, `primaryButtonClass` in `src/components/AdminNav.tsx`).
-- The admin Low tag, `warning` on `clay-100`, 4.0 to 1 (`src/components/AllBoxesTable.tsx:37`).
+- Orange keyboard rings, 2.2 to 1 on bone 50 (`src/components/FilterPanel.tsx:453`, `src/components/SplashScreen.tsx:218`, `:243`). The admin's Add place now takes the green ring.
 - Box status words on `bone-100` (the pill without a photo): Stocked 4.4 to 1, Running low just under 4.5 (`src/components/BoxCardBody.tsx:184`, `src/lib/blessingBoxes.ts:430-436`).
 
 **Off the scales:**
 
 - Type: 13, 15 and 18 pixels written by hand on the location help card (`src/components/LocationHelpCard.tsx:154-193`); two title sizes for one job (`text-3xl` in `src/components/AboutContent.tsx:70`, `text-2xl` in `src/components/SuggestPageContent.tsx:33` and `src/components/VenueContent.tsx:121`); the box card forms' 12-pixel labels (`src/components/AdoptBoxForm.tsx:166`) and the period box's 12-pixel label.
-- Corners: plain `rounded` (4 pixels) on 46 small things (tick boxes, count tags, thumbnails, focus outlines); `rounded-[14px]` by hand; `rounded-t-[20px]` on the share preview sheet (`src/components/ShareEventForm.tsx:552`).
+- Corners: plain `rounded` (4 pixels) on small things on the public pages (none left in the admin since #926); `rounded-[14px]` by hand; `rounded-t-[20px]` on the share preview sheet (`src/components/ShareEventForm.tsx:552`).
 - Shadows: black-based shadows by hand on the side panel (`0 8px 32px rgba(0,0,0,0.18)`, `src/components/DesktopSidePanel.tsx:175`), the Menu (22% and 18%, `src/components/HamburgerMenu.tsx:290`, `:315`) and Filters (22%, `src/components/FilterPanel.tsx:304`); the share preview backdrop at 45% (`src/components/ShareEventForm.tsx:548`). The Menu panel is also `white` and, as a dropdown, an 8-pixel radius.
 - Motion: the phone sheet's open, close and grab-bar moves are the browser's smooth scroll, whose speed and curve no token sets (`src/components/ScrollSheet.tsx`, #923).
 - Two sheet systems: the phone card is the native scroll sheet, but while a walking route is on it is still the vaul drawer, with vaul's own drag and 0.5 s slide (`src/components/BottomSheet.tsx`), until the route strip moves too (#923).
-- Motion: of the four motion tokens only `--ease-out-circ` is used by name, by the switches (`src/app/globals.css:96-99`); live color changes are `duration-150` (some 100, the side-panel shift 300) on Tailwind's default curve `cubic-bezier(0.4, 0, 0.2, 1)`.
+- Motion: of the four motion tokens only `--ease-out-circ` is used by name, by the switches, side panels and sliders (`src/app/globals.css:96-99`); live color changes are `duration-150` (some 100, the side-panel shift 300) on Tailwind's default curve `cubic-bezier(0.4, 0, 0.2, 1)`.
 
 **Other:**
 
-- The keyboard sees only the browser's outline on the Dashboard's Needs you cards (no `focus-visible` style, `src/components/DashboardNeedsStrip.tsx`) and on box activity's Previous and Next.
-- `src/components/KpiCard.tsx`: in the mockup at 360 wide, two cards across leave about 110 pixels inside each and a number with its change needs about 130; not yet checked on the site.
+- The keyboard sees only the browser's outline on box activity's Previous and Next.
 - The event page draws its own copy of the flyer (`src/components/EventPage.tsx:124-145`) instead of `src/components/EventFlyer.tsx`.
-- The browser's own `window.confirm` still asks in `src/components/ProposalCard.tsx:261`, `src/components/PublishPanel.tsx:156`, `src/components/ToReviewSummaryBox.tsx:77`, `src/components/EventForm.tsx:372`, `src/components/EventFlyerField.tsx:137` and, on the public site, `src/components/ReportPhotoButton.tsx:29`. Only Remove from map is approved to change.
-- In every reject step on change cards the red Confirm comes before Cancel.
+- The browser's own `window.confirm` still asks on the public site, when someone reports a box photo (`src/components/ReportPhotoButton.tsx:29`). The admin has none left (#926); the public pop-up was outside that work.
+- The admin's list filters are not in the address: the Blessing Boxes status chips, Sponsor slider and search, and the Places chips once pressed, are lost on a refresh and can't be shared (only the Dashboard period and the Activity filters are kept). Left out of #926 on purpose; the same open question as the public view (Search and filter).
+- Two different things on the event form say Cancel: the Cancel link beside Save (leave the form, save nothing) and the red Cancel event in Danger zone (mark the event cancelled). They sit apart, but the words are the same.
+- Admin words that don't yet say what to do: "Visitor numbers are unavailable right now." and "Usage numbers are unavailable right now." on the Dashboard have no Try again.
+- Admin pages still carry the public browser-tab title, `Pueblo Food Map — Food Resources in Pueblo County, CO` (`ROOT_METADATA`, `src/lib/site.ts`), long dash included, on every admin page. `buildPageMetadata` in the same file always adds a canonical link and share-image tags, which an admin page must not get, so the admin can't use it as it is; a fix needs a change to that public file.
+- The date box's built-in calendar button (the admin's `type="date"` boxes, such as Activity's From and To) shows the browser's own outline when reached by keyboard, not the green ring.
+- Two lists of field names: Waiting to publish takes its own from `src/lib/adminVenues.ts` ("SNAP/EBT", "Special hours", "WIC"), while every other admin place that names a field uses `src/lib/fieldLabels.ts` ("Accepts SNAP", "Monthly hours", "Accepts WIC").
 - The link preview image (`public/og-image.png`) runs the word Map past the cream half onto the green map under a pin, and has a gradient stripe along its top: it breaks two logo rules.
 - The About page's mission sentence has a long dash; the brand note uses a comma there.
-- Live words that break the wording rules (vague or a long dash), not rewritten: `Something went wrong` (`src/lib/i18n.ts`, public forms, also as the first line of admin errors in `src/components/AddVenueForm.tsx:661-662`, `src/components/ArchiveVenueButton.tsx:91`, `src/components/PublishPanel.tsx:146`, `src/components/AdminLoginForm.tsx:67`, `src/components/EventSubmissionsList.tsx:51`, `:53`, `src/components/ToReviewSummaryBox.tsx:112`); long dashes in the Send us feedback line, `Couldn't verify you're human — please retry.`, `Hours unknown — call ahead` (both languages), and the admin messages in `src/components/PublishPanel.tsx:135`, `:146` and `src/components/ToReviewSummaryBox.tsx:103`, `:112`.
+- Live words that break the wording rules (vague or a long dash), not rewritten: `Something went wrong` (`src/lib/i18n.ts`, the public forms' red box title and the box alert pages); long dashes in the Send us feedback line, `Couldn't verify you're human — please retry.` and `Hours unknown — call ahead` (both languages). The admin's messages were rewritten in #926: none says "Something went wrong" or uses a long dash.

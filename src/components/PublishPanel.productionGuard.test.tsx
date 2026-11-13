@@ -41,11 +41,12 @@ afterEach(() => {
 
 describe("PublishPanel — publish_not_production message", () => {
   test("403 publish_not_production shows the staging-specific message, not the generic 'session expired' one", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     mockFetch.mockResolvedValueOnce(jsonResponse(403, { ok: false, error: "publish_not_production" }));
     const user = userEvent.setup();
     render(<PublishPanel summary={summary({ newDrafts: 1 })} />);
 
+    // Publish asks first; the confirm's own Publish sends.
+    await user.click(screen.getByRole("button", { name: /^publish$/i }));
     await user.click(screen.getByRole("button", { name: /^publish$/i }));
 
     await waitFor(() =>

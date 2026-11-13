@@ -71,14 +71,22 @@ describe("ActivityLog", () => {
     const days = buildActivityDays({ actions: [], events: [failed], sessionHeaders: [] });
     render(<ActivityLog days={days} filters={filters} people={[]} olderHref="/admin/activity?until=x" />);
 
-    expect(screen.getByText(/Failed sign-in — attacker@evil\.com/)).toBeDefined();
+    expect(screen.getByText(/Failed sign-in: attacker@evil\.com/)).toBeDefined();
     expect(screen.getByText(/isn't an admin/)).toBeDefined();
     expect(screen.getByRole("link", { name: "Show older" }).getAttribute("href")).toBe("/admin/activity?until=x");
   });
 
-  test("an empty page says so", () => {
-    render(<ActivityLog days={[]} filters={filters} people={[]} olderHref={null} />);
-    expect(screen.getByText("No activity matches these filters.")).toBeDefined();
+  // #926: one Clear filters on the page (in the form), and the empty line
+  // only speaks of filters when a filter is set.
+  test.each([
+    ["no filter set", false, "No activity yet."],
+    ["a filter set", true, "No activity matches these filters."],
+  ])("an empty page with %s says so and shows one Clear filters", (_case, filtered, line) => {
+    render(<ActivityLog days={[]} filters={filtered ? { ...filters, q: "pantry" } : filters} people={[]} olderHref={null} filtered={filtered} />);
+    expect(screen.getByText(line)).toBeDefined();
+    const clear = screen.getAllByRole("link", { name: "Clear filters" });
+    expect(clear).toHaveLength(1);
+    expect(clear[0].getAttribute("href")).toBe("/admin/activity");
   });
 
   test("labels both automatic refresh actors readably", () => {
@@ -86,7 +94,7 @@ describe("ActivityLog", () => {
     const days = buildActivityDays({ actions: [auto(1, "refresh-pipeline"), auto(2, "refresh-pipeline-ai")], events: [], sessionHeaders: [] });
     render(<ActivityLog days={days} filters={filters} people={[]} olderHref={null} />);
 
-    expect(screen.getByText("Automatic — weekly data refresh")).toBeDefined();
-    expect(screen.getByText("Automatic — data refresh, AI auto-apply")).toBeDefined();
+    expect(screen.getByText("Automatic: weekly data refresh")).toBeDefined();
+    expect(screen.getByText("Automatic: data refresh, AI auto-apply")).toBeDefined();
   });
 });

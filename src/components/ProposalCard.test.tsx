@@ -4,8 +4,8 @@
  * keeps every per-card behavior test that isn't about a multi-card list).
  * Covers:
  *   - Each card shows the venue + a clear before/after diff for `update`.
- *   - `remove` cards require a confirm() before POSTing approve, and use
- *     the danger button treatment — never a single click.
+ *   - `remove` cards ask on the page (AdminConfirm) before POSTing approve:
+ *     nothing is sent until the confirm's own button is pressed.
  *   - `link_health` cards render NO Approve button, only a real Link to the
  *     venue's edit screen.
  *   - A genuinely-new `add` (no existing venue) renders NO Approve button,
@@ -35,19 +35,16 @@ vi.mock("next/navigation", () => ({
 import ProposalCard from "@/components/ProposalCard";
 
 const mockFetch = vi.fn();
-let confirmSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   mockFetch.mockReset();
   mockPush.mockReset();
   mockRefresh.mockReset();
   vi.stubGlobal("fetch", mockFetch);
-  confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  confirmSpy.mockRestore();
 });
 
 // ─── Fixtures ───────────────────────────────────────────────────────────────
@@ -204,7 +201,7 @@ describe("ProposalCard — update card (before/after diff)", () => {
 
     await user.click(screen.getByRole("button", { name: /^Approve$/i }));
 
-    expect(confirmSpy).not.toHaveBeenCalled();
+    // One press sends: no confirm step on a plain update.
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith("/api/admin/proposals/1/approve", expect.anything()));
     await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
   });
@@ -240,7 +237,7 @@ describe("ProposalCard — update card (before/after diff)", () => {
 });
 
 describe("ProposalCard — remove card (never a single click)", () => {
-  test("removal shows a danger 'Archive this venue' button and requires window.confirm before POSTing", async () => {
+  test("'Archive this venue' first asks on the page, naming the place; only the confirm's own button POSTs", async () => {
     mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true }) });
     const user = userEvent.setup();
     render(
@@ -250,16 +247,15 @@ describe("ProposalCard — remove card (never a single click)", () => {
       />,
     );
 
-    const button = screen.getByRole("button", { name: /Archive this venue/i });
-    await user.click(button);
+    await user.click(screen.getByRole("button", { name: /Archive this venue/i }));
+    const confirm = within(screen.getByRole("group", { name: "Archive Old Pantry?" }));
+    expect(mockFetch).not.toHaveBeenCalled();
 
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy.mock.calls[0][0]).toMatch(/Old Pantry/);
+    await user.click(confirm.getByRole("button", { name: "Archive this venue" }));
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith("/api/admin/proposals/2/approve", expect.anything()));
   });
 
-  test("declining the confirm dialog never calls fetch", async () => {
-    confirmSpy.mockReturnValue(false);
+  test("Cancel on the archive confirm never calls fetch and puts focus back on the button", async () => {
     const user = userEvent.setup();
     render(
       <ProposalCard
@@ -269,7 +265,9 @@ describe("ProposalCard — remove card (never a single click)", () => {
     );
 
     await user.click(screen.getByRole("button", { name: /Archive this venue/i }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(mockFetch).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /Archive this venue/i })).toHaveFocus();
   });
 
   test("a remove card never renders a plain 'Approve' button", () => {

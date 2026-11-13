@@ -502,8 +502,9 @@ ul.dscode{list-style:none;padding:0}.dscode code{font-size:13px;background:var(-
    prefixed pa- so they never collide with the public replicas (pfm-). Tailwind sizes written out: text-xs 12/16,
    text-sm 14/20, text-base 16/24, rounded = 4px, rounded-md 10px, rounded-lg 14px (globals.css @theme).
    globals.css @theme redefines spacing 5, 6, 8 and 10 as 24, 32, 48 and 64 pixels, so p-5 is 24 and w-10 is 64 here. "ring-2 ring-offset-2" is a 2px white gap then a 2px ring. sm: = 640px and up, lg: = 1024px and up, so the
-   360-pixel Phone view shows the phone layout. Proposed hovers (sage 100 in place of a grey) sit inside
-   @media (hover:hover) plus a .is-hover still, as the bottom bar does. */
+   360-pixel Phone view shows the phone layout. The admin as built in #926 (src/lib/adminCardStyles.ts,
+   src/components/formClasses.ts, AdminConfirm, AdminRowMenu, AdminSegmented): one 48-pixel button height, ink 400
+   text-box edges, fully round tags, sage 100 hovers inside @media (hover:hover) plus a .is-hover still. */
 .pa{font-family:'Public Sans',system-ui,-apple-system,sans-serif;font-feature-settings:"cv02","cv03","cv04","cv11";color:var(--color-ink-700);text-align:left;font-size:14px;line-height:20px;box-sizing:border-box;min-width:0}
 .pa *,.pa *::before,.pa *::after{box-sizing:border-box}
 /* WHY .pa :where(): the resets weigh one class, enough to beat the kit's bare a / h2 / button rules but no more
@@ -524,7 +525,6 @@ ul.dscode{list-style:none;padding:0}.dscode code{font-size:13px;background:var(-
 .pa-stand{display:grid;place-items:center;min-height:120px;border-radius:14px;border:1px solid var(--color-bone-200);background:var(--color-bone-100);color:var(--color-ink-500);font-size:13px;text-align:center;padding:12px}
 /* A state still fills its picture, so full-width buttons show full width; smaller pieces stay centred. */
 .dsd>div>.pa:not(.pa-cq){flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.pa-tagnew{display:inline-block;margin:0 0 8px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;border:1.5px dashed var(--wntx);color:var(--wntx)}
 
 /* AdminNav */
 .pa-head{border-bottom:1px solid var(--color-bone-200);background:#fff}
@@ -538,11 +538,10 @@ ul.dscode{list-style:none;padding:0}.dscode code{font-size:13px;background:var(-
 .pa-nl{display:inline-flex;align-items:center;white-space:nowrap;border-radius:10px;padding:8px 12px;min-height:48px;font-size:14px;line-height:20px;font-weight:500;color:var(--color-ink-500);transition:color .15s,background-color .15s}
 .pa-nl[aria-current="page"]{background:var(--color-sage-600);color:var(--color-bone-50)}
 @media (hover:hover){.pa-nl:not([aria-current]):hover{background:var(--color-sage-100)}}.pa-nl.is-hover{background:var(--color-sage-100)}
-.pa-nl.is-livehover{background:var(--color-bone-200)}
 .pa-pill{margin-left:6px;display:inline-flex;align-items:center;justify-content:center;min-width:18px;padding:0 6px;border-radius:9999px;background:var(--color-clay-100);color:var(--color-clay-700);font-size:12px;line-height:16px;font-weight:700}
-.pa-add{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 16px;border-radius:10px;background:var(--color-brand-orange);color:var(--color-brand-navy)!important;font-size:14px;line-height:20px;font-weight:700;transition:opacity .15s}
-@media (hover:hover){.pa-add:hover{opacity:.9}}.pa-add.is-hover{opacity:.9}
-.pa-add:focus-visible,.pa-add.is-focus{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--color-brand-orange)}
+.pa-add{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 16px;border-radius:10px;background:var(--color-brand-orange);color:var(--color-brand-navy)!important;font-size:14px;line-height:20px;font-weight:700}
+.pa-add:active{filter:brightness(.95)}
+.pa-add:focus-visible,.pa-add.is-focus{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--color-sage-500)}
 
 /* Sign-in (AdminLoginForm + login page) */
 .pa-login{background:var(--color-bone-50);padding:48px 16px;display:flex;justify-content:center}
@@ -552,7 +551,7 @@ ul.dscode{list-style:none;padding:0}.dscode code{font-size:13px;background:var(-
 @container pa (min-width:640px){.pa-lcard{padding:48px}}
 .pa-label{display:block;margin-bottom:4px;font-size:14px;line-height:20px;font-weight:500;color:var(--color-ink-700)}
 .pa-label .req{color:var(--color-danger)}.pa-label .hint{font-weight:400;color:var(--color-ink-400)}
-.pa-in{display:block;width:100%;border-radius:10px;border:1px solid var(--color-bone-300);padding:8px 12px;font-size:16px;line-height:24px;color:var(--color-ink-900);background:#fff}
+.pa-in{display:block;width:100%;min-height:48px;border-radius:10px;border:1px solid var(--color-ink-400);padding:8px 12px;font-size:16px;line-height:24px;color:var(--color-ink-900);background:#fff}
 @media (min-width:768px){.pa-in{font-size:14px;line-height:20px}}
 .pa-in::placeholder{color:var(--color-ink-400);opacity:1}
 .pa-in.bad{border-color:var(--color-danger)}
@@ -561,25 +560,26 @@ ul.dscode{list-style:none;padding:0}.dscode code{font-size:13px;background:var(-
 textarea.pa-in{resize:vertical}
 .pa-err{margin-top:4px;font-size:12px;line-height:16px;color:var(--color-danger)}
 .pa-bfull{display:block;width:100%;height:48px;border-radius:10px;background:var(--color-sage-600)!important;color:var(--color-bone-50)!important;font-size:16px!important;line-height:24px;font-weight:600!important;transition:background-color .15s}
-.pa-bline{display:inline-flex;align-items:center;justify-content:center;width:100%;height:48px;border-radius:10px;border:1px solid var(--color-sage-500)!important;font-size:14px;font-weight:500;color:var(--color-sage-600)!important;transition:background-color .15s}
+.pa-bline{display:inline-flex;align-items:center;justify-content:center;width:100%;min-height:48px;padding:0 16px;border-radius:10px;border:1px solid var(--color-bone-300)!important;font-size:16px;line-height:24px;font-weight:500;color:var(--color-ink-700)!important;transition:background-color .15s}
 @media (hover:hover){.pa-bline:not(:disabled):hover{background:var(--color-sage-100)}}.pa-bline.is-hover{background:var(--color-sage-100)}
-.pa-bline.is-livehover{background:var(--color-sage-50)}
 .pa-or{display:flex;align-items:center;gap:12px;margin:24px 0;font-size:12px;line-height:16px;color:var(--color-ink-400)}.pa-or span{height:1px;flex:1;background:var(--color-bone-200)}
-.pa-tl{min-height:48px;font-size:14px;line-height:20px;font-weight:500;color:var(--color-sage-700)!important;text-decoration:underline!important;text-underline-offset:2px}
+.pa-tl{display:inline-flex;align-items:center;min-height:48px;font-size:14px;line-height:20px;font-weight:500;color:var(--color-sage-700)!important;text-decoration:underline!important;text-underline-offset:2px}
 .pa-tl:disabled{cursor:not-allowed;text-decoration:none!important;opacity:.6}
 .pa-tl:focus-visible,.pa-tl.is-focus{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--color-sage-500);border-radius:2px}
-.pa-links{margin-top:16px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.pa-links{margin-top:16px;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
 
-/* Shared buttons (adminCardStyles.ts, formClasses.ts). Short = no min-h-12 (36 and 34 pixels); .tall = min-h-12. */
-.pa-bp,.pa-bs,.pa-bd{display:inline-flex;align-items:center;justify-content:center;border-radius:10px;font-size:14px;line-height:20px;transition:color .15s,background-color .15s;white-space:nowrap}
-.pa-bp{padding:8px 16px;background:var(--color-sage-600)!important;color:var(--color-bone-50)!important;font-weight:600!important}
-.pa-bp.big{min-height:48px;padding:0 16px;font-size:16px;line-height:24px}
-.pa-bs{padding:6px 12px;border:1px solid var(--color-bone-300)!important;font-weight:500!important;color:var(--color-ink-700)!important}
-.pa-bd{padding:6px 12px;border:1px solid var(--color-danger)!important;font-weight:500!important;color:var(--color-danger)!important}
-.pa-bp.tall,.pa-bs.tall,.pa-bd.tall{min-height:48px}.pa-bs.tall.wide4,.pa-bd.tall.wide4{padding:0 16px}
-.pa-bp:disabled,.pa-bs:disabled,.pa-bd:disabled{opacity:.5;cursor:not-allowed}.pa-bfull:disabled,.pa-bp.big:disabled{opacity:.6;cursor:not-allowed}
+/* Shared buttons (adminCardStyles.ts primaryButtonClass, secondaryButtonClass, dangerButtonClass): one height, 48
+   (min-h-12), 8 by 16 padding, centred words that may wrap on a narrow phone. .big = formClasses.ts's 16-pixel form
+   buttons (ADMIN_PRIMARY_BUTTON, ADMIN_SECONDARY_BUTTON). */
+.pa-bp,.pa-bs,.pa-bd{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:8px 16px;border-radius:10px;font-size:14px;line-height:20px;text-align:center;transition:color .15s,background-color .15s}
+.pa-bp{background:var(--color-sage-600)!important;color:var(--color-bone-50)!important;font-weight:600!important}
+.pa-bp.big,.pa-bs.big{padding:0 16px;font-size:16px;line-height:24px}
+.pa-bs{border:1px solid var(--color-bone-300)!important;font-weight:500!important;color:var(--color-ink-700)!important}
+.pa-bd{border:1px solid var(--color-danger)!important;font-weight:500!important;color:var(--color-danger)!important}
+.pa-bp:active,.pa-bs:active,.pa-bd:active,.pa-bfull:active{filter:brightness(.95)}
+.pa-bp:disabled,.pa-bs:disabled,.pa-bd:disabled{opacity:.5;cursor:not-allowed}.pa-bfull:disabled,.pa-bp.big:disabled{opacity:.5;cursor:not-allowed}
 @media (hover:hover){.pa-bp:not(:disabled):hover,.pa-bfull:not(:disabled):hover{background:var(--color-sage-700)!important}.pa-bs:not(:disabled):hover{background:var(--color-sage-100)}.pa-bd:not(:disabled):hover{background:var(--color-danger);color:var(--color-bone-50)!important}}
-.pa-bp.is-hover,.pa-bfull.is-hover{background:var(--color-sage-700)!important}.pa-bs.is-hover{background:var(--color-sage-100)}.pa-bs.is-livehover{background:var(--color-bone-100)}.pa-bd.is-hover{background:var(--color-danger);color:var(--color-bone-50)!important}
+.pa-bp.is-hover,.pa-bfull.is-hover{background:var(--color-sage-700)!important}.pa-bs.is-hover{background:var(--color-sage-100)}.pa-bd.is-hover{background:var(--color-danger);color:var(--color-bone-50)!important}
 .pa-bp:focus-visible,.pa-bp.is-focus,.pa-bs:focus-visible,.pa-bs.is-focus,.pa-bfull:focus-visible,.pa-bfull.is-focus,.pa-bline:focus-visible,.pa-bline.is-focus{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--color-sage-500)}
 .pa-bd:focus-visible,.pa-bd.is-focus{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--color-danger)}
 .pa-btns{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
@@ -592,17 +592,38 @@ textarea.pa-in{resize:vertical}
 .pa-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}.pa-row.atop{align-items:flex-start}
 .pa-strong{font-weight:600;color:var(--color-ink-700)}
 .pa-fl{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.025em;color:var(--color-ink-400)}
-.pa-tag{display:inline-flex;align-items:center;padding:2px 6px;border-radius:4px;font-size:12px;line-height:16px;font-weight:500}
-.pa-tag.round{border-radius:9999px;padding:2px 8px}
+/* tagClass(tone): one shape, fully round. calm t-sage, attention t-clay, quiet t-bone, neutral t-bone2, caution t-yel
+   (Draft on Places) and t-low (Low on Boxes, the same tone), danger t-empty. */
+.pa-tag{display:inline-flex;align-items:center;white-space:nowrap;padding:2px 8px;border-radius:9999px;font-size:12px;line-height:16px;font-weight:500}
 .t-sage{background:var(--color-sage-100);color:var(--color-sage-700)}.t-clay{background:var(--color-clay-100);color:var(--color-clay-700)}.t-bone{background:var(--color-bone-100);color:var(--color-ink-500)}
-.t-low{background:var(--color-clay-100);color:var(--color-warning)}.t-empty{background:var(--color-clay-100);color:var(--color-danger)}.t-yel{background:var(--color-brand-yellow);color:var(--color-ink-900)}.t-bone2{background:var(--color-bone-200);color:var(--color-ink-700)}
+.t-low{background:var(--color-brand-yellow);color:var(--color-ink-900)}.t-empty{background:var(--color-clay-100);color:var(--color-danger)}.t-yel{background:var(--color-brand-yellow);color:var(--color-ink-900)}.t-bone2{background:var(--color-bone-200);color:var(--color-ink-700)}
 .pa-meta{font-size:12px;line-height:16px;color:var(--color-ink-400)}
 .pa-name{font-size:16px;line-height:24px;font-weight:600;color:var(--color-ink-700)}
 .pa-small{font-size:12px;line-height:16px;color:var(--color-ink-500)}
 .pa-wait{max-width:672px;border-radius:14px;border:1px solid var(--color-clay-500);background:var(--color-clay-100);padding:12px 16px;color:var(--color-clay-700)}
 .pa-wait dl{margin-top:12px;display:flex;flex-direction:column;gap:12px}.pa-wait dt{font-weight:600}.pa-wait dd{margin-top:2px}
 .pa-wait s{text-decoration-thickness:1px}.pa-wait .by{display:block;font-size:12px;line-height:16px;color:var(--color-ink-500)}
-.pa-grp>h2{margin-bottom:8px;font-size:14px;line-height:20px;font-weight:600;color:var(--color-ink-700)}.pa-grp>ul{display:flex;flex-direction:column;gap:16px}
+.ds .pa .pa-grp>h3.wm{margin-bottom:12px}.pa-grp>ul{display:flex;flex-direction:column;gap:16px}
+/* failureBoxClass, failureLineClass, emptyStateClass, controlLabelClass, groupTitleClass (adminCardStyles.ts) */
+.pa-fail{border-radius:10px;border:1px solid var(--color-danger);background:#fff;padding:12px 16px}.pa-fail .t{color:var(--color-danger);font-weight:500}
+.pa-empty{display:flex;flex-direction:column;align-items:center;gap:12px;border-radius:14px;border:1px solid var(--color-bone-200);background:#fff;box-shadow:0 1px 2px rgba(26,24,23,.04),0 0 0 1px rgba(26,24,23,.05);padding:48px 16px;text-align:center;color:var(--color-ink-500)}
+.pa-clab{display:block;margin-bottom:4px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.025em;color:var(--color-ink-400)}
+.ds .pa h4.pa-gt{margin:0 0 4px;font-family:inherit;font-size:14px;line-height:20px;font-weight:600;letter-spacing:normal;text-transform:none;color:var(--color-ink-700)}
+/* AdminSegmented: a fieldset (.pa-segf) whose legend is hidden, or shown as the label (.pa-label, .pa-clab), then the
+   track (.pa-seg): full width on a phone, its own width from 640. The chosen part carries the sage 600 fill
+   (:has(:checked)), as the live thumb does. */
+.pa-segf{border:0;margin:0;padding:0;min-width:0}.pa-segf legend{padding:0}
+.pa-segf legend:not([class]){position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.pa-seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;padding:4px;border-radius:9999px;background:var(--color-bone-200);min-width:0}
+@container pa (min-width:640px){.pa-seg{display:inline-grid}}
+.pa-seg label{position:relative;display:flex;align-items:center;justify-content:center;height:40px;padding:0 16px;border-radius:9999px;white-space:nowrap;font-size:14px;line-height:20px;font-weight:600;color:var(--color-ink-700);cursor:pointer;transition:background-color .25s cubic-bezier(.32,.72,0,1),color .25s cubic-bezier(.32,.72,0,1)}
+.pa-seg label::before{content:"";position:absolute;inset:-4px 0}
+.pa-seg input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.pa-seg label:has(input:checked){background:var(--color-sage-600);color:var(--color-bone-50);box-shadow:0 2px 6px rgba(26,24,23,.25)}
+@media (hover:hover){.pa-seg label:not(:has(input:checked)):hover{background:var(--color-sage-100)}}.pa-seg label.is-hover{background:var(--color-sage-100)}
+.pa .pa-seg label:has(input:focus-visible),.pa .pa-seg label.is-focus{box-shadow:0 0 0 2px var(--color-bone-200),0 0 0 4px var(--color-sage-500)}
+/* The admin error page (admin/error.tsx) */
+.pa-errpage{background:var(--color-bone-50);padding:24px 16px}.pa-errpage h1{font-size:20px;line-height:28px}.pa-errpage p{margin-top:8px}.pa-errpage .r{margin-top:16px;display:flex;flex-wrap:wrap;align-items:center;gap:16px}
 
 /* Publish bar */
 .pa-pub{border-radius:14px;border:1px solid var(--color-bone-200);background:#fff;padding:16px}
@@ -610,6 +631,9 @@ textarea.pa-in{resize:vertical}
 @container pa (min-width:640px){.pa-pub{padding:16px 32px}.pa-pub .in{flex-direction:row;align-items:center;justify-content:space-between}}
 .pa-pub .ok{margin-top:12px;color:var(--color-sage-700)}.pa-pub .bad{margin-top:12px;color:var(--color-danger)}
 .pa-lnk{font-weight:500;text-decoration:underline!important;text-underline-offset:2px}
+/* Text links (linkClass, tapLinkClass): the sage 100 tint under the pointer, and a link that wraps draws its tint and ring around each line whole. */
+.pa-lnk,.pa-tl,.pa-tw .nm{transition:background-color .15s;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+@media (hover:hover){.pa-lnk:hover,.pa-tl:not(:disabled):hover,.pa-tw .nm:hover{background:var(--color-sage-100)}}
 .pa-bot{border-radius:14px;border:1px solid var(--color-bone-200);background:#fff;padding:12px 16px;color:var(--color-ink-700)}
 .pa-bot.stuck{border-color:var(--color-danger);color:var(--color-danger)}
 @container pa (min-width:640px){.pa-bot{padding:12px 32px}}
@@ -624,36 +648,40 @@ textarea.pa-in{resize:vertical}
 
 /* Form fields */
 .pa-form{max-width:672px;display:flex;flex-direction:column;gap:24px}
-.pa-cb{display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--color-ink-700)}.pa-cb input{width:16px;height:16px;margin:0;accent-color:var(--color-sage-500)}
-.pa-cb input:focus-visible{outline:none;box-shadow:0 0 0 2px var(--color-sage-500)}
-.pa-banner{border-radius:10px;border:1px solid var(--color-danger);background:#fff;padding:12px 16px;color:var(--color-danger)}.pa-banner .t{font-weight:500}
-.pa-reload{margin-top:8px;display:inline-flex;align-items:center;min-height:48px;padding:0 16px;border-radius:10px;border:1px solid var(--color-danger)!important;background:#fff!important;color:var(--color-danger)!important;font-size:14px;font-weight:500}
-@media (hover:hover){.pa-reload:hover{background:var(--color-bone-100)!important}}
-.pa-reload:focus-visible{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--color-sage-500)}
-.pa-savepair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:8px}.pa-savepair .pa-bs{height:48px;font-size:16px;line-height:24px}
+.pa-cb{display:flex;align-items:center;gap:8px;min-height:48px;margin:0 -8px;padding:0 8px;border-radius:10px;cursor:pointer;font-size:14px;color:var(--color-ink-700);transition:background-color .15s}
+@media (hover:hover){.pa-cb:hover{background:var(--color-sage-100)}}.pa-cb.is-hover{background:var(--color-sage-100)}.pa-cb input{flex:none;width:20px;height:20px;margin:0;cursor:pointer;accent-color:var(--color-sage-600)}
+.pa-cb input:focus-visible,.pa-cb.is-focus input{outline:2px solid var(--color-sage-500);outline-offset:2px}.pa-cb.is-focus,.pa-seg label.is-focus{outline:0}
+.pa-banner{border-radius:10px;border:1px solid var(--color-danger);background:#fff;padding:12px 16px;color:var(--color-danger)}.pa-banner .t{font-weight:500}.pa-banner .pa-bd{margin-top:8px}
+.pa-savepair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:8px}.pa-savepair>*{width:100%}.pa-savepair .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.pa-savepair .two>*{width:100%}
 
 /* Lists and tables */
 .pa-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.pa-chip{display:inline-flex;align-items:center;border-radius:9999px;border:1px solid var(--color-bone-300)!important;padding:4px 12px!important;font-size:12px!important;line-height:16px;font-weight:500!important;color:var(--color-ink-500)!important;transition:background-color .15s}
-.pa-chip.on{border-color:var(--color-sage-500)!important;background:var(--color-sage-100);color:var(--color-sage-700)!important}
-.pa-fb{min-height:48px;border-radius:9999px;border:1px solid var(--color-bone-300)!important;padding:0 14px!important;font-size:14px!important;font-weight:500!important;background:#fff!important;color:var(--color-ink-700)!important;transition:background-color .15s}
+/* chipClass(on): Places and Boxes chips are one look now (.pa-chip with .on, .pa-fb with aria-pressed). */
+.pa-chip{display:inline-flex;align-items:center;min-height:48px;border-radius:9999px;border:1px solid var(--color-bone-300)!important;padding:0 14px!important;font-size:14px!important;line-height:20px;font-weight:500!important;background:#fff!important;color:var(--color-ink-700)!important;transition:background-color .15s}
+.pa-chip.on{border-color:var(--color-sage-500)!important;background:var(--color-sage-100)!important;color:var(--color-sage-700)!important}
+.pa-fb{display:inline-flex;align-items:center;min-height:48px;border-radius:9999px;border:1px solid var(--color-bone-300)!important;padding:0 14px!important;font-size:14px!important;font-weight:500!important;background:#fff!important;color:var(--color-ink-700)!important;transition:background-color .15s}
 .pa-fb[aria-pressed="true"]{border-color:var(--color-sage-500)!important;background:var(--color-sage-100)!important;color:var(--color-sage-700)!important}
 .pa-fb:disabled{cursor:not-allowed;opacity:.5}
 @media (hover:hover){.pa-chip:not(.on):hover,.pa-fb:not([aria-pressed="true"]):not(:disabled):hover{background:var(--color-sage-100)!important}}.pa-chip.is-hover,.pa-fb.is-hover{background:var(--color-sage-100)!important}
-.pa-chip.is-livehover,.pa-fb.is-livehover{background:var(--color-bone-100)!important}
 .pa-chip:focus-visible,.pa-fb:focus-visible,.pa-chip.is-focus,.pa-fb.is-focus{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--color-sage-500)}
 .pa-key{display:flex;flex-direction:column;gap:6px;border-radius:14px;border:1px solid var(--color-bone-200);background:#fff;padding:12px 16px;font-size:12px;line-height:16px;color:var(--color-ink-500)}.pa-key>div{display:flex;align-items:center;gap:6px}
 @container pa (min-width:640px){.pa-key{flex-direction:row;flex-wrap:wrap;column-gap:24px}}
 /* WHY position:relative: the hidden "Edit" heading (.sr, absolute) otherwise escapes the scroll box and pushed the whole
-   360-pixel page sideways. The live EventsList has no positioned parent either: reported, not checked on the site. */
+   360-pixel page sideways. The live tableWrapClass is relative for the same reason. */
 .pa-tw{position:relative;overflow-x:auto;border-radius:14px;border:1px solid var(--color-bone-200);background:#fff}.pa-tw.el{box-shadow:0 1px 2px rgba(26,24,23,.04),0 0 0 1px rgba(26,24,23,.05)}
 .pa-tw table{width:100%;border-collapse:collapse;text-align:left;font-size:14px;line-height:20px}
 .pa-tw th{padding:12px 16px;font-weight:500}.pa-tw td{padding:12px 16px}
-.pa-tw thead tr{border-bottom:1px solid var(--color-bone-200)}.pa-tw thead.cap tr{font-size:11px;text-transform:uppercase;letter-spacing:.025em;color:var(--color-ink-400)}.pa-tw thead.cap.xs tr{font-size:12px;line-height:16px}.pa-tw thead.plain{color:var(--color-ink-500)}
-.pa-tw tbody tr{border-bottom:1px solid var(--color-bone-100)}.pa-tw tbody.b2 tr{border-bottom-color:var(--color-bone-200)}.pa-tw tbody tr:last-child{border-bottom:0}
-@media (hover:hover){.pa-tw tbody.hov tr:hover{background:var(--color-sage-100)}}.pa-tw tbody tr.is-hover{background:var(--color-sage-100)}.pa-tw tbody tr.is-livehover{background:var(--color-bone-100)}
+/* The three tables share one look (tableHeadRowClass, tableRowClass, tableLinkRowClass): 11-pixel ink 400 capital
+   headings over a bone 200 line, bone 200 row lines, and the sage 100 tint only on a row that links somewhere (.hov). */
+.pa-tw thead tr{border-bottom:1px solid var(--color-bone-200);font-size:11px;text-transform:uppercase;letter-spacing:.025em;color:var(--color-ink-400)}
+.pa-tw tbody tr{border-bottom:1px solid var(--color-bone-200);transition:background-color .15s}.pa-tw tbody tr:last-child{border-bottom:0}
+@media (hover:hover){.pa-tw tbody.hov tr:hover{background:var(--color-sage-100)}}.pa-tw tbody tr.is-hover{background:var(--color-sage-100)}
+/* The Places category words (inline colors, like CategoryLabel) turn ink 700 on a tinted row: no category color, and not the ink 400 dots, reads on sage 100. */
+.pa-cat span{transition:color .15s}
+@media (hover:hover){.pa-tw tbody.hov tr:hover .pa-cat span{color:var(--color-ink-700)!important}}.pa-tw tbody tr.is-hover .pa-cat span{color:var(--color-ink-700)!important}
+.pa-tw .nw{white-space:nowrap}
 .pa-tw .nm{font-weight:500;color:var(--color-sage-700)!important;text-decoration:underline!important;text-underline-offset:2px;border-radius:4px}
-.pa-tw .nm:focus-visible,.pa-tw .nm.is-focus{outline:none;box-shadow:0 0 0 2px var(--color-sage-500)}
+.pa-tw .nm:focus-visible,.pa-tw .nm.is-focus{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--color-sage-500)}
 .pa-tw .m5{color:var(--color-ink-500)}.pa-tw .m9{font-weight:500;color:var(--color-ink-900)}
 .pa-ctl{display:flex;flex-direction:column;gap:4px;flex:1}
 .pa-ctlrow{display:flex;flex-direction:column;gap:12px}
@@ -665,20 +693,25 @@ textarea.pa-in{resize:vertical}
 @container pa (min-width:640px){.pa-esub .in{flex-direction:row}}
 .pa-esub h4{font-size:16px;line-height:24px;font-weight:600;color:var(--color-ink-900)}.pa-esub .b9{font-weight:500;color:var(--color-ink-900)}
 .pa-lab2{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-ink-400)}
-.pa-bs.ev{min-height:48px;padding:0 16px;background:#fff}
-/* Three-dot menu, ruling version: the kit's .dots/.menu (mock.js opens it) in PFM sizes and the sage 100 hover. */
+.pa-esub .top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+/* Three-dot menu (AdminRowMenu): the kit's .dots/.menu (mock.js opens it) in PFM sizes and the sage 100 hover. */
 .pa-dotw{position:relative;flex:none;align-self:flex-start;margin-left:auto}
 .pa .pa-dots{width:48px;height:48px;border-radius:10px;font-size:22px;color:var(--color-ink-500)}
 @media (hover:hover){.pa .pa-dots:hover{background:var(--color-sage-100);color:var(--color-ink-700)}}.pa .pa-dots[aria-expanded=true]{background:var(--color-sage-100);color:var(--color-ink-700)}
 .pa .pa-dots:focus-visible{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--color-sage-500)}
-.pa-dotw .menu{right:0;top:52px;border-color:var(--color-bone-200);border-radius:14px}
-.pa .menu button{min-height:48px;color:var(--color-ink-700)}.pa .menu .dng{color:var(--color-danger)}.pa .menu hr{border-top-color:var(--color-bone-200)}
-@media (hover:hover){.pa .menu button:hover{background:var(--color-sage-100)}}
+.pa-dotw .menu{right:0;top:52px;min-width:200px;padding:4px 0;border-color:var(--color-bone-200);border-radius:14px;box-shadow:0 4px 12px rgba(26,24,23,.06),0 0 0 1px rgba(26,24,23,.06)}
+.pa .menu button{min-height:48px;padding:8px 16px;border-radius:0;color:var(--color-ink-700)}.pa .menu hr{margin:0}.pa .menu .dng{color:var(--color-danger)}.pa .menu hr{border-top-color:var(--color-bone-200)}
+@media (hover:hover){.pa .menu button:hover{background:var(--color-sage-100)}}.pa .menu button.is-hover{background:var(--color-sage-100)}
+/* A choice reached by keyboard: the fill plus an inset sage 500 ring, so focus never looks like hover. */
+.pa .menu button:focus-visible,.pa .menu button.is-focus{outline:none;background:var(--color-sage-100);box-shadow:inset 0 0 0 2px var(--color-sage-500)}
+/* A table's title row: the section title, its one action at the right (wraps under it on a narrow phone). */
+.pa-titlerow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+/* The Cancel event step in the confirm's look: .pa-confirm's edge and corners, a fieldset with its legend on the edge. */
+.pa-cstep{margin:0;min-width:0}.pa-cstep legend{padding:0 4px;margin-bottom:0}
 
 /* Dashboard numbers */
 .pa-sec{border-radius:14px;border:1px solid var(--color-bone-200);background:#fff;padding:16px;box-shadow:0 1px 2px rgba(26,24,23,.04),0 0 0 1px rgba(26,24,23,.05)}
 @container pa (min-width:640px){.pa-sec{padding:24px}}
-.pa-sec>h2{font-size:16px;line-height:24px}
 /* WHY: the kit styles every h3 on these pages as a small grey capital label (.ds h3); the replicas' h3s are the
    admin's own text-sm medium ink-700 (or the wordmark), so put them back. */
 .ds .pa h3{margin:0;font-family:inherit;font-size:14px;line-height:20px;font-weight:500;letter-spacing:normal;text-transform:none;color:var(--color-ink-700)}
@@ -687,15 +720,14 @@ textarea.pa-in{resize:vertical}
 @container pa (min-width:640px){.pa-kgrid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .pa-kpi{border-radius:14px;border:1px solid var(--color-bone-200);background:#fff;padding:16px;box-shadow:0 1px 2px rgba(26,24,23,.04),0 0 0 1px rgba(26,24,23,.05)}
 .pa-kpi .l{font-size:12px;line-height:16px;font-weight:500;text-transform:uppercase;letter-spacing:.025em;color:var(--color-ink-500)}
-.pa-kpi .v{margin-top:4px;display:flex;align-items:baseline;gap:8px}.pa-kpi .n{font-size:24px;line-height:32px;font-weight:600;color:var(--color-ink-900)}
+.pa-kpi{min-width:0;display:flex;flex-direction:column}.pa-kpi .v{margin-top:auto;padding-top:4px;display:flex;flex-wrap:wrap;align-items:baseline;column-gap:8px}.pa-kpi .n{font-size:24px;line-height:32px;font-weight:600;color:var(--color-ink-900)}
 .pa-kpi .ab{margin-right:4px;font-size:14px;font-weight:400;color:var(--color-ink-500)}
 .pa-kpi .d{font-size:12px;line-height:16px;font-weight:500}.pa-kpi .d.up{color:var(--color-sage-700)}.pa-kpi .d.down{color:var(--color-danger)}.pa-kpi .d.flat{color:var(--color-ink-500);font-weight:400}
 .pa-kpi svg{display:block;margin-top:4px;color:var(--color-sage-500)}
 .pa-needs{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
 @container pa (min-width:640px){.pa-needs{grid-template-columns:repeat(2,minmax(0,1fr))}}@container pa (min-width:1024px){.pa-needs{grid-template-columns:repeat(4,minmax(0,1fr))}}
-.pa-need{display:flex;min-height:44px;flex-direction:column;gap:4px;border-radius:14px;border:1px solid var(--color-bone-200);background:#fff;padding:16px;box-shadow:0 1px 2px rgba(26,24,23,.04),0 0 0 1px rgba(26,24,23,.05);transition:background-color .15s}
-@media (hover:hover){.pa-need:hover{background:var(--color-sage-100)}}.pa-need.is-hover{background:var(--color-sage-100)}.pa-need.is-livehover{background:var(--color-bone-100)}
-.pa-need.is-focus{outline:-webkit-focus-ring-color auto 1px}
+.pa-need{display:flex;min-height:48px;flex-direction:column;gap:4px;border-radius:14px;border:1px solid var(--color-bone-200);background:#fff;padding:16px;box-shadow:0 1px 2px rgba(26,24,23,.04),0 0 0 1px rgba(26,24,23,.05);transition:background-color .15s}
+@media (hover:hover){.pa-need:hover{background:var(--color-sage-100)}}.pa-need.is-hover{background:var(--color-sage-100)}
 .pa-need .l{font-size:12px;line-height:16px;font-weight:500;text-transform:uppercase;letter-spacing:.025em;color:var(--color-ink-500)}
 .pa-need .n{font-size:24px;line-height:32px;font-weight:600;color:var(--color-ink-900)}.pa-need .n.zero{color:var(--color-ink-500)}.pa-need .x{font-size:12px;line-height:16px;color:var(--color-ink-500)}
 .pa-bars{display:flex;flex-direction:column;gap:8px}.pa-bars li{display:flex;align-items:center;gap:8px}
@@ -708,14 +740,14 @@ textarea.pa-in{resize:vertical}
 .pa-weeks span{font-size:10px;line-height:14px;color:var(--color-ink-400);white-space:nowrap}
 .pa-legend{margin-top:12px;display:flex;align-items:center;gap:16px;font-size:12px;line-height:16px;color:var(--color-ink-500)}.pa-legend span{display:flex;align-items:center;gap:6px}.pa-legend i{width:10px;height:10px;border-radius:2px}
 
-/* Archive confirm */
-.pa-danger{max-width:672px;border-top:1px solid var(--color-bone-200);padding-top:24px}.pa-danger>h2{margin-bottom:8px;font-size:14px;line-height:20px;font-weight:600;color:var(--color-ink-700)}
-.pa-confirm{border-radius:10px;border:1px solid var(--color-danger);background:#fff;padding:16px;display:flex;flex-direction:column;gap:8px}
-.pa-confirm .t{font-size:16px;line-height:24px;font-weight:600;color:var(--color-ink-900)}
-.pa-confirm .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:4px}.pa-confirm .two>*{width:100%;white-space:normal;text-align:center}
+/* On-page confirm (AdminConfirm): red edge for removals, .ok (sage 500 edge) for Publish and Approve all */
+.pa-danger{max-width:672px;border-top:1px solid var(--color-bone-200);padding-top:24px}.ds .pa .pa-danger>h3.wm{margin-bottom:12px}
+.pa-confirm{border-radius:10px;border:1px solid var(--color-danger);background:#fff;padding:16px;display:flex;flex-direction:column;gap:8px}.pa-confirm.ok{border-color:var(--color-sage-500)}
+.pa-confirm .t{font-size:16px;line-height:24px;font-weight:500;color:var(--color-ink-900)}.pa-confirm .t+p{color:var(--color-ink-700)}.pa-confirm .er{color:var(--color-danger)}
+.pa-confirm .two{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin-top:4px}
+@container pa (min-width:640px){.pa-confirm .two{grid-template-columns:repeat(2,minmax(0,1fr))}}.pa-confirm .two>*{width:100%;white-space:normal;text-align:center}
 /* WHY: the display:flex rules above outrank the hidden attribute, so hidden pieces showed. */
 .pa [hidden]{display:none!important}
-.pa-native{border-radius:8px;background:#fff;box-shadow:0 8px 24px rgba(26,24,23,.25),0 0 0 1px rgba(26,24,23,.1);padding:14px;font:13px/1.4 system-ui,sans-serif;color:#222;max-width:320px}.pa-native b{display:block;margin-bottom:6px}.pa-native .nb{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.pa-native .nb span{padding:4px 14px;border-radius:6px;border:1px solid #bbb;background:#f2f2f2}.pa-native .nb span.ok{background:#3b6fd4;border-color:#3b6fd4;color:#fff}
 /* === end admin === */
 /* === pages-forms === */
 /* Components, pages and forms (pages/03b-components-pages.ts). Replicas of PageNav, SiteFooter, StyxCredit,

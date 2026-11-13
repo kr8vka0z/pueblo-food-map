@@ -101,9 +101,10 @@ describe("DashboardPage (/admin) — auth guard", () => {
     expect(screen.getByText("Blessing boxes")).toBeDefined();
     expect(screen.getByText("Map data health")).toBeDefined();
     expect(screen.getByText("No automated data refresh has run yet.")).toBeDefined();
-    // The period switch defaults to 30 days and links to the other two.
-    expect(screen.getByRole("link", { name: "7 days" }).getAttribute("href")).toBe("/admin?period=7d");
-    expect(screen.getByRole("link", { name: "90 days" }).getAttribute("href")).toBe("/admin?period=90d");
+    // The period slider (real radios, #926) defaults to 30 days and offers the other two.
+    expect(screen.getByRole("radio", { name: "30 days" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "7 days" })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: "90 days" })).not.toBeChecked();
     // No unpublished changes -> the Publish bar itself never renders.
     expect(screen.queryByText(/waiting to go live/i)).toBeNull();
     expect(forbidden).not.toHaveBeenCalled();
@@ -114,11 +115,11 @@ describe("DashboardPage (/admin) — auth guard", () => {
     mockGetCloudflareContext.mockResolvedValue({ env: { BETTER_AUTH_RP_ID: undefined } });
 
     const first = render(await DashboardPage({ searchParams: Promise.resolve({ period: "7d" }) }));
-    expect(screen.getByRole("link", { name: "7 days" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("radio", { name: "7 days" })).toBeChecked();
     first.unmount();
 
     render(await DashboardPage({ searchParams: Promise.resolve({ period: "not-a-real-period" }) }));
-    expect(screen.getByRole("link", { name: "30 days" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("radio", { name: "30 days" })).toBeChecked();
   });
 
   test("access denied -> fails closed: forbidden() fires and the denial is logged", async () => {

@@ -34,11 +34,13 @@
  * before (POST .../approve, applyApprovedProposal's isRestore branch).
  */
 
+import { busyButtonProps } from "@/components/formClasses";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { categoryLabels } from "@/lib/categories";
 import { formatLastVerified } from "@/lib/adminVenues";
+import { fieldLabel } from "@/lib/fieldLabels";
 import { describeIrregularSchedule, formatSlot } from "@/lib/hours";
 import { t } from "@/lib/i18n";
 import { safeUrl } from "@/lib/safeUrl";
@@ -54,34 +56,42 @@ import type {
   ReviewLane,
 } from "@/lib/adminProposals";
 import type { VenueLookup } from "@/lib/adminVenueLookup";
+import AdminConfirm, { AdminRejectStep, useAdminConfirm, useAdminStep } from "@/components/AdminConfirm";
 import {
   cardClass,
+  cardNameClass,
   dangerButtonClass,
+  failureLineClass,
   fieldLabelClass,
   formatSubmittedAt,
+  keepTogetherClass,
+  linkClass,
   primaryButtonClass,
   secondaryButtonClass,
+  tagClass,
+  type TagTone,
 } from "@/lib/adminCardStyles";
 
-// ─── Shared styling (reuses existing DESIGN.md tokens — no new ones) ───────
+// ─── Shared styling (tags go through tagClass; tones carry the meaning) ────
 
 // Exported: VenueListView.tsx reuses this SAME label map for its own source
 // display, rather than a second copy that could drift from this one.
-export const SOURCE_BADGE: Record<ProposalSourceValue, { label: string; className: string }> = {
-  osm: { label: "OpenStreetMap", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
-  plentiful: { label: "Plentiful", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
-  link_health: { label: "Broken link", className: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]" },
-  care_and_share: { label: "Care and Share", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
-  website: { label: "Venue website", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
-  usda_snap: { label: "USDA SNAP list", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
-  cdphe_wic: { label: "Colorado WIC list", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
+// calm = an ordinary data source; attention = needs a look (a broken link).
+export const SOURCE_BADGE: Record<ProposalSourceValue, { label: string; tone: TagTone }> = {
+  osm: { label: "OpenStreetMap", tone: "calm" },
+  plentiful: { label: "Plentiful", tone: "calm" },
+  link_health: { label: "Broken link", tone: "attention" },
+  care_and_share: { label: "Care and Share", tone: "calm" },
+  website: { label: "Venue website", tone: "calm" },
+  usda_snap: { label: "USDA SNAP list", tone: "calm" },
+  cdphe_wic: { label: "Colorado WIC list", tone: "calm" },
 };
 
-// Triage lanes (#543) — existing badge colour pairs only, no new tokens.
-export const LANE_BADGE: Record<ReviewLane, { label: string; className: string }> = {
-  needs_human: { label: "Needs a human", className: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]" },
-  likely_rename: { label: "Likely rename", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
-  likely_noise: { label: "Likely noise", className: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]" },
+// Triage lanes (#543): needs a look, calm, or quiet.
+export const LANE_BADGE: Record<ReviewLane, { label: string; tone: TagTone }> = {
+  needs_human: { label: "Needs a human", tone: "attention" },
+  likely_rename: { label: "Likely rename", tone: "calm" },
+  likely_noise: { label: "Likely noise", tone: "quiet" },
 };
 
 const REMOVE_REASON_LABEL: Record<string, string> = {
@@ -123,26 +133,6 @@ const CHANGE_TYPE_LABEL: Record<ProposalChangeType, string> = {
   update: "Field update",
   remove: "Remove",
 };
-
-const FIELD_LABELS: Record<string, string> = {
-  name: "Name",
-  category: "Category",
-  lat: "Latitude",
-  lng: "Longitude",
-  address: "Address",
-  phone: "Phone",
-  url: "Website",
-  hours_weekly: "Hours",
-  hours_irregular: "Monthly hours",
-  notes: "Notes",
-  operator: "Operator",
-  last_verified: "Last verified",
-};
-
-// Exported for the same reuse reason as SOURCE_BADGE above.
-export function fieldLabel(field: string): string {
-  return FIELD_LABELS[field] ?? field;
-}
 
 function capitalizeDay(day: string): string {
   return day.charAt(0).toUpperCase() + day.slice(1);
@@ -201,15 +191,21 @@ export interface ProposalCardProps {
 
 export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
   const router = useRouter();
-  const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [rejectState, setRejectState] = useState<ActionState>({ status: "idle" });
+  // Focus goes to the reason box on open and back to the button on Cancel
+  // (#926); Escape does what Cancel does, except while the reject is being sent.
+  const { open: rejectOpen, openStep: openReject, closeStep: closeReject, triggerRef: rejectRef, fieldRef: reasonRef } =
+    useAdminStep({ busy: rejectState.status === "submitting", onCancel: cancelReject });
   const [approveState, setApproveState] = useState<ActionState>({ status: "idle" });
+  // The removal approve asks on the page first (#926 decision 7): nothing is
+  // posted until the confirm's own "Archive this venue" is pressed.
+  const { asking, ask, cancel, triggerRef } = useAdminConfirm();
 
   const { row } = proposal;
   const source = row.source as ProposalSourceValue;
   const changeType = row.change_type as ProposalChangeType;
-  const sourceBadge = SOURCE_BADGE[source] ?? { label: row.source, className: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]" };
+  const sourceBadge = SOURCE_BADGE[source] ?? { label: row.source, tone: "quiet" as const };
   const reasonFieldId = `proposal-reject-reason-${row.id}`;
 
   const afterName = !proposal.parseError && typeof proposal.diff.after?.name === "string" ? proposal.diff.after.name : undefined;
@@ -236,6 +232,10 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
   // One body for Approve and Reject: the two differ only in path, request
   // body, which state they drive and the failure sentence.
   async function act(path: "approve" | "reject", body: unknown, setState: (s: ActionState) => void, failMessage: string) {
+    // WHY both states: Approve and the Reject step each have their own, and
+    // both stay pressable while the other runs (#926), so one decision at a
+    // time is enforced here, not by the buttons.
+    if (approveState.status === "submitting" || rejectState.status === "submitting") return;
     setState({ status: "submitting" });
     try {
       const res = await postAction(path, body);
@@ -257,9 +257,14 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
     }
   }
 
-  async function handleApprove(confirmMessage?: string) {
-    if (confirmMessage && !window.confirm(confirmMessage)) return;
-    await act("approve", undefined, setApproveState, "Something went wrong. This wasn't applied. Try again.");
+  async function handleApprove(failMessage = "This change was not applied. Try again.") {
+    await act("approve", undefined, setApproveState, failMessage);
+  }
+
+  function cancelReject() {
+    setReason("");
+    setRejectState({ status: "idle" });
+    closeReject();
   }
 
   async function handleConfirmReject() {
@@ -267,22 +272,18 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
     // reason typed into the textarea just above — SubmissionCard.tsx's own
     // reject already sends { reason }; this card fell out of sync when it
     // was extracted from the old /admin/flags queue.
-    await act("reject", { reason }, setRejectState, "Something went wrong. This wasn't rejected. Try again.");
+    await act("reject", { reason }, setRejectState, "This suggestion was not rejected. Try again.");
   }
 
   return (
     <div className={cardClass}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${sourceBadge.className}`}>
-            {sourceBadge.label}
-          </span>
-          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-[var(--color-bone-100)] text-[var(--color-ink-500)]">
+          <span className={tagClass(sourceBadge.tone)}>{sourceBadge.label}</span>
+          <span className={tagClass("quiet")}>
             {isRestore ? "Restore" : rename ? "Rename / move" : CHANGE_TYPE_LABEL[changeType] ?? changeType}
           </span>
-          <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${laneBadge.className}`}>
-            {laneBadge.label}
-          </span>
+          <span className={tagClass(laneBadge.tone)}>{laneBadge.label}</span>
         </div>
         {/* created_at + run_id — a reviewer working a real queue needs to know
             whether a card is from last night's run or one from weeks ago. */}
@@ -301,22 +302,22 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
             need to scope queries to one column or the other rather than
             asserting on now-legitimately-duplicated text. */}
         <div data-testid="proposal-detail" className="min-w-0 flex-1">
-          <p className="text-base font-semibold text-[var(--color-ink-700)]">{venueName}</p>
+          <p className={cardNameClass}>{venueName}</p>
           {/* Address alongside the name — recognising the actual place, not just
               matching an id, is what lets an admin judge the change at all. */}
-          {venue?.address && <p className="text-xs text-[var(--color-ink-500)]">{venue.address}</p>}
+          {venue?.address && <p className="text-sm text-[var(--color-ink-500)]">{venue.address}</p>}
           <p className="text-xs text-[var(--color-ink-400)]">{row.target_venue_id}</p>
           {rename && (
             <p className="mt-2 text-sm text-[var(--color-ink-700)]">
-              {sourceBadge.label} stopped listing this place and started listing <span className="break-all">{rename.to_id}</span> at
-              the same spot or phone. Approving updates this venue in place — same page and link — with the new details below.
+              {sourceBadge.label} stopped listing this place and started listing <span className="[overflow-wrap:anywhere]">{rename.to_id}</span> at
+              the same spot or phone. Approving updates this venue in place, on the same page and link, with the new details below.
             </p>
           )}
           {summary && <p className="mt-2 text-xs text-[var(--color-ink-500)]">{summary}</p>}
 
           {proposal.parseError ? (
             <p className="mt-2 text-sm text-[var(--color-clay-700)]">
-              Couldn&apos;t read details for this proposal — the stored data may be malformed. You can still
+              Couldn&apos;t read details for this proposal. The stored data may be malformed. You can still
               reject it below.
             </p>
           ) : source === "link_health" ? (
@@ -353,85 +354,71 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
           <button
             type="button"
             onClick={() => handleApprove()}
-            disabled={approveState.status === "submitting"}
+            {...busyButtonProps(approveState.status === "submitting")}
             className={primaryButtonClass}
           >
             {approveState.status === "submitting" ? "Applying…" : rename ? "Approve rename" : "Approve"}
           </button>
         )}
         {!proposal.parseError && changeType === "remove" && (
-          <button
-            type="button"
-            onClick={() =>
-              handleApprove(
-                `Remove "${venueName}" from the map? It will stop appearing on the next publish, but its record is kept, not deleted, and this can be reviewed later.`,
-              )
-            }
-            disabled={approveState.status === "submitting"}
-            className={dangerButtonClass}
-          >
-            {approveState.status === "submitting" ? "Removing…" : "Archive this venue"}
-          </button>
+          <>
+            <button
+              ref={triggerRef}
+              type="button"
+              hidden={asking}
+              onClick={ask}
+              disabled={approveState.status === "submitting"}
+              className={dangerButtonClass}
+            >
+              Archive this venue
+            </button>
+            {asking && (
+              <div className="w-full">
+                <AdminConfirm
+                  title={`Archive ${venueName}?`}
+                  confirmLabel="Archive this venue"
+                  busyLabel="Archiving…"
+                  tone="danger"
+                  busy={approveState.status === "submitting"}
+                  error={approveState.status === "error" ? approveState.message : null}
+                  onConfirm={() => handleApprove("The place was not archived. Try again.")}
+                  onCancel={() => {
+                    setApproveState({ status: "idle" });
+                    cancel();
+                  }}
+                >
+                  It stops showing on the public map at the next publish. Its record is kept, not deleted.
+                </AdminConfirm>
+              </div>
+            )}
+          </>
         )}
-        {!rejectOpen && (
-          <button type="button" onClick={() => setRejectOpen(true)} className={secondaryButtonClass}>
-            Reject
-          </button>
-        )}
+        {/* Hidden while the archive confirm is open: one decision at a time. */}
+        <button ref={rejectRef} type="button" hidden={rejectOpen || asking} onClick={openReject} className={secondaryButtonClass}>
+          Reject
+        </button>
       </div>
 
-      {approveState.status === "error" && (
-        <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
+      {/* The removal's own failure shows inside its confirm instead. */}
+      {approveState.status === "error" && !asking && (
+        <p role="alert" className={`mt-2 ${failureLineClass}`}>
           {approveState.message}
         </p>
       )}
 
       {rejectOpen && (
-        <div className="mt-4 border-t border-[var(--color-bone-200)] pt-4">
-          <label htmlFor={reasonFieldId} className={`${fieldLabelClass} mb-1 block`}>
-            Reason <span className="font-normal normal-case text-[var(--color-ink-400)]">(optional, for your own notes)</span>
-          </label>
-          <textarea
-            id={reasonFieldId}
-            rows={2}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            // text-base on mobile: iOS Safari auto-zooms on focus under 16px.
-            className={
-              "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm " +
-              "text-[var(--color-ink-900)] bg-white placeholder:text-[var(--color-ink-400)] " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-              "focus-visible:border-[var(--color-sage-500)]"
-            }
-          />
-          <div className="mt-2 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleConfirmReject}
-              disabled={rejectState.status === "submitting"}
-              className={dangerButtonClass}
-            >
-              {rejectState.status === "submitting" ? "Rejecting…" : "Confirm reject"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setRejectOpen(false);
-                setReason("");
-                setRejectState({ status: "idle" });
-              }}
-              disabled={rejectState.status === "submitting"}
-              className={secondaryButtonClass}
-            >
-              Cancel
-            </button>
-          </div>
-          {rejectState.status === "error" && (
-            <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
-              {rejectState.message}
-            </p>
-          )}
-        </div>
+        <AdminRejectStep
+          id={reasonFieldId}
+          fieldRef={reasonRef}
+          reason={reason}
+          onReason={setReason}
+          busy={rejectState.status === "submitting"}
+          confirmLabel="Confirm reject"
+          busyLabel="Rejecting…"
+          onCancel={cancelReject}
+          onConfirm={handleConfirmReject}
+          error={rejectState.status === "error" ? rejectState.message : null}
+        />
       )}
     </div>
   );
@@ -450,19 +437,18 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
  * data comes from the exact same untrusted OSM/Plentiful sources. `phone`
  * is skipped when the value is the "(empty)" sentinel formatFieldValue
  * produces for a null/undefined/empty field — a `tel:(empty)` link would be
- * worse than no link. `break-all` on the url anchor lets a long link wrap
- * instead of blowing out the card width (the same reason VenueCard's own
- * distance readout uses a fixed-width font rather than letting layout
- * jitter — different fix, same "don't let one value's length break the
- * layout" concern).
+ * worse than no link. A web address may wrap anywhere (it has no spaces),
+ * so it never blows out the card width; overflow-wrap:anywhere, not
+ * break-all, so ordinary words beside it are not broken mid-word (#926).
+ * The phone value is kept whole when it fits (keepTogetherClass) but may
+ * wrap: the field is free text and can hold several numbers.
  */
 function renderFieldValue(field: string | undefined, formatted: string): React.ReactNode {
-  const linkClass = "break-all text-[var(--color-sage-700)] underline underline-offset-2";
   if (field === "url") {
     const href = safeUrl(formatted);
     if (href) {
       return (
-        <a href={href} target="_blank" rel="noopener noreferrer" className={linkClass}>
+        <a href={href} target="_blank" rel="noopener noreferrer" className={`${linkClass} [overflow-wrap:anywhere]`}>
           {formatted}
         </a>
       );
@@ -470,7 +456,7 @@ function renderFieldValue(field: string | undefined, formatted: string): React.R
   }
   if (field === "phone" && formatted !== "(empty)") {
     return (
-      <a href={`tel:${formatted}`} className={linkClass}>
+      <a href={`tel:${formatted}`} className={`${linkClass} ${keepTogetherClass}`}>
         {formatted}
       </a>
     );
@@ -515,7 +501,7 @@ function RemoveDetails({
     <div className="mt-2 space-y-1">
       {venue && <DetailRow label="Category" value={categoryLabels[venue.category as VenueCategory] ?? venue.category} />}
       <p className="text-sm text-[var(--color-ink-700)]">
-        {reason ?? <>{sourceLabel} no longer lists &ldquo;{name}&rdquo;.</>} Archiving keeps its record — it stops
+        {reason ?? <>{sourceLabel} no longer lists &ldquo;{name}&rdquo;.</>} Archiving keeps its record: it stops
         appearing on the public map but is never deleted.
       </p>
     </div>
@@ -568,8 +554,8 @@ function AddDetails({ diff, sourceLabel, isRestore }: { diff: ProposedDiff; sour
     <div className="mt-2 space-y-1">
       <p className="text-sm font-medium text-[var(--color-clay-700)]">
         {isRestore
-          ? `${sourceLabel} lists this place again — not currently shown on the map.`
-          : `Found by ${sourceLabel} — not currently on the map.`}
+          ? `${sourceLabel} lists this place again. It is not currently shown on the map.`
+          : `Found by ${sourceLabel}. Not currently on the map.`}
       </p>
       {after.address && <DetailRow label="Address" value={after.address} />}
       {categoryLabel && <DetailRow label="Category" value={categoryLabel} />}
@@ -607,7 +593,7 @@ function FieldDiff({ diff, sourceLabel }: { diff: ProposedDiff; sourceLabel: str
     return (
       <p className="mt-2 text-sm text-[var(--color-ink-500)]">
         Confirmed still present by {sourceLabel}
-        {verifiedAt ? ` on ${formatLastVerified(verifiedAt)}` : ""} — no other details changed.
+        {verifiedAt ? ` on ${formatLastVerified(verifiedAt)}` : ""}. No other details changed.
       </p>
     );
   }
@@ -688,7 +674,9 @@ function ProposalSourceNotes({ diff, showSummary }: { diff: ProposedDiff; showSu
           key={p.field}
           className="rounded-[var(--radius-md)] bg-[var(--color-clay-100)] px-2 py-1.5 text-sm text-[var(--color-clay-700)]"
         >
-          <span className="font-medium">The venue told us the {fieldLabel(p.field).toLowerCase()}</span> on{" "}
+          {/* The field's own label leads, as written ("Accepts SNAP", "Phone"), so the
+              sentence reads the same for every field (#926). */}
+          <span className="font-medium">{fieldLabel(p.field)}</span>: the venue told us this itself on{" "}
           {formatLastVerified(p.pinned_at.slice(0, 10))}
           {p.note ? ` (${p.note})` : ""}.
           {p.stale ? " That was over a year ago, so this change may be right; renew the pin if the venue confirms again." : " Approve only if you trust this source over the venue."}
@@ -868,7 +856,7 @@ function ProposalPreview({
 
   return (
     <div>
-      <p className={`${fieldLabelClass} mb-2`}>Preview — public map</p>
+      <p className={`${fieldLabelClass} mb-2`}>Preview on the public map</p>
       {previewVenue ? (
         <ul
           inert

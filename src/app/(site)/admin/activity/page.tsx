@@ -25,6 +25,10 @@ import {
 } from "@/lib/activityLog";
 import AdminNav from "@/components/AdminNav";
 import ActivityLog from "@/components/ActivityLog";
+import { pageBodyClass, pageTitleClass } from "@/lib/adminCardStyles";
+
+/** The filter fields the form sends; "until" is paging, not a filter. */
+const FILTER_KEYS = ["person", "type", "from", "to", "q"];
 
 function olderHref(filters: ActivityFilters, until: string): string {
   const params = new URLSearchParams();
@@ -47,7 +51,10 @@ export default async function ActivityPage({
   // Owner gate — checked before a single activity row is read.
   if (identity.isOwner !== true) notFound();
 
-  const filters = parseActivityFilters(searchParams ? await searchParams : {});
+  const params = searchParams ? await searchParams : {};
+  const filters = parseActivityFilters(params);
+  // Decided from the address, not by comparing with the clock-based default range.
+  const filtered = FILTER_KEYS.some((key) => [params[key]].flat().some(Boolean));
   const [page, people, navCounts] = await Promise.all([
     loadActivityPage(db, filters),
     loadActivityPeople(db),
@@ -59,13 +66,14 @@ export default async function ActivityPage({
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="activity" counts={navCounts} showActivity />
-      <div className="px-4 py-6 sm:px-6">
-        <h2 className="wordmark mx-auto mb-4 max-w-3xl text-lg text-[var(--color-ink-900)]">Activity</h2>
+      <div className={pageBodyClass}>
+        <h2 className={pageTitleClass}>Activity</h2>
         <ActivityLog
           days={days}
           filters={filters}
           people={people}
           olderHref={nextUntil ? olderHref(filters, nextUntil) : null}
+          filtered={filtered}
         />
       </div>
     </main>

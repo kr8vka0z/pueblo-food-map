@@ -18,12 +18,13 @@
  */
 
 import AdminLoginForm from "@/components/AdminLoginForm";
+import { adminNameClass } from "@/lib/adminCardStyles";
 
 export default function AdminLoginPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-[var(--color-bone-50)] px-4 py-12">
       <div className="w-full max-w-sm">
-        <h1 className="wordmark mb-6 text-center text-2xl text-[var(--color-ink-900)]">
+        <h1 className={`${adminNameClass} mb-6 text-center`}>
           Pueblo Food Map Admin
         </h1>
         <AdminLoginForm />

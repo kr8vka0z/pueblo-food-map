@@ -3,7 +3,7 @@
 // words (English, Spanish, where they show); one Don't. Built from the approved Components entries, which each
 // pattern links to. Every message is copied from src/lib/i18n.ts, i18n.es.ts or the component that holds it; a
 // live message that breaks a wording ruling is shown as it is and flagged. Made-up data only.
-// CSS: mock.css block "patterns-brand" (classes pb-), plus the admin block's pa- classes for the Archive confirm.
+// CSS: mock.css block "patterns-brand" (classes pb-), plus the admin block's pa- classes for the on-page confirm.
 import { dodont, dsSec, toc, type Page, type Status } from "../lib";
 
 /** One row of the words table: the live words, their Spanish twin ("" for admin, English only), where they show,
@@ -68,18 +68,22 @@ const adminLayout = pat({
   screens: ["Dashboard, Blessing Boxes, Places, Events, and Activity for the owner", "Add a venue, Edit a place, Add event, Edit event", "Sign-in has its own one-box page"],
   steps: [
     "<b>Admin menu</b> across the top: Pueblo Food Map Admin, Signed in as, then the tabs (Dashboard, Blessing Boxes, Places, Events, and Activity for the owner) with a count on any tab that has work waiting, and Add place at the end.",
-    "<b>Page title</b> in Fraunces, 20 pixels: Events, Add event, Edit Eastside Community Pantry. <b>No line under the title</b> (owner's ruling).",
+    "<b>Every page has a title</b> in Fraunces, 20 pixels: Places, Blessing Boxes, Events, Add event, Edit Eastside Community Pantry. Section titles are Fraunces 18, a small group heading Public Sans 14 semi-bold. <b>No line under the title</b> (owner's ruling).",
+    "<b>One page body:</b> 16 pixels at the sides on a phone, 32 from 640 wide, 24 between parts. A form page is one 672-pixel column, title included.",
     "<b>Summary boxes</b> under the title, such as To review and Waiting to publish. A box with nothing in it is hidden, not shown empty.",
-    "<b>The list or the form.</b> Forms stop at 672 pixels wide.",
+    "<b>The list or the form.</b>",
     "<b>The Publish bar</b> on Places and the Dashboard, when saved changes are waiting to go on the public map.",
   ],
   example: `<div class="pb-adm"><div class="pb-admtop"><b>Pueblo Food Map Admin</b><small>Signed in as dana@example.org</small><div class="tabs"><span class="on">Places <i>12</i></span><span>Events</span><span>Add place</span></div></div><div class="pb-admbody"><b class="pb-h2">Edit Eastside Community Pantry</b><div class="pb-box">Waiting to publish: 2 changes</div>${field("Name", "Eastside Community Pantry")}</div></div>`,
   wordsNote: "The admin is in English only.",
   words: [
-    ["Pueblo Food Map Admin", "", "Top of every admin page (AdminNav.tsx:119)"],
+    ["Pueblo Food Map Admin", "", "Top of every admin page, its one main heading (AdminNav.tsx)"],
     ["Signed in as dana@example.org", "", "Under it (the address is made up)"],
-    ["Edit Eastside Community Pantry", "", "A place's edit page title (venues/[id]/edit/page.tsx:369)"],
-    ["Add a venue", "", "The new place page title (venues/new/page.tsx:161)"],
+    ["Hi dana", "", "The Dashboard's title (admin/page.tsx; the name is made up)"],
+    ["Places · Blessing Boxes · Events · Activity", "", "The other list pages' titles"],
+    ["Edit Eastside Community Pantry", "", "A place's edit page title (venues/[id]/edit/page.tsx)"],
+    ["Add a venue", "", "The new place page title (venues/new/page.tsx)"],
+    ["This page didn't load", "", "When an admin page fails to load (admin/error.tsx)"],
   ],
   doIt: [`<div class="pb-adm"><div class="pb-admbody"><b class="pb-h2">Events</b><div class="pb-box">No events yet</div></div></div>`, "The title, then straight to the work."],
   dont: [`<div class="pb-adm"><div class="pb-admbody"><b class="pb-h2">Events</b><p class="pb-sub">View and manage all the events in the system.</p></div></div>`, "A line under the title that says nothing new (owner's ruling: no subtitle)."],
@@ -89,8 +93,8 @@ const adminLayout = pat({
 // ── Forms ───────────────────────────────────────────────────────────────────────────────────────────────────
 const savePair = (cancel: boolean) => `<div class="pb-save">${cancel ? outline("Cancel") : ""}${sage("Save changes", "w")}</div>`;
 const forms = pat({
-  id: "forms", name: "Forms", status: "changing",
-  statusNote: "What changes: Save changes on a place's edit page gets a Cancel beside it (owner's ruling: Cancel beside Save). The public forms stay as they are.",
+  id: "forms", name: "Forms", status: "built",
+  statusNote: "Live as is. Cancel sits beside Save on every admin form (#926, owner's ruling: Cancel beside Save). The public forms are as they were.",
   when: "Any time someone types more than one thing: a visitor telling us about a place, or staff editing one.",
   screens: ["Public: Suggest a place, Send us feedback, Report an issue, Share an event", "Admin: Add a venue, a place's edit page, Add event, Edit event"],
   steps: [
@@ -99,10 +103,10 @@ const forms = pat({
     "<b>The send button says what it sends:</b> Submit suggestion, Send feedback, Submit report, Send for review. While the are-you-human check runs it reads Verifying…; while sending, Sending…. It can't be pressed twice.",
     "<b>Sent:</b> the form is replaced by Thank you! and a line saying what happens next, with Back to map.",
     "<b>Failed:</b> a red box at the top, everything typed stays, and Try again sits under the send button.",
-    "<b>Admin:</b> Cancel beside Save changes (the ruling; live today Save changes stands alone). Cancel goes back to Places and saves nothing. Events already pair Save with Back to events.",
+    "<b>Admin:</b> Cancel beside Save on every form, a third of the row. It saves nothing and goes where Save would land: Places (or the To review list, when a place's form was opened from a review), or Events from the event form. While a save runs, Cancel is off.",
     "<b>Admin, someone else saved first:</b> the red box says so and offers Reload. Nothing typed is cleared until Reload is pressed.",
   ],
-  example: `<div class="pb-two-ex"><div class="pb-pg card">${field("Place name *", "", "Please enter a place name.")}${field("Your email *", "you@example.com")}${sage("Sending…", "w dim")}</div><div class="pb-pg card">${field("Name", "Eastside Community Pantry")}${savePair(true)}<small class="pb-cap">Admin, the ruling: Cancel beside Save</small></div></div>`,
+  example: `<div class="pb-two-ex"><div class="pb-pg card">${field("Place name *", "", "Please enter a place name.")}${field("Your email *", "you@example.com")}${sage("Sending…", "w dim")}</div><div class="pb-pg card">${field("Name", "Eastside Community Pantry")}${savePair(true)}<small class="pb-cap">Admin: Cancel beside Save</small></div></div>`,
   words: [
     ["Submit suggestion", "Enviar sugerencia", "Suggest a place, the send button (i18n.ts:261)"],
     ["Verifying…", "Verificando…", "Send button while the are-you-human check runs (i18n.ts:366)"],
@@ -110,13 +114,13 @@ const forms = pat({
     ["Thank you!", "¡Gracias!", "Replaces the form once it's sent (i18n.ts:265)"],
     ["Your suggestion has been submitted. We review all suggestions and will add verified places to the map.", "Tu sugerencia ha sido enviada. Revisamos todas las sugerencias y agregaremos los lugares verificados al mapa.", "Under Thank you! (i18n.ts:266)"],
     ["Your email is used only to follow up on your submission. It is never sold or shared.", "Tu correo solo se usa para darte seguimiento. Nunca lo vendemos ni compartimos.", "Under every email box (i18n.ts:549)"],
-    ["Save changes", "", "Admin, a place's edit page (AddVenueForm.tsx:1368); Add venue on a new one"],
+    ["Save changes", "", "Admin, a place's edit page (AddVenueForm.tsx); Add venue on a new one; Save draft and Publish on an event"],
     ["Saving…", "", "Admin save button while it saves"],
-    ["Cancel", "", "Beside Save changes. Not built yet: the ruling"],
+    ["Cancel", "", "Admin, beside the save buttons on every form"],
     ["Someone else changed this place since you opened it. Reload to see their changes.", "", "Admin, red box at the top, with Reload (api/admin/venues/[id]/route.ts:431)"],
   ],
   doIt: [`<div class="pb-pg card">${savePair(true)}</div>`, "Cancel beside Save, so leaving without saving is one plain tap."],
-  dont: [`<div class="pb-pg card">${savePair(false)}</div>`, "Save on its own, as on a place's edit page today. The only way out is the browser's back button."],
+  dont: [`<div class="pb-pg card">${savePair(false)}</div>`, "Save on its own. The only way out is the browser's back button (made-up example)."],
   see: [["Public form fields and buttons", "components-pages.html#forms"], ["Admin form fields and the save button", "components-admin.html#admin-forms"]],
 });
 
@@ -125,13 +129,13 @@ const errors = pat({
   id: "errors", name: "Errors", status: "built",
   statusNote: "Shown as it is live. Some live words break a wording ruling (vague, or a long dash); they are flagged in the table and listed for the owner, not rewritten here.",
   when: "Something stopped the job: a box is filled in wrong, a send or save failed, the map can't load.",
-  screens: ["Every public form and every admin form", "The map screen, when the map can't load", "Admin actions: publish, approve, archive, sign-in"],
+  screens: ["Every public form and every admin form", "The map screen, when the map can't load", "Admin actions: publish, approve, archive, sign-in; an admin page that fails to load"],
   steps: [
-    "<b>A box is wrong:</b> red edge, and a line under it saying what to put in. The keyboard moves to the first wrong box.",
+    "<b>A box is wrong:</b> red edge, and a line under it saying what to put in. The keyboard moves to the first wrong box. On the admin the edge stays red while the box has focus, and after a refused save the page scrolls that box to the middle of the screen (both admin forms; sign-in and Add host too).",
     "<b>A send or save failed:</b> a red box at the top of the form says it wasn't sent and offers Try again. Public forms also give an email address to write to. What was typed stays.",
     "<b>Too many sends:</b> say how long to wait, an hour.",
     "<b>Something can't work on this phone:</b> fall back and say so, not as an error. When the map can't load, the list shows instead with a plain line.",
-    "<b>Admin:</b> the red line says what did not happen (The venue was not saved), then Try again.",
+    "<b>Admin:</b> the red line says what did not happen (The place was not saved), then what to do. A problem with something typed, or a lookup that found nothing (No match found), is the small line under its box or button, like the field errors; an action on a card or list that failed is the larger red line. No admin message says Something went wrong. A page that fails to load shows the admin error page: nothing was changed, Try again, Go to the Dashboard.",
     "<b>Never a pop-up that fades</b> for a failure, and never a code.",
   ],
   example: `<div class="pb-pg card"><div class="pb-err"><b>Something went wrong</b><p>Your suggestion couldn't be sent. Please try again, or email us directly at suggestions@pueblofoodmap.com.</p></div>${field("Place name *", "Eastside Community Pantry")}${sage("Submit suggestion", "w")}${outline("Try again")}</div>`,
@@ -145,31 +149,34 @@ const errors = pat({
     ["Map unavailable", "Mapa no disponible", "Over the list when the map can't load (i18n.ts:534)"],
     ["The interactive map can't load on this device, so we're showing the list instead.", "El mapa interactivo no se puede cargar en este dispositivo, así que mostramos la lista.", "Under it (i18n.ts:535)"],
     ["Map needs a connection", "El mapa necesita conexión", "Offline, with The list still works. (i18n.ts:538)"],
-    ["Something went wrong. The venue was not saved. Try again.", "", "Admin, a place's form (AddVenueForm.tsx:661-662)", "vague first line"],
-    ["Something went wrong. The venue was not removed. Try again.", "", "Admin, under Remove from map (ArchiveVenueButton.tsx:91)", "vague first line"],
-    ["Couldn't load events. Check your connection and try again.", "", "Admin, Events, with Retry (EventsList.tsx:63-64)"],
-    ["Couldn't reach GitHub to publish. Nothing was changed — try again in a moment.", "", "Admin, Publish failed (PublishPanel.tsx:135)", "long dash"],
-    ["Something went wrong publishing. Nothing was changed — try again in a moment.", "", "Admin, Publish failed for another reason (PublishPanel.tsx:146)", "vague, and a long dash"],
-    ["Something went wrong. Try again.", "", "Admin sign-in (AdminLoginForm.tsx:67) and shared events (EventSubmissionsList.tsx:51, :53)", "vague: no reason, no other way"],
-    ["More than 200 date-only proposals selected — narrow the filter and retry.", "", "Admin, Approve all date-only updates (ToReviewSummaryBox.tsx:103)", "long dash"],
-    ["Something went wrong. Some proposals may already be approved — refresh before retrying.", "", "Admin, the same, failed partway (ToReviewSummaryBox.tsx:112)", "long dash"],
+    ["The place was not saved. Try again.", "", "Admin, a place's form (AddVenueForm.tsx)"],
+    ["The place was not removed. Try again.", "", "Admin, in the Remove from map confirm (ArchiveVenueButton.tsx)"],
+    ["Couldn't load events. Check your connection and try again.", "", "Admin, Events, with Retry (EventsList.tsx)"],
+    ["Couldn't reach GitHub to publish. Nothing was changed. Try again in a moment.", "", "Admin, Publish failed before anything changed (PublishPanel.tsx)"],
+    ["The publish didn't finish, so we can't tell whether the map changed. Reload the page to see what's still waiting, then try again.", "", "Admin, Publish failed with a server error or a lost connection (PublishPanel.tsx)"],
+    ["The code was not sent. Try again.", "", "Admin sign-in (AdminLoginForm.tsx)"],
+    ["The submission was not dismissed. Try again.", "", "Admin, an event the public sent in (EventSubmissionsList.tsx)"],
+    ["Nothing was approved: more than 200 date-only proposals were selected. Narrow the filter and try again.", "", "Admin, Approve all date-only updates (ToReviewSummaryBox.tsx)"],
+    ["Some updates may not have been approved. Refresh the page to see which, then try again.", "", "Admin, the same, failed partway (ToReviewSummaryBox.tsx)"],
+    ["This page didn't load", "", "Admin, a page that failed to load (admin/error.tsx), then Nothing was changed. Try again, or go back to the Dashboard."],
   ],
   doIt: [`<div class="pb-pg card">${field("Your email *", "dana@example", "Please enter a valid email address.")}</div>`, "Under the box, say what to put in."],
   dont: [`<div class="pb-toast">Error 400</div>`, "A code in a pop-up that fades. Nobody can act on it (made-up example)."],
-  see: [["Public form fields and buttons", "components-pages.html#forms"], ["Admin form fields", "components-admin.html#admin-forms"], ["Archive confirm", "components-admin.html#admin-archive"]],
+  see: [["Public form fields and buttons", "components-pages.html#forms"], ["Admin form fields", "components-admin.html#admin-forms"], ["On-page confirm", "components-admin.html#admin-confirm"]],
 });
 
 // ── Empty states ────────────────────────────────────────────────────────────────────────────────────────────
 const empty = pat({
   id: "empty", name: "Empty states", status: "built",
   when: "A list has nothing in it, because nothing is there yet or because a search or a filter found nothing.",
-  screens: ["Saved places, the list view, the search box, the events list", "Admin: Events, Places, Blessing Boxes and the Dashboard charts"],
+  screens: ["Saved places, the list view, the search box, the events list", "Admin: Events, Places, Blessing Boxes, Activity, a box's check-ins and host emails, and the Dashboard charts"],
   steps: [
     "<b>Say what's missing</b> in a short line: No saved places yet.",
     "<b>Say how to fill it</b>, or give the one button that does: Tap the star on any place to save it.",
     "<b>After a search or a filter,</b> offer the way out: Clear filters, or a row of categories to try.",
     "A 28-pixel line icon in ink 400 above the words at most. No pictures.",
     "<b>Admin summary boxes</b> with nothing in them hide instead of showing empty.",
+    "<b>Admin lists</b> show one shared empty box, lifted like the cards; after a filter, Clear filters sits in it. Activity is the exception: its filter form always holds the page's one Clear filters, so its empty box has only its line.",
   ],
   example: `<div class="pb-two-ex"><div class="pb-empty"><span class="pb-star" aria-hidden="true">☆</span><b>No saved places yet</b><p>Tap the star on any place to save it. It will show up here.</p></div><div class="pb-empty"><p>No places match your filters.</p>${outline("Clear filters")}</div></div>`,
   words: [
@@ -180,9 +187,12 @@ const empty = pat({
     ["No matches for \"zzq\"", "Sin resultados para \"zzq\"", "Under the search box (i18n.ts:137; the search word is made up)"],
     ["Try a category instead:", "Prueba una categoría:", "Above the category row under it (i18n.ts:138)"],
     ["No events coming up", "No hay eventos próximos", "The events list, with Show places again (i18n.ts:442, :446)"],
-    ["No events yet", "", "Admin, Events, with Add a one-day giveaway, a turkey drive or a pop-up distribution. and Add event (EventsList.tsx:84-86)"],
-    ["No venues match your search.", "", "Admin, Places (VenueListView.tsx:459)"],
-    ["No visitor data yet for this period.", "", "Admin, a Dashboard chart (admin/page.tsx:371)"],
+    ["No events yet.", "", "Admin, Events, with Add a one-day giveaway, a turkey drive or a pop-up distribution. and Add event (EventsList.tsx)"],
+    ["No places match your search or filters.", "", "Admin, Places after a filter, with Clear filters (VenueListView.tsx); No places yet. with none at all"],
+    ["No boxes match these filters.", "", "Admin, Blessing Boxes after a filter, with Clear filters (AllBoxesTable.tsx)"],
+    ["No activity matches these filters.", "", "Admin, Activity when a filter is set; Clear filters is in the filter form (ActivityLog.tsx)"],
+    ["No activity yet.", "", "Admin, Activity with no filter set (ActivityLog.tsx)"],
+    ["No visitor data yet for this period.", "", "Admin, a Dashboard chart (admin/page.tsx)"],
   ],
   doIt: [`<div class="pb-empty sm"><p>No places match your filters.</p>${outline("Clear filters")}</div>`, "Says why it's empty and gives the way out."],
   dont: [`<div class="pb-empty sm"><p>No results.</p></div>`, "Results of what? What now? (made-up example)"],
@@ -196,7 +206,7 @@ const waiting = pat({
   screens: ["The map screen while the map loads, and Near me while it locates", "Every send and save button", "A box card while its details load; the Share an event address and flyer checks"],
   steps: [
     "<b>The map loading:</b> a plain bone 100 block where the map will be, with Loading map… gently pulsing (still for anyone who turns motion off).",
-    "<b>A button that started something</b> fades, says what it's doing (Sending…, Saving…, Removing…) and can't be pressed twice.",
+    "<b>A button that started something</b> fades, says what it's doing (Sending…, Saving…, Removing…) and can't be pressed twice. On the admin it keeps the keyboard on it while it works (marked off, not switched off), so nobody is dropped back to the top of the page.",
     "<b>Near me while locating:</b> its icon becomes a turning spinner, it can't be pressed again, and a hidden line tells screen readers Locating…. Its word stays Near me.",
     "<b>A spinner only inside the control that started the wait.</b> Never one over the whole map, and no grey placeholder shapes.",
     "Words end in a real ellipsis (…), never three dots.",
@@ -209,8 +219,8 @@ const waiting = pat({
     ["Loading…", "Cargando…", "A box card while it loads (i18n.ts:768)"],
     ["Checking the address…", "Revisando la dirección…", "Share an event, the address box (i18n.ts:479)"],
     ["Adding your flyer…", "Agregando tu volante…", "Share an event, the flyer (i18n.ts:489)"],
-    ["Saving…", "", "Admin save buttons (AddVenueForm.tsx:1368, EventForm.tsx:666)"],
-    ["Approving…", "", "Admin, Approve all date-only updates (ToReviewSummaryBox.tsx:132)"],
+    ["Saving…", "", "Admin save buttons (AddVenueForm.tsx, EventForm.tsx)"],
+    ["Approving…", "", "Admin, Approve all date-only updates (ToReviewSummaryBox.tsx)"],
   ],
   doIt: [`<div class="pb-pg card">${sage("Sending…", "w dim")}</div>`, "The button says what it's doing and can't be pressed twice."],
   dont: [`<div class="pb-mapload big"><span class="pb-spin" aria-hidden="true"></span></div>`, "A spinner over the whole map, saying nothing (made-up example)."],
@@ -218,40 +228,46 @@ const waiting = pat({
 });
 
 // ── Confirming a risky action ───────────────────────────────────────────────────────────────────────────────
-// The ruling version is the approved Archive confirm (pages/03c-components-admin.ts, ruleConfirm), drawn with the
-// admin block's own pa- classes so it can't drift from that entry.
+// The live on-page confirm (AdminConfirm; pages/03c-components-admin.ts, confirmBox), drawn with the admin block's
+// own pa- classes so it can't drift from that entry.
 const ruleConfirm = `<div class="pa" style="width:100%"><div class="pa-confirm" role="group" aria-labelledby="pb-cf1"><p class="t" id="pb-cf1">Remove Eastside Community Pantry from the map?</p>
   <p>It will stop appearing on the next publish. Its record is kept, not deleted, and this can be reviewed later.</p>
-  <div class="two"><button type="button" class="pa-bs tall pa-ring">Cancel</button><button type="button" class="pa-bd tall pa-ring">Remove from map</button></div></div></div>`;
+  <div class="two"><button type="button" class="pa-bs pa-ring">Cancel</button><button type="button" class="pa-bd pa-ring">Remove from map</button></div></div></div>`;
 const confirm = pat({
-  id: "confirm", name: "Confirming a risky action", status: "changing",
-  statusNote: "What changes: Remove from map stops using the browser's own pop-up and asks in a box on the page, Cancel first (owner's ruling). The other places that still use the browser's pop-up are listed below as drift, not changed.",
+  id: "confirm", name: "Confirming a risky action", status: "built",
+  statusNote: "Live as is on the admin (#926): every risky admin action asks in a box on the page, Cancel first. The one browser pop-up left is on the public site, a box photo's report.",
   when: "The action changes what the public sees or can't be easily undone: taking a place off the map, publishing, hiding a photo.",
-  screens: ["Admin: Remove from map at the foot of a place's edit page (the ruling applies here now)", "Still the browser's pop-up (drift): a change card's Archive this venue, Publish, Approve all date-only updates, Archive event, Remove this flyer, and on the public site a box photo's report"],
+  screens: ["Admin, on the page: Remove from map, a change card's Archive this venue, Publish, Approve all date-only updates, Archive event, Remove this flyer", "Still the browser's pop-up (drift): on the public site, a box photo's report"],
   steps: [
     "The first tap <b>opens the confirm right where the button was</b>, on the page. Never the browser's pop-up.",
     "It <b>names the thing and says exactly what happens</b>, and what doesn't: it leaves the map; the record is kept.",
-    "Two buttons side by side, each half the row and 48 tall. <b>Cancel comes first</b>, so Enter on the first button never removes anything.",
-    "The risky button <b>names the action</b>: Remove from map, not Yes or OK.",
-    "While it works it reads Removing… and can't be pressed twice. If it fails, the red line says nothing was removed.",
+    "Two buttons, 48 tall: half the row each from 640 pixels wide, stacked full width on a phone. <b>Cancel comes first</b> (on top on a phone), so Enter on the first button never removes anything.",
+    "The risky button <b>names the action</b>: Remove from map, not Yes or OK. Removals are red; Publish and Approve all are green.",
+    "While it works it says what it's doing (Removing…) and can't be pressed twice, yet the keyboard stays on it. If it fails, the red line says what did not happen.",
+    "In a Reject, Remove photo or Decline step too, <b>Cancel comes first</b> and the red Confirm second; in the Cancel event step, Keep event first, then the red Confirm cancel event, in a box with the confirm's look. The Reject, Remove photo and Decline steps are one shared part (AdminRejectStep). Escape closes any of these steps unless its request is running, and Cancel, Keep event or Escape clears what was typed.",
   ],
   example: ruleConfirm,
   words: [
-    ["Remove Eastside Community Pantry from the map?", "", "The ruling box's question (the place is made up)"],
-    ["It will stop appearing on the next publish. Its record is kept, not deleted, and this can be reviewed later.", "", "Under it"],
-    ["Cancel", "", "The safe button, first"],
-    ["Remove from map", "", "The risky button, and the button that opens the box"],
-    ["Remove \"Eastside Community Pantry\" from the map? It will stop appearing on the next publish, but its record is kept, not deleted, and this can be reviewed later.", "", "Live today: the browser's pop-up (ArchiveVenueButton.tsx:58)"],
-    ["Remove \"Eastside Community Pantry\" from the map? It will stop appearing on the next publish, but its record is kept, not deleted, and this can be reviewed later.", "", "Drift: a change card's Archive this venue (ProposalCard.tsx:261, words at :367)"],
-    ["Publish 2 new places and 3 edited places to the public map? 1 place will be removed. This opens a change request that auto-merges.", "", "Drift: Publish (PublishPanel.tsx:156, words at :111-113; the numbers are made up)"],
-    ["Approve all 12 proposals that only update the last-verified date? Real changes are not included.", "", "Drift: Approve all date-only updates (ToReviewSummaryBox.tsx:77)"],
-    ["Archive this event? It leaves the map and the list of live events, and stays in the admin history.", "", "Drift: Archive event (EventForm.tsx:372)"],
-    ["Remove this flyer?", "", "Drift: an event's flyer (EventFlyerField.tsx:137)"],
-    ["Hide this photo and send it for review?", "¿Ocultar esta foto y enviarla para revisión?", "Drift, public: reporting a box photo (ReportPhotoButton.tsx:29, words at i18n.ts:879)"],
+    ["Remove Eastside Community Pantry from the map?", "", "Remove from map, a place's edit page (ArchiveVenueButton.tsx; the place is made up)"],
+    ["It will stop appearing on the next publish. Its record is kept, not deleted, and this can be reviewed later.", "", "Under it; then Cancel and Remove from map"],
+    ["It leaves the map right away. Its record is kept, not deleted, and this can be reviewed later.", "", "Under it instead, for a blessing box (boxes are live, no Publish)"],
+    ["This place is removed from the map.", "", "In place of the button once it is off the map, with no Danger zone heading"],
+    ["Archive Eastside Community Pantry?", "", "Archive this venue, a data change that removes a place (ProposalCard.tsx)"],
+    ["It stops showing on the public map at the next publish. Its record is kept, not deleted.", "", "Under it; then Cancel and Archive this venue"],
+    ["Publish 2 new places and 3 edited places to the public map?", "", "Publish (PublishPanel.tsx; the numbers are made up)"],
+    ["1 place will be removed. This opens a change request on GitHub that merges on its own.", "", "Under it (the first sentence only when places are removed); then Cancel and Publish, green"],
+    ["Approve all 12 date-only updates?", "", "Approve all on Places (ToReviewSummaryBox.tsx)"],
+    ["These only update the last-verified date. Real changes are not included.", "", "Under it; then Cancel and Approve 12 updates, green"],
+    ["Archive this event?", "", "Archive event, an event's edit page (EventForm.tsx)"],
+    ["It leaves the map and the list of live events, and stays in the admin history.", "", "Under it; then Cancel and Archive event"],
+    ["Remove this flyer?", "", "Remove, under an event's flyer (EventFlyerField.tsx)"],
+    ["The event stays. Only the picture is removed.", "", "Under it; then Cancel and Remove flyer"],
+    ["Cancel", "", "The safe button, always first"],
+    ["Hide this photo and send it for review?", "¿Ocultar esta foto y enviarla para revisión?", "Drift, public: reporting a box photo, still the browser's pop-up (ReportPhotoButton.tsx)"],
   ],
   doIt: [ruleConfirm.replace("pb-cf1", "pb-cf2").replace("pb-cf1", "pb-cf2"), "Name the place, say what happens, safe button first."],
-  dont: [`<div class="pa" style="width:100%"><div class="pa-confirm"><p class="t">Are you sure?</p><div class="two"><button type="button" class="pa-bd tall">Yes</button><button type="button" class="pa-bs tall">No</button></div></div></div>`, "Are you sure? Yes / No. Nobody knows what Yes does, and the risky button comes first."],
-  see: [["Archive confirm (ArchiveVenueButton)", "components-admin.html#admin-archive"], ["Change cards", "components-admin.html#admin-change"], ["Publish bar", "components-admin.html#admin-publish"]],
+  dont: [`<div class="pa" style="width:100%"><div class="pa-confirm"><p class="t">Are you sure?</p><div class="two"><button type="button" class="pa-bd">Yes</button><button type="button" class="pa-bs">No</button></div></div></div>`, "Are you sure? Yes / No. Nobody knows what Yes does, and the risky button comes first (made-up example)."],
+  see: [["On-page confirm (AdminConfirm)", "components-admin.html#admin-confirm"], ["Change cards", "components-admin.html#admin-change"], ["Publish bar", "components-admin.html#admin-publish"]],
 });
 
 // ── Picking several ─────────────────────────────────────────────────────────────────────────────────────────
@@ -433,7 +449,7 @@ export const pages: Page[] = [{
   blurb: "Jobs that repeat across the site, each with its exact words in English and Spanish: page layout, forms, errors, empty states, waiting, confirming, picking, search, finding food near me, directions, and the two languages.",
   changed: [
     "Twelve patterns, each in the same order: when it applies, the screens it covers, the steps, the exact words with their Spanish, one do and one don't, and the Components entries it is built from.",
-    "Two patterns change, both from your rulings: Forms (Cancel beside Save changes on a place's edit page) and Confirming a risky action (Remove from map asks on the page, Cancel first).",
+    "Both patterns that were changing are now built on the admin (#926): Forms (Cancel beside Save on every admin form) and Confirming a risky action (every risky admin action asks on the page, Cancel first). The admin's error and empty words were rewritten in the same work.",
   ],
   kept: [
     "Every message is the live one, copied from the site. Where it breaks a wording rule (a vague Something went wrong, or a long dash) it is shown as it is with a red Breaks a ruling note, not rewritten.",
@@ -442,8 +458,8 @@ export const pages: Page[] = [{
   ],
   check: [
     "Search and filter: the map's view isn't in the address, so a link can't bring back a search or filters. Fine as is, or should it be?",
-    "Confirming: five more admin actions and one public one still use the browser's pop-up. Should the on-page confirm reach them too?",
-    "Errors: the flagged messages. Rewrite them in a later round, or leave them?",
+    "Confirming: the admin has no browser pop-up left; the public photo report still uses one. Should the on-page confirm reach it too?",
+    "Errors: the flagged public messages. Rewrite them in a later round, or leave them?",
   ],
   html: `<div class="head"><h1>Patterns</h1></div>${toc(items)}${parts.join("")}`,
 }];

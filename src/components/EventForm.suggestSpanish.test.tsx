@@ -56,11 +56,15 @@ describe("Suggest Spanish", () => {
     fetchMock.mockReturnValue(new Promise((r) => (release = r)));
 
     await userEvent.click(suggestButton());
-    expect(suggestButton()).toBeDisabled();
+    // #926: the working button keeps focus (aria-disabled) and a second press sends nothing.
+    expect(suggestButton()).toHaveAttribute("aria-disabled", "true");
+    expect(suggestButton()).toHaveFocus();
+    await userEvent.click(suggestButton());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     fireEvent.change(field(/^Name \(Spanish\)/), { target: { value: "Escrito a mano" } });
     release(ok({ name_es: "Colecta de pavos" }));
 
-    await waitFor(() => expect(suggestButton()).not.toBeDisabled());
+    await waitFor(() => expect(suggestButton()).not.toHaveAttribute("aria-disabled"));
     expect(field(/^Name \(Spanish\)/).value).toBe("Escrito a mano");
   });
 

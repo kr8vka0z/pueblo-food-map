@@ -97,7 +97,8 @@ describe("BoxesPage (/admin/boxes) — auth guard", () => {
     render(await BoxesPage());
 
     expect(screen.getByText("admin@example.com")).toBeDefined();
-    expect(screen.getByText("Blessing boxes — 0 in service")).toBeDefined();
+    expect(screen.getByRole("heading", { level: 2, name: "Blessing Boxes" })).toBeDefined();
+    expect(screen.getByText("All boxes (0 in service)")).toBeDefined();
     expect(screen.getByText(/No box reports in the last 8 weeks/)).toBeDefined();
     expect(screen.getByText("No blessing boxes yet.")).toBeDefined();
     // #677: BoxesWaitingChips ("Waiting on you:") is gone — replaced by
@@ -117,7 +118,7 @@ describe("BoxesPage (/admin/boxes) — auth guard", () => {
 
     render(await BoxesPage());
 
-    expect(screen.getByText("Blessing boxes — 1 in service")).toBeDefined();
+    expect(screen.getByText("All boxes (1 in service)")).toBeDefined();
     expect(screen.getByText("Active Box")).toBeDefined();
     expect(screen.getByText("Removed Box")).toBeDefined();
   });

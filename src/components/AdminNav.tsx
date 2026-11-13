@@ -25,6 +25,8 @@
 
 import Link from "next/link";
 import type { AdminNavCounts } from "@/lib/adminNavCounts";
+import { adminNameClass, focusRingClass } from "@/lib/adminCardStyles";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 export type AdminActiveTab = "dashboard" | "boxes" | "places" | "events" | "activity";
 
@@ -93,7 +95,10 @@ const navLinkBase =
   "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 min-h-12";
 
 const navLinkActive = "bg-[var(--color-sage-600)] text-[var(--color-bone-50)]";
-const navLinkInactive = "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-200)]";
+const navLinkInactive = "text-[var(--color-ink-500)] hover:bg-[var(--color-sage-100)]";
+// The loading skeleton's tabs: nothing lit, nothing changes under the pointer
+// (the design page's admin menu: "nothing lit" while the next page loads).
+const navLinkSkeleton = "text-[var(--color-ink-500)]";
 
 const pillClass =
   "ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-[var(--color-clay-100)] " +
@@ -104,27 +109,30 @@ const pillClass =
 // the owner explicitly approved this exact treatment on the mockup for the
 // admin's one primary action, so this is a deliberate, owner-approved third
 // use, not a drift from the token rule (see DESIGN.md's own updated note).
-const primaryButtonClass =
+// WHY no hover change and a sage ring (#926 decisions 1 and 4): orange buttons
+// get no hover change, and an orange ring is 2.3:1 on white, under the 3:1 floor.
+const addPlaceClass =
   "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] " +
   "bg-[var(--color-brand-orange)] px-4 text-sm font-bold text-[var(--color-brand-navy)] " +
-  "transition-colors duration-150 hover:opacity-90 " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-orange)] " +
-  "focus-visible:ring-offset-2";
+  PRESS_FEEDBACK +
+  " " +
+  focusRingClass;
+
+// WHY no overflow-x-auto: on a 360 px phone a scrolling row hides tabs off
+// screen; the row wraps instead (#926 decision 18).
+const navRowClass = "flex flex-wrap items-center gap-1 px-4 pb-3 sm:px-6";
 
 export default function AdminNav({ email, active, counts, showActivity = false }: AdminNavProps) {
   const items = showActivity ? [...NAV_ITEMS, ACTIVITY_ITEM] : NAV_ITEMS;
   return (
     <header className="border-b border-[var(--color-bone-200)] bg-white">
       <div className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <h1 className="wordmark text-2xl text-[var(--color-ink-900)]">Pueblo Food Map Admin</h1>
+        <h1 className={adminNameClass}>Pueblo Food Map Admin</h1>
         <p className="text-sm text-[var(--color-ink-500)]">
           Signed in as <span className="font-medium text-[var(--color-sage-700)]">{email}</span>
         </p>
       </div>
-      <nav
-        aria-label="Admin"
-        className="flex flex-wrap items-center gap-1 overflow-x-auto px-4 pb-3 sm:px-6"
-      >
+      <nav aria-label="Admin" className={navRowClass}>
         {items.map((item) => {
           const count = (item.countKeys ?? []).reduce((sum, key) => sum + counts[key], 0);
           const isActive = item.key === active;
@@ -141,7 +149,7 @@ export default function AdminNav({ email, active, counts, showActivity = false }
           );
         })}
         <span className="flex-1" aria-hidden />
-        <Link href="/admin/venues/new" className={primaryButtonClass}>
+        <Link href="/admin/venues/new" className={addPlaceClass}>
           Add place
         </Link>
       </nav>
@@ -164,19 +172,19 @@ export function AdminNavSkeleton() {
   return (
     <header className="border-b border-[var(--color-bone-200)] bg-white">
       <div className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <p className="wordmark text-2xl text-[var(--color-ink-900)]">Pueblo Food Map Admin</p>
+        <p className={adminNameClass}>Pueblo Food Map Admin</p>
         <p className="text-sm text-[var(--color-ink-500)]" aria-hidden>
           &nbsp;
         </p>
       </div>
-      <nav aria-label="Admin" className="flex flex-wrap items-center gap-1 overflow-x-auto px-4 pb-3 sm:px-6">
+      <nav aria-label="Admin" className={navRowClass}>
         {NAV_ITEMS.map((item) => (
-          <Link key={item.key} href={item.href} className={`${navLinkBase} ${navLinkInactive}`}>
+          <Link key={item.key} href={item.href} className={`${navLinkBase} ${navLinkSkeleton}`}>
             {item.label}
           </Link>
         ))}
         <span className="flex-1" aria-hidden />
-        <Link href="/admin/venues/new" className={primaryButtonClass}>
+        <Link href="/admin/venues/new" className={addPlaceClass}>
           Add place
         </Link>
       </nav>

@@ -25,6 +25,7 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import MapComponent from "@/components/Map";
+import { track, EVENTS } from "@/lib/analytics";
 import type { Venue } from "@/types/venue";
 import { PUEBLO_CENTER_LAT, PUEBLO_CENTER_LNG, PUEBLO_DEFAULT_ZOOM } from "@/data/pueblo-bbox";
 
@@ -40,6 +41,13 @@ export const mockFitBounds = vi.fn();
 // render, so tests can assert it stays fixed regardless of the venues prop
 // (#231 — initial view must not depend on the venue set).
 let lastInitialViewState: unknown = undefined;
+// The `onMoveEnd` prop Map.tsx passed on the latest render (map_moved tests, #919).
+let lastOnMoveEnd: ((e: unknown) => void) | undefined;
+
+vi.mock("@/lib/analytics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/analytics")>()),
+  track: vi.fn(),
+}));
 
 // ─── Mock react-map-gl/mapbox ─────────────────────────────────────────────────
 // MapGL forwards the ref so Map.tsx's mapRef.current is populated with a mock
@@ -55,10 +63,12 @@ vi.mock("react-map-gl/mapbox", async () => {
     {
       children,
       initialViewState,
+      onMoveEnd,
     }: {
       children: React.ReactNode;
       onLoad?: (e: { target: object }) => void;
       initialViewState?: unknown;
+      onMoveEnd?: (e: unknown) => void;
     },
     ref: React.Ref<{
       flyTo: typeof mockFlyTo;
@@ -67,6 +77,7 @@ vi.mock("react-map-gl/mapbox", async () => {
     }>,
   ) {
     lastInitialViewState = initialViewState;
+    lastOnMoveEnd = onMoveEnd;
     React.useImperativeHandle(ref, () => ({
       flyTo: mockFlyTo,
       jumpTo: mockJumpTo,
@@ -564,5 +575,40 @@ describe("Map — default home view on initial load (#231)", () => {
       }),
     );
     expect(mockFitBounds).not.toHaveBeenCalled();
+  });
+});
+
+// ─── map_moved (#919) ─────────────────────────────────────────────────────────
+
+describe("Map — map_moved", () => {
+  const target = { getZoom: () => 14.4, getBounds: () => null };
+  const userMove = { target, originalEvent: new Event("mouseup") };
+  const mapMovedCalls = () => vi.mocked(track).mock.calls.filter((c) => c[0] === EVENTS.MAP_MOVED);
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  test("a programmatic move (flyTo/fitBounds: no originalEvent) sends nothing", () => {
+    render(<MapComponent {...makeProps()} />);
+    act(() => lastOnMoveEnd?.({ target }));
+    act(() => vi.advanceTimersByTime(5000));
+    expect(mapMovedCalls()).toHaveLength(0);
+  });
+
+  test("moves a visitor makes in quick succession send one event, the rounded zoom only", () => {
+    render(<MapComponent {...makeProps()} />);
+    act(() => lastOnMoveEnd?.(userMove));
+    act(() => vi.advanceTimersByTime(500));
+    act(() => lastOnMoveEnd?.(userMove));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(mapMovedCalls()).toEqual([[EVENTS.MAP_MOVED, { zoom: 14 }]]);
+  });
+
+  test("unmounting cancels a pending event", () => {
+    const { unmount } = render(<MapComponent {...makeProps()} />);
+    act(() => lastOnMoveEnd?.(userMove));
+    unmount();
+    act(() => vi.advanceTimersByTime(5000));
+    expect(mapMovedCalls()).toHaveLength(0);
   });
 });

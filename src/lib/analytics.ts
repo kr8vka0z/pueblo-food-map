@@ -48,10 +48,19 @@ type PostHogClient = {
 };
 
 // Set once initAnalytics() passes every gate and posthog-js has loaded.
-// track() checks this rather than re-deriving the gates itself, so a
-// caller that fires before/without init (or on a gated device) is a silent,
-// zero-cost no-op — never a network call to an uninitialized SDK.
+// track() checks this rather than re-deriving the gates itself: a caller
+// that fires before init is queued (`pending` below), and one on a gated
+// device is a silent no-op, never a network call to an uninitialized SDK.
 let client: PostHogClient | null = null;
+
+// Events tracked before posthog-js has loaded (#919 review: the splash's tour
+// tap and nearest_food can fire before the deferred init). Flushed once init
+// succeeds; set to null, dropping them, the moment any gate refuses (no key,
+// /admin, internal device), so the gates still win. ponytail: capped at
+// MAX_PENDING and anything past it is dropped; nothing tracked before init
+// comes close in practice.
+const MAX_PENDING = 20;
+let pending: [EventName, Record<string, unknown>][] | null = [];
 
 // Set the first time an event would be sent from an /admin page (#861).
 // Once set, nothing more is sent for the rest of this page load, public
@@ -200,7 +209,6 @@ export async function track(
   props: Record<string, unknown> = {},
 ): Promise<void> {
   if (!ALLOWED_EVENTS.has(name)) return;
-  if (!client) return;
 
   let finalProps = props;
   if (name === EVENTS.SEARCH_USED) {
@@ -209,7 +217,19 @@ export async function track(
     finalProps = sanitized === undefined ? rest : { ...rest, term: sanitized };
   }
 
-  client.capture(name, finalProps);
+  if (client) client.capture(name, finalProps);
+  else if (pending && pending.length < MAX_PENDING) pending.push([name, finalProps]);
+}
+
+/** Probes sessionStorage: posthog-js silently falls back to localStorage and cookies when it can't use it (#919 review). */
+function sessionStorageWorks(): boolean {
+  try {
+    window.sessionStorage.setItem("pfm_probe", "1");
+    window.sessionStorage.removeItem("pfm_probe");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -222,6 +242,7 @@ export async function track(
 export function _resetAnalyticsStateForTest(): void {
   client = null;
   stoppedForAdmin = false;
+  pending = [];
 }
 
 export type InitAnalyticsOptions = {
@@ -281,19 +302,22 @@ export async function initAnalytics(options: InitAnalyticsOptions = {}): Promise
   }
 
   const key = options.key ?? process.env.NEXT_PUBLIC_POSTHOG_KEY;
-  if (!key) return; // No key configured — total no-op (local dev, tests, Lighthouse CI).
-
   const pathname =
     options.pathname ?? (typeof window !== "undefined" ? window.location.pathname : "");
-  if (isAdminPath(pathname)) return;
-
-  if (isInternalDevice()) return;
+  // No key (local dev, tests, Lighthouse CI), /admin, or Kyle's own device:
+  // a total no-op, and anything queued before now is dropped unsent.
+  if (!key || isAdminPath(pathname) || isInternalDevice()) {
+    pending = null;
+    return;
+  }
 
   const posthog = (await import("posthog-js")).default as unknown as PostHogClient;
   posthog.init(key, {
     api_host: "/ingest",
-    // Tab-only: the visit ID lives in sessionStorage, never a cookie (see header).
-    persistence: "sessionStorage",
+    // Tab-only: the visit ID lives in sessionStorage, never a cookie (see
+    // header). Where sessionStorage is refused, memory, never posthog-js's
+    // own fallback to localStorage and cookies, which would outlive the tab.
+    persistence: sessionStorageWorks() ? "sessionStorage" : "memory",
     person_profiles: "never",
     autocapture: true,
     // No PostHog surveys exist (project 630731 has zero, checked 2026-09-29) and
@@ -314,6 +338,7 @@ export async function initAnalytics(options: InitAnalyticsOptions = {}): Promise
       if (!isAdminPath(window.location.pathname)) return event;
       stoppedForAdmin = true;
       client = null;
+      pending = null;
       posthog.stopSessionRecording();
       return null;
     },
@@ -352,4 +377,6 @@ export async function initAnalytics(options: InitAnalyticsOptions = {}): Promise
     .then((status) => posthog.register({ geo_permission: status.state }))
     .catch(() => {});
   client = posthog;
+  for (const [name, props] of pending ?? []) posthog.capture(name, props);
+  pending = null;
 }

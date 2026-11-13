@@ -295,3 +295,44 @@ describe("initAnalytics — moving into /admin without a reload (#861)", () => {
     expect(beforeSend({ event: "$pageview" })).toBeNull();
   });
 });
+
+describe("initAnalytics — #919 review: no persistent ID, no lost early events", () => {
+  beforeEach(() => {
+    init.mockClear();
+    capture.mockClear();
+    window.localStorage.clear();
+    _resetAnalyticsStateForTest();
+  });
+
+  test("storage refused: memory persistence, never posthog-js's localStorage+cookie fallback", async () => {
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
+    try {
+      await initAnalytics({ key: "test-key", pathname: "/" });
+    } finally {
+      setItem.mockRestore();
+    }
+    expect(init).toHaveBeenCalledWith("test-key", expect.objectContaining({ persistence: "memory" }));
+  });
+
+  test("an event tracked before init is sent once init succeeds", async () => {
+    await track(EVENTS.NEAREST_FOOD, { nearest_open_miles: 1, within_1_mile: 2 });
+    expect(capture).not.toHaveBeenCalled();
+    await initAnalytics({ key: "test-key", pathname: "/" });
+    expect(capture).toHaveBeenCalledWith(EVENTS.NEAREST_FOOD, { nearest_open_miles: 1, within_1_mile: 2 });
+  });
+
+  test.each([
+    ["/admin path", { key: "test-key", pathname: "/admin/places" }, false],
+    ["internal device", { key: "test-key", pathname: "/" }, true],
+    ["no key", { key: undefined, pathname: "/" }, false],
+  ])("an event tracked before a refused init (%s) is never sent", async (_name, options, internal) => {
+    if (internal) markInternalDevice();
+    await track(EVENTS.VENUE_OPENED, { venueId: "abc" });
+    await initAnalytics(options);
+    await track(EVENTS.VENUE_OPENED, { venueId: "abc" });
+    expect(init).not.toHaveBeenCalled();
+    expect(capture).not.toHaveBeenCalled();
+  });
+});

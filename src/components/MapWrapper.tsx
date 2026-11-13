@@ -704,7 +704,6 @@ export default function MapWrapper({
     (id: string | null) => {
       setSelectedEventId(id);
       if (id !== null) {
-        void track(EVENTS.EVENT_OPENED, { eventId: id });
         setSelectedVenueId(null);
         // The event card takes the desktop panel over (#759): drop the venue
         // card, Saved or Menu view it replaces.
@@ -1112,6 +1111,18 @@ export default function MapWrapper({
   // without the parameter (the selection stays inert: no pin matches it).
   // Ended/cancelled events never reach `events`, so they get no pin.
   const { event: selectedEvent } = useEventDetail(selectedEventId, events, eventsLoaded);
+
+  // event_opened (#919): keyed off the resolved event, not selectEvent(), so a
+  // `/?event=<id>` link (selected through useMapUI, never selectEvent) counts
+  // too. Same last-tracked ref as venue_opened below, so a re-render of the
+  // same open card doesn't fire again.
+  const lastTrackedEventIdRef = useRef<string | null>(null);
+  const selectedEventIdResolved = selectedEvent?.id ?? null;
+  useEffect(() => {
+    if (selectedEventIdResolved === lastTrackedEventIdRef.current) return;
+    lastTrackedEventIdRef.current = selectedEventIdResolved;
+    if (selectedEventIdResolved !== null) void track(EVENTS.EVENT_OPENED, { eventId: selectedEventIdResolved });
+  }, [selectedEventIdResolved]);
 
   // The phone sheet's React key (#882 preview feedback). It used to be the
   // selected id or "empty", so closing flipped it to "empty" and remounted the

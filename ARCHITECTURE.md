@@ -874,8 +874,11 @@ Turnstile is a first-party Cloudflare product with a simpler integration
 model and no Google dependency — appropriate for a civic app serving
 populations that may distrust Google tracking.
 
-**PII policy:** IP addresses are used only for rate-limiting — never logged or
-persisted. Contact emails go to Resend in the email body; the route handlers
+**PII policy:** in the form handlers, IP addresses are used only for
+rate-limiting — never logged or persisted. The one other use is analytics: the
+`/ingest` relay passes the visitor IP (`CF-Connecting-IP`, as
+`X-Forwarded-For`) to PostHog for a city lookup, and PostHog's "Discard client
+IP data" setting throws it away after (#919, `src/lib/ingestTarget.ts`). Contact emails go to Resend in the email body; the route handlers
 do not log them.
 
 **What Cloudflare Workers Logs keeps:** logs are on for prod and staging

@@ -572,11 +572,10 @@ User taps "Near me" (BottomNav)
   → handleLocateRequest()
     → stamps userRequestedAtRef
     → increments recenterRequestId  (Map.tsx flyTo fires even if position unchanged)
-    → calls geo.request()   (first try high accuracy, ≤60 s cached fix; a timeout /
-                              unavailable error retries ONCE at low accuracy, ≤5 min cached fix;
-                              code 1 is the only "denied"; a second failure is GeoState
-                              {permission:'failed', reason:'timeout'|'unavailable'}, which the
-                              next tap simply retries — #738)
+    → calls geo.request()   (ONE try at low accuracy, ≤5 min cached fix, 5 s timeout, #921;
+                              code 1 is the only "denied"; a timeout / unavailable error is
+                              GeoState {permission:'failed', reason:'timeout'|'unavailable'} at
+                              once, which the next tap simply retries — #738)
   → useEffect watches geo.state
     → clears isLocating when permission resolves
     → sets locationFailure (LocationHelpCard) if permission is 'denied' OR 'failed' AND a fresh user request was pending; clears it on a granted position (#739)

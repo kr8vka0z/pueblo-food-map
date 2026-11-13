@@ -811,11 +811,16 @@ export default function BottomSheet({
               people there's more, so a real handle no longer lies about what
               it does. */}
           {showGrabBar && (
-            // One resting height: the bar toggles nothing, so it is hidden but
-            // keeps its space. Removing it moved the content up, which changed
-            // the measurement back to two heights, which brought the bar back:
-            // a render loop ("Maximum update depth", iOS simulator).
-            <div className={"flex shrink-0 justify-center pt-2 pb-1" + (singleSnap ? " invisible" : "")} aria-hidden={singleSnap || undefined}>
+            // One resting height (a card whose first view fills the sheet, which a
+            // blessing box's check-in does on a real phone): the bar toggles
+            // nothing, so the button is disabled and hidden from screen readers,
+            // but it stays DRAWN. It is still the handle a swipe down closes the
+            // sheet from, and Kyle saw box cards without it while places had it
+            // (#917 round 3). It keeps its space either way: removing it moved
+            // the content up, which changed the measurement back to two heights,
+            // which brought the bar back: a render loop ("Maximum update depth",
+            // iOS simulator).
+            <div className="flex shrink-0 justify-center pt-2 pb-1" aria-hidden={singleSnap || undefined}>
               <button
                 type="button"
                 disabled={singleSnap}

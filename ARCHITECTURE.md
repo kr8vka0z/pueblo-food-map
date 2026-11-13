@@ -1232,7 +1232,7 @@ Map Menu item (phone drawer or desktop side panel) → MapWrapper.startTour dire
   plumbing to the main bundle (MapWrapper's demo handlers, FilterPanel's
   `trapFocus` prop, two `data-tour` attributes).
 - **Targets** are existing hooks (`data-testid` on SearchBar/BottomNav,
-  `data-venue-id` on VenueMarker, `[data-bottom-sheet]` / the desktop card's
+  `data-venue-id` on VenueMarker, `[data-sheet-surface]` / the desktop card's
   `aria-labelledby`, `data-tour` on SearchResultsPopover and FilterPanel's
   switch rows). Every match of a step's selector is unioned into one
   highlight. A missing target falls back to a centered tooltip.
@@ -1421,7 +1421,7 @@ review** (see "Shared events" below).
   expands it (`onRequestExpand`, the grab bar's action), and collapsing clamps
   it again. It shows only when the clamp actually cuts the text. About
   unclamps at once; the sheet slides to its new fully-open height when it
-  re-measures (see "Maps-style sheet"). On a phone the flyer sits
+  re-measures (see "Phone card sheet"). On a phone the flyer sits
   at the top of the below-the-fold section, not above the badge, so nothing
   above the fold ever moves.
 - **Phone card sheet** (#923, replacing #882's vaul snap points; Kyle:

@@ -147,7 +147,12 @@ export default function VenueCardBody({
 
   return (
     // Panel: no top padding, the pinned action row above it (DesktopVenueWindow) ends 12px above the name.
-    <div className={sheet ? "flex flex-col px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3" : "flex flex-col px-4 pb-4 gap-3"}>
+    // Sheet: no top padding either (#917 round 3, Kyle: "too big of a gap"). The
+    // grab bar's wrapper ends 4px under its 48px button and the action buttons'
+    // -m-1 reaches 4px above the row, so the two tap boxes meet edge to edge
+    // and the icons sit 14px under the grab bar's tap box. Closer would make
+    // the boxes overlap.
+    <div className={sheet ? "flex flex-col px-5 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3" : "flex flex-col px-4 pb-4 gap-3"}>
       {/* Phone (#917, R4): the action row is the card's first line, 12px
           above the name, so the name runs the full width. It ends with a
           close button hidden until keyboard focus (#882), which takes no room. */}

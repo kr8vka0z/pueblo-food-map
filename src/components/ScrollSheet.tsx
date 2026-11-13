@@ -101,8 +101,14 @@ export default function ScrollSheet({
   const armed = useRef(false);
   const lastRest = useRef<Resting>("closed");
   const measurePending = useRef(false);
-  // undefined = not measured yet; null = the card has no detail section.
-  const firstView = useRef<number | null | undefined>(undefined);
+  // null = the card has no detail section (or none read yet).
+  const firstView = useRef<number | null>(null);
+  // Whether `firstView` was read while collapsed. A card that opens already
+  // expanded (the route card's Clear walking route, the tour) has no collapsed
+  // reading yet, so it keeps re-reading until it has one: frozen at its first
+  // frame, a box measured before its check-in panel finished drawing kept a
+  // collapsed height its full layout doesn't have (agent-browser, 360 wide).
+  const firstViewCollapsed = useRef(false);
 
   // ── The top edge's shadow at full height ───────────────────────────────
   // The track is the scroll container, so it clips everything inside it: once
@@ -134,8 +140,9 @@ export default function ScrollSheet({
     const detail = sheet.querySelector<HTMLElement>(`#${detailId}`);
     // Read only while collapsed (#882): opened, "Read more" can make the first
     // view taller than it will be once collapsed again.
-    if (!expandedRef.current || firstView.current === undefined) {
+    if (!expandedRef.current || !firstViewCollapsed.current) {
       firstView.current = detail ? detail.getBoundingClientRect().top - top + Number(detail.dataset.peekPx ?? 64) : null;
+      firstViewCollapsed.current = !expandedRef.current;
     }
     const next = sheetDetents({
       trackHeight: track.clientHeight,
@@ -150,7 +157,8 @@ export default function ScrollSheet({
   }, [detailId, syncEdge]);
 
   useLayoutEffect(() => {
-    firstView.current = undefined;
+    firstView.current = null;
+    firstViewCollapsed.current = false;
     measure();
   }, [contentKey, measure]);
   useLayoutEffect(() => {

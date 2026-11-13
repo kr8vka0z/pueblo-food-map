@@ -137,6 +137,20 @@ describe("BottomSheet resting heights", () => {
     expect(detents()).toEqual([364, 640]);
   });
 
+  test("a card first measured while expanded keeps reading its first view until it has been collapsed", () => {
+    // A card that mounts already expanded (Clear walking route on the route card) is measured
+    // expanded first; here: expand, then show a different card in the same sheet.
+    const view = render(<BottomSheet venue={venue} onClose={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /show details/i }));
+    detailTop = 300;
+    view.rerender(<BottomSheet venue={{ ...venue, id: "v2" }} onClose={() => {}} />);
+    expect(detents()).toEqual([264, 640]);
+
+    detailTop = 400; // e.g. a box's check-in panel finishes drawing
+    view.rerender(<BottomSheet venue={{ ...venue, id: "v2" }} onClose={() => {}} />);
+    expect(detents()).toEqual([364, 640]);
+  });
+
   test("a lazily loaded short card re-measures when it arrives, and fully open stops at its own height", async () => {
     contentHeight = 540; // short card: 60px grab-bar row + 540 = 600 of the 640px track
     render(<BottomSheet venue={null} event={event} onClose={() => {}} locale="en" />);

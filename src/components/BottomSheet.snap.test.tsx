@@ -165,7 +165,7 @@ describe("BottomSheet snap points", () => {
     expect(rootProps.current.snapPoints).toEqual(["496px", "700px"]);
   });
 
-  test("one resting height: the card is laid out expanded (no inert controls, content scrolls, no grab bar)", () => {
+  test("one resting height: the card is laid out expanded (no inert controls, content scrolls, grab bar drawn but not a control)", () => {
     contentHeight = 320; // 60 + 320 = 380 visible; detail at 400 - 100 + 64 = 364 → under 24px apart
     render(<BottomSheet venue={venue} onClose={() => {}} />);
 

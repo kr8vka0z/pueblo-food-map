@@ -147,7 +147,12 @@ export default function VenueCardBody({
 
   return (
     // Panel: no top padding, the pinned action row above it (DesktopVenueWindow) ends 12px above the name.
-    <div className={sheet ? "flex flex-col px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3" : "flex flex-col px-4 pb-4 gap-3"}>
+    // Sheet: no top padding either (#917 round 3, Kyle: "too big of a gap"). The
+    // grab bar's wrapper ends 4px under its 48px button and the action buttons'
+    // -m-1 reaches 4px above the row, so the two tap boxes meet edge to edge
+    // and the icons sit 14px under the grab bar's tap box. Closer would make
+    // the boxes overlap.
+    <div className={sheet ? "flex flex-col px-5 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3" : "flex flex-col px-4 pb-4 gap-3"}>
       {/* Phone (#917, R4): the action row is the card's first line, 12px
           above the name, so the name runs the full width. It ends with a
           close button hidden until keyboard focus (#882), which takes no room. */}
@@ -213,16 +218,19 @@ export default function VenueCardBody({
         </p>
       )}
 
-      {/* Distance + hours today */}
-      <div className={`flex ${sheet ? "items-center gap-4 text-sm" : "flex-wrap items-center gap-3 text-xs"} text-[var(--color-ink-500)]`}>
+      {/* Distance + hours today. Each item stays on one line and the row wraps
+          as a unit (#917 round 3, Kyle: "these are dropping lines"): at 390 in
+          Spanish "1.2 mi de ti" and "Horario desconocido — llama antes" each
+          broke onto two lines; now a long one drops whole to the next line. */}
+      <div className={`flex flex-wrap items-center ${sheet ? "gap-x-4 gap-y-1 text-sm" : "gap-x-3 gap-y-1 text-xs"} text-[var(--color-ink-500)]`}>
         {venue.distanceMiles !== undefined && (
-          <span className={`flex items-center ${sheet ? "gap-1.5" : "gap-1"}`}>
+          <span className={`flex items-center whitespace-nowrap ${sheet ? "gap-1.5" : "gap-1"}`}>
             <MapPin size={iconSm} aria-hidden className="text-[var(--color-ink-400)]" />
             {formatMiles(venue.distanceMiles)} {t("distance.fromYou", locale)}
           </span>
         )}
         {status && status.state !== "no_hours" && (
-          <span className={`flex items-center ${sheet ? "gap-1.5" : "gap-1"}`}>
+          <span className={`flex items-center whitespace-nowrap ${sheet ? "gap-1.5" : "gap-1"}`}>
             <Clock size={iconSm} aria-hidden className="text-[var(--color-ink-400)]" />
             {status.state === "open"
               ? `${t("badge.openNow", locale)} · ${t("badge.closesAt", locale, { time: status.time })}`
@@ -235,7 +243,7 @@ export default function VenueCardBody({
             filter — this label says why there's no open/closed read, with a
             different icon (not Clock) so it's never mistaken for "open". */}
         {status && status.state === "no_hours" && (
-          <span className={`flex items-center ${sheet ? "gap-1.5" : "gap-1"} text-[var(--color-ink-700)] font-medium`}>
+          <span className={`flex items-center whitespace-nowrap ${sheet ? "gap-1.5" : "gap-1"} text-[var(--color-ink-700)] font-medium`}>
             <CircleHelp size={iconSm} aria-hidden className="text-[var(--color-ink-700)]" />
             {t("badge.hoursUnknown", locale)}
           </span>

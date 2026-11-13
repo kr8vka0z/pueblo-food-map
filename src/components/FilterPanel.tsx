@@ -31,6 +31,7 @@ import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { useOverlayEscape, useOverlayRegistration, useScrollLock } from "@/lib/overlayRegistry";
+import { useLastOpen, usePresence } from "@/lib/usePresence";
 import { track, EVENTS } from "@/lib/analytics";
 import type { VenueCategory } from "@/types/venue";
 
@@ -52,6 +53,9 @@ const TITLE_ID = "filter-panel-title";
 // an incidental brush of the panel — matches the touch-target/gesture
 // tolerances used elsewhere in this app's mobile review passes.
 const SWIPE_CLOSE_THRESHOLD_PX = 50;
+// #917 round 3 (Kyle: "way too fast"): the panel slides in from the left in
+// 300 ms and out in 250 ms on --ease-out-circ, the dim fading with it.
+const CLOSE_MS = 250;
 // All focusable elements inside the panel for the Tab trap — same selector
 // shape as HamburgerMenu.tsx's FOCUSABLE, narrowed to what this panel
 // actually renders: buttons, including every row's role="switch" (#917: the
@@ -159,7 +163,18 @@ function SwitchRow({
   );
 }
 
-export default function FilterPanel({
+/**
+ * While the panel slides out it shows what it showed when it closed:
+ * MapWrapper resets the events count to 0 on close, which would drop the
+ * Events row and change the footer mid-slide (#922 review). `open`, `onClose`
+ * and `trapFocus` stay live.
+ */
+export default function FilterPanel(props: FilterPanelProps) {
+  const shown = useLastOpen(props.open, props);
+  return <FilterPanelView {...shown} open={props.open} onClose={props.onClose} trapFocus={props.trapFocus} />;
+}
+
+function FilterPanelView({
   open,
   onClose,
   locale: localeProp,
@@ -278,14 +293,20 @@ export default function FilterPanel({
     [close],
   );
 
-  if (!open) return null;
+  // Still mounted for CLOSE_MS after `open` turns false, so it can slide out.
+  const mounted = usePresence(open, CLOSE_MS);
+  if (!mounted) return null;
 
   return (
     <>
       <div
         data-testid="filter-panel-backdrop"
         aria-hidden="true"
-        onClick={close}
+        onClick={open ? close : undefined}
+        className={
+          "transition-opacity ease-out-circ motion-reduce:transition-none " +
+          (open ? "opacity-100 duration-300 starting:opacity-0" : "pointer-events-none opacity-0 duration-250")
+        }
         style={{ position: "fixed", inset: 0, backgroundColor: "rgba(26,24,23,0.4)", zIndex: 1004 }}
       />
       <div
@@ -297,11 +318,15 @@ export default function FilterPanel({
         aria-modal={trapFocus ? "true" : undefined}
         // Held open by the tour: shown, never pressable (no filter can be
         // toggled, not even by a screen reader's double-tap).
-        inert={!trapFocus || undefined}
+        // Closing (sliding out): nothing on it may take focus or a tap.
+        inert={!trapFocus || !open || undefined}
         aria-labelledby={TITLE_ID}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        className="flex flex-col bg-[var(--color-bone-50)]"
+        className={
+          "flex flex-col bg-[var(--color-bone-50)] transition-transform ease-out-circ motion-reduce:transition-none " +
+          (open ? "translate-x-0 duration-300 starting:-translate-x-full" : "-translate-x-full duration-250")
+        }
         style={{
           position: "fixed",
           top: 0,

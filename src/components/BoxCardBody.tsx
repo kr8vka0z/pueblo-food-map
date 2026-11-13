@@ -516,7 +516,9 @@ export default function BoxCardBody({
       <div className={`flex flex-col gap-3 ${className}`}>
         {/* First view: always rendered, never clipped — everything a visitor
             needs to report the box's status is one tap away (#667). */}
-        <div className="flex flex-col gap-3 px-4 pt-3 pb-1">
+        {/* No top padding (#917 round 3): the action row's 48px tap boxes
+            meet the grab bar's edge to edge, as on a place card. */}
+        <div className="flex flex-col gap-3 px-4 pb-1">
           {nameBlock}
           {/* Status pill ALWAYS inline here (#667 item 4), directly under the name. */}
           <StatusPill box={box} locale={locale} overlay={false} />

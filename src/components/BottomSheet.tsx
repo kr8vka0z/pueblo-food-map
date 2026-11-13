@@ -464,7 +464,8 @@ export default function BottomSheet({
   // One measured snap point (a short screen, or a first view taller than the
   // sheet): the sheet is always fully open, so every card body is laid out as
   // expanded (nothing `inert`, content scrolls) and the grab bar, which would
-  // toggle nothing, is hidden. Unmeasured (jsdom, the first frame) doesn't count.
+  // toggle nothing, is drawn but disabled (see the bar below). Unmeasured
+  // (jsdom, the first frame) doesn't count.
   const singleSnap = snapMeasured && snap.points.length === 1;
   const cardExpanded = expanded || singleSnap;
   const scrollerScrolls = cardExpanded || isWalkRouteActive;
@@ -811,11 +812,18 @@ export default function BottomSheet({
               people there's more, so a real handle no longer lies about what
               it does. */}
           {showGrabBar && (
-            // One resting height: the bar toggles nothing, so it is hidden but
-            // keeps its space. Removing it moved the content up, which changed
-            // the measurement back to two heights, which brought the bar back:
-            // a render loop ("Maximum update depth", iOS simulator).
-            <div className={"flex shrink-0 justify-center pt-2 pb-1" + (singleSnap ? " invisible" : "")} aria-hidden={singleSnap || undefined}>
+            // One resting height (a card whose first view fills the sheet, which a
+            // blessing box's check-in does on a real phone): the bar toggles
+            // nothing, so the button is disabled and hidden from screen readers,
+            // but it stays DRAWN. It is still the handle a swipe down closes the
+            // sheet from, and Kyle saw box cards without it while places had it
+            // (#917 round 3). It keeps its space either way: removing it moved
+            // the content up, which changed the measurement back to two heights,
+            // which brought the bar back: a render loop ("Maximum update depth",
+            // iOS simulator). `pointer-events-none` while disabled: a touch on the
+            // bar then lands on the sheet itself, so the swipe down still drags
+            // it (a disabled control may swallow pointer events in some browsers).
+            <div className="flex shrink-0 justify-center pt-2 pb-1" aria-hidden={singleSnap || undefined}>
               <button
                 type="button"
                 disabled={singleSnap}
@@ -826,7 +834,8 @@ export default function BottomSheet({
                 className={
                   "flex h-12 w-12 items-center justify-center rounded-md " +
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-                  PRESS_FEEDBACK
+                  PRESS_FEEDBACK +
+                  (singleSnap ? " pointer-events-none" : "")
                 }
               >
                 <span aria-hidden className="h-[5px] w-10 rounded-full bg-[var(--color-bone-300)]" />

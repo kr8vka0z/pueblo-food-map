@@ -6,7 +6,8 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { buildVenueMetaDescription, buildVenueTitle } from "@/lib/venueSummary";
+import { buildVenueMetaDescription, buildVenueTitle, parseVenueCity } from "@/lib/venueSummary";
+import { publishedVenues } from "@/data/published-venues";
 import type { Venue } from "@/types/venue";
 
 const base: Venue = {
@@ -38,5 +39,20 @@ describe("SNAP venue title and description (#921)", () => {
     expect(description.length).toBeLessThanOrEqual(160);
     // Still whole sentences after the reorder: the address sentence follows.
     expect(description).toContain("100 Test St");
+  });
+
+  // A long name drops ", CO" but never the place (Codex round 1: "Walmart
+  // Supercenter, Pueblo West" lost its town under the old "Name: Accepts" rung).
+  // SNAP drops out only when even the shortest SNAP rung can't fit 70 chars
+  // (es "Pueblo Farmer's Market" with the "Condado de Pueblo" fallback).
+  test.each(["en", "es"] as const)("every published SNAP venue keeps its place in its %s title", (locale) => {
+    const suffix = " · Pueblo Food Map".length;
+    for (const v of publishedVenues.filter((v) => v.accepts_snap === true)) {
+      const title = buildVenueTitle(v, locale);
+      const city = parseVenueCity(v.address, locale);
+      expect(title).toContain(city);
+      expect(title.length + suffix).toBeLessThanOrEqual(70);
+      if (!title.includes("SNAP/EBT")) expect(`${v.name}, ${city}: SNAP/EBT`.length + suffix).toBeGreaterThan(70);
+    }
   });
 });

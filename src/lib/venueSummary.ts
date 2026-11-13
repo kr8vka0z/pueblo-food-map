@@ -150,11 +150,14 @@ export function buildVenueTitle(venue: Venue, locale: Locale = "en"): string {
   const categoryFull = t(`category.full.${venue.category}`, locale);
   const categoryShort = t(`summary.title.category.${venue.category}`, locale);
   // #921: a SNAP store leads with what searchers ask ("does loaf n jug take
-  // ebt"), then falls back to the same ladder as every other venue.
+  // ebt"); a long name drops ", CO", then the verb, then falls back to the
+  // same ladder as every other venue. Every SNAP rung keeps the place (#921).
   const snap = venue.accepts_snap === true ? t("summary.title.acceptsSnap", locale) : null;
 
   const candidates = [
-    ...(snap ? [`${venue.name}, ${city}, CO: ${snap}`, `${venue.name}: ${snap}`] : []),
+    ...(snap
+      ? [`${venue.name}, ${city}, CO: ${snap}`, `${venue.name}, ${city}: ${snap}`, `${venue.name}, ${city}: SNAP/EBT`]
+      : []),
     `${venue.name} – ${categoryFull} ${connector} ${city}, CO`,
     `${venue.name} – ${categoryShort} ${connector} ${city}, CO`,
     `${venue.name} ${connector} ${city}, CO`,

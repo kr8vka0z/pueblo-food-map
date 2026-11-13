@@ -31,7 +31,7 @@ import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { useOverlayEscape, useOverlayRegistration, useScrollLock } from "@/lib/overlayRegistry";
-import { usePresence } from "@/lib/usePresence";
+import { useLastOpen, usePresence } from "@/lib/usePresence";
 import { track, EVENTS } from "@/lib/analytics";
 import type { VenueCategory } from "@/types/venue";
 
@@ -163,7 +163,18 @@ function SwitchRow({
   );
 }
 
-export default function FilterPanel({
+/**
+ * While the panel slides out it shows what it showed when it closed:
+ * MapWrapper resets the events count to 0 on close, which would drop the
+ * Events row and change the footer mid-slide (#922 review). `open`, `onClose`
+ * and `trapFocus` stay live.
+ */
+export default function FilterPanel(props: FilterPanelProps) {
+  const shown = useLastOpen(props.open, props);
+  return <FilterPanelView {...shown} open={props.open} onClose={props.onClose} trapFocus={props.trapFocus} />;
+}
+
+function FilterPanelView({
   open,
   onClose,
   locale: localeProp,

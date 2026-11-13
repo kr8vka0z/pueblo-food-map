@@ -44,3 +44,30 @@ export function usePresence(open: boolean, exitMs: number, animate = true): bool
   }, [held, exitMs]);
   return open || held;
 }
+
+/**
+ * The value as it was while `open`, kept after `open` turns false, so a panel
+ * sliding out shows what it showed when it closed (the BottomSheet `held`
+ * pattern). The parents reset state on close: Saved's section goes back to
+ * null (so the view falls back to the Menu) and MapWrapper's events count
+ * drops to 0; without this the closing panel changed under the slide (#922
+ * review). Functions are not compared: parents make new callbacks every
+ * render, and a closing panel is inert, so a stale one is never called.
+ */
+export function useLastOpen<T>(open: boolean, value: T): T {
+  const [last, setLast] = useState(value);
+  if (open && !sameData(last, value)) setLast(value);
+  return open ? value : last;
+}
+
+function sameData(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  const x = a as Record<string, unknown>;
+  const y = b as Record<string, unknown>;
+  const keys = Object.keys(x);
+  return (
+    keys.length === Object.keys(y).length &&
+    keys.every((k) => (typeof x[k] === "function" && typeof y[k] === "function") || Object.is(x[k], y[k]))
+  );
+}

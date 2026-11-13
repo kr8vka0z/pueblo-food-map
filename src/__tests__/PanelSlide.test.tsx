@@ -4,18 +4,23 @@
  * while it slides out, then unmounts. The risks pinned here:
  *   - while sliding out it is inert (no focus, no taps) and then really goes;
  *   - a reduced-motion visitor gets no hold: closed means gone at once;
- *   - the Menu's tablet/desktop dropdown, which has no slide, is never held.
+ *   - the Menu's tablet/desktop dropdown, which has no slide, is never held;
+ *   - a sliding-out panel keeps showing what it showed when it closed, though
+ *     the parent resets state on close (#922 review): PageNav's Saved section
+ *     goes back to null (view falls back to the Menu), and MapWrapper's
+ *     events count drops to 0 (the Events row and footer would change).
  * The other panel suites stub matchMedia without `no-preference`, so they run
  * the no-motion path and keep asserting close-then-gone.
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import FilterPanel from "@/components/FilterPanel";
 import HamburgerMenu from "@/components/HamburgerMenu";
+import PageNav from "@/components/PageNav";
 import { MOBILE_QUERY } from "@/lib/useMediaQuery";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/", useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/about", useRouter: () => ({ push: vi.fn() }) }));
 
 function stubMedia({ reduce = false, mobile = true } = {}) {
   vi.stubGlobal(
@@ -110,6 +115,42 @@ describe("Menu panel slide", () => {
     const { rerender } = render(<HamburgerMenu locale="en" open onClose={vi.fn()} />);
     expect(document.getElementById("hamburger-panel")!.className).toBe("");
     rerender(<HamburgerMenu locale="en" open={false} onClose={vi.fn()} />);
+    expect(document.getElementById("hamburger-panel")).toBeNull();
+  });
+});
+
+describe("a closing panel keeps what it showed", () => {
+  test("Filters: the Events row and the events footer stay while it slides out, though the count resets to 0", () => {
+    stubMedia();
+    const props = { ...filterProps, onToggleEvents: vi.fn(), filterEvents: true };
+    // MapWrapper's real props: open with 3 events; on close filterEventsCount is 0,
+    // so both eventsCount and the Events-mode resultCount become 0.
+    const { rerender } = render(<FilterPanel {...props} open eventsCount={3} resultCount={3} />);
+    expect(screen.getByRole("switch", { name: "Events" })).toBeDefined();
+    const footer = screen.getByText("Show 3 events");
+
+    rerender(<FilterPanel {...props} open={false} eventsCount={0} resultCount={0} />);
+    expect(screen.getByRole("switch", { name: "Events", hidden: true })).toBeDefined();
+    expect(footer.isConnected).toBe(true);
+    expect(footer.textContent).toBe("Show 3 events");
+
+    act(() => vi.advanceTimersByTime(250));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("Saved (PageNav, the real parent): closing keeps the saved view while it slides out, not the Menu", () => {
+    stubMedia();
+    render(<PageNav locale="en" />);
+    fireEvent.click(screen.getByTestId("nav-saved"));
+    expect(screen.getByText(/No saved places yet/i)).toBeDefined();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    const panel = document.getElementById("hamburger-panel")!;
+    expect(panel.hasAttribute("inert")).toBe(true);
+    expect(panel.textContent).toMatch(/No saved places yet/i);
+    expect(panel.textContent).not.toMatch(/Send us feedback/i);
+
+    act(() => vi.advanceTimersByTime(250));
     expect(document.getElementById("hamburger-panel")).toBeNull();
   });
 });

@@ -46,7 +46,7 @@ import { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
 import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuery";
 import type { Locale } from "@/lib/i18n";
 import { useOverlayEscape, useOverlayRegistration, useScrollLock } from "@/lib/overlayRegistry";
-import { usePresence } from "@/lib/usePresence";
+import { useLastOpen, usePresence } from "@/lib/usePresence";
 import type { Venue } from "@/types/venue";
 import type { ViewMode } from "@/lib/useMapUI";
 
@@ -265,6 +265,9 @@ export default function HamburgerMenu({
   // `open` turns false (registration above stays on `open`): the close
   // handler's focus return looks for the bar's item within ~10 frames.
   const mounted = usePresence(open, 250, isMobile);
+  // Closing Saved resets the parent's section to null, so `view` falls back to
+  // "top" at once: keep showing the view it closed on while it slides out.
+  const shownView = useLastOpen(open, view);
 
   // The bottom bar (z 1003) still draws over the tablet/desktop DROPDOWN
   // variant below 2xl (isBelow2xl but !isMobile) — keep its last item
@@ -371,7 +374,7 @@ export default function HamburgerMenu({
           style={panelStyle}
         >
           <HamburgerMenuContent
-            view={view}
+            view={shownView}
             locale={locale}
             savedVenues={savedVenues}
             savedLoading={savedLoading}

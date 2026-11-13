@@ -19,7 +19,7 @@ import {
   tagClass,
   type TagTone,
 } from "@/lib/adminCardStyles";
-import { ADMIN_PRIMARY_BUTTON, inputBase, inputBorder, labelClass } from "@/components/formClasses";
+import { ADMIN_PRIMARY_BUTTON, labelClass, inputClass } from "@/components/formClasses";
 import {
   ACTIVITY_TYPES,
   describeDevice,
@@ -46,7 +46,6 @@ const AUTOMATIC_ACTOR_LABELS: Record<string, string> = {
 /** Runs of this many or more consecutive same-tag actions collapse. */
 const COLLAPSE_RUN = 3;
 
-const inputClass = `${inputBase} ${inputBorder(false)}`;
 // activityLog.ts's three tones mapped onto the shared tag tones (#926 decision 12).
 const TAG_TONE: Record<"neutral" | "good" | "bad", TagTone> = { neutral: "neutral", good: "calm", bad: "attention" };
 

@@ -35,7 +35,7 @@ import {
   tagClass,
   type TagTone,
 } from "@/lib/adminCardStyles";
-import { inputBase, inputBorder } from "@/components/formClasses";
+import { inputClass } from "@/components/formClasses";
 import AdminSegmented from "@/components/AdminSegmented";
 import { openRowLink } from "@/lib/rowLinkClick";
 
@@ -296,22 +296,17 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, address or sponsor"
-            className={`${inputBase} ${inputBorder(false)}`}
+            className={inputClass}
           />
         </div>
         <div>
-          {/* The slider's legend is read by screen readers; this caption is
-              its visible twin, so it is hidden from them. */}
-          <p aria-hidden="true" className={controlLabelClass}>
-            Sponsor
-          </p>
           <AdminSegmented
             name="boxes-sponsor-filter"
             legend="Sponsor"
+            legendClass={controlLabelClass}
             options={SPONSOR_OPTIONS}
             value={sponsorFilter}
             onChange={(v) => setSponsorFilter(v === "has" || v === "needs" ? v : "any")}
-            fullWidth
           />
         </div>
         <div>
@@ -322,7 +317,7 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
             id="boxes-sort"
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
-            className={`${inputBase} ${inputBorder(false)}`}
+            className={inputClass}
           >
             {SORT_OPTIONS.map((option) => (
               <option key={option.key} value={option.key}>

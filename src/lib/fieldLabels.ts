@@ -1,7 +1,7 @@
 /**
  * fieldLabels.ts — the plain name a person reads for a venue field
  * ("accepts_snap" → "Accepts SNAP"), shared by the change cards
- * (ProposalCard re-exports fieldLabel), the Places "To review" column, the
+ * (ProposalCard), the Places "To review" column, the
  * source-switch panel and the Activity page's change lines (#926).
  *
  * WHY its own file: ActivityLog is a server component and ProposalCard is

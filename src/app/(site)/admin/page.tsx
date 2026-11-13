@@ -74,6 +74,7 @@ import {
 } from "@/lib/boxStats";
 import { formatDurationLabel } from "@/lib/formatDurationLabel";
 import { t } from "@/lib/i18n";
+import { pluralize } from "@/lib/pluralize";
 import { loadVisitorsAnalytics, DASHBOARD_PERIODS, type DashboardPeriod } from "@/lib/cfAnalytics";
 import { loadMapUsageAnalytics } from "@/lib/posthogQuery";
 import { createFetchLimiter } from "@/lib/analyticsFetch";
@@ -126,11 +127,6 @@ function pctOf(count: number, total: number | null | undefined): number | null {
 
 function formatPct(pct: number | null): string {
   return pct === null ? "—" : `${pct}%`;
-}
-
-/** "1 ask", "2 asks": a count with its word in the right number (#926). */
-function countOf(n: number, one: string, many = `${one}s`): string {
-  return `${n} ${n === 1 ? one : many}`;
 }
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
@@ -279,7 +275,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       label: "Box photos & sponsor requests",
       count: photos.length + adopters.length,
       href: "/admin/boxes?show=review",
-      detail: `${countOf(photos.length, "photo")}, ${countOf(adopters.length, "sponsor request")}`,
+      detail: `${pluralize(photos.length, "photo")}, ${pluralize(adopters.length, "sponsor request")}`,
     },
     {
       key: "box-help",
@@ -376,7 +372,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               <div>
                 <h4 className={`${groupTitleClass} mb-1`}>How people found the site</h4>
                 <BarList
-                  items={visitors.referrers.map((r) => ({ label: r.label, value: r.visits, displayValue: countOf(r.visits, "visit") }))}
+                  items={visitors.referrers.map((r) => ({ label: r.label, value: r.visits, displayValue: pluralize(r.visits, "visit") }))}
                   emptyMessage="No referrer data yet for this period."
                 />
               </div>
@@ -410,7 +406,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 <KpiCard label="Place cards opened" displayValue={String(mapUsage.headline.cardsOpened)} value={mapUsage.headline.cardsOpened} previousValue={mapUsage.headline.previousCardsOpened} />
                 <KpiCard
                   label="Switched to Spanish"
-                  displayValue={cfVisits === null ? countOf(mapUsage.headline.localeSwitchedToEs, "switch", "switches") : formatPct(localeEsPct)}
+                  displayValue={cfVisits === null ? `${mapUsage.headline.localeSwitchedToEs} ${mapUsage.headline.localeSwitchedToEs === 1 ? "switch" : "switches"}` : formatPct(localeEsPct)}
                   value={cfVisits === null ? mapUsage.headline.localeSwitchedToEs : (localeEsPct ?? 0)}
                   previousValue={cfVisits === null ? mapUsage.headline.previousLocaleSwitchedToEs : (previousLocaleEsPct ?? undefined)}
                 />
@@ -423,7 +419,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     items={placeUsage.slice(0, 6).map((p) => ({
                       label: p.name ?? "Removed place",
                       value: p.count,
-                      displayValue: countOf(p.count, "open"),
+                      displayValue: pluralize(p.count, "open"),
                       href: p.href ?? undefined,
                     }))}
                     emptyMessage="No place cards opened yet this period."
@@ -478,7 +474,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     items={mapUsage.filters.map((f) => ({
                       label: filterLabel(f.filter),
                       value: f.count,
-                      displayValue: cfVisits === null ? countOf(f.count, "toggle") : formatPct(pctOf(f.count, cfVisits)),
+                      displayValue: cfVisits === null ? pluralize(f.count, "toggle") : formatPct(pctOf(f.count, cfVisits)),
                     }))}
                     emptyMessage="No filters toggled on yet this period."
                   />
@@ -505,7 +501,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     items={mapUsage.utmSources.map((u) => ({
                       label: u.campaign ? `${u.source} · ${u.campaign}` : u.source,
                       value: u.sessions,
-                      displayValue: countOf(u.sessions, "session"),
+                      displayValue: pluralize(u.sessions, "session"),
                     }))}
                     emptyMessage="No tagged flyer or link visits yet this period."
                   />
@@ -557,7 +553,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <div>
               <h4 className={`${groupTitleClass} mb-1`}>Most-needed items</h4>
               <BarList
-                items={mostNeeded.map((n) => ({ label: t(`box.needs.${n.key}`, "en"), value: n.count, displayValue: countOf(n.count, "ask") }))}
+                items={mostNeeded.map((n) => ({ label: t(`box.needs.${n.key}`, "en"), value: n.count, displayValue: pluralize(n.count, "ask") }))}
                 emptyMessage="Not enough check-ins yet to say."
               />
             </div>
@@ -578,7 +574,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             {latestRefresh ? (
               <>
                 Last data refresh {new Date(latestRefresh.createdAt).toLocaleDateString("en-US", { timeZone: TIME_ZONE })}:{" "}
-                {countOf(latestRefresh.suggestedCount, "suggested change")}.{" "}
+                {pluralize(latestRefresh.suggestedCount, "suggested change")}.{" "}
                 <Link href="/admin/places?show=review" className={linkClass}>
                   Review →
                 </Link>

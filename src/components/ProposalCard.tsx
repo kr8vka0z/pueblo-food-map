@@ -55,12 +55,10 @@ import type {
   ReviewLane,
 } from "@/lib/adminProposals";
 import type { VenueLookup } from "@/lib/adminVenueLookup";
-import AdminConfirm, { useAdminConfirm, useAdminStep } from "@/components/AdminConfirm";
-import { hintClass, inputBase, inputBorder } from "@/components/formClasses";
+import AdminConfirm, { AdminRejectStep, useAdminConfirm, useAdminStep } from "@/components/AdminConfirm";
 import {
   cardClass,
   cardNameClass,
-  controlLabelClass,
   dangerButtonClass,
   failureLineClass,
   fieldLabelClass,
@@ -133,10 +131,6 @@ const CHANGE_TYPE_LABEL: Record<ProposalChangeType, string> = {
   update: "Field update",
   remove: "Remove",
 };
-
-// The field-label map lives in src/lib/fieldLabels.ts (the Activity page, a
-// server component, needs it too); re-exported here for existing callers.
-export { fieldLabel };
 
 function capitalizeDay(day: string): string {
   return day.charAt(0).toUpperCase() + day.slice(1);
@@ -411,43 +405,18 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
       )}
 
       {rejectOpen && (
-        <div className="mt-4 border-t border-[var(--color-bone-200)] pt-4">
-          <label htmlFor={reasonFieldId} className={controlLabelClass}>
-            Reason <span className={`${hintClass} normal-case`}>(optional, for your own notes)</span>
-          </label>
-          <textarea
-            ref={reasonRef}
-            id={reasonFieldId}
-            rows={2}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            className={`${inputBase} ${inputBorder(false)}`}
-          />
-          {/* Cancel first, the red Confirm second (#926 decision 8). */}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={cancelReject}
-              disabled={rejectState.status === "submitting"}
-              className={secondaryButtonClass}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmReject}
-              disabled={rejectState.status === "submitting"}
-              className={dangerButtonClass}
-            >
-              {rejectState.status === "submitting" ? "Rejecting…" : "Confirm reject"}
-            </button>
-          </div>
-          {rejectState.status === "error" && (
-            <p role="alert" className={`mt-2 ${failureLineClass}`}>
-              {rejectState.message}
-            </p>
-          )}
-        </div>
+        <AdminRejectStep
+          id={reasonFieldId}
+          fieldRef={reasonRef}
+          reason={reason}
+          onReason={setReason}
+          busy={rejectState.status === "submitting"}
+          confirmLabel="Confirm reject"
+          busyLabel="Rejecting…"
+          onCancel={cancelReject}
+          onConfirm={handleConfirmReject}
+          error={rejectState.status === "error" ? rejectState.message : null}
+        />
       )}
     </div>
   );

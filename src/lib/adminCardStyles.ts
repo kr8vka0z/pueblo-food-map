@@ -38,6 +38,7 @@
  *   primaryButtonClass             green filled, 14 px words, 48 tall
  *   secondaryButtonClass           outline (bone 300 edge, ink 700 words), 48 tall
  *   dangerButtonClass              red outline, fills red under the pointer, rings red, 48 tall
+ *   buttonClass(look, size)        the three above built from one base; formClasses.ts's form buttons use size "text-base"
  *   pickerOptionClass              a full-width, left-aligned outline option in a picker list (a place or address match)
  *   linkClass                      inline link (in a sentence or a table cell), sage 100 under the pointer
  *   bannerLinkClass                linkClass without its colour: takes the banner's own (Publish bot banner)
@@ -133,33 +134,38 @@ export const tableCellClass = "px-4 py-3";
 // inside tableWrapClass instead.
 export const tableHeadCellClass = tableCellClass + " whitespace-nowrap font-medium";
 
-// Shared by the three buttons: one height, centred words that may wrap on a
-// narrow phone, the press dim, and the disabled look.
+// Shared by every admin button: one height, centred words that may wrap on a
+// narrow phone, the press dim, and the off look, both for disabled and for
+// aria-disabled (a working button that must keep keyboard focus).
 const buttonBase =
-  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] px-4 py-2 text-center text-sm " +
+  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] px-4 py-2 text-center " +
   "transition-colors duration-150 " +
   PRESS_FEEDBACK +
-  " disabled:opacity-50 disabled:cursor-not-allowed ";
-
-export const primaryButtonClass =
-  buttonBase +
-  "bg-[var(--color-sage-600)] font-semibold text-[var(--color-bone-50)] hover:bg-[var(--color-sage-700)] " +
-  focusRingClass;
-
-export const secondaryButtonClass =
-  buttonBase +
-  "border border-[var(--color-bone-300)] bg-transparent font-medium text-[var(--color-ink-700)] " +
-  "hover:bg-[var(--color-sage-100)] " +
-  focusRingClass;
+  " disabled:opacity-50 disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:cursor-not-allowed ";
 
 // WHY the red fill on hover and a red ring: the design page pictures the red
 // outline filling red under the pointer (#926 decision 1), and a sage ring
 // beside red words reads as a different control.
-export const dangerButtonClass =
-  buttonBase +
-  "border border-[var(--color-danger)] bg-transparent font-medium text-[var(--color-danger)] " +
-  "hover:bg-[var(--color-danger)] hover:text-[var(--color-bone-50)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2";
+const BUTTON_LOOKS = {
+  primary: "bg-[var(--color-sage-600)] font-semibold text-[var(--color-bone-50)] hover:bg-[var(--color-sage-700)] " + focusRingClass,
+  secondary:
+    "border border-[var(--color-bone-300)] bg-transparent font-medium text-[var(--color-ink-700)] " +
+    "hover:bg-[var(--color-sage-100)] " +
+    focusRingClass,
+  danger:
+    "border border-[var(--color-danger)] bg-transparent font-medium text-[var(--color-danger)] " +
+    "hover:bg-[var(--color-danger)] hover:text-[var(--color-bone-50)] " +
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2",
+};
+
+/** One button string: a look and a word size (14 px here, 16 px for a form's Save row in formClasses.ts). */
+export function buttonClass(look: keyof typeof BUTTON_LOOKS, size: "text-sm" | "text-base" = "text-sm"): string {
+  return buttonBase + size + " " + BUTTON_LOOKS[look];
+}
+
+export const primaryButtonClass = buttonClass("primary");
+export const secondaryButtonClass = buttonClass("secondary");
+export const dangerButtonClass = buttonClass("danger");
 
 // Full width and left-aligned on purpose: secondaryButtonClass centres its
 // words, and appending text-left to it would fight it in stylesheet order.

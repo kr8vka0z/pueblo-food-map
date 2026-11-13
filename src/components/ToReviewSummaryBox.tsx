@@ -79,12 +79,6 @@ export default function ToReviewSummaryBox({ reviewRowCount, proposals, submissi
 
   async function handleBulkApprove(ids: number[]) {
     setBulkState({ status: "submitting" });
-    await runBulkApprove(ids);
-    // Close the confirm either way; the result line below says what happened.
-    cancel();
-  }
-
-  async function runBulkApprove(ids: number[]) {
     try {
       const res = await fetch("/api/admin/proposals/approve-date-only", {
         method: "POST",
@@ -119,6 +113,9 @@ export default function ToReviewSummaryBox({ reviewRowCount, proposals, submissi
       });
     } catch {
       setBulkState({ status: "error", message: "Nothing was approved. Try again." });
+    } finally {
+      // Close the confirm either way; the result line below says what happened.
+      cancel();
     }
   }
 

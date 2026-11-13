@@ -67,7 +67,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { categoryLabels } from "@/lib/categories";
 import CategoryLabel from "@/components/CategoryLabel";
-import { inputBase, inputBorder } from "@/components/formClasses";
+import { inputClass } from "@/components/formClasses";
 import {
   chipClass,
   controlLabelClass,
@@ -141,8 +141,6 @@ const STATUS_TONE: Record<AdminDisplayStatus, TagTone> = {
 // A public item carries the same "needs a look" tone as SubmissionCard's
 // "Public report" tag, so it reads the same everywhere it appears.
 const PUBLIC_TONE: TagTone = "attention";
-
-const controlInputClass = `${inputBase} ${inputBorder(false)}`;
 
 // ─── Item helpers — read across the ReviewItem union without callers caring
 // which table an item came from ─────────────────────────────────────────────
@@ -478,7 +476,7 @@ export default function VenueListView({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name or address"
-            className={controlInputClass}
+            className={inputClass}
           />
         </div>
         <div>
@@ -489,7 +487,7 @@ export default function VenueListView({
             id="venue-category-filter"
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value as CategoryFilter)}
-            className={controlInputClass}
+            className={inputClass}
           >
             <option value="all">All</option>
             {ALL_CATEGORIES.map((cat) => (

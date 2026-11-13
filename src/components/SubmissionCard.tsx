@@ -39,17 +39,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAdminStep } from "@/components/AdminConfirm";
+import { AdminRejectStep, useAdminStep } from "@/components/AdminConfirm";
 import { categoryLabels } from "@/lib/categories";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import type { VenueCategory } from "@/types/venue";
 import type { ClosurePayload, NewVenuePayload, ReviewSubmission } from "@/lib/publicSubmissions";
-import { hintClass, inputBase, inputBorder } from "@/components/formClasses";
 import {
   cardClass,
   cardNameClass,
-  controlLabelClass,
-  dangerButtonClass,
   failureLineClass,
   fieldLabelClass,
   formatSubmittedAt,
@@ -196,43 +193,18 @@ export default function SubmissionCard({ submission }: SubmissionCardProps) {
       )}
 
       {rejectOpen && (
-        <div className="mt-4 border-t border-[var(--color-bone-200)] pt-4">
-          <label htmlFor={reasonFieldId} className={controlLabelClass}>
-            Reason <span className={`${hintClass} normal-case`}>(optional, for your own notes)</span>
-          </label>
-          <textarea
-            ref={reasonRef}
-            id={reasonFieldId}
-            rows={2}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            className={`${inputBase} ${inputBorder(false)}`}
-          />
-          {/* Cancel first, the red Confirm second (#926 decision 8). */}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={cancelReject}
-              disabled={rejectState.status === "submitting"}
-              className={secondaryButtonClass}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmReject}
-              disabled={rejectState.status === "submitting"}
-              className={dangerButtonClass}
-            >
-              {rejectState.status === "submitting" ? "Rejecting…" : "Confirm reject"}
-            </button>
-          </div>
-          {rejectState.status === "error" && (
-            <p role="alert" className={`mt-2 ${failureLineClass}`}>
-              {rejectState.message}
-            </p>
-          )}
-        </div>
+        <AdminRejectStep
+          id={reasonFieldId}
+          fieldRef={reasonRef}
+          reason={reason}
+          onReason={setReason}
+          busy={rejectState.status === "submitting"}
+          confirmLabel="Confirm reject"
+          busyLabel="Rejecting…"
+          onCancel={cancelReject}
+          onConfirm={handleConfirmReject}
+          error={rejectState.status === "error" ? rejectState.message : null}
+        />
       )}
     </div>
   );

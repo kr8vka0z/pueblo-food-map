@@ -21,14 +21,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAdminStep } from "@/components/AdminConfirm";
+import { AdminRejectStep, useAdminStep } from "@/components/AdminConfirm";
 import { KIND_LABEL } from "@/components/BoxCheckinsAdminPanel";
 import type { AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import {
   cardClass,
   cardNameClass,
-  controlLabelClass,
-  dangerButtonClass,
   failureLineClass,
   fieldLabelClass,
   formatSubmittedAt,
@@ -36,7 +34,6 @@ import {
   secondaryButtonClass,
   tagClass,
 } from "@/lib/adminCardStyles";
-import { hintClass, inputBase, inputBorder } from "@/components/formClasses";
 
 export interface PhotoReviewCardProps {
   photo: AdminBoxPhotoRow;
@@ -66,6 +63,7 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
 
   const isFlagged = photo.status === "flagged";
   const reasonFieldId = `photo-reject-reason-${photo.id}`;
+  const confirmRejectLabel = isFlagged ? "Confirm remove" : "Confirm reject";
   // #926 decision 15: an error says what did NOT happen, then what to do.
   const errorMessage = {
     approve: isFlagged ? "The photo was not kept. Try again." : "The photo was not approved. Try again.",
@@ -157,40 +155,18 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
       </div>
 
       {rejectOpen && (
-        <div className="mt-4 border-t border-[var(--color-bone-200)] pt-4">
-          <label htmlFor={reasonFieldId} className={controlLabelClass}>
-            Reason <span className={`${hintClass} normal-case`}>(optional, for your own notes)</span>
-          </label>
-          <textarea
-            ref={reasonRef}
-            id={reasonFieldId}
-            rows={2}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            className={`${inputBase} ${inputBorder(false)}`}
-          />
-          {/* #926 decision 8: Cancel first, the red Confirm second, in DOM and visual order. */}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={cancelReject}
-              disabled={state.status === "submitting"}
-              className={secondaryButtonClass}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmReject}
-              disabled={state.status === "submitting"}
-              className={dangerButtonClass}
-            >
-              {state.status === "submitting" && state.action === "reject"
-                ? "Saving…"
-                : `Confirm ${isFlagged ? "remove" : "reject"}`}
-            </button>
-          </div>
-        </div>
+        <AdminRejectStep
+          id={reasonFieldId}
+          fieldRef={reasonRef}
+          reason={reason}
+          onReason={setReason}
+          busy={state.status === "submitting"}
+          confirmLabel={confirmRejectLabel}
+          // "Saving…" only while the reject itself runs; an Approve running keeps the plain label.
+          busyLabel={state.status === "submitting" && state.action === "reject" ? "Saving…" : confirmRejectLabel}
+          onCancel={cancelReject}
+          onConfirm={handleConfirmReject}
+        />
       )}
 
       {state.status === "error" && (

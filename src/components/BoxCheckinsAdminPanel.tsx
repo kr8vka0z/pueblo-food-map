@@ -131,7 +131,7 @@ export default function BoxCheckinsAdminPanel({ checkins }: BoxCheckinsAdminPane
                 if (pendingId !== row.id) void toggleVisibility(row);
               }}
               aria-disabled={pendingId === row.id || undefined}
-              className={`${secondaryButtonClass} shrink-0 aria-disabled:cursor-not-allowed aria-disabled:opacity-50`}
+              className={`${secondaryButtonClass} shrink-0`}
             >
               {pendingId === row.id ? "Saving…" : row.visibility === "visible" ? "Hide" : "Unhide"}
             </button>

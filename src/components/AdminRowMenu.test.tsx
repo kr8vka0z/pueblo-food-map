@@ -18,8 +18,8 @@ function setup() {
       <AdminRowMenu
         labelledBy="item-name"
         items={[
-          { label: "Dismiss", onSelect: dismiss, danger: true },
           { label: "Make it a draft event", onSelect: draft },
+          { label: "Dismiss", onSelect: dismiss, danger: true },
         ]}
       />
       <button type="button">Elsewhere</button>
@@ -32,7 +32,7 @@ function setup() {
 const items = () => screen.getAllByRole("menuitem");
 
 describe("AdminRowMenu", () => {
-  test("its name includes the visible item name, and the danger item renders last", async () => {
+  test("its name includes the visible item name, and the items render in the given order", async () => {
     const { user, button } = setup();
     await user.click(button);
     expect(items().map((i) => i.textContent)).toEqual(["Make it a draft event", "Dismiss"]);

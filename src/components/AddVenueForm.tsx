@@ -89,11 +89,18 @@ import {
   hintClass,
   inputBase,
   inputBorder,
+  inputClass,
   labelClass,
   requiredMarkClass,
   saveRowClass,
 } from "@/components/formClasses";
-import { dangerButtonClass, failureBoxClass, failureLineClass, secondaryButtonClass } from "@/lib/adminCardStyles";
+import {
+  dangerButtonClass,
+  failureBoxClass,
+  failureLineClass,
+  pickerOptionClass,
+  secondaryButtonClass,
+} from "@/lib/adminCardStyles";
 import { EMAIL_RE } from "@/lib/email";
 import { focusFirstProblem } from "@/lib/focusFirstProblem";
 import type { IrregularSchedule, VenueCategory, WeeklyHours } from "@/types/venue";
@@ -784,7 +791,7 @@ export default function AddVenueForm({
               onChange={(e) => setField("hostName", e.target.value)}
               placeholder="e.g. First Baptist Church"
               maxLength={FIELD_LIMITS.SUGGEST_VENUE_NAME}
-              className={`${inputBase} ${inputBorder(false)}`}
+              className={inputClass}
             />
           </div>
 
@@ -799,7 +806,7 @@ export default function AddVenueForm({
               onChange={(e) => setField("hostNote", e.target.value)}
               placeholder="Shown on the box's public page"
               maxLength={FIELD_LIMITS.BOX_ADOPTER_NOTE}
-              className={`${inputBase} ${inputBorder(false)} resize-y min-h-[56px]`}
+              className={`${inputClass} resize-y min-h-[56px]`}
             />
           </div>
 
@@ -815,7 +822,7 @@ export default function AddVenueForm({
               onChange={(e) => setField("hostContact", e.target.value)}
               placeholder="Phone or email, for admin use only"
               maxLength={FIELD_LIMITS.SUGGEST_CONTACT}
-              className={`${inputBase} ${inputBorder(false)}`}
+              className={inputClass}
             />
           </div>
 
@@ -830,7 +837,7 @@ export default function AddVenueForm({
               onChange={(e) => setField("mostNeeded", e.target.value)}
               placeholder="e.g. canned protein, diapers, no glass"
               maxLength={FIELD_LIMITS.BOX_CHECKIN_NOTE}
-              className={`${inputBase} ${inputBorder(false)}`}
+              className={inputClass}
             />
           </div>
 
@@ -844,7 +851,7 @@ export default function AddVenueForm({
                 id="box-installed-on"
                 value={values.installedOn}
                 onChange={(e) => setField("installedOn", e.target.value)}
-                className={`${inputBase} ${inputBorder(false)}`}
+                className={inputClass}
               />
             </div>
             <div>
@@ -856,7 +863,7 @@ export default function AddVenueForm({
                 id="box-removed-on"
                 value={values.removedOn}
                 onChange={(e) => setField("removedOn", e.target.value)}
-                className={`${inputBase} ${inputBorder(false)}`}
+                className={inputClass}
               />
             </div>
           </div>
@@ -944,11 +951,9 @@ export default function AddVenueForm({
                         <button
                           type="button"
                           onClick={() => applyGeocodeMatch(match)}
-                          className={`w-full ${secondaryButtonClass}`}
+                          className={pickerOptionClass}
                         >
-                          {/* WHY an inner span: the shared button centres its
-                              words, and an address list reads down its left edge. */}
-                          <span className="w-full text-left">{match.matchedAddress}</span>
+                          {match.matchedAddress}
                         </button>
                       </li>
                     ))}
@@ -1078,7 +1083,7 @@ export default function AddVenueForm({
                 value={values.hours[day]}
                 onChange={(e) => setHourDay(day, e.target.value)}
                 placeholder="9:00-17:00"
-                className={`${inputBase} ${inputBorder(false)}`}
+                className={inputClass}
               />
             </div>
           ))}
@@ -1131,7 +1136,7 @@ export default function AddVenueForm({
               id={`irregular-recurrence-${i}`}
               value={row.recurrence}
               onChange={(e) => setIrregularField(i, "recurrence", e.target.value as IrregularEntryDraft["recurrence"])}
-              className={`${inputBase} ${inputBorder(false)}`}
+              className={inputClass}
             >
               <option value="">Select a kind…</option>
               <option value="monthly_ordinal">A specific weekday each month (e.g. 4th Tuesday)</option>
@@ -1145,7 +1150,7 @@ export default function AddVenueForm({
                   aria-label={`Schedule ${i + 1} ordinal`}
                   value={row.ordinal}
                   onChange={(e) => setIrregularField(i, "ordinal", e.target.value as IrregularEntryDraft["ordinal"])}
-                  className={`${inputBase} ${inputBorder(false)}`}
+                  className={inputClass}
                 >
                   <option value="">1st, 2nd…</option>
                   <option value="1">1st</option>
@@ -1159,7 +1164,7 @@ export default function AddVenueForm({
                   aria-label={`Schedule ${i + 1} weekday`}
                   value={row.weekday}
                   onChange={(e) => setIrregularField(i, "weekday", e.target.value as IrregularEntryDraft["weekday"])}
-                  className={`${inputBase} ${inputBorder(false)}`}
+                  className={inputClass}
                 >
                   <option value="">Weekday…</option>
                   {DISPLAY_DAY_KEYS.map((day) => (
@@ -1180,7 +1185,7 @@ export default function AddVenueForm({
                 value={row.dayOfMonth}
                 onChange={(e) => setIrregularField(i, "dayOfMonth", e.target.value)}
                 placeholder="Day of month (1-31)"
-                className={`${inputBase} ${inputBorder(false)}`}
+                className={inputClass}
               />
             )}
 
@@ -1191,7 +1196,7 @@ export default function AddVenueForm({
                 value={row.slots}
                 onChange={(e) => setIrregularField(i, "slots", e.target.value)}
                 placeholder="11:00 AM - 12:00 PM"
-                className={`${inputBase} ${inputBorder(false)}`}
+                className={inputClass}
               />
             )}
 
@@ -1206,7 +1211,7 @@ export default function AddVenueForm({
                   ? "Describe the schedule, e.g. \"3rd weekend, call ahead\""
                   : "Note (optional)"
               }
-              className={`${inputBase} ${inputBorder(false)} resize-y min-h-[56px]`}
+              className={`${inputClass} resize-y min-h-[56px]`}
             />
           </div>
         ))}
@@ -1222,27 +1227,21 @@ export default function AddVenueForm({
 
       {/* SNAP / WIC tri-state */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {/* The visible label is aria-hidden: the slider's own legend carries
-            the same name for screen readers, so it isn't read twice. */}
         <div>
-          <p aria-hidden className={labelClass}>
-            Accepts SNAP
-          </p>
           <AdminSegmented
             name="venue-snap"
             legend="Accepts SNAP"
+            legendClass={labelClass}
             options={TRI_STATE_OPTIONS}
             value={values.acceptsSnap}
             onChange={(v) => setField("acceptsSnap", v as TriStateValue)}
           />
         </div>
         <div>
-          <p aria-hidden className={labelClass}>
-            Accepts WIC
-          </p>
           <AdminSegmented
             name="venue-wic"
             legend="Accepts WIC"
+            legendClass={labelClass}
             options={TRI_STATE_OPTIONS}
             value={values.acceptsWic}
             onChange={(v) => setField("acceptsWic", v as TriStateValue)}
@@ -1261,7 +1260,7 @@ export default function AddVenueForm({
           value={values.phone}
           onChange={(e) => setField("phone", e.target.value)}
           maxLength={FIELD_LIMITS.SUGGEST_CONTACT}
-          className={`${inputBase} ${inputBorder(false)}`}
+          className={inputClass}
         />
       </div>
 
@@ -1301,7 +1300,7 @@ export default function AddVenueForm({
           value={values.url}
           onChange={(e) => setField("url", e.target.value)}
           maxLength={FIELD_LIMITS.SUGGEST_CONTACT}
-          className={`${inputBase} ${inputBorder(false)}`}
+          className={inputClass}
         />
       </div>
 
@@ -1316,7 +1315,7 @@ export default function AddVenueForm({
           value={values.operator}
           onChange={(e) => setField("operator", e.target.value)}
           maxLength={FIELD_LIMITS.SUGGEST_VENUE_NAME}
-          className={`${inputBase} ${inputBorder(false)}`}
+          className={inputClass}
         />
       </div>
 
@@ -1331,7 +1330,7 @@ export default function AddVenueForm({
           value={values.notes}
           onChange={(e) => setField("notes", e.target.value)}
           maxLength={FIELD_LIMITS.SUGGEST_NOTES}
-          className={`${inputBase} ${inputBorder(false)} resize-y min-h-[72px]`}
+          className={`${inputClass} resize-y min-h-[72px]`}
         />
       </div>
 
@@ -1404,7 +1403,7 @@ export default function AddVenueForm({
                   maxLength={FIELD_LIMITS.VENUE_TOLD_US_NOTE}
                   onChange={(e) => setVenueToldUsNote(e.target.value)}
                   placeholder="e.g. Heather, admin assistant, by email"
-                  className={`${inputBase} ${inputBorder(false)}`}
+                  className={inputClass}
                 />
               </div>
             )}

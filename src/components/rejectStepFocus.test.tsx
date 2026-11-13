@@ -3,8 +3,8 @@
  * Remove photo, Decline) keeps keyboard focus (#926): opening it moves focus
  * to the reason box, and Cancel hands it back to the button that opened it,
  * which stays mounted while the step is open; Escape does what Cancel does
- * and clears the typed reason. Cards are built from the same
- * row parsers the admin pages use.
+ * and clears the typed reason; Cancel comes before the red Confirm (#926
+ * decision 8). Cards are built from the same row parsers the admin pages use.
  */
 
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -68,10 +68,11 @@ const submission = parseSubmissionRow({
   review_reason: null,
 });
 
-const CARDS: [string, string, () => ReactElement][] = [
+const CARDS: [string, string, string, () => ReactElement][] = [
   [
     "PhotoReviewCard",
     "Reject",
+    "Confirm reject",
     () => (
       <PhotoReviewCard
         photo={{
@@ -90,6 +91,7 @@ const CARDS: [string, string, () => ReactElement][] = [
   [
     "SponsorRequestCard",
     "Decline",
+    "Confirm decline",
     () => (
       <SponsorRequestCard
         adopter={{
@@ -106,39 +108,36 @@ const CARDS: [string, string, () => ReactElement][] = [
       />
     ),
   ],
-  ["ProposalCard", "Reject", () => <ProposalCard proposal={proposal} />],
-  ["SubmissionCard", "Reject", () => <SubmissionCard submission={submission} />],
+  ["ProposalCard", "Reject", "Confirm reject", () => <ProposalCard proposal={proposal} />],
+  ["SubmissionCard", "Reject", "Confirm reject", () => <SubmissionCard submission={submission} />],
 ];
 
-test.each(CARDS)("%s: opening the step focuses the reason box; Cancel returns focus to %s", async (_card, trigger, card) => {
+// Cancel and Escape leave the same state behind: the step closes, focus is
+// back on the opener (the same element, never remounted), the typed reason
+// is gone when it reopens, and nothing is sent.
+test.each(CARDS)("%s: the step opens on the reason box, Cancel and Escape close it back to %s", async (_card, trigger, confirm, card) => {
   const user = userEvent.setup();
   render(card());
   const opener = screen.getByRole("button", { name: trigger });
+  const reasonBox = () => screen.queryByRole("textbox", { name: /^Reason/ });
 
   await user.click(opener);
-  expect(screen.getByRole("textbox", { name: /^Reason/ })).toHaveFocus();
+  expect(reasonBox()).toHaveFocus();
+  const cancel = screen.getByRole("button", { name: "Cancel" });
+  expect(cancel.compareDocumentPosition(screen.getByRole("button", { name: confirm })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-  await user.click(screen.getByRole("button", { name: "Cancel" }));
-  expect(screen.queryByRole("textbox", { name: /^Reason/ })).toBeNull();
-  expect(screen.getByRole("button", { name: trigger })).toBe(opener); // the same element, never remounted
+  await user.click(cancel);
+  expect(reasonBox()).toBeNull();
+  expect(screen.getByRole("button", { name: trigger })).toBe(opener);
   expect(opener).toHaveFocus();
-  expect(fetchMock).not.toHaveBeenCalled();
-});
-
-// #926: Escape leaves the same state behind as Cancel: the step closes, the
-// typed reason is gone when it reopens, focus is back on the opener, nothing sent.
-test.each(CARDS)("%s: Escape closes the step and clears the typed reason", async (_card, trigger, card) => {
-  const user = userEvent.setup();
-  render(card());
-  const opener = screen.getByRole("button", { name: trigger });
 
   await user.click(opener);
-  await user.type(screen.getByRole("textbox", { name: /^Reason/ }), "Duplicate");
+  await user.type(reasonBox()!, "Duplicate");
   await user.keyboard("{Escape}");
-
-  expect(screen.queryByRole("textbox", { name: /^Reason/ })).toBeNull();
+  expect(reasonBox()).toBeNull();
   expect(opener).toHaveFocus();
+
   await user.click(opener);
-  expect(screen.getByRole("textbox", { name: /^Reason/ })).toHaveValue("");
+  expect(reasonBox()).toHaveValue("");
   expect(fetchMock).not.toHaveBeenCalled();
 });

@@ -8,6 +8,7 @@
  *   inputBase                text box / select / textarea: 48 tall, 16 px words on phones (14 from md)
  *   inputBorder(hasError)    its edge and focus colour: ink 400 at rest (5.9:1 on white, clears the 3:1 floor) with a sage focus;
  *                            on error red at rest AND in focus. Always pair it with inputBase.
+ *   inputClass               inputBase + inputBorder(false), for a box that is never marked wrong
  *   labelClass, errorClass   the label above a field and the red line under it
  *   hintClass                the "(optional)" hint inside a label, ink 400 (DESIGN.md Forms)
  *   requiredMarkClass        the red star after a required field's label (aria-hidden; the field says aria-required)
@@ -20,7 +21,7 @@
  *   cancelLinkProps(busy)    spread on the Cancel <Link> so it is off while a save runs
  */
 
-import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { buttonClass } from "@/lib/adminCardStyles";
 
 // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
 // block: a textarea is inline by default and leaves a gap under it for the
@@ -42,6 +43,8 @@ export const inputBorder = (hasError: boolean) =>
   hasError
     ? "border-[var(--color-danger)] focus-visible:border-[var(--color-danger)] focus-visible:ring-[var(--color-danger)]"
     : "border-[var(--color-ink-400)] focus-visible:border-[var(--color-sage-500)] focus-visible:ring-[var(--color-sage-500)]";
+/** A box that is never marked wrong (a filter, a reason box): inputBase with the resting edge. */
+export const inputClass = `${inputBase} ${inputBorder(false)}`;
 export const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
 export const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
 export const hintClass = "font-normal text-[var(--color-ink-400)]";
@@ -62,23 +65,11 @@ export const checkboxClass =
   "size-[20px] shrink-0 cursor-pointer accent-[var(--color-sage-600)] " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-sage-500)]";
 
-/** Sage-filled form-level primary button (Save, Send code, Add event). */
-export const ADMIN_PRIMARY_BUTTON =
-  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] px-4 " +
-  "text-center text-base font-semibold text-[var(--color-bone-50)] transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-60 disabled:cursor-not-allowed " +
-  PRESS_FEEDBACK;
+/** Sage-filled form-level primary button (Save, Send code, Add event): primaryButtonClass at 16 px. */
+export const ADMIN_PRIMARY_BUTTON = buttonClass("primary", "text-base");
 
-/** Outline partner of ADMIN_PRIMARY_BUTTON: Cancel beside Save. */
-export const ADMIN_SECONDARY_BUTTON =
-  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-bone-300)] " +
-  "bg-transparent px-4 text-center text-base font-medium text-[var(--color-ink-700)] transition-colors duration-150 " +
-  "hover:bg-[var(--color-sage-100)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  // aria-disabled: Cancel is a link, which has no native disabled state.
-  "disabled:opacity-60 disabled:cursor-not-allowed aria-disabled:opacity-60 aria-disabled:cursor-not-allowed " +
-  PRESS_FEEDBACK;
+/** Outline partner of ADMIN_PRIMARY_BUTTON: Cancel beside Save. Its aria-disabled dim matters here: Cancel is a link. */
+export const ADMIN_SECONDARY_BUTTON = buttonClass("secondary", "text-base");
 
 /** Cancel (a third) then Save (two thirds). Keep Save the form's first submit button. */
 export const saveRowClass = "grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2";

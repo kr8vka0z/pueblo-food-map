@@ -107,7 +107,6 @@ describe("ArchiveVenueButton — confirm gate", () => {
 // a place waits for the next publish.
 describe("ArchiveVenueButton — what the confirm promises", () => {
   test.each([
-    [undefined, /next publish/],
     ["place" as const, /next publish/],
     ["box" as const, /right away/],
   ])("kind %s says %s", async (kind, promise) => {

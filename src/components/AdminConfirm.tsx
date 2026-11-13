@@ -10,7 +10,7 @@
  * Nothing is sent until the action button is pressed: that press is the
  * gate window.confirm used to be.
  *
- * Three parts:
+ * Four parts:
  *   useAdminConfirm()  -> { asking, ask, cancel, triggerRef }
  *     ask()       opens it (call from the trigger's onClick).
  *     cancel()    closes it and puts focus back on the trigger. Also call it
@@ -21,9 +21,11 @@
  *     triggerRef  put on the trigger button. Keep the trigger MOUNTED with
  *                 hidden={asking} (not unmounted), or focus has nowhere to
  *                 return to.
- *   useAdminStep({ busy?, onCancel? }) -> { open, openStep, closeStep, triggerRef, fieldRef }
+ *   useAdminStep({ busy, onCancel }) -> { open, openStep, closeStep, triggerRef, fieldRef }
  *                 the same for an inline reason step that is not a confirm:
  *                 opening focuses fieldRef, closing returns to the trigger.
+ *   <AdminRejectStep …/>  the review cards' one reason step (Reason box,
+ *                 Cancel, red Confirm) built on useAdminStep; see its comment.
  *   <AdminConfirm title body confirmLabel busyLabel tone busy error onConfirm onCancel />
  *     title         the question, naming the thing ("Remove Eastside Pantry from the map?")
  *     children      optional body: what happens and what does not
@@ -56,16 +58,23 @@
  */
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
-import { dangerButtonClass, failureLineClass, primaryButtonClass, secondaryButtonClass } from "@/lib/adminCardStyles";
+import {
+  controlLabelClass,
+  dangerButtonClass,
+  failureLineClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from "@/lib/adminCardStyles";
+import { hintClass, inputClass } from "@/components/formClasses";
 
-export function useAdminConfirm<T extends HTMLElement = HTMLButtonElement>(): {
+export function useAdminConfirm(): {
   asking: boolean;
   ask: () => void;
   cancel: () => void;
-  triggerRef: RefObject<T | null>;
+  triggerRef: RefObject<HTMLButtonElement | null>;
 } {
   const [asking, setAsking] = useState(false);
-  const triggerRef = useRef<T | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const returnFocus = useRef(false);
   const ask = useCallback(() => setAsking(true), []);
   const cancel = useCallback(() => {
@@ -93,24 +102,20 @@ export function useAdminConfirm<T extends HTMLElement = HTMLButtonElement>(): {
  * the step: the nearest ancestor of fieldRef marked data-admin-step, else
  * the element that directly holds fieldRef. Mark the step's box with
  * data-admin-step when the field sits in its own wrapper (a TextField), so
- * Escape also works from the step's buttons. Options, both optional:
+ * Escape also works from the step's buttons. Options, both required:
  *   busy      true while the step's request runs: Escape then does nothing.
  *   onCancel  what the step's own Cancel button does (clear the reason,
  *             then closeStep()), so Escape leaves the same state behind.
- *             Without it Escape only calls closeStep().
  */
-export function useAdminStep<F extends HTMLElement = HTMLTextAreaElement>(
-  options: { busy?: boolean; onCancel?: () => void } = {},
-): {
+export function useAdminStep({ busy, onCancel }: { busy: boolean; onCancel: () => void }): {
   open: boolean;
   openStep: () => void;
   closeStep: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
-  fieldRef: RefObject<F | null>;
+  fieldRef: RefObject<HTMLTextAreaElement | null>;
 } {
-  const { busy = false, onCancel } = options;
   const { asking, ask, cancel, triggerRef } = useAdminConfirm();
-  const fieldRef = useRef<F | null>(null);
+  const fieldRef = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
     if (asking) fieldRef.current?.focus();
   }, [asking]);
@@ -125,12 +130,71 @@ export function useAdminStep<F extends HTMLElement = HTMLTextAreaElement>(
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || busy) return;
       e.preventDefault();
-      (onCancel ?? cancel)();
+      onCancel();
     };
     box.addEventListener("keydown", onKeyDown);
     return () => box.removeEventListener("keydown", onKeyDown);
-  }, [asking, busy, onCancel, cancel]);
+  }, [asking, busy, onCancel]);
   return { open: asking, openStep: ask, closeStep: cancel, triggerRef, fieldRef };
+}
+
+type AdminRejectStepProps = {
+  id: string;
+  fieldRef: RefObject<HTMLTextAreaElement | null>;
+  reason: string;
+  onReason: (reason: string) => void;
+  busy: boolean;
+  confirmLabel: string;
+  busyLabel: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+  error?: string | null;
+};
+
+/**
+ * AdminRejectStep — the one reason step behind Reject, Remove photo and
+ * Decline on the review cards (#926 decision 8): an optional Reason box,
+ * then Cancel FIRST and the red Confirm second. Pair it with useAdminStep:
+ *   {open && <AdminRejectStep id={…} fieldRef={fieldRef} reason={reason} onReason={setReason} busy={busy}
+ *     confirmLabel="Confirm reject" busyLabel="Rejecting…" onCancel={cancelReject} onConfirm={reject} />}
+ * onCancel is the same function given to useAdminStep (clear the reason,
+ * then closeStep()), so Cancel and Escape leave the same state. The reason
+ * box is a direct child of the step's box, so the hook's Escape listener
+ * covers the buttons too. error, when given, is a red line inside the step.
+ */
+export function AdminRejectStep({
+  id,
+  fieldRef,
+  reason,
+  onReason,
+  busy,
+  confirmLabel,
+  busyLabel,
+  onCancel,
+  onConfirm,
+  error,
+}: AdminRejectStepProps) {
+  return (
+    <div className="mt-4 border-t border-[var(--color-bone-200)] pt-4">
+      <label htmlFor={id} className={controlLabelClass}>
+        Reason <span className={`${hintClass} normal-case`}>(optional, for your own notes)</span>
+      </label>
+      <textarea ref={fieldRef} id={id} rows={2} value={reason} onChange={(e) => onReason(e.target.value)} className={inputClass} />
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={onCancel} disabled={busy} className={secondaryButtonClass}>
+          Cancel
+        </button>
+        <button type="button" onClick={onConfirm} disabled={busy} className={dangerButtonClass}>
+          {busy ? busyLabel : confirmLabel}
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className={`mt-2 ${failureLineClass}`}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
 }
 
 type AdminConfirmProps = {

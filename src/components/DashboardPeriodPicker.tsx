@@ -13,11 +13,11 @@
  * picker).
  */
 
-import { useState, useTransition } from "react";
+import { startTransition, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminSegmented from "@/components/AdminSegmented";
 
-export interface DashboardPeriodPickerProps {
+interface DashboardPeriodPickerProps {
   /** The period the server rendered (already validated by the page). */
   period: string;
   options: { value: string; label: string }[];
@@ -27,7 +27,6 @@ export default function DashboardPeriodPicker({ period, options }: DashboardPeri
   const router = useRouter();
   const [value, setValue] = useState(period);
   const [renderedPeriod, setRenderedPeriod] = useState(period);
-  const [, startTransition] = useTransition();
   // A new server period (Back, or the page re-rendering) wins over the local choice.
   if (period !== renderedPeriod) {
     setRenderedPeriod(period);

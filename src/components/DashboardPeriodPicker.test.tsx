@@ -1,7 +1,7 @@
 /**
  * DashboardPeriodPicker: choosing a period navigates to /admin with that
- * `period=` and keeps every other query value already in the address, by
- * pointer and by the arrow keys (real radios).
+ * `period=` and keeps every other query value already in the address (the
+ * arrow keys are AdminSegmented.test.tsx's: real radios).
  */
 
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -27,21 +27,12 @@ afterEach(() => {
 });
 
 describe("DashboardPeriodPicker", () => {
-  test.each([
-    ["a press", async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("radio", { name: "90 days" }))],
-    [
-      "the arrow key",
-      async (user: ReturnType<typeof userEvent.setup>) => {
-        screen.getByRole("radio", { name: "30 days" }).focus();
-        await user.keyboard("{ArrowRight}");
-      },
-    ],
-  ])("%s moves to the new period, keeps the other query values and shows the choice at once", async (_how, act) => {
+  test("a press moves to the new period, keeps the other query values and shows the choice at once", async () => {
     window.history.replaceState(null, "", "/admin?period=30d&foo=1");
     const user = userEvent.setup();
     render(<DashboardPeriodPicker period="30d" options={OPTIONS} />);
 
-    await act(user);
+    await user.click(screen.getByRole("radio", { name: "90 days" }));
 
     expect(mockPush).toHaveBeenCalledTimes(1);
     const [href] = mockPush.mock.calls[0] as [string];

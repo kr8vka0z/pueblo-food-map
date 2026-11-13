@@ -54,10 +54,7 @@ export default async function ActivityPage({
   const params = searchParams ? await searchParams : {};
   const filters = parseActivityFilters(params);
   // Decided from the address, not by comparing with the clock-based default range.
-  const filtered = FILTER_KEYS.some((key) => {
-    const value = params[key];
-    return Array.isArray(value) ? value.some(Boolean) : Boolean(value);
-  });
+  const filtered = FILTER_KEYS.some((key) => [params[key]].flat().some(Boolean));
   const [page, people, navCounts] = await Promise.all([
     loadActivityPage(db, filters),
     loadActivityPeople(db),

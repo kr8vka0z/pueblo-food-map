@@ -12,10 +12,10 @@
  *               event's name). The button is named "More actions for <that
  *               name>" through aria-labelledby, so no person- or
  *               place-supplied text ever goes into an attribute.
- *   items       { label, onSelect, danger?, disabled? }[]. Rendered in the
- *               given order, except danger items, which always go last under
- *               a bone 200 line (the risky choice last). Keyboard order is
- *               the rendered order.
+ *   items       { label, onSelect, danger? }[], rendered in the given order:
+ *               pass the risky (danger) items last. A bone 200 line goes
+ *               above the first danger item. Keyboard order is the rendered
+ *               order.
  *   disabled    optional; disables the three-dot button itself (natively),
  *               for example while the row's own request runs. The menu never
  *               shows while it is set.
@@ -27,10 +27,6 @@
  * choosing an item closes, returns focus to the button, then calls
  * onSelect. A press outside closes. No open animation (it is often opened
  * by keyboard).
- *
- * Disabled items use aria-disabled, not the disabled attribute: a natively
- * disabled button refuses focus, which would stall the arrow keys. Choosing
- * one does nothing.
  *
  * Layering: a small local z-20, enough to float over its own card and the
  * neighbouring rows on an admin page (no map there). It is deliberately NOT
@@ -47,11 +43,10 @@ import { EllipsisVertical } from "lucide-react";
 import { focusRingClass } from "@/lib/adminCardStyles";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
-export type AdminRowMenuItem = {
+type AdminRowMenuItem = {
   label: string;
   onSelect: () => void;
   danger?: boolean;
-  disabled?: boolean;
 };
 
 type AdminRowMenuProps = {
@@ -62,7 +57,6 @@ type AdminRowMenuProps = {
 
 export default function AdminRowMenu({ labelledBy, items, disabled = false }: AdminRowMenuProps) {
   const baseId = useId();
-  const buttonId = `${baseId}-button`;
   const menuId = `${baseId}-menu`;
   const prefixId = `${baseId}-prefix`;
   const [openState, setOpen] = useState(false);
@@ -74,8 +68,7 @@ export default function AdminRowMenu({ labelledBy, items, disabled = false }: Ad
   const buttonRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const ordered = [...items.filter((i) => !i.danger), ...items.filter((i) => i.danger)];
-  const firstDanger = ordered.findIndex((i) => i.danger);
+  const firstDanger = items.findIndex((i) => i.danger);
 
   function openMenu(where: "first" | "last") {
     focusOnOpen.current = where;
@@ -89,7 +82,7 @@ export default function AdminRowMenu({ labelledBy, items, disabled = false }: Ad
 
   useEffect(() => {
     if (!open) return;
-    const list = itemRefs.current.slice(0, ordered.length);
+    const list = itemRefs.current.slice(0, items.length);
     (focusOnOpen.current === "first" ? list[0] : list[list.length - 1])?.focus();
     // Only on opening: a parent re-render while open must not pull focus back.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -117,7 +110,7 @@ export default function AdminRowMenu({ labelledBy, items, disabled = false }: Ad
   }
 
   function onMenuKeyDown(e: KeyboardEvent<HTMLDivElement>) {
-    const list = itemRefs.current.slice(0, ordered.length);
+    const list = itemRefs.current.slice(0, items.length);
     const at = list.indexOf(document.activeElement as HTMLButtonElement);
     const move = (to: number) => list[(to + list.length) % list.length]?.focus();
     switch (e.key) {
@@ -150,7 +143,6 @@ export default function AdminRowMenu({ labelledBy, items, disabled = false }: Ad
   }
 
   function choose(item: AdminRowMenuItem) {
-    if (item.disabled) return;
     close(true);
     item.onSelect();
   }
@@ -162,7 +154,6 @@ export default function AdminRowMenu({ labelledBy, items, disabled = false }: Ad
       </span>
       <button
         ref={buttonRef}
-        id={buttonId}
         type="button"
         disabled={disabled}
         aria-labelledby={`${prefixId} ${labelledBy}`}
@@ -194,7 +185,7 @@ export default function AdminRowMenu({ labelledBy, items, disabled = false }: Ad
             "overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white py-1"
           }
         >
-          {ordered.map((item, i) => (
+          {items.map((item, i) => (
             <button
               key={`${i}-${item.label}`}
               ref={(el) => {
@@ -203,14 +194,12 @@ export default function AdminRowMenu({ labelledBy, items, disabled = false }: Ad
               type="button"
               role="menuitem"
               tabIndex={-1}
-              aria-disabled={item.disabled || undefined}
               onClick={() => choose(item)}
               className={
                 "flex min-h-12 w-full items-center px-4 py-2 text-left text-sm transition-colors duration-150 " +
                 "hover:bg-[var(--color-sage-100)] focus-visible:bg-[var(--color-sage-100)] focus-visible:outline-none " +
                 (i === firstDanger ? "border-t border-[var(--color-bone-200)] " : "") +
-                (item.danger ? "text-[var(--color-danger)] " : "text-[var(--color-ink-700)] ") +
-                (item.disabled ? "cursor-not-allowed opacity-50" : "")
+                (item.danger ? "text-[var(--color-danger)]" : "text-[var(--color-ink-700)]")
               }
             >
               {item.label}

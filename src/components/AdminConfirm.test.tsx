@@ -117,25 +117,6 @@ describe("AdminConfirm", () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
-  // A Reject / Remove photo / Decline step closes the same two ways, and
-  // leaves no half-typed reason behind for the next time it opens.
-  test.each([
-    ["Cancel", async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("button", { name: "Cancel" }))],
-    ["Escape", async (user: ReturnType<typeof userEvent.setup>) => user.keyboard("{Escape}")],
-  ])("%s closes a reason step, returns focus to its trigger and clears the reason", async (_name, close) => {
-    const user = userEvent.setup();
-    render(<StepHarness />);
-    await user.click(screen.getByRole("button", { name: "Reject" }));
-    const box = screen.getByRole("textbox", { name: "Reason" });
-    expect(box).toHaveFocus();
-    await user.type(box, "dup");
-    await close(user);
-    expect(screen.queryByRole("textbox", { name: "Reason" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Reject" })).toHaveFocus();
-    await user.click(screen.getByRole("button", { name: "Reject" }));
-    expect(screen.getByRole("textbox", { name: "Reason" })).toHaveValue("");
-  });
-
   test("Escape does not close a reason step while its request runs", async () => {
     const user = userEvent.setup();
     const { rerender } = render(<StepHarness />);

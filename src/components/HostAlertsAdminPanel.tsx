@@ -214,14 +214,10 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
             )}
           </div>
           <div>
-            {/* The slider's legend is read by screen readers; this caption is
-                its visible twin, so it is hidden from them. */}
-            <p aria-hidden="true" className={labelClass}>
-              Email language
-            </p>
             <AdminSegmented
               name="host-alert-lang"
               legend="Email language"
+              legendClass={labelClass}
               options={LANG_OPTIONS}
               value={lang}
               onChange={(v) => setLang(v === "es" ? "es" : "en")}
@@ -233,7 +229,7 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
           <button
             type="submit"
             aria-disabled={state.status === "submitting" || undefined}
-            className={`${primaryButtonClass} sm:mt-[24px] aria-disabled:cursor-not-allowed aria-disabled:opacity-50`}
+            className={`${primaryButtonClass} sm:mt-[24px]`}
           >
             {state.status === "submitting" && state.removing === null ? "Adding…" : "Add host"}
           </button>

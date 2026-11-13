@@ -6,14 +6,18 @@
  * the browser gives the arrow keys, the group name and the checked state.
  *
  * Props (controlled):
- *   name      the radios' shared name
- *   legend    the group's name, read by screen readers (visually hidden)
- *   options   { value, label }[], 2 or 3 of them
- *   value     the chosen value
- *   onChange  called with the newly chosen value
- *   fullWidth optional; the track fills its container (equal segments)
- *             instead of hugging its words, to line up with full-width
- *             fields above and below it on a phone
+ *   name         the radios' shared name
+ *   legend       the group's name (a real <legend>)
+ *   legendClass  optional; shows the legend as the slider's visible label in
+ *                this class (labelClass on a form, controlLabelClass above
+ *                a filter). Without it the legend is for screen readers
+ *                only, for a slider whose meaning is already on screen.
+ *   options      { value, label }[], 2 or 3 of them
+ *   value        the chosen value
+ *   onChange     called with the newly chosen value
+ *
+ * Width: full width below 640 (equal segments, lined up with the full-width
+ * fields and buttons around it on a phone), its own width from 640 up.
  *
  * The look is LanguageToggle's (src/components/LanguageToggle.tsx): a bone
  * 200 track, here fully round; a sage 600 thumb behind the chosen word that
@@ -30,10 +34,10 @@ import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 type AdminSegmentedProps = {
   name: string;
   legend: string;
+  legendClass?: string;
   options: { value: string; label: string }[];
   value: string;
   onChange: (value: string) => void;
-  fullWidth?: boolean;
 };
 
 // Full literals so Tailwind's scanner sees them: columns and thumb width by
@@ -51,7 +55,7 @@ const SEGMENT_CLASS =
   " has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--color-sage-500)] " +
   "has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-[var(--color-bone-200)] ";
 
-export default function AdminSegmented({ name, legend, options, value, onChange, fullWidth = false }: AdminSegmentedProps) {
+export default function AdminSegmented({ name, legend, legendClass, options, value, onChange }: AdminSegmentedProps) {
   const n = options.length;
   const at = Math.max(
     0,
@@ -59,11 +63,10 @@ export default function AdminSegmented({ name, legend, options, value, onChange,
   );
   return (
     <fieldset className="min-w-0">
-      <legend className="sr-only">{legend}</legend>
+      <legend className={legendClass ?? "sr-only"}>{legend}</legend>
       <div
         className={
-          "relative rounded-full bg-[var(--color-bone-200)] p-1 " +
-          (fullWidth ? "grid w-full " : "inline-grid ") +
+          "relative grid w-full rounded-full bg-[var(--color-bone-200)] p-1 sm:inline-grid sm:w-auto " +
           (COLS[n] ?? "grid-flow-col")
         }
       >

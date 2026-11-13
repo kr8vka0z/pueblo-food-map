@@ -25,7 +25,7 @@ import { useEffect, useRef, useState } from "react";
 import { shrinkFlyerToJpeg, UnsupportedImageError } from "@/lib/imageResize";
 import type { PublicFlyer } from "@/lib/events";
 import { dangerButtonClass, secondaryButtonClass } from "@/lib/adminCardStyles";
-import { errorClass, fieldGroupClass, hintClass, inputBase, inputBorder, labelClass } from "@/components/formClasses";
+import { errorClass, fieldGroupClass, hintClass, labelClass, inputClass } from "@/components/formClasses";
 import AdminConfirm, { useAdminConfirm } from "@/components/AdminConfirm";
 
 export interface EventFlyerFieldProps {
@@ -40,7 +40,6 @@ export interface EventFlyerFieldProps {
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
 const WRONG_TYPE = "That file isn't a JPEG, PNG or WebP image. Choose a different one.";
 
-const inputClass = `${inputBase} ${inputBorder(false)}`;
 
 type Busy = null | "uploading" | "saving" | "removing";
 

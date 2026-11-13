@@ -123,20 +123,6 @@ describe("PhotoReviewCard — pending photo", () => {
     expect(screen.queryByLabelText(/Reason/)).not.toBeInTheDocument();
     expect(mockFetch).not.toHaveBeenCalled();
   });
-
-  // #926 decision 8: Cancel comes first, the red Confirm second (Tab order).
-  test.each([
-    ["pending", "Reject", "Confirm reject"],
-    ["flagged", "Remove photo", "Confirm remove"],
-  ] as const)("%s: the reject step puts Cancel before %s's confirm", async (status, open, confirm) => {
-    const user = userEvent.setup();
-    render(<PhotoReviewCard photo={makePhoto({ status, flag_count: status === "flagged" ? 1 : 0 })} />);
-
-    await user.click(screen.getByRole("button", { name: open }));
-    const cancel = screen.getByRole("button", { name: "Cancel" });
-    const confirmButton = screen.getByRole("button", { name: confirm });
-    expect(cancel.compareDocumentPosition(confirmButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
 });
 
 describe("PhotoReviewCard — flagged (reported) photo", () => {

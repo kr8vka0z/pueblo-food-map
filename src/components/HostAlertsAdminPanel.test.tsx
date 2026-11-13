@@ -38,7 +38,9 @@ describe("HostAlertsAdminPanel", () => {
     );
     expect(screen.getByText("a@example.com")).toBeInTheDocument();
     expect(screen.getByText("b@example.com")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Remove" })).toHaveLength(2);
+    // #926: each Remove is named after its own address (aria-labelledby).
+    expect(screen.getByRole("button", { name: "Remove a@example.com" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove b@example.com" })).toBeInTheDocument();
   });
 
   test("adding a host POSTs and replaces the list with the response's refreshed hosts", async () => {
@@ -57,11 +59,11 @@ describe("HostAlertsAdminPanel", () => {
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/admin/blessing-boxes/box-1/host-alerts");
     expect(init.method).toBe("POST");
-    // Single-language alert emails: defaults to "en" when the admin never touches the select.
+    // Single-language alert emails: defaults to "en" when the admin never touches the slider.
     expect(JSON.parse(init.body as string)).toEqual({ email: "new@example.com", lang: "en" });
   });
 
-  test("picking Spanish from the language select sends lang 'es'", async () => {
+  test("picking Spanish on the language slider sends lang 'es'", async () => {
     const user = userEvent.setup();
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ ok: true, result: "added", hosts: [{ id: 1, email: "new@example.com" }] }), {
@@ -71,7 +73,8 @@ describe("HostAlertsAdminPanel", () => {
     render(<HostAlertsAdminPanel venueId="box-1" initialHosts={[]} />);
 
     await user.type(screen.getByLabelText("Add a host email"), "new@example.com");
-    await user.selectOptions(screen.getByLabelText("Email language"), "es");
+    // #926 decision 10: the two-way language choice is a slider of real radios.
+    await user.click(screen.getByRole("radio", { name: "Spanish" }));
     await user.click(screen.getByRole("button", { name: "Add host" }));
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
@@ -94,7 +97,7 @@ describe("HostAlertsAdminPanel", () => {
     mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, hosts: [] }), { status: 200 }));
     render(<HostAlertsAdminPanel venueId="box-1" initialHosts={[{ id: 1, email: "a@example.com" }]} />);
 
-    await user.click(screen.getByRole("button", { name: "Remove" }));
+    await user.click(screen.getByRole("button", { name: "Remove a@example.com" }));
 
     await waitFor(() => expect(screen.queryByText("a@example.com")).not.toBeInTheDocument());
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];

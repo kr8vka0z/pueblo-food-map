@@ -21,6 +21,7 @@ import AdminNav from "@/components/AdminNav";
 import EventForm, { type EventFormValues } from "@/components/EventForm";
 import { loadPendingEventSubmission, parseSubmissionPayload } from "@/lib/eventSubmissions";
 import { utcIsoToPuebloLocal } from "@/lib/eventTime";
+import { pageTitleClass } from "@/lib/adminCardStyles";
 
 export default async function NewEventPage({ searchParams }: { searchParams?: Promise<{ from?: string }> }) {
   const { from } = searchParams ? await searchParams : {};
@@ -51,14 +52,18 @@ export default async function NewEventPage({ searchParams }: { searchParams?: Pr
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="events" counts={navCounts} showActivity={identity.isOwner === true} />
       <div className="space-y-6 px-4 py-6 sm:px-6">
-        <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Add event</h2>
-        {fromSubmission && (
-          <p className="max-w-2xl text-sm text-[var(--color-ink-700)]">
-            Sent in by the public. We couldn&rsquo;t find the address on the map: press Find location or pick a place, then
-            save the draft. The flyer is added when you save.
-          </p>
-        )}
-        <EventForm venues={venues} initialValues={fromSubmission?.values} submissionId={fromSubmission?.id} />
+        <h2 className={pageTitleClass}>Add event</h2>
+        {/* WHY a notice inside the form, not a line under the title: admin page titles carry no subtitle (#926 decision 5). */}
+        <EventForm
+          venues={venues}
+          initialValues={fromSubmission?.values}
+          submissionId={fromSubmission?.id}
+          notice={
+            fromSubmission
+              ? "Sent in by the public. We couldn’t find the address on the map: press Find location or pick a place, then save the draft. The flyer is added when you save."
+              : undefined
+          }
+        />
       </div>
     </main>
   );

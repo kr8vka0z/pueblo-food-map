@@ -174,7 +174,7 @@ describe("AdminLoginForm — signed-out: email code (#684)", () => {
     await user.type(screen.getByLabelText(/^email$/i), "kysboyd@gmail.com");
     await user.click(screen.getByRole("button", { name: /email me a code/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/something went wrong/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/code was not sent/i);
     expect(screen.queryByTestId("admin-login-sent")).toBeNull();
   });
 
@@ -186,7 +186,7 @@ describe("AdminLoginForm — signed-out: email code (#684)", () => {
     await user.type(screen.getByLabelText(/^email$/i), "kysboyd@gmail.com");
     await user.click(screen.getByRole("button", { name: /email me a code/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/something went wrong/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/code was not sent/i);
   });
 
   test("never mentions a sign-in link", () => {

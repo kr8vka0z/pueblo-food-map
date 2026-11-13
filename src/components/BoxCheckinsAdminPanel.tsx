@@ -24,10 +24,11 @@
  * check on this button.
  */
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { parseAdminNeeds, type AdminCheckinRow } from "@/lib/blessingBoxes";
 import { t } from "@/lib/i18n";
+import { secondaryButtonClass, tagClass } from "@/lib/adminCardStyles";
 
 interface BoxCheckinsAdminPanelProps {
   checkins: AdminCheckinRow[];
@@ -45,6 +46,7 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", ti
 
 export default function BoxCheckinsAdminPanel({ checkins }: BoxCheckinsAdminPanelProps) {
   const router = useRouter();
+  const idPrefix = useId();
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [errorId, setErrorId] = useState<number | null>(null);
 
@@ -71,60 +73,66 @@ export default function BoxCheckinsAdminPanel({ checkins }: BoxCheckinsAdminPane
   }
 
   if (checkins.length === 0) {
-    return <p className="text-sm text-[var(--color-ink-500)]">No check-ins yet.</p>;
+    return (
+      <div>
+        <p className="text-sm text-[var(--color-ink-500)]">No check-ins yet.</p>
+        <p className="text-sm text-[var(--color-ink-500)]">
+          They show up here when someone reports on this box from its card on the map.
+        </p>
+      </div>
+    );
   }
 
   return (
     <ul className="divide-y divide-[var(--color-bone-200)]">
-      {checkins.map((row) => (
-        <li key={row.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-[var(--color-ink-700)]">
-              {KIND_LABEL[row.kind]}
-              {row.kind === "problem" && (
-                <span className="ml-2 rounded bg-[var(--color-danger)]/10 px-1.5 py-0.5 text-xs font-medium text-[var(--color-danger)]">
-                  Admin only
-                </span>
-              )}
-              {row.visibility === "hidden" && (
-                <span className="ml-2 rounded bg-[var(--color-bone-100)] px-1.5 py-0.5 text-xs font-medium text-[var(--color-ink-500)]">
-                  Hidden
-                </span>
-              )}
-            </p>
-            <p className="text-xs text-[var(--color-ink-400)]">
-              {dateFormatter.format(new Date(row.created_at))}
-              {row.hidden_by && ` · hidden by ${row.hidden_by}`}
-            </p>
-            {row.note && <p className="mt-1 text-sm text-[var(--color-ink-700)]">{row.note}</p>}
-            {/* Needs labels come from the public card's i18n keys; this
-                panel is English-only (see dateFormatter), so always "en". */}
-            {parseAdminNeeds(row.needs).length > 0 && (
-              <p className="mt-1 text-xs text-[var(--color-ink-500)]">
-                Needs: {parseAdminNeeds(row.needs).map((k) => t(`box.needs.${k}`, "en")).join(", ")}
+      {checkins.map((row) => {
+        // The button's name says which check-in it acts on ("Hide Filled
+        // Sep 17, 2026, 12:00 PM") through aria-labelledby pointing at this
+        // row's visible kind and date, never an aria-label built from text.
+        const buttonId = `${idPrefix}-${row.id}-button`;
+        const kindId = `${idPrefix}-${row.id}-kind`;
+        const dateId = `${idPrefix}-${row.id}-date`;
+        return (
+          <li key={row.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-[var(--color-ink-700)]">
+                <span id={kindId}>{KIND_LABEL[row.kind]}</span>
+                {row.kind === "problem" && <span className={`ml-2 ${tagClass("attention")}`}>Admin only</span>}
+                {row.visibility === "hidden" && <span className={`ml-2 ${tagClass("quiet")}`}>Hidden</span>}
               </p>
-            )}
-            {errorId === row.id && (
-              <p role="alert" className="mt-1 text-xs text-[var(--color-danger)]">
-                Something went wrong. Try again.
+              <p className="text-xs text-[var(--color-ink-400)]">
+                <span id={dateId} className="whitespace-nowrap">{dateFormatter.format(new Date(row.created_at))}</span>
+                {row.hidden_by && ` · hidden by ${row.hidden_by}`}
               </p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => toggleVisibility(row)}
-            disabled={pendingId === row.id}
-            className={
-              "shrink-0 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-1.5 " +
-              "text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-              "disabled:opacity-50 disabled:cursor-not-allowed"
-            }
-          >
-            {pendingId === row.id ? "Saving…" : row.visibility === "visible" ? "Hide" : "Unhide"}
-          </button>
-        </li>
-      ))}
+              {row.note && <p className="mt-1 text-sm text-[var(--color-ink-700)]">{row.note}</p>}
+              {/* Needs labels come from the public card's i18n keys; this
+                  panel is English-only (see dateFormatter), so always "en". */}
+              {parseAdminNeeds(row.needs).length > 0 && (
+                <p className="mt-1 text-xs text-[var(--color-ink-500)]">
+                  Needs: {parseAdminNeeds(row.needs).map((k) => t(`box.needs.${k}`, "en")).join(", ")}
+                </p>
+              )}
+              {errorId === row.id && (
+                <p role="alert" className="mt-1 text-xs text-[var(--color-danger)]">
+                  {row.visibility === "visible"
+                    ? "The check-in was not hidden. Try again."
+                    : "The check-in is still hidden. Try again."}
+                </p>
+              )}
+            </div>
+            <button
+              id={buttonId}
+              type="button"
+              aria-labelledby={`${buttonId} ${kindId} ${dateId}`}
+              onClick={() => toggleVisibility(row)}
+              disabled={pendingId === row.id}
+              className={`${secondaryButtonClass} shrink-0`}
+            >
+              {pendingId === row.id ? "Saving…" : row.visibility === "visible" ? "Hide" : "Unhide"}
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }

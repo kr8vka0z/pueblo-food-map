@@ -64,8 +64,19 @@
  */
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { categoryLabels } from "@/lib/categories";
+import CategoryLabel from "@/components/CategoryLabel";
+import { inputBase, inputBorder } from "@/components/formClasses";
+import {
+  chipClass,
+  fieldLabelClass,
+  linkClass,
+  secondaryButtonClass,
+  tableWrapClass,
+  tagClass,
+  type TagTone,
+} from "@/lib/adminCardStyles";
 import { DISPLAY_STATUS_KEY, DISPLAY_STATUS_LABELS, formatLastVerified, type AdminDisplayStatus } from "@/lib/adminVenues";
 import { SOURCE_BADGE, LANE_BADGE, fieldLabel } from "@/components/ProposalCard";
 import { summarizeSubmissionForRow } from "@/components/SubmissionCard";
@@ -111,32 +122,19 @@ const QUICK_FILTER_LABELS: Record<QuickFilter, string> = {
 // select's option list never shifts as search/filter state changes.
 const ALL_CATEGORIES = Object.keys(categoryLabels) as VenueCategory[];
 
-const STATUS_BADGE_STYLES: Record<AdminDisplayStatus, string> = {
-  live: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]",
-  draft: "bg-[var(--color-brand-yellow)] text-[var(--color-ink-900)]",
-  live_edits_waiting: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]",
-  removed: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]",
+// Draft is the yellow caution tag (DESIGN.md "Lists and tables").
+const STATUS_TONE: Record<AdminDisplayStatus, TagTone> = {
+  live: "calm",
+  draft: "caution",
+  live_edits_waiting: "attention",
+  removed: "quiet",
 };
 
-// clay-100/700: the established informational-emphasis pairing (DESIGN.md)
-// — same pairing SubmissionCard.tsx's own "Public report" badge uses, so a
-// public item reads the same accent everywhere it appears.
-const PUBLIC_BADGE_CLASS = "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]";
+// A public item carries the same "needs a look" tone as SubmissionCard's
+// "Public report" tag, so it reads the same everywhere it appears.
+const PUBLIC_TONE: TagTone = "attention";
 
-const controlLabelClass =
-  "text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-400)]";
-// text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
-const controlInputClass =
-  "rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-3 py-2 text-base md:text-sm " +
-  "text-[var(--color-ink-900)] placeholder:text-[var(--color-ink-400)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-  "focus-visible:border-[var(--color-sage-500)]";
-
-const filterChipClass = (active: boolean) =>
-  "inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors duration-150 " +
-  (active
-    ? "border-[var(--color-sage-500)] bg-[var(--color-sage-100)] text-[var(--color-sage-700)]"
-    : "border-[var(--color-bone-300)] text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)]");
+const controlInputClass = `${inputBase} ${inputBorder(false)}`;
 
 // ─── Item helpers — read across the ReviewItem union without callers caring
 // which table an item came from ─────────────────────────────────────────────
@@ -237,15 +235,15 @@ const REVIEW_FIELD_WORD: Record<string, string> = {
 };
 
 export function summarizeProposalForRow(p: Extract<ReviewItem, { kind: "proposal" }>["proposal"]): string {
-  if (p.parseError) return "Suggested change — couldn't read details";
+  if (p.parseError) return "Suggested change: couldn't read details";
   const { row, diff } = p;
   if (row.source === "link_health") return "Website link broken";
   if (renameMetaOf(diff)) return "Listed under a new name";
-  if (row.change_type === "remove") return "Looks closed — suggests removal";
+  if (row.change_type === "remove") return "Looks closed: suggests removal";
   if (row.change_type === "add") return "Suggested new place";
   const fields = reviewableDiffFields(diff);
   // Care and Share review-only cards (scripts/refresh/careAndShare.ts) — not "still current".
-  if (fields.length === 0 && diff.meta?.match) return "Care and Share listing — same place?";
+  if (fields.length === 0 && diff.meta?.match) return "Care and Share listing: same place?";
   if (fields.length === 0 && diff.meta?.needs_review) return "Hours need a look";
   if (fields.length === 0) return "Confirmed still current";
   if (fields.length === 1) return `New ${REVIEW_FIELD_WORD[fields[0]] ?? fieldLabel(fields[0]).toLowerCase()}`;
@@ -264,16 +262,17 @@ function summarizeItemForRow(item: ReviewItem): string {
 }
 
 function ReviewCell({ items }: { items: ReviewItem[] }) {
-  if (items.length === 0) return <span className="text-[var(--color-ink-400)]">—</span>;
+  // ink 500, not 400: the row's hover tint (sage 100) needs ink 500 or darker.
+  if (items.length === 0) return <span className="text-[var(--color-ink-500)]">—</span>;
   return (
     <ul className="flex flex-col gap-1">
       {items.map((item) => {
         const lane = itemLane(item);
-        const badge = lane ? LANE_BADGE[lane] : { label: "Public", className: PUBLIC_BADGE_CLASS };
+        const badge = lane ? LANE_BADGE[lane] : { label: "Public", tone: PUBLIC_TONE };
         return (
-          <li key={reviewItemKey(item)} className="flex items-center gap-1.5 text-xs">
+          <li key={reviewItemKey(item)} className="flex flex-wrap items-center gap-1.5 text-xs">
             <span className="text-[var(--color-ink-700)]">{summarizeItemForRow(item)}</span>
-            <span className={`inline-flex items-center rounded px-1 py-0.5 font-medium ${badge.className}`}>{badge.label}</span>
+            <span className={tagClass(badge.tone)}>{badge.label}</span>
           </li>
         );
       })}
@@ -294,6 +293,21 @@ export default function VenueListView({
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>(initialSourceFilter);
   const [laneFilter, setLaneFilter] = useState<LaneFilterValue>("all");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const hasFilters =
+    query.trim() !== "" || quickFilter !== "all" || categoryFilter !== "all" || sourceFilter !== "all" || laneFilter !== "all";
+
+  // Clear filters (DESIGN.md Patterns, empty after a filter): resets the
+  // search box too, then puts focus on it, since the button itself goes away.
+  function clearFilters() {
+    setQuery("");
+    setQuickFilter("all");
+    setCategoryFilter("all");
+    setSourceFilter("all");
+    setLaneFilter("all");
+    searchRef.current?.focus();
+  }
 
   const rows: Row[] = useMemo(() => {
     const venueRows: Row[] = venues.map((venue) => ({
@@ -368,13 +382,14 @@ export default function VenueListView({
 
       {/* Quick-filter chips (#674, moved the concept of a filter row up from
           the old /admin/flags queue's source/change-type chips). */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div role="group" aria-label="Filter places by status" className="mb-3 flex flex-wrap items-center gap-2">
         {QUICK_FILTER_ORDER.map((value) => (
           <button
             key={value}
             type="button"
             onClick={() => setQuickFilter(value)}
-            className={filterChipClass(quickFilter === value)}
+            aria-pressed={quickFilter === value}
+            className={chipClass(quickFilter === value)}
           >
             {QUICK_FILTER_LABELS[value]}
             {quickFilterCounts[value] > 0 && ` (${quickFilterCounts[value]})`}
@@ -390,14 +405,25 @@ export default function VenueListView({
           filter group — an admin filtering "where did this come from"
           shouldn't have to look in two places for the answer. */}
       {(presentSources.length > 1 || presentLanes.length > 1) && (
-        <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div role="group" aria-label="Filter by source or lane" className="mb-3 flex flex-wrap items-center gap-2">
           {presentSources.length > 1 && (
             <>
-              <button type="button" onClick={() => setSourceFilter("all")} className={filterChipClass(sourceFilter === "all")}>
+              <button
+                type="button"
+                onClick={() => setSourceFilter("all")}
+                aria-pressed={sourceFilter === "all"}
+                className={chipClass(sourceFilter === "all")}
+              >
                 All sources
               </button>
               {presentSources.map((source) => (
-                <button key={source} type="button" onClick={() => setSourceFilter(source)} className={filterChipClass(sourceFilter === source)}>
+                <button
+                  key={source}
+                  type="button"
+                  onClick={() => setSourceFilter(source)}
+                  aria-pressed={sourceFilter === source}
+                  className={chipClass(sourceFilter === source)}
+                >
                   {source === "public" ? "The public" : (SOURCE_BADGE[source as ProposalSourceValue]?.label ?? source)}
                 </button>
               ))}
@@ -406,11 +432,22 @@ export default function VenueListView({
           {presentLanes.length > 1 && (
             <>
               <span className="mx-1 h-4 w-px bg-[var(--color-bone-300)]" aria-hidden />
-              <button type="button" onClick={() => setLaneFilter("all")} className={filterChipClass(laneFilter === "all")}>
+              <button
+                type="button"
+                onClick={() => setLaneFilter("all")}
+                aria-pressed={laneFilter === "all"}
+                className={chipClass(laneFilter === "all")}
+              >
                 All lanes
               </button>
               {presentLanes.map((lane) => (
-                <button key={lane} type="button" onClick={() => setLaneFilter(lane)} className={filterChipClass(laneFilter === lane)}>
+                <button
+                  key={lane}
+                  type="button"
+                  onClick={() => setLaneFilter(lane)}
+                  aria-pressed={laneFilter === lane}
+                  className={chipClass(laneFilter === lane)}
+                >
                   {LANE_BADGE[lane].label}
                 </button>
               ))}
@@ -422,10 +459,11 @@ export default function VenueListView({
       {/* Search + category filter */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex flex-1 flex-col gap-1">
-          <label htmlFor="venue-search" className={controlLabelClass}>
+          <label htmlFor="venue-search" className={fieldLabelClass}>
             Search
           </label>
           <input
+            ref={searchRef}
             id="venue-search"
             type="search"
             value={query}
@@ -435,7 +473,7 @@ export default function VenueListView({
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor="venue-category-filter" className={controlLabelClass}>
+          <label htmlFor="venue-category-filter" className={fieldLabelClass}>
             Category
           </label>
           <select
@@ -455,14 +493,19 @@ export default function VenueListView({
       </div>
 
       {sorted.length === 0 ? (
-        <p className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-12 text-center text-sm text-[var(--color-ink-500)]">
-          No venues match your search.
-        </p>
+        <div className="flex flex-col items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-12 text-center text-sm text-[var(--color-ink-500)]">
+          <p>{hasFilters ? "No places match your search or filters." : "No places yet."}</p>
+          {hasFilters && (
+            <button type="button" onClick={clearFilters} className={secondaryButtonClass}>
+              Clear filters
+            </button>
+          )}
+        </div>
       ) : (
-        <div className="elevation-1 overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white">
+        <div className={tableWrapClass}>
           <table className="w-full min-w-[680px] text-left text-sm">
             <thead>
-              <tr className="border-b border-[var(--color-bone-200)] text-[11px] uppercase tracking-wide text-[var(--color-ink-400)]">
+              <tr className={`border-b border-[var(--color-bone-200)] ${fieldLabelClass}`}>
                 <th scope="col" className="px-4 py-3 font-medium">
                   Name
                 </th>
@@ -499,38 +542,36 @@ export default function VenueListView({
   );
 }
 
+// The row tint under the pointer is sage 100 (#926 decision 1); the name
+// link inside is the row's one pressable part.
+// SHARED-GAP: a table row hover string (AllBoxesTable and EventsList could share it).
+const ROW_CLASS =
+  "border-b border-[var(--color-bone-200)] last:border-0 transition-colors duration-150 hover:bg-[var(--color-sage-100)]";
+
+/** The kind of place in its public colored words (CategoryLabel, R3); SNAP and WIC only when the row says so. */
+function CategoryCell({ category, snap = false, wic = false }: { category: VenueCategory | null; snap?: boolean; wic?: boolean }) {
+  if (!category) return <span className="text-[var(--color-ink-500)]">—</span>;
+  const benefits = [snap && "SNAP", wic && "WIC"].filter((b): b is string => typeof b === "string");
+  return <CategoryLabel category={category} label={categoryLabels[category]} benefits={benefits} />;
+}
+
 function VenueRow({ row, statusByVenueId }: { row: Row; statusByVenueId: Record<string, AdminDisplayStatus> }) {
   if (row.kind === "new") {
     const { item } = row;
     return (
-      <tr className="border-b border-[var(--color-bone-200)] last:border-0 hover:bg-[var(--color-bone-100)]">
+      <tr className={ROW_CLASS}>
         <td className="px-4 py-3 font-medium">
-          <Link
-            href={newItemHref(item)}
-            className={
-              "text-[var(--color-sage-700)] underline underline-offset-2 " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
-            }
-          >
+          <Link href={newItemHref(item)} className={linkClass}>
             {rowName(row)}
           </Link>
         </td>
         <td className="px-4 py-3 text-[var(--color-ink-700)]">
-          {(() => {
-            const category = rowCategory(row);
-            return category ? categoryLabels[category] : "—";
-          })()}
+          <CategoryCell category={rowCategory(row)} />
         </td>
         <td className="px-4 py-3">
           <div className="flex flex-wrap items-center gap-1">
-            <span className="inline-flex items-center rounded-full bg-[var(--color-clay-100)] px-2 py-0.5 text-xs font-medium text-[var(--color-clay-700)]">
-              Suggested new place
-            </span>
-            {item.kind === "submission" && (
-              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PUBLIC_BADGE_CLASS}`}>
-                Public
-              </span>
-            )}
+            <span className={tagClass("attention")}>Suggested new place</span>
+            {item.kind === "submission" && <span className={tagClass(PUBLIC_TONE)}>Public</span>}
           </div>
         </td>
         <td className="px-4 py-3">
@@ -554,23 +595,19 @@ function VenueRow({ row, statusByVenueId }: { row: Row; statusByVenueId: Record<
   const isArchivedRowLinkable = venue.status !== "archived" || items.length > 0;
 
   return (
-    <tr className="border-b border-[var(--color-bone-200)] last:border-0 hover:bg-[var(--color-bone-100)]">
+    <tr className={ROW_CLASS}>
       <td className="px-4 py-3 font-medium">
         {isArchivedRowLinkable ? (
-          <Link
-            href={`/admin/venues/${venue.id}/edit`}
-            className={
-              "text-[var(--color-sage-700)] underline underline-offset-2 " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
-            }
-          >
+          <Link href={`/admin/venues/${venue.id}/edit`} className={linkClass}>
             {venue.name}
           </Link>
         ) : (
           <span className="text-[var(--color-ink-700)]">{venue.name}</span>
         )}
       </td>
-      <td className="px-4 py-3 text-[var(--color-ink-700)]">{categoryLabels[venue.category]}</td>
+      <td className="px-4 py-3 text-[var(--color-ink-700)]">
+        <CategoryCell category={venue.category} snap={venue.accepts_snap === 1} wic={venue.accepts_wic === 1} />
+      </td>
       <td className="px-4 py-3">
         <StatusBadge status={statusByVenueId[venue.id]} />
       </td>
@@ -600,14 +637,5 @@ function StatusKey() {
 }
 
 function StatusBadge({ status }: { status: AdminDisplayStatus }) {
-  return (
-    <span
-      className={
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium " +
-        STATUS_BADGE_STYLES[status]
-      }
-    >
-      {DISPLAY_STATUS_LABELS[status]}
-    </span>
-  );
+  return <span className={tagClass(STATUS_TONE[status])}>{DISPLAY_STATUS_LABELS[status]}</span>;
 }

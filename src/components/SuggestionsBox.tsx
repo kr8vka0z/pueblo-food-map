@@ -27,6 +27,7 @@
 import ProposalCard from "@/components/ProposalCard";
 import SubmissionCard from "@/components/SubmissionCard";
 import { reviewItemKey, type ReviewItem } from "@/lib/publicSubmissions";
+import { sectionTitleClass } from "@/lib/adminCardStyles";
 import type { VenueLookup } from "@/lib/adminVenueLookup";
 
 export interface SuggestionsBoxProps {
@@ -39,9 +40,8 @@ export default function SuggestionsBox({ items, venue }: SuggestionsBoxProps) {
 
   return (
     <div className="max-w-2xl">
-      <h2 className="mb-2 text-sm font-semibold text-[var(--color-ink-700)]">
-        Suggestions to review ({items.length})
-      </h2>
+      {/* h3: the edit page's own title is the h2 (#926 decision 5). */}
+      <h3 className={`${sectionTitleClass} mb-2`}>Suggestions to review ({items.length})</h3>
       <ul className="flex flex-col gap-4">
         {items.map((item) => (
           <li key={reviewItemKey(item)}>

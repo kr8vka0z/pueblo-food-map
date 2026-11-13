@@ -24,6 +24,7 @@
 import type { VenueCategory } from "@/types/venue";
 import { categoryColors } from "@/lib/categories";
 import { googleMapsUrl } from "@/lib/googleMapsUrl";
+import { tapLinkClass } from "@/lib/adminCardStyles";
 
 export interface StaticLocationMapProps {
   lat: number | null;
@@ -101,7 +102,7 @@ export default function StaticLocationMap({ lat, lng, category, name, address }:
         href={googleMapsUrl(coords.lat, coords.lng)}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-2 inline-block text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+        className={`text-sm ${tapLinkClass}`}
       >
         Open in Google Maps
       </a>

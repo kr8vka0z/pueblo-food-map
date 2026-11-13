@@ -26,11 +26,17 @@ export interface WaitingToPublishBoxProps {
   changes: WaitingToPublishChange[];
 }
 
+// SHARED-GAP: the clay notice box (clay 100 fill, clay 500 edge, radius lg,
+// clay 700 words), used here and by the edit page's dead-link banner;
+// belongs in src/lib/adminCardStyles.ts.
+export const clayNoticeClass =
+  "max-w-2xl rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]";
+
 export default function WaitingToPublishBox({ changes }: WaitingToPublishBoxProps) {
   if (changes.length === 0) return null;
 
   return (
-    <div className="max-w-2xl rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]">
+    <div className={clayNoticeClass}>
       <p className="font-semibold">Waiting to publish</p>
       <p className="mt-1">These changes won&apos;t show on the public map until the next Publish.</p>
       <dl className="mt-3 flex flex-col gap-3">

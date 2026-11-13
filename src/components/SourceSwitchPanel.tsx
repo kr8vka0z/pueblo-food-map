@@ -14,21 +14,23 @@ import { useEffect, useState } from "react";
 import { fieldLabel, SOURCE_BADGE } from "@/components/ProposalCard";
 import type { ProposalSourceValue } from "@/lib/adminProposals";
 import { SWITCH_THRESHOLD, type SwitchState } from "@/lib/sourceSwitch";
+import { cardSlimClass, groupTitleClass, tagClass } from "@/lib/adminCardStyles";
 
 export function SourceSwitchList({ states }: { states: SwitchState[] | null }) {
   if (!states || states.length === 0) return null;
   const bySource = new Map<string, SwitchState[]>();
   for (const s of states) bySource.set(s.source, [...(bySource.get(s.source) ?? []), s]);
   return (
-    <div className="elevation-1 mb-4 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-3">
+    <div className={`${cardSlimClass} mb-4`}>
       {[...bySource].map(([source, pairs]) => (
         <div key={source} className="text-sm">
-          <p className="font-semibold text-[var(--color-ink-700)]">
+          <p className={groupTitleClass}>
             {SOURCE_BADGE[source as ProposalSourceValue]?.label ?? source}: switches on after {SWITCH_THRESHOLD} approvals in a row
           </p>
-          <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[var(--color-ink-500)]">
+          <ul className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[var(--color-ink-500)]">
             {pairs.map((p) => (
-              <li key={p.field} className={p.on ? "font-medium text-[var(--color-sage-700)]" : undefined}>
+              // A pair that runs by itself shows as a calm tag.
+              <li key={p.field} className={p.on ? tagClass("calm") : undefined}>
                 {p.on
                   ? `${fieldLabel(p.field)}: updates on its own`
                   : `${fieldLabel(p.field)}: ${p.streak} of ${SWITCH_THRESHOLD}, asks you first`}

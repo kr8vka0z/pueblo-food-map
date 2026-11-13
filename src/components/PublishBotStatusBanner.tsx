@@ -28,6 +28,7 @@
  */
 
 import type { PublishBotPrState } from "@/lib/publishVenues";
+import { focusRingClass } from "@/lib/adminCardStyles";
 
 export interface PublishBotStatusBannerProps {
   prNumber: number;
@@ -36,9 +37,13 @@ export interface PublishBotStatusBannerProps {
 }
 
 const STUCK_COPY: Record<Exclude<PublishBotPrState, "in_progress">, string> = {
-  stuck_conflict: "Publish is stuck: merge conflict —",
-  stuck_checks: "Publish is stuck: checks failing or pending too long —",
+  stuck_conflict: "Publish is stuck: merge conflict.",
+  stuck_checks: "Publish is stuck: checks failing or pending too long.",
 };
+
+// SHARED-GAP: linkClass without its sage color. The design page has these
+// links take the banner's own color (red when stuck).
+const bannerLinkClass = `rounded-[var(--radius-sm)] font-medium underline underline-offset-2 ${focusRingClass}`;
 
 export default function PublishBotStatusBanner({ prNumber, prUrl, state }: PublishBotStatusBannerProps) {
   const isStuck = state !== "in_progress";
@@ -59,20 +64,20 @@ export default function PublishBotStatusBanner({ prNumber, prUrl, state }: Publi
             href={prUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium underline underline-offset-2"
+            className={bannerLinkClass}
           >
             PR #{prNumber}
-          </a>
-          . The public map is still showing the OLD data. Fix it (or close the PR) and publish again.
+          </a>{" "}
+          hasn&apos;t merged, so the public map is still showing the OLD data. Fix it (or close the PR) and publish again.
         </>
       ) : (
         <>
-          Publish in progress — waiting on{" "}
+          Publish in progress: waiting on{" "}
           <a
             href={prUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium underline underline-offset-2"
+            className={bannerLinkClass}
           >
             PR #{prNumber}
           </a>

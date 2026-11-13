@@ -17,10 +17,22 @@
  * convention for this app's other admin table.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { NEEDS_HELP_STATUSES, type BoxHealthEntry, type BoxHealthStatus } from "@/lib/boxHealth";
 import type { BoxReviewSummary } from "@/lib/adminBoxes";
+import {
+  cardClass,
+  chipClass,
+  fieldLabelClass,
+  linkClass,
+  secondaryButtonClass,
+  tableWrapClass,
+  tagClass,
+  type TagTone,
+} from "@/lib/adminCardStyles";
+import { inputBase, inputBorder } from "@/components/formClasses";
+import AdminSegmented from "@/components/AdminSegmented";
 
 export interface AllBoxesTableProps {
   entries: BoxHealthEntry[];
@@ -30,14 +42,15 @@ export interface AllBoxesTableProps {
   initialShowReview?: boolean;
 }
 
-// One label/color badge per status — a table row has room to spell the
-// status out.
-const STATUS_BADGE: Record<BoxHealthStatus, { label: string; className: string }> = {
-  ok: { label: "OK", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
-  low: { label: "Low", className: "bg-[var(--color-clay-100)] text-[var(--color-warning)]" },
-  empty: { label: "Empty", className: "bg-[var(--color-clay-100)] text-[var(--color-danger)]" },
-  problem: { label: "Problem", className: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]" },
-  quiet: { label: "Quiet", className: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]" },
+// One label/tag per status — a table row has room to spell the status out.
+// WHY Low is "caution" (ink 900 on yellow): the old amber on clay 100 was
+// 4.0:1, under the 4.5:1 words need (#926 decision 12).
+const STATUS_BADGE: Record<BoxHealthStatus, { label: string; tone: TagTone }> = {
+  ok: { label: "OK", tone: "calm" },
+  low: { label: "Low", tone: "caution" },
+  empty: { label: "Empty", tone: "danger" },
+  problem: { label: "Problem", tone: "attention" },
+  quiet: { label: "Quiet", tone: "quiet" },
 };
 
 // "review" is cross-cutting (a box can be "review" AND "ok" at once — a
@@ -66,7 +79,16 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "attention", label: "Needs attention first" },
   { key: "oldest", label: "Last report: oldest first" },
   { key: "newest", label: "Last report: newest first" },
-  { key: "name", label: "Name A–Z" },
+  { key: "name", label: "Name A to Z" },
+];
+
+// Three choices, so a slider (#926 decision 10). Labels stay short: the
+// slider never wraps, and all three must fit a 360 px phone. The visible
+// "Sponsor" caption above gives them their context.
+const SPONSOR_OPTIONS: { value: SponsorFilter; label: string }[] = [
+  { value: "any", label: "Any" },
+  { value: "has", label: "Has one" },
+  { value: "needs", label: "Needs one" },
 ];
 
 function formatLastReport(entry: BoxHealthEntry): string {
@@ -171,7 +193,7 @@ function ReviewCell({ summary }: { summary: BoxReviewSummary | undefined }) {
           <img
             src={`/api/admin/box-photos/${summary.photo.id}/preview`}
             alt=""
-            className="h-8 w-8 flex-none rounded object-cover border border-[var(--color-bone-200)]"
+            className="h-8 w-8 flex-none rounded-[var(--radius-sm)] object-cover border border-[var(--color-bone-200)]"
           />
           <span className="text-xs font-medium text-[var(--color-ink-700)]">
             {summary.photo.status === "flagged" ? `Photo reported (${summary.photo.flagCount}×)` : "New photo"}
@@ -180,26 +202,30 @@ function ReviewCell({ summary }: { summary: BoxReviewSummary | undefined }) {
       )}
       {summary.sponsorRequest && (
         <p className="text-xs text-[var(--color-ink-700)]">
-          <span className="font-medium">Sponsor request</span> — {summary.sponsorRequest.displayName}
+          <span className="font-medium">Sponsor request:</span> {summary.sponsorRequest.displayName}
         </p>
       )}
     </div>
   );
 }
 
-const filterButtonClass =
-  "min-h-12 rounded-full border px-3.5 text-sm font-medium transition-colors duration-150 " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:cursor-not-allowed disabled:opacity-50";
-const filterButtonActive = "border-[var(--color-sage-500)] bg-[var(--color-sage-100)] text-[var(--color-sage-700)]";
-const filterButtonInactive =
-  "border-[var(--color-bone-300)] bg-white text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]";
-
 export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialShowReview = false }: AllBoxesTableProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialShowReview ? "review" : "all");
   const [sponsorFilter, setSponsorFilter] = useState<SponsorFilter>("any");
   const [sort, setSort] = useState<SortKey>("attention");
   const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // DESIGN.md "Empty states" step 3 / "Search and filter" step 6: Clear
+  // filters clears the filters and the search words (not the sort). The
+  // button unmounts once rows come back, so focus moves to the search box,
+  // a control that stays.
+  function clearFilters() {
+    setStatusFilter("all");
+    setSponsorFilter("any");
+    setSearch("");
+    searchRef.current?.focus();
+  }
 
   const statusCounts = useMemo(() => {
     const counts = new Map<StatusFilter, number>();
@@ -220,8 +246,13 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
 
   if (entries.length === 0) {
     return (
-      <div className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-10 text-center">
-        <p className="text-sm text-[var(--color-ink-500)]">No blessing boxes yet.</p>
+      <div className={`${cardClass} text-center`}>
+        <div className="py-6">
+          <p className="text-sm text-[var(--color-ink-500)]">No blessing boxes yet.</p>
+          <p className="text-sm text-[var(--color-ink-500)]">
+            Add a place with the category Blessing Box and it shows up here.
+          </p>
+        </div>
       </div>
     );
   }
@@ -244,7 +275,7 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
               aria-pressed={isActive}
               disabled={isDisabled}
               onClick={() => setStatusFilter(filter.key)}
-              className={`${filterButtonClass} ${isActive ? filterButtonActive : filterButtonInactive}`}
+              className={chipClass(isActive)}
             >
               {filter.label} ({count})
             </button>
@@ -252,44 +283,44 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
         })}
       </div>
 
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <div className="min-w-0 flex-1 sm:max-w-xs">
-          <label htmlFor="boxes-search" className="sr-only">
+          <label htmlFor="boxes-search" className={`${fieldLabelClass} mb-1 block`}>
             Search boxes
           </label>
           <input
+            ref={searchRef}
             type="text"
             id="boxes-search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, address or sponsor"
-            className="min-h-12 w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-3 text-sm text-[var(--color-ink-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+            className={`${inputBase} ${inputBorder(false)}`}
           />
         </div>
         <div>
-          <label htmlFor="boxes-sponsor-filter" className="sr-only">
+          {/* The slider's legend is read by screen readers; this caption is
+              its visible twin, so it is hidden from them. */}
+          <p aria-hidden="true" className={`${fieldLabelClass} mb-1`}>
             Sponsor
-          </label>
-          <select
-            id="boxes-sponsor-filter"
+          </p>
+          <AdminSegmented
+            name="boxes-sponsor-filter"
+            legend="Sponsor"
+            options={SPONSOR_OPTIONS}
             value={sponsorFilter}
-            onChange={(e) => setSponsorFilter(e.target.value as SponsorFilter)}
-            className="min-h-12 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-3 text-sm text-[var(--color-ink-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-          >
-            <option value="any">Any sponsor status</option>
-            <option value="has">Has a sponsor</option>
-            <option value="needs">Needs a sponsor</option>
-          </select>
+            onChange={(v) => setSponsorFilter(v === "has" || v === "needs" ? v : "any")}
+          />
         </div>
         <div>
-          <label htmlFor="boxes-sort" className="sr-only">
+          <label htmlFor="boxes-sort" className={`${fieldLabelClass} mb-1 block`}>
             Sort
           </label>
           <select
             id="boxes-sort"
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
-            className="min-h-12 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-3 text-sm text-[var(--color-ink-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+            className={`${inputBase} ${inputBorder(false)}`}
           >
             {SORT_OPTIONS.map((option) => (
               <option key={option.key} value={option.key}>
@@ -304,36 +335,41 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
         Showing {filtered.length} of {entries.length} boxes
       </p>
 
-      <div className="elevation-1 overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white">
-        <table className="w-full min-w-[560px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-[var(--color-bone-200)] text-xs uppercase tracking-wide text-[var(--color-ink-400)]">
-              <th scope="col" className="px-4 py-3 font-medium">
-                Box
-              </th>
-              <th scope="col" className="px-4 py-3 font-medium">
-                Status
-              </th>
-              <th scope="col" className="px-4 py-3 font-medium">
-                Last report
-              </th>
-              <th scope="col" className="px-4 py-3 font-medium">
-                Sponsor
-              </th>
-              <th scope="col" className="px-4 py-3 font-medium">
-                To review
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-sm text-[var(--color-ink-500)]">
-                  No boxes match these filters.
-                </td>
+      {/* Nothing matches: its own box, not a cell of the 560-wide table, so
+          the message and Clear filters are never cut off on a phone. */}
+      {filtered.length === 0 ? (
+        <div className={`${cardClass} text-center`}>
+          <div className="flex flex-col items-center gap-3 py-6">
+            <p className="text-sm text-[var(--color-ink-500)]">No boxes match these filters.</p>
+            <button type="button" onClick={clearFilters} className={secondaryButtonClass}>
+              Clear filters
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className={tableWrapClass}>
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-[var(--color-bone-200)] text-xs uppercase tracking-wide text-[var(--color-ink-400)]">
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Box
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Status
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Last report
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Sponsor
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  To review
+                </th>
               </tr>
-            ) : (
-              filtered.map((entry) => {
+            </thead>
+            <tbody>
+              {filtered.map((entry) => {
                 const badge = STATUS_BADGE[entry.health.status];
                 const review = reviewByVenueId[entry.venueId];
                 return (
@@ -342,10 +378,7 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
                       {/* Box name IS the edit link (#671, same "name = edit link"
                           change #672 made to the Places tab) — the separate
                           trailing Edit column/link is gone. */}
-                      <Link
-                        href={`/admin/venues/${entry.venueId}/edit`}
-                        className="font-medium text-[var(--color-sage-700)] underline underline-offset-2"
-                      >
+                      <Link href={`/admin/venues/${entry.venueId}/edit`} className={linkClass}>
                         {entry.name}
                       </Link>
                       <p className="text-xs text-[var(--color-ink-500)]">{entry.address}</p>
@@ -354,22 +387,20 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${badge.className}`}>
-                        {badge.label}
-                      </span>
+                      <span className={tagClass(badge.tone)}>{badge.label}</span>
                     </td>
-                    <td className="px-4 py-3 text-[var(--color-ink-700)]">{formatLastReport(entry)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-[var(--color-ink-700)]">{formatLastReport(entry)}</td>
                     <td className="px-4 py-3 text-[var(--color-ink-700)]">{formatSponsors(entry.sponsors)}</td>
                     <td className="px-4 py-3">
                       <ReviewCell summary={review} />
                     </td>
                   </tr>
                 );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

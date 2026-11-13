@@ -20,7 +20,6 @@ const mockFetch = vi.fn();
 beforeEach(() => {
   mockFetch.mockReset();
   vi.stubGlobal("fetch", mockFetch);
-  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -60,7 +59,9 @@ test("201 date-only waiting: sends exactly the first 200 date-only ids, never a 
   const proposals = [realChange(1), realChange(2), ...Array.from({ length: 201 }, (_, i) => dateOnly(100 + i))];
   render(<ToReviewSummaryBox reviewRowCount={203} proposals={proposals} submissionCount={0} />);
 
-  await userEvent.setup().click(screen.getByRole("button", { name: /200 date-only updates/ }));
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: /200 date-only updates/ }));
+  await user.click(screen.getByRole("button", { name: "Approve 200 updates" }));
 
   expect(mockFetch).toHaveBeenCalledTimes(1);
   const { ids } = JSON.parse(mockFetch.mock.calls[0][1].body as string) as { ids: number[] };

@@ -39,12 +39,33 @@ describe("AllBoxesTable — empty states", () => {
     expect(screen.queryByRole("group", { name: "Filter boxes by status" })).toBeNull();
   });
 
-  test("boxes exist but none match the filters: one row with the empty-filter message", async () => {
+  test("boxes exist but none match the filters: the empty-filter message", async () => {
     const user = userEvent.setup();
     render(<AllBoxesTable entries={[entryWithStatus("a", "ok", 1)]} />);
     await user.type(screen.getByLabelText("Search boxes"), "no such box");
     expect(screen.getByText("No boxes match these filters.")).toBeDefined();
     expect(screen.getByText("Showing 0 of 1 boxes")).toBeDefined();
+  });
+
+  // DESIGN.md "Empty states" step 3: Clear filters clears the status, the
+  // sponsor filter and the search words, and focus lands on the search box
+  // (the button itself disappears once rows come back).
+  test("Clear filters brings every box back and moves focus to the search box", async () => {
+    const user = userEvent.setup();
+    render(<AllBoxesTable entries={[entryWithStatus("a", "ok", 1), entryWithStatus("b", "empty", 1)]} />);
+    await user.click(screen.getByRole("button", { name: "OK (1)" }));
+    await user.click(screen.getByRole("radio", { name: "Has one" }));
+    await user.type(screen.getByLabelText("Search boxes"), "Box a");
+    expect(screen.getByText("Showing 0 of 2 boxes")).toBeDefined();
+
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+
+    expect(screen.getByText("Showing 2 of 2 boxes")).toBeDefined();
+    expect(screen.getByLabelText("Search boxes")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "All (2)" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("radio", { name: "Any" })).toBeChecked();
+    expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByLabelText("Search boxes"));
   });
 });
 
@@ -73,8 +94,8 @@ describe("AllBoxesTable — row content", () => {
         ]}
       />,
     );
-    // "Needs a sponsor" also names a <select> option (the Sponsor filter) —
-    // scope to the table cell so the two don't collide.
+    // Scoped to the table: the cell's wording must hold, wherever else the
+    // words appear on the page.
     expect(within(screen.getByRole("table")).getByText("Needs a sponsor")).toBeDefined();
     expect(screen.getByText("Jamie R.")).toBeDefined();
     expect(screen.getByText("Jamie R., Sam T.")).toBeDefined();
@@ -165,18 +186,25 @@ describe("AllBoxesTable — Sponsor filter", () => {
     makeEntry({ venueId: "unsponsored", sponsors: [] }),
   ];
 
-  test("'Has a sponsor' keeps only boxes with sponsors", async () => {
+  // #926 decision 10: the three-way Sponsor choice is a slider of real radios.
+  test("'Has one' keeps only boxes with sponsors", async () => {
     const user = userEvent.setup();
     render(<AllBoxesTable entries={entries} />);
-    await user.selectOptions(screen.getByLabelText("Sponsor"), "has");
+    await user.click(screen.getByRole("radio", { name: "Has one" }));
     expect(screen.getByText("Showing 1 of 2 boxes")).toBeDefined();
+    expect(screen.getByRole("link", { name: "Blessing Box - Routt" }).getAttribute("href")).toBe(
+      "/admin/venues/sponsored/edit",
+    );
   });
 
-  test("'Needs a sponsor' keeps only boxes without sponsors", async () => {
+  test("'Needs one' keeps only boxes without sponsors", async () => {
     const user = userEvent.setup();
     render(<AllBoxesTable entries={entries} />);
-    await user.selectOptions(screen.getByLabelText("Sponsor"), "needs");
+    await user.click(screen.getByRole("radio", { name: "Needs one" }));
     expect(screen.getByText("Showing 1 of 2 boxes")).toBeDefined();
+    expect(screen.getByRole("link", { name: "Blessing Box - Routt" }).getAttribute("href")).toBe(
+      "/admin/venues/unsponsored/edit",
+    );
   });
 });
 
@@ -224,7 +252,7 @@ describe("AllBoxesTable — sort", () => {
     expect(names).toEqual(["Box recent", "Box old", "Box never"]);
   });
 
-  test("'Name A–Z' sorts alphabetically", async () => {
+  test("'Name A to Z' sorts alphabetically", async () => {
     const user = userEvent.setup();
     const entries = [
       makeEntry({ venueId: "z", name: "Zeta Box" }),
@@ -252,7 +280,7 @@ describe("AllBoxesTable — 'To review' (#677)", () => {
     };
   }
 
-  test("column: shows a thumbnail + 'New photo' for a pending photo, and 'Sponsor request — <name>' for a request", () => {
+  test("column: shows a thumbnail + 'New photo' for a pending photo, and 'Sponsor request: <name>' for a request", () => {
     render(<AllBoxesTable entries={entries} reviewByVenueId={reviewMap()} />);
     expect(screen.getByAltText("")).toHaveAttribute("src", "/api/admin/box-photos/42/preview");
     expect(screen.getByText("New photo")).toBeDefined();

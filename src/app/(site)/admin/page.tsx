@@ -12,9 +12,10 @@
  * authentication"): getAdminDb() verifies identity before this page renders
  * anything, failing closed via handlePageAuthError.
  *
- * PERIOD SWITCH: a plain `?period=7d|30d|90d` search param, server-rendered
- * `<Link>`s (no client JS) — the whole page re-renders per period the same
- * way any other admin filter link already does in this app. Defaults to
+ * PERIOD SWITCH: a plain `?period=7d|30d|90d` search param. The slider
+ * (DashboardPeriodPicker, the page's one client piece, #926 decision 10)
+ * navigates to `/admin?period=...` keeping any other query value, and the
+ * whole page re-renders per period on the server. Defaults to
  * 30d; an unrecognized value falls back to 30d rather than erroring, same
  * "never trust a query param" posture every other admin route takes.
  * "Every number that has a time range... shows the change vs the previous
@@ -85,6 +86,15 @@ import DashboardNeedsStrip, { type NeedsCardData } from "@/components/DashboardN
 import KpiCard from "@/components/KpiCard";
 import BarList from "@/components/BarList";
 import DailyBars from "@/components/DailyBars";
+import DashboardPeriodPicker from "@/components/DashboardPeriodPicker";
+import {
+  cardClass,
+  groupTitleClass,
+  linkClass,
+  pageTitleClass,
+  sectionTitleClass,
+  tapLinkClass,
+} from "@/lib/adminCardStyles";
 // The Worker runs in UTC; refresh dates are shown as Pueblo calendar days.
 import { TIME_ZONE } from "@/lib/eventTime";
 
@@ -315,31 +325,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="wordmark text-xl text-[var(--color-ink-900)]">Hi {identity.email.split("@")[0]}</h1>
-          <nav aria-label="Time period" className="flex gap-1 rounded-[var(--radius-md)] border border-[var(--color-bone-200)] bg-white p-1">
-            {DASHBOARD_PERIODS.map((p) => (
-              <Link
-                key={p}
-                href={`/admin?period=${p}`}
-                aria-current={p === period ? "page" : undefined}
-                className={`min-h-12 rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium transition-colors duration-150 ${
-                  p === period
-                    ? "bg-[var(--color-sage-600)] text-[var(--color-bone-50)]"
-                    : "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)]"
-                }`}
-              >
-                {PERIOD_LABELS[p]}
-              </Link>
-            ))}
-          </nav>
+          {/* The page's title is an h2: AdminNav's "Pueblo Food Map Admin" is the one h1 (#926 decision 5). */}
+          <h2 className={pageTitleClass}>Hi {identity.email.split("@")[0]}</h2>
+          <DashboardPeriodPicker period={period} options={DASHBOARD_PERIODS.map((p) => ({ value: p, label: PERIOD_LABELS[p] }))} />
         </div>
 
         <section aria-label="Needs you">
           <DashboardNeedsStrip cards={needsCards} />
         </section>
 
-        <section aria-labelledby="visitors-heading" className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
-          <h2 id="visitors-heading" className="wordmark text-base text-[var(--color-ink-900)]">
+        <section aria-labelledby="visitors-heading" className={cardClass}>
+          <h2 id="visitors-heading" className={sectionTitleClass}>
             Visitors
           </h2>
           {visitors ? (
@@ -362,16 +358,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </div>
               {visitors.phoneLcpMs !== null && (
                 <p className="text-xs text-[var(--color-ink-500)]">
-                  Google calls anything under {(LCP_GOOD_MS / 1000).toFixed(1)}s &quot;good&quot; —{" "}
+                  Google calls anything under {(LCP_GOOD_MS / 1000).toFixed(1)}s &quot;good&quot;, and{" "}
                   {visitors.phoneLcpMs <= LCP_GOOD_MS ? "we're in that range." : "we're slower than that right now."}
                 </p>
               )}
               <div>
-                <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Visitors per day</h3>
+                <h3 className={groupTitleClass}>Visitors per day</h3>
                 <DailyBars points={visitors.dailyVisitors.map((d) => ({ date: d.date, value: d.visits }))} emptyMessage="No visitor data yet for this period." />
               </div>
               <div>
-                <h3 className="text-sm font-medium text-[var(--color-ink-700)]">How people found the site</h3>
+                <h3 className={groupTitleClass}>How people found the site</h3>
                 <BarList
                   items={visitors.referrers.map((r) => ({ label: r.label, value: r.visits, displayValue: `${r.visits} visits` }))}
                   emptyMessage="No referrer data yet for this period."
@@ -383,9 +379,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           )}
         </section>
 
-        <section aria-labelledby="map-usage-heading" className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
+        <section aria-labelledby="map-usage-heading" className={cardClass}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 id="map-usage-heading" className="wordmark text-base text-[var(--color-ink-900)]">
+            <h2 id="map-usage-heading" className={sectionTitleClass}>
               What people do on the map
             </h2>
             {mapUsage && posthogProjectId && (
@@ -393,7 +389,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 href={`https://us.posthog.com/project/${posthogProjectId}`}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+                className={`${tapLinkClass} text-xs`}
               >
                 Open in PostHog →
               </a>
@@ -415,7 +411,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Most opened places</h3>
+                  <h3 className={groupTitleClass}>Most opened places</h3>
                   <BarList
                     items={placeUsage.slice(0, 6).map((p) => ({
                       label: p.name ?? "Removed place",
@@ -427,7 +423,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   />
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Top searches</h3>
+                  <h3 className={groupTitleClass}>Top searches</h3>
                   <BarList
                     items={mapUsage.topSearches.map((s) => ({
                       label: s.term,
@@ -437,14 +433,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     emptyMessage="Not enough repeated searches yet to say."
                   />
                   <p className="mt-1 text-xs text-[var(--color-ink-500)]">
-                    Terms searched 3+ times only. A &quot;0 results&quot; tag means every one of those searches found nothing — a hint the map may be missing that place.
+                    Terms searched 3+ times only. A &quot;0 results&quot; tag means every one of those searches found nothing, a hint the map may be missing that place.
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">After opening a card, people…</h3>
+                  <h3 className={groupTitleClass}>After opening a card, people…</h3>
                   <BarList
                     items={[
                       { label: "Directions (walk)", value: mapUsage.cardActions.directionsWalk, displayValue: formatPct(pctOf(mapUsage.cardActions.directionsWalk, mapUsage.headline.cardsOpened)) },
@@ -460,7 +456,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   />
                   <p className="mt-1 text-xs text-[var(--color-ink-500)]">Share of cards opened this period.</p>
                   {/* #919: taps on a place's own page, as plain counts: that page isn't a card, so a share of cards opened would mislead. */}
-                  <h3 className="mt-4 text-sm font-medium text-[var(--color-ink-700)]">On a place&apos;s own page, people…</h3>
+                  <h3 className={`${groupTitleClass} mt-4`}>On a place&apos;s own page, people…</h3>
                   <BarList
                     items={[
                       { label: "Directions", value: mapUsage.cardActions.venuePageDirections },
@@ -470,7 +466,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   />
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Filters people use</h3>
+                  <h3 className={groupTitleClass}>Filters people use</h3>
                   <BarList
                     items={mapUsage.filters.map((f) => ({
                       label: filterLabel(f.filter),
@@ -484,7 +480,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Location shared?</h3>
+                  <h3 className={groupTitleClass}>Location shared?</h3>
                   <BarList
                     items={[
                       { label: "Granted", value: mapUsage.location.granted, displayValue: `${mapUsage.location.granted}` },
@@ -497,7 +493,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   />
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Came from a flyer or link tag</h3>
+                  <h3 className={groupTitleClass}>Came from a flyer or link tag</h3>
                   <BarList
                     items={mapUsage.utmSources.map((u) => ({
                       label: u.campaign ? `${u.source} · ${u.campaign}` : u.source,
@@ -514,8 +510,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           )}
         </section>
 
-        <section aria-labelledby="boxes-heading" className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
-          <h2 id="boxes-heading" className="wordmark text-base text-[var(--color-ink-900)]">
+        <section aria-labelledby="boxes-heading" className={cardClass}>
+          <h2 id="boxes-heading" className={sectionTitleClass}>
             Blessing boxes
           </h2>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -541,7 +537,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           )}
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Longest since last filled</h3>
+              <h3 className={groupTitleClass}>Longest since last filled</h3>
               <BarList
                 items={longestSinceFill.map((b) => ({
                   label: b.name,
@@ -552,7 +548,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               />
             </div>
             <div>
-              <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Most-needed items</h3>
+              <h3 className={groupTitleClass}>Most-needed items</h3>
               <BarList
                 items={mostNeeded.map((n) => ({ label: t(`box.needs.${n.key}`, "en"), value: n.count, displayValue: `${n.count} asks` }))}
                 emptyMessage="Not enough check-ins yet to say."
@@ -561,8 +557,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </div>
         </section>
 
-        <section aria-labelledby="map-health-heading" className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
-          <h2 id="map-health-heading" className="wordmark text-base text-[var(--color-ink-900)]">
+        <section aria-labelledby="map-health-heading" className={cardClass}>
+          <h2 id="map-health-heading" className={sectionTitleClass}>
             Map data health
           </h2>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -574,8 +570,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <p className="mt-3 text-sm text-[var(--color-ink-500)]">
             {latestRefresh ? (
               <>
-                Last data refresh {new Date(latestRefresh.createdAt).toLocaleDateString("en-US", { timeZone: TIME_ZONE })} — {latestRefresh.suggestedCount} suggested changes.{" "}
-                <Link href="/admin/places?show=review" className="font-medium text-[var(--color-sage-700)] underline underline-offset-2">
+                Last data refresh {new Date(latestRefresh.createdAt).toLocaleDateString("en-US", { timeZone: TIME_ZONE })}:{" "}
+                {latestRefresh.suggestedCount} suggested changes.{" "}
+                <Link href="/admin/places?show=review" className={linkClass}>
                   Review →
                 </Link>
               </>
@@ -584,7 +581,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             )}
           </p>
           {staleThreeMonths > 0 && (
-            <Link href="/admin/places" className="mt-1 inline-block text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2">
+            <Link href="/admin/places" className={`${tapLinkClass} text-sm`}>
               See places due for a check →
             </Link>
           )}

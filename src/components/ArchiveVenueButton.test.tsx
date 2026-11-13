@@ -1,10 +1,11 @@
 /**
- * ArchiveVenueButton tests (#255).
+ * ArchiveVenueButton tests (#255; on-page confirm #926).
  *
- * Covers AC2 end to end at the component layer: the confirm() gate (decline
- * -> fetch never called; accept -> POST /api/admin/venues/<id>/archive),
- * the success redirect, a failure banner on a non-200 response, and the
- * already-archived informational state (no actionable button at all).
+ * Covers AC2 end to end at the component layer: the confirm gate (first
+ * press only opens the on-page box; Cancel -> fetch never called; the box's
+ * own Remove from map -> POST /api/admin/venues/<id>/archive), the success
+ * redirect, a failure line on a non-200 response, and the already-archived
+ * informational state (no actionable button at all).
  *
  * next/navigation's useRouter is mocked module-wide, same pattern as
  * AddVenueForm.test.tsx (the first client component in this codebase to
@@ -12,7 +13,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mockPush = vi.fn();
@@ -37,28 +38,32 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** Presses the trigger, then returns the opened on-page confirm box. */
+async function openConfirm(user: ReturnType<typeof userEvent.setup>) {
+  render(<ArchiveVenueButton venueId="manual-abc" venueName="Eastside Pantry" alreadyArchived={false} />);
+  await user.click(screen.getByRole("button", { name: /Remove from map/i }));
+  return screen.getByRole("group", { name: /Eastside Pantry/ });
+}
+
 describe("ArchiveVenueButton — confirm gate", () => {
-  test("declining the confirm dialog never calls fetch", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
+  test("the first press only opens the box; Cancel sends nothing and brings the button back", async () => {
     const user = userEvent.setup();
-    render(<ArchiveVenueButton venueId="manual-abc" venueName="Eastside Pantry" alreadyArchived={false} />);
+    const box = await openConfirm(user);
 
-    await user.click(screen.getByRole("button", { name: /Remove from map/i }));
-
-    expect(window.confirm).toHaveBeenCalledTimes(1);
-    expect(window.confirm as unknown as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
-      expect.stringContaining("Eastside Pantry"),
-    );
     expect(mockFetch).not.toHaveBeenCalled();
+    await user.click(within(box).getByRole("button", { name: "Cancel" }));
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(screen.queryByRole("group")).toBeNull();
+    expect(screen.getByRole("button", { name: /Remove from map/i })).toHaveFocus();
   });
 
-  test("accepting the confirm dialog POSTs /api/admin/venues/<id>/archive", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+  test("the box's Remove from map POSTs /api/admin/venues/<id>/archive, once", async () => {
     mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true, id: "manual-abc", status: "archived" }) });
     const user = userEvent.setup();
-    render(<ArchiveVenueButton venueId="manual-abc" venueName="Eastside Pantry" alreadyArchived={false} />);
+    const box = await openConfirm(user);
 
-    await user.click(screen.getByRole("button", { name: /Remove from map/i }));
+    await user.click(within(box).getByRole("button", { name: /Remove from map/i }));
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
@@ -68,39 +73,33 @@ describe("ArchiveVenueButton — confirm gate", () => {
   });
 
   test("a successful (200) archive redirects to /admin/places and refreshes", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true, id: "manual-abc", status: "archived" }) });
     const user = userEvent.setup();
-    render(<ArchiveVenueButton venueId="manual-abc" venueName="Eastside Pantry" alreadyArchived={false} />);
+    const box = await openConfirm(user);
 
-    await user.click(screen.getByRole("button", { name: /Remove from map/i }));
+    await user.click(within(box).getByRole("button", { name: /Remove from map/i }));
 
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/places"));
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 
-  test("a non-200 response shows an error banner, no redirect", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-    mockFetch.mockResolvedValueOnce({ status: 404, json: async () => ({ ok: false, error: "Not found" }) });
+  test.each([
+    ["a non-200 response", () => mockFetch.mockResolvedValueOnce({ status: 404, json: async () => ({ ok: false }) })],
+    ["a network-level failure", () => mockFetch.mockRejectedValueOnce(new Error("network down"))],
+  ])("%s shows an error line, no redirect, and Cancel clears it", async (_label, arrange) => {
+    arrange();
     const user = userEvent.setup();
-    render(<ArchiveVenueButton venueId="manual-abc" venueName="Eastside Pantry" alreadyArchived={false} />);
+    const box = await openConfirm(user);
 
-    await user.click(screen.getByRole("button", { name: /Remove from map/i }));
+    await user.click(within(box).getByRole("button", { name: /Remove from map/i }));
 
     expect(await screen.findByRole("alert")).toBeDefined();
     expect(mockPush).not.toHaveBeenCalled();
-  });
 
-  test("a network-level failure shows an error banner, no redirect", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-    mockFetch.mockRejectedValueOnce(new Error("network down"));
-    const user = userEvent.setup();
-    render(<ArchiveVenueButton venueId="manual-abc" venueName="Eastside Pantry" alreadyArchived={false} />);
-
+    // A reopened box must not carry the last attempt's failure.
+    await user.click(within(box).getByRole("button", { name: "Cancel" }));
     await user.click(screen.getByRole("button", { name: /Remove from map/i }));
-
-    expect(await screen.findByRole("alert")).toBeDefined();
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
 

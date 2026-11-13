@@ -32,7 +32,7 @@ describe("ProposalCard — Care and Share", () => {
     expect(screen.getByText(/RMSER Pueblo/)).toBeInTheDocument();
     expect(screen.getByText(/73 m away/)).toBeInTheDocument();
     expect(screen.queryByText(/no other details changed/)).not.toBeInTheDocument();
-    expect(summarizeProposalForRow(p)).toBe("Care and Share listing — same place?");
+    expect(summarizeProposalForRow(p)).toBe("Care and Share listing: same place?");
   });
 
   test("a schedule it couldn't read shows their words and how to stop seeing it", () => {

@@ -29,13 +29,20 @@ import {
   formatSubmittedAt,
   primaryButtonClass,
   secondaryButtonClass,
+  tagClass,
 } from "@/lib/adminCardStyles";
+import { inputBase, inputBorder } from "@/components/formClasses";
 
 export interface PhotoReviewCardProps {
   photo: AdminBoxPhotoRow;
 }
 
-type ActionState = { status: "idle" } | { status: "submitting" } | { status: "error"; message: string };
+// `action` says which button is working, so only that one reads "Approving…"
+// or "Saving…" (both stay disabled either way).
+type ActionState =
+  | { status: "idle" }
+  | { status: "submitting"; action: "approve" | "reject" }
+  | { status: "error"; message: string };
 
 export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
   const router = useRouter();
@@ -45,12 +52,16 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
 
   const isFlagged = photo.status === "flagged";
   const reasonFieldId = `photo-reject-reason-${photo.id}`;
-  const genericErrorMessage = "Something went wrong. Try again.";
+  // #926 decision 15: an error says what did NOT happen, then what to do.
+  const errorMessage = {
+    approve: isFlagged ? "The photo was not kept. Try again." : "The photo was not approved. Try again.",
+    reject: isFlagged ? "The photo was not removed. Try again." : "The photo was not rejected. Try again.",
+  };
 
   // Approve sends no body; reject sends `{ reason }`. Anything but a 200
-  // (or a network error) shows the generic error.
+  // (or a network error) shows that action's error line.
   async function act(path: "approve" | "reject", body?: { reason: string }) {
-    setState({ status: "submitting" });
+    setState({ status: "submitting", action: path });
     try {
       const res = await fetch(`/api/admin/box-photos/${photo.id}/${path}`, {
         method: "POST",
@@ -63,7 +74,7 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
     } catch {
       // fall through to the error state
     }
-    setState({ status: "error", message: genericErrorMessage });
+    setState({ status: "error", message: errorMessage[path] });
   }
 
   const handleApprove = () => act("approve");
@@ -74,16 +85,8 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           {/* clay-100/700: this codebase's established "informational emphasis" badge pairing — same as SubmissionCard's "Public report" badge. */}
-          {isFlagged && (
-            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-[var(--color-clay-100)] text-[var(--color-clay-700)]">
-              Photo reported ({photo.flag_count}×)
-            </span>
-          )}
-          {photo.status === "pending" && (
-            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-              New photo
-            </span>
-          )}
+          {isFlagged && <span className={tagClass("attention")}>Photo reported ({photo.flag_count}×)</span>}
+          {photo.status === "pending" && <span className={tagClass("calm")}>New photo</span>}
         </div>
         <p className="text-xs text-[var(--color-ink-400)]">{formatSubmittedAt(photo.created_at)}</p>
       </div>
@@ -120,7 +123,11 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
           disabled={state.status === "submitting"}
           className={primaryButtonClass}
         >
-          {state.status === "submitting" ? "Approving…" : isFlagged ? "Keep photo" : "Approve"}
+          {state.status === "submitting" && state.action === "approve"
+            ? "Approving…"
+            : isFlagged
+              ? "Keep photo"
+              : "Approve"}
         </button>
         {!rejectOpen && (
           <button
@@ -137,29 +144,17 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
       {rejectOpen && (
         <div className="mt-4 border-t border-[var(--color-bone-200)] pt-4">
           <label htmlFor={reasonFieldId} className={`${fieldLabelClass} mb-1 block`}>
-            Reason <span className="font-normal normal-case text-[var(--color-ink-400)]">(optional)</span>
+            Reason <span className="font-normal normal-case text-[var(--color-ink-400)]">(optional, for your own notes)</span>
           </label>
           <textarea
             id={reasonFieldId}
             rows={2}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            className={
-              "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm " +
-              "text-[var(--color-ink-900)] bg-white placeholder:text-[var(--color-ink-400)] " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-              "focus-visible:border-[var(--color-sage-500)]"
-            }
+            className={`${inputBase} ${inputBorder(false)}`}
           />
-          <div className="mt-2 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleConfirmReject}
-              disabled={state.status === "submitting"}
-              className={dangerButtonClass}
-            >
-              {state.status === "submitting" ? "Saving…" : `Confirm ${isFlagged ? "remove" : "reject"}`}
-            </button>
+          {/* #926 decision 8: Cancel first, the red Confirm second, in DOM and visual order. */}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => {
@@ -171,6 +166,16 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
               className={secondaryButtonClass}
             >
               Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmReject}
+              disabled={state.status === "submitting"}
+              className={dangerButtonClass}
+            >
+              {state.status === "submitting" && state.action === "reject"
+                ? "Saving…"
+                : `Confirm ${isFlagged ? "remove" : "reject"}`}
             </button>
           </div>
         </div>

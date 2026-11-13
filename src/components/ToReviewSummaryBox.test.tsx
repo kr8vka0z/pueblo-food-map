@@ -19,19 +19,22 @@ vi.mock("next/navigation", () => ({
 import ToReviewSummaryBox from "@/components/ToReviewSummaryBox";
 
 const mockFetch = vi.fn();
-let confirmSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   mockFetch.mockReset();
   mockRefresh.mockReset();
   vi.stubGlobal("fetch", mockFetch);
-  confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  confirmSpy.mockRestore();
 });
+
+/** Opens the on-page confirm, then presses its own Approve button (the second press). */
+async function approveViaConfirm(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: /Approve all/i }));
+  await user.click(screen.getByRole("button", { name: /^Approve \d+ updates$/ }));
+}
 
 /** The one shape POST /api/admin/proposals/approve-date-only ever bulk-approves. */
 function makeDateOnlyProposal(overrides: Partial<ParsedProposal> = {}): ParsedProposal {
@@ -112,15 +115,17 @@ describe("ToReviewSummaryBox — bulk approve date-only updates", () => {
     expect(screen.getByRole("button", { name: "Approve all 2 date-only updates" })).toBeDefined();
   });
 
-  test("declining the confirm dialog never calls fetch", async () => {
-    confirmSpy.mockReturnValue(false);
+  test("the first press only asks; Cancel sends nothing and puts focus back on the button", async () => {
     const user = userEvent.setup();
     render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeDateOnlyProposal()]} submissionCount={0} />);
 
     await user.click(screen.getByRole("button", { name: /Approve all/i }));
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy.mock.calls[0][0]).toMatch(/Real changes are not included/);
+    expect(screen.getByText(/Real changes are not included/)).toBeDefined();
     expect(mockFetch).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /Approve all/i })).toHaveFocus();
   });
 
   test("confirming POSTs the exact date-only ids and refreshes on success", async () => {
@@ -134,7 +139,7 @@ describe("ToReviewSummaryBox — bulk approve date-only updates", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /Approve all/i }));
+    await approveViaConfirm(user);
 
     await waitFor(() =>
       expect(mockFetch).toHaveBeenCalledWith(
@@ -151,9 +156,9 @@ describe("ToReviewSummaryBox — bulk approve date-only updates", () => {
     const user = userEvent.setup();
     render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeDateOnlyProposal()]} submissionCount={0} />);
 
-    await user.click(screen.getByRole("button", { name: /Approve all/i }));
+    await approveViaConfirm(user);
 
-    await waitFor(() => expect(screen.getByText(/Something went wrong/i)).toBeDefined());
+    await waitFor(() => expect(screen.getByText(/Some updates may not have been approved/)).toBeDefined());
     expect(mockRefresh).not.toHaveBeenCalled();
   });
 
@@ -162,11 +167,9 @@ describe("ToReviewSummaryBox — bulk approve date-only updates", () => {
     const user = userEvent.setup();
     render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeDateOnlyProposal()]} submissionCount={0} />);
 
-    await user.click(screen.getByRole("button", { name: /Approve all/i }));
+    await approveViaConfirm(user);
 
-    await waitFor(() =>
-      expect(screen.getByText(/More than 200 date-only proposals selected — narrow the filter and retry/i)).toBeDefined(),
-    );
+    await waitFor(() => expect(screen.getByText(/more than 200 date-only proposals were selected/i)).toBeDefined());
   });
 
   test("the result line is aria-live=\"polite\"", async () => {
@@ -174,7 +177,7 @@ describe("ToReviewSummaryBox — bulk approve date-only updates", () => {
     const user = userEvent.setup();
     render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeDateOnlyProposal()]} submissionCount={0} />);
 
-    await user.click(screen.getByRole("button", { name: /Approve all/i }));
+    await approveViaConfirm(user);
     await waitFor(() => {
       const resultLine = screen.getByText("Approved 1. Skipped 0.");
       expect(resultLine.getAttribute("aria-live")).toBe("polite");

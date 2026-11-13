@@ -50,6 +50,7 @@ import AdminNav from "@/components/AdminNav";
 import BoxesToReviewBox from "@/components/BoxesToReviewBox";
 import BoxReportsChart from "@/components/BoxReportsChart";
 import AllBoxesTable from "@/components/AllBoxesTable";
+import { cardClass, pageTitleClass, sectionTitleClass } from "@/lib/adminCardStyles";
 
 /** The chart's own window — src/lib/adminDashboard.ts's bucketCheckinsByWeek default. */
 const CHART_WEEKS = 8;
@@ -96,6 +97,8 @@ export default async function BoxesPage({
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="boxes" counts={navCounts} showActivity={identity.isOwner === true} />
       <div className="px-4 py-6 sm:px-6">
+        <h2 className={`${pageTitleClass} mb-4`}>Blessing Boxes</h2>
+
         <BoxesToReviewBox
           reviewingBoxCount={reviewingBoxCount}
           photosCount={photos.length}
@@ -103,17 +106,16 @@ export default async function BoxesPage({
           sponsorRequestsCount={adopters.length}
         />
 
-        <h2 className="wordmark mb-4 text-lg text-[var(--color-ink-900)]">Blessing boxes — {inServiceCount} in service</h2>
-
-        <section className="elevation-1 mb-6 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
-          <h2 className="wordmark text-lg text-[var(--color-ink-900)]">Box reports, last 8 weeks</h2>
+        {/* Sections are h3: the page title above is this page's h2 (#926 decision 5). */}
+        <section className={`${cardClass} mb-6`}>
+          <h3 className={sectionTitleClass}>Box reports, last 8 weeks</h3>
           <div className="mt-3">
             <BoxReportsChart buckets={weeklyBuckets} />
           </div>
         </section>
 
         <section>
-          <h2 className="wordmark mb-3 text-lg text-[var(--color-ink-900)]">All boxes</h2>
+          <h3 className={`${sectionTitleClass} mb-3`}>All boxes ({inServiceCount} in service)</h3>
           {/* key forces a remount on `?show=review` — see this file's own header. */}
           <AllBoxesTable
             key={showReview ? "review" : "all"}

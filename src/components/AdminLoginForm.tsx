@@ -42,7 +42,15 @@ import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/authClient";
 import { markInternalDevice } from "@/lib/analytics";
 import { EMAIL_RE } from "@/lib/email";
-import { errorClass, inputBase, labelClass } from "@/components/formClasses";
+import {
+  ADMIN_PRIMARY_BUTTON,
+  ADMIN_SECONDARY_BUTTON,
+  errorClass,
+  inputBase,
+  inputBorder,
+  labelClass,
+} from "@/components/formClasses";
+import { tapLinkClass } from "@/lib/adminCardStyles";
 
 type FormStatus = "idle" | "sending" | "sent" | "error";
 type CodeStatus = "idle" | "verifying" | "error";
@@ -64,21 +72,17 @@ function codeErrorMessage(error: { code?: string; status?: number } | null | und
     case "TOO_MANY_ATTEMPTS":
       return "Too many tries. Send a new code.";
     default:
-      return "Something went wrong. Try again.";
+      return "That code didn't work. Try again.";
   }
 }
 
-const primaryButtonClass =
-  "w-full h-12 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
-  "text-base font-semibold transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-  "focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed";
-const secondaryButtonClass =
-  "w-full h-12 inline-flex items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
-  "text-sm font-medium text-[var(--color-sage-600)] bg-transparent " +
-  "transition-colors duration-150 hover:bg-[var(--color-sage-50)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
+const primaryButtonClass = `${ADMIN_PRIMARY_BUTTON} w-full`;
+const secondaryButtonClass = `${ADMIN_SECONDARY_BUTTON} w-full`;
+// SHARED-GAP: a lifted card (elevation 2) for the sign-in box. cardClass is
+// elevation 1; the design page pictures the sign-in card lifted (#926 decision 14).
+const signInCardClass = "elevation-2 rounded-[var(--radius-lg)] bg-white p-6 sm:p-8";
+// The small text buttons under the code box: 48 tall tap area plus the ring.
+const textButtonClass = `${tapLinkClass} text-sm disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60`;
 
 export default function AdminLoginForm() {
   const { data: session, isPending: sessionPending } = authClient.useSession();
@@ -244,7 +248,7 @@ export default function AdminLoginForm() {
       return (
         <div
           data-testid="admin-login-passkey-prompt"
-          className="elevation-2 rounded-[var(--radius-lg)] bg-white p-6 sm:p-8"
+          className={signInCardClass}
         >
           <p className="text-sm text-[var(--color-ink-500)]">Signing you in…</p>
         </div>
@@ -256,7 +260,7 @@ export default function AdminLoginForm() {
     return (
       <div
         data-testid="admin-login-passkey-prompt"
-        className="elevation-2 rounded-[var(--radius-lg)] bg-white p-6 sm:p-8"
+        className={signInCardClass}
       >
         <p className="text-sm text-[var(--color-ink-500)]">Signed in as</p>
         <p className="mb-4 text-lg font-medium text-[var(--color-sage-700)]">
@@ -281,7 +285,7 @@ export default function AdminLoginForm() {
         )}
         <Link
           href="/admin"
-          className="mt-4 block text-center text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+          className={`${tapLinkClass} mt-4 w-full justify-center text-sm`}
         >
           Continue to admin without a passkey
         </Link>
@@ -291,7 +295,7 @@ export default function AdminLoginForm() {
 
   // ─── Signed-out view: email code + passkey sign-in ──────────────────────
   return (
-    <div className="elevation-2 rounded-[var(--radius-lg)] bg-white p-6 sm:p-8">
+    <div className={signInCardClass}>
       {formStatus === "sent" ? (
         <div data-testid="admin-login-sent">
           <p role="status" className="text-sm text-[var(--color-ink-700)]">
@@ -322,9 +326,7 @@ export default function AdminLoginForm() {
               onChange={(e) => handleCodeChange(e.target.value)}
               aria-invalid={codeError ? "true" : undefined}
               aria-describedby={codeError ? "admin-login-code-error" : undefined}
-              className={`${inputBase} ${
-                codeError ? "border-[var(--color-danger)]" : "border-[var(--color-bone-300)]"
-              } tracking-[0.4em] tabular-nums`}
+              className={`${inputBase} ${inputBorder(Boolean(codeError))} tracking-[0.4em] tabular-nums`}
               placeholder="123456"
             />
             {codeError && (
@@ -341,7 +343,7 @@ export default function AdminLoginForm() {
               type="button"
               onClick={handleResend}
               disabled={resendIn > 0}
-              className="min-h-12 text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60"
+              className={textButtonClass}
             >
               {resendIn > 0 ? `Resend code (${resendIn}s)` : "Resend code"}
             </button>
@@ -355,7 +357,7 @@ export default function AdminLoginForm() {
                 setCodeStatus("idle");
                 setResendIn(0);
               }}
-              className="min-h-12 text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+              className={textButtonClass}
             >
               Use a different email
             </button>
@@ -379,11 +381,7 @@ export default function AdminLoginForm() {
             onChange={(e) => setEmail(e.target.value)}
             aria-invalid={fieldError ? "true" : undefined}
             aria-describedby={fieldError ? "admin-login-email-error" : undefined}
-            className={`${inputBase} ${
-              fieldError
-                ? "border-[var(--color-danger)]"
-                : "border-[var(--color-bone-300)]"
-            } mb-1`}
+            className={`${inputBase} ${inputBorder(Boolean(fieldError))} mb-1`}
             placeholder="you@example.com"
           />
           {fieldError && (
@@ -401,7 +399,7 @@ export default function AdminLoginForm() {
           </button>
           {formStatus === "error" && (
             <p className={errorClass} role="alert">
-              Something went wrong sending the code. Try again.
+              The code was not sent. Try again.
             </p>
           )}
 

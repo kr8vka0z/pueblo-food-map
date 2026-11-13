@@ -13,6 +13,16 @@
  * browser state.
  */
 
+// SHARED-GAP: a tile card with 16 px padding at every width (the design
+// page's .pa-kpi and .pa-need tiles; DashboardNeedsStrip imports it too).
+// cardClass steps to 24 px from 640 wide, which squeezes four tiles across
+// inside a section card; cardSlimClass is 12 by 16.
+export const tileCardClass =
+  "elevation-1 min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4";
+// SHARED-GAP: the tile's 12 px capitals label in ink 500 (the design page's
+// .pa-kpi .l and .pa-need .l). fieldLabelClass is 11 px in ink 400.
+export const tileLabelClass = "text-xs font-medium uppercase tracking-wide text-[var(--color-ink-500)]";
+
 export interface KpiCardProps {
   label: string;
   /** Formatted for display already (e.g. "1,204", "42%", "2.1s") — this component never formats the value itself, only the delta. */
@@ -91,11 +101,19 @@ function Sparkline({ points }: { points: readonly number[] }) {
 export default function KpiCard({ label, displayValue, value, previousValue, sparkline, approximate }: KpiCardProps) {
   const delta = computeKpiDelta(value, previousValue);
   return (
-    <div className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-500)]">{label}</p>
-      <div className="mt-1 flex items-baseline gap-2">
+    <div className={tileCardClass}>
+      <p className={tileLabelClass}>{label}</p>
+      {/* WHY flex-wrap and a real space after "about": two cards across a
+          360 px phone leave about 110 px, so the change drops under the
+          number and "about" may sit on its own line, instead of running past
+          the card's edge. */}
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
         <p className="text-2xl font-semibold text-[var(--color-ink-900)]">
-          {approximate && <span className="mr-1 text-sm font-normal text-[var(--color-ink-500)]">about</span>}
+          {approximate && (
+            <>
+              <span className="text-sm font-normal text-[var(--color-ink-500)]">about</span>{" "}
+            </>
+          )}
           {displayValue}
         </p>
         {previousValue !== undefined && <DeltaBadge delta={delta} />}

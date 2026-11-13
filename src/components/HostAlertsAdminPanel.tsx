@@ -18,14 +18,18 @@
  * would be pure overhead for no correctness gain.
  *
  * Single-language alert emails: the "Add a host email" form also carries an
- * "Email language" select (English/Spanish, default English) — a host is
+ * "Email language" slider (English/Spanish, default English; #926 decision
+ * 10: a two-way choice is a slider) — a host is
  * admin-added, not self-signed-up, so there's no page locale to read the
  * way the two public forms (AdoptBoxForm/BoxAlertSignupForm) do; the admin
  * picks it directly. The route stores it and every future alert this host
  * receives renders in ONLY that language.
  */
 
-import { useState } from "react";
+import { useId, useState } from "react";
+import AdminSegmented from "@/components/AdminSegmented";
+import { inputBase, inputBorder } from "@/components/formClasses";
+import { dangerButtonClass, fieldLabelClass, primaryButtonClass } from "@/lib/adminCardStyles";
 
 interface HostRow {
   id: number;
@@ -37,37 +41,36 @@ export interface HostAlertsAdminPanelProps {
   initialHosts: HostRow[];
 }
 
-const primaryButtonClass =
-  "inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
-  "px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] transition-colors duration-150 " +
-  "hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 " +
-  "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
+const LANG_OPTIONS = [
+  { value: "en", label: "English" },
+  { value: "es", label: "Spanish" },
+];
 
-const removeButtonClass =
-  "text-sm font-medium text-[var(--color-danger)] underline underline-offset-2 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
-
-const inputClass =
-  "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm " +
-  "text-[var(--color-ink-900)] bg-white placeholder:text-[var(--color-ink-400)] " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-  "focus-visible:border-[var(--color-sage-500)]";
-
-type PanelState = { status: "idle" } | { status: "submitting" } | { status: "error"; message: string };
+// `removing` names the host being removed, so only that row says
+// "Removing…" and the Add button only says "Adding…" while adding. Every
+// button stays disabled during any request, as before.
+type PanelState =
+  | { status: "idle" }
+  | { status: "submitting"; removing: string | null }
+  | { status: "error"; message: string };
 
 export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAlertsAdminPanelProps) {
+  const idPrefix = useId();
   const [hosts, setHosts] = useState<HostRow[]>(initialHosts);
   const [email, setEmail] = useState("");
   const [lang, setLang] = useState<"en" | "es">("en");
   const [state, setState] = useState<PanelState>({ status: "idle" });
 
-  const genericErrorMessage = "Something went wrong. Try again.";
+  // #926 decision 15: an error says what did NOT happen, then what to do.
+  const failedMessage = {
+    POST: "The host email was not added. Try again.",
+    DELETE: "The host email was not removed. Try again.",
+  };
 
   // POST (add) and DELETE (remove) share one request/response shape. The
   // 409 message is POST-only: that is the one route answer it describes.
-  async function mutate(method: "POST" | "DELETE", body: object, onSuccess?: () => void) {
-    setState({ status: "submitting" });
+  async function mutate(method: "POST" | "DELETE", body: { email: string; lang?: "en" | "es" }, onSuccess?: () => void) {
+    setState({ status: "submitting", removing: method === "DELETE" ? body.email : null });
     try {
       const res = await fetch(`/api/admin/blessing-boxes/${venueId}/host-alerts`, {
         method,
@@ -85,9 +88,9 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
         setState({ status: "error", message: "That address previously stopped these emails and can't be re-added here." });
         return;
       }
-      setState({ status: "error", message: genericErrorMessage });
+      setState({ status: "error", message: failedMessage[method] });
     } catch {
-      setState({ status: "error", message: genericErrorMessage });
+      setState({ status: "error", message: failedMessage[method] });
     }
   }
 
@@ -103,28 +106,44 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
   return (
     <div>
       {hosts.length === 0 ? (
-        <p className="text-sm text-[var(--color-ink-500)]">No host emails on file yet.</p>
+        <div>
+          <p className="text-sm text-[var(--color-ink-500)]">No host emails on file yet.</p>
+          <p className="text-sm text-[var(--color-ink-500)]">
+            Add one below to email the host when this box is reported empty, filled or with a problem.
+          </p>
+        </div>
       ) : (
-        <ul className="flex flex-col gap-1">
-          {hosts.map((h) => (
-            <li key={h.id} className="flex items-center justify-between gap-2 text-sm text-[var(--color-ink-700)]">
-              <span>{h.email}</span>
-              <button
-                type="button"
-                onClick={() => handleRemove(h.email)}
-                disabled={state.status === "submitting"}
-                className={removeButtonClass}
-              >
-                Remove
-              </button>
-            </li>
-          ))}
+        <ul className="flex flex-col gap-2">
+          {hosts.map((h) => {
+            // The button's name is "Remove <that email>" through
+            // aria-labelledby on the visible address, never an aria-label.
+            const buttonId = `${idPrefix}-${h.id}-remove`;
+            const emailId = `${idPrefix}-${h.id}-email`;
+            const removingThis = state.status === "submitting" && state.removing === h.email;
+            return (
+              <li key={h.id} className="flex items-center justify-between gap-2 text-sm text-[var(--color-ink-700)]">
+                <span id={emailId} className="min-w-0 break-words">
+                  {h.email}
+                </span>
+                <button
+                  id={buttonId}
+                  type="button"
+                  aria-labelledby={`${buttonId} ${emailId}`}
+                  onClick={() => handleRemove(h.email)}
+                  disabled={state.status === "submitting"}
+                  className={`${dangerButtonClass} shrink-0`}
+                >
+                  {removingThis ? "Removing…" : "Remove"}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
-      <form onSubmit={handleAdd} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-        <div className="flex-1">
-          <label htmlFor="host-alert-email" className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-400)]">
+      <form onSubmit={handleAdd} className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="min-w-0 flex-1">
+          <label htmlFor="host-alert-email" className={`${fieldLabelClass} mb-1 block`}>
             Add a host email
           </label>
           <input
@@ -134,25 +153,25 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="host@example.com"
-            className={inputClass}
+            className={`${inputBase} ${inputBorder(false)}`}
           />
         </div>
         <div>
-          <label htmlFor="host-alert-lang" className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-400)]">
+          {/* The slider's legend is read by screen readers; this caption is
+              its visible twin, so it is hidden from them. */}
+          <p aria-hidden="true" className={`${fieldLabelClass} mb-1`}>
             Email language
-          </label>
-          <select
-            id="host-alert-lang"
+          </p>
+          <AdminSegmented
+            name="host-alert-lang"
+            legend="Email language"
+            options={LANG_OPTIONS}
             value={lang}
-            onChange={(e) => setLang(e.target.value === "es" ? "es" : "en")}
-            className={inputClass}
-          >
-            <option value="en">English</option>
-            <option value="es">Spanish</option>
-          </select>
+            onChange={(v) => setLang(v === "es" ? "es" : "en")}
+          />
         </div>
         <button type="submit" disabled={state.status === "submitting"} className={primaryButtonClass}>
-          {state.status === "submitting" ? "Adding…" : "Add host"}
+          {state.status === "submitting" && state.removing === null ? "Adding…" : "Add host"}
         </button>
       </form>
 

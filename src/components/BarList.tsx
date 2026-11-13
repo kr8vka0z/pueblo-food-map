@@ -8,6 +8,8 @@
  * No "use client": static markup only.
  */
 
+import { linkClass } from "@/lib/adminCardStyles";
+
 export interface BarListItem {
   label: string;
   value: number;
@@ -36,7 +38,7 @@ export default function BarList({ items, emptyMessage }: BarListProps) {
           {item.href ? (
             <a
               href={item.href}
-              className="w-28 flex-none truncate text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+              className={`${linkClass} w-28 flex-none truncate text-sm`}
               title={item.label}
             >
               {item.label}

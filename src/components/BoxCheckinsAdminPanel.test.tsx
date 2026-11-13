@@ -104,8 +104,20 @@ describe("BoxCheckinsAdminPanel — rendering", () => {
       />,
     );
     expect(screen.getByText("Hidden")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Hide" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Unhide" })).toBeDefined();
+    expect(screen.getByRole("button", { name: /^Hide / })).toBeDefined();
+    expect(screen.getByRole("button", { name: /^Unhide / })).toBeDefined();
+  });
+
+  // #926: each button's name says which check-in it acts on (its kind and
+  // date), so a screen-reader user can tell the rows' buttons apart.
+  test("each Hide button is named after its own check-in's kind", () => {
+    render(
+      <BoxCheckinsAdminPanel
+        checkins={[makeRow({ id: 1, kind: "filled" }), makeRow({ id: 2, kind: "problem", note: "Door broken" })]}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /^Hide Filled \S/ })).toBeDefined();
+    expect(screen.getByRole("button", { name: /^Hide Problem report \S/ })).toBeDefined();
   });
 });
 
@@ -115,7 +127,7 @@ describe("BoxCheckinsAdminPanel — toggling visibility", () => {
     const user = userEvent.setup();
     render(<BoxCheckinsAdminPanel checkins={[makeRow({ id: 7, visibility: "visible" })]} />);
 
-    await user.click(screen.getByRole("button", { name: "Hide" }));
+    await user.click(screen.getByRole("button", { name: /^Hide / }));
 
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/admin/box-checkins/7/visibility",
@@ -130,7 +142,7 @@ describe("BoxCheckinsAdminPanel — toggling visibility", () => {
     const user = userEvent.setup();
     render(<BoxCheckinsAdminPanel checkins={[makeRow({ id: 9, visibility: "hidden" })]} />);
 
-    await user.click(screen.getByRole("button", { name: "Unhide" }));
+    await user.click(screen.getByRole("button", { name: /^Unhide / }));
 
     const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
     expect(body).toEqual({ visibility: "visible" });
@@ -141,7 +153,7 @@ describe("BoxCheckinsAdminPanel — toggling visibility", () => {
     const user = userEvent.setup();
     render(<BoxCheckinsAdminPanel checkins={[makeRow({ id: 1 })]} />);
 
-    await user.click(screen.getByRole("button", { name: "Hide" }));
+    await user.click(screen.getByRole("button", { name: /^Hide / }));
 
     await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
   });
@@ -151,9 +163,9 @@ describe("BoxCheckinsAdminPanel — toggling visibility", () => {
     const user = userEvent.setup();
     render(<BoxCheckinsAdminPanel checkins={[makeRow({ id: 1 })]} />);
 
-    await user.click(screen.getByRole("button", { name: "Hide" }));
+    await user.click(screen.getByRole("button", { name: /^Hide / }));
 
-    await waitFor(() => expect(screen.getByText(/Something went wrong/)).toBeDefined());
+    await waitFor(() => expect(screen.getByText("The check-in was not hidden. Try again.")).toBeDefined());
     expect(mockRefresh).not.toHaveBeenCalled();
   });
 
@@ -162,9 +174,9 @@ describe("BoxCheckinsAdminPanel — toggling visibility", () => {
     const user = userEvent.setup();
     render(<BoxCheckinsAdminPanel checkins={[makeRow({ id: 1 })]} />);
 
-    await user.click(screen.getByRole("button", { name: "Hide" }));
+    await user.click(screen.getByRole("button", { name: /^Hide / }));
 
-    await waitFor(() => expect(screen.getByText(/Something went wrong/)).toBeDefined());
+    await waitFor(() => expect(screen.getByText("The check-in was not hidden. Try again.")).toBeDefined());
   });
 
   test("toggling one row's button does not disable a different row's button", async () => {
@@ -176,11 +188,11 @@ describe("BoxCheckinsAdminPanel — toggling visibility", () => {
       />,
     );
 
-    const buttons = screen.getAllByRole("button", { name: "Hide" });
+    const buttons = screen.getAllByRole("button", { name: /^Hide / });
     await user.click(buttons[0]);
 
     await waitFor(() => expect(screen.getByText("Saving…")).toBeDefined());
-    const stillIdle = screen.getAllByRole("button", { name: "Hide" });
+    const stillIdle = screen.getAllByRole("button", { name: /^Hide / });
     expect(stillIdle).toHaveLength(1); // the other row's button is untouched
     expect(stillIdle[0]).not.toBeDisabled();
   });

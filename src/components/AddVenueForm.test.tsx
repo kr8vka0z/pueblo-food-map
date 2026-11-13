@@ -20,7 +20,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mockPush = vi.fn();
@@ -63,8 +63,9 @@ describe("AddVenueForm — rendering", () => {
     expect(screen.getByLabelText(/^Longitude/i)).toBeDefined();
     expect(screen.getByLabelText("Monday")).toBeDefined();
     expect(screen.getByLabelText("Sunday")).toBeDefined();
-    expect(screen.getByLabelText(/^Accepts SNAP/i)).toBeDefined();
-    expect(screen.getByLabelText(/^Accepts WIC/i)).toBeDefined();
+    // SNAP / WIC are sliders of radios now (#926 decision 10): named groups.
+    expect(screen.getByRole("group", { name: /^Accepts SNAP/i })).toBeDefined();
+    expect(screen.getByRole("group", { name: /^Accepts WIC/i })).toBeDefined();
     expect(screen.getByLabelText(/^Phone/i)).toBeDefined();
     expect(screen.getByLabelText(/^Email/i)).toBeDefined();
     expect(screen.getByLabelText(/^Website/i)).toBeDefined();
@@ -123,6 +124,38 @@ describe("AddVenueForm — submit", () => {
     expect(body.accepts_snap).toBeNull();
     expect(body.accepts_wic).toBeNull();
     expect(body.hours_weekly).toBeUndefined();
+  });
+
+  test.each([
+    ["Yes", 1],
+    ["No", 0],
+  ])("picking %s on the SNAP and WIC sliders sends %d for both", async (label, sent) => {
+    mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ id: "manual-abc" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm />);
+    await fillRequiredFields(user);
+    for (const group of [/^Accepts SNAP/i, /^Accepts WIC/i]) {
+      await user.click(within(screen.getByRole("group", { name: group })).getByRole("radio", { name: label }));
+    }
+
+    await user.click(screen.getByRole("button", { name: /Add venue/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const body = JSON.parse((mockFetch.mock.calls[0] as [string, RequestInit])[1].body as string);
+    expect(body.accepts_snap).toBe(sent);
+    expect(body.accepts_wic).toBe(sent);
+  });
+
+  test("Enter in a text box still saves with Cancel in the save row", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ id: "manual-abc" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm />);
+    await fillRequiredFields(user);
+
+    await user.type(screen.getByLabelText(/^Source/i), "{Enter}");
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    expect(mockPush).toHaveBeenCalledWith("/admin/places");
   });
 
   test("a server 422 response renders the returned per-field error inline, no redirect", async () => {

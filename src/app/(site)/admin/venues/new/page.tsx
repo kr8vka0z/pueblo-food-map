@@ -62,6 +62,7 @@ import { loadAdminNavCounts } from "@/lib/adminNavCounts";
 import AdminNav from "@/components/AdminNav";
 import AddVenueForm, { type AddVenueFormValues } from "@/components/AddVenueForm";
 import ProposalCard from "@/components/ProposalCard";
+import { pageTitleClass, sectionTitleClass } from "@/lib/adminCardStyles";
 import { mapSubmissionPayloadToFormValues, mapAddProposalToFormValues } from "@/lib/adminVenueForm";
 import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@/lib/adminProposals";
 import type { NewVenuePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
@@ -158,10 +159,10 @@ export default async function NewVenuePage({
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="places" counts={navCounts} showActivity={identity.isOwner === true} />
       <div className="px-4 py-6 sm:px-6 space-y-6">
-        <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Add a venue</h2>
+        <h2 className={pageTitleClass}>Add a venue</h2>
         {proposalPrefill && (
           <div className="max-w-2xl">
-            <h3 className="mb-2 text-sm font-semibold text-[var(--color-ink-700)]">Suggested new place</h3>
+            <h3 className={`mb-2 ${sectionTitleClass}`}>Suggested new place</h3>
             <ProposalCard proposal={proposalPrefill.proposal} />
           </div>
         )}

@@ -71,14 +71,19 @@ describe("ActivityLog", () => {
     const days = buildActivityDays({ actions: [], events: [failed], sessionHeaders: [] });
     render(<ActivityLog days={days} filters={filters} people={[]} olderHref="/admin/activity?until=x" />);
 
-    expect(screen.getByText(/Failed sign-in — attacker@evil\.com/)).toBeDefined();
+    expect(screen.getByText(/Failed sign-in: attacker@evil\.com/)).toBeDefined();
     expect(screen.getByText(/isn't an admin/)).toBeDefined();
     expect(screen.getByRole("link", { name: "Show older" }).getAttribute("href")).toBe("/admin/activity?until=x");
   });
 
-  test("an empty page says so", () => {
-    render(<ActivityLog days={[]} filters={filters} people={[]} olderHref={null} />);
+  test("an empty page says so, and offers Clear filters only when a filter is set", () => {
+    const { unmount } = render(<ActivityLog days={[]} filters={filters} people={[]} olderHref={null} />);
     expect(screen.getByText("No activity matches these filters.")).toBeDefined();
+    expect(screen.queryByRole("link", { name: "Clear filters" })).toBeNull();
+    unmount();
+
+    render(<ActivityLog days={[]} filters={{ ...filters, q: "pantry" }} people={[]} olderHref={null} filtered />);
+    expect(screen.getByRole("link", { name: "Clear filters" }).getAttribute("href")).toBe("/admin/activity");
   });
 
   test("labels both automatic refresh actors readably", () => {
@@ -86,7 +91,7 @@ describe("ActivityLog", () => {
     const days = buildActivityDays({ actions: [auto(1, "refresh-pipeline"), auto(2, "refresh-pipeline-ai")], events: [], sessionHeaders: [] });
     render(<ActivityLog days={days} filters={filters} people={[]} olderHref={null} />);
 
-    expect(screen.getByText("Automatic — weekly data refresh")).toBeDefined();
-    expect(screen.getByText("Automatic — data refresh, AI auto-apply")).toBeDefined();
+    expect(screen.getByText("Automatic: weekly data refresh")).toBeDefined();
+    expect(screen.getByText("Automatic: data refresh, AI auto-apply")).toBeDefined();
   });
 });

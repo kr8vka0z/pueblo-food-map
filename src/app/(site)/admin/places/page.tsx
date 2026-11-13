@@ -99,6 +99,7 @@ import ToReviewSummaryBox from "@/components/ToReviewSummaryBox";
 import SourceSwitchPanel from "@/components/SourceSwitchPanel";
 import PublishPanel from "@/components/PublishPanel";
 import AdminNav from "@/components/AdminNav";
+import { pageTitleClass } from "@/lib/adminCardStyles";
 import type { AdminVenueRow } from "@/types/venue";
 
 /**
@@ -177,6 +178,7 @@ export default async function PlacesPage({
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="places" counts={navCounts} showActivity={identity.isOwner === true} />
       <div className="px-4 py-6 sm:px-6">
+        <h2 className={`${pageTitleClass} mb-4`}>Places</h2>
         <ToReviewSummaryBox reviewRowCount={reviewRowCount} proposals={proposals} submissionCount={submissions.length} />
         <SourceSwitchPanel />
         {isStaging ? (

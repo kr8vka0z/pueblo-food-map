@@ -37,7 +37,7 @@ function fillTimes(start = "2026-11-21T10:00", end = "2026-11-21T14:00") {
 }
 
 async function pickVenue() {
-  await userEvent.click(screen.getByLabelText(/already on the map/i));
+  await userEvent.click(screen.getByLabelText(/^on the map$/i));
   await userEvent.type(screen.getByLabelText(/search places/i), "east");
   await userEvent.click(screen.getByRole("button", { name: /Eastside Pantry/ }));
 }
@@ -170,23 +170,34 @@ describe("EventForm edit mode", () => {
     await waitFor(() => expect(invalid(screen.getByLabelText(/^Link/))).toBe(true));
   });
 
-  test("archive asks first, sends the precondition, and returns to the list", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+  test("Enter in a box saves: the save button is the form's first submit button", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true, id: "e1", status: "published", updated_at: "x" }), { status: 200 }));
+    render(<EventForm {...props} />);
+    await userEvent.type(nameInput(), "{Enter}");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).action).toBe("save");
+  });
+
+  test("archive asks on the page first, sends the precondition only on the second press, and returns to the list", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true, status: "archived" }), { status: 200 }));
     render(<EventForm {...props} />);
 
     await userEvent.click(screen.getByRole("button", { name: /archive event/i }));
+    expect(fetchMock).not.toHaveBeenCalled(); // the first press only opens the confirm
+    await userEvent.click(screen.getByRole("button", { name: /archive event/i })); // the confirm's action button
 
     await waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith("/admin/events"));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/admin/events/e1/archive");
     expect(JSON.parse(init.body as string)).toEqual({ expectedUpdatedAt: "2026-10-01T00:00:00.000Z" });
   });
 
-  test("declining the archive confirmation sends nothing", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
+  test("pressing Cancel in the archive confirm sends nothing and brings the Archive button back", async () => {
     render(<EventForm {...props} />);
     await userEvent.click(screen.getByRole("button", { name: /archive event/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /archive event/i })).toHaveFocus();
   });
 });

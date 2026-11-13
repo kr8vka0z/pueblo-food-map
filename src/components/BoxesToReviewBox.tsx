@@ -18,6 +18,7 @@
 
 import Link from "next/link";
 import { pluralize } from "@/lib/pluralize";
+import { cardSlimClass, primaryButtonClass } from "@/lib/adminCardStyles";
 
 export interface BoxesToReviewBoxProps {
   /** Boxes with at least one photo or sponsor request pending — the "N" in the summary line, and what the "To review" chip/column count matches. */
@@ -30,15 +31,6 @@ export interface BoxesToReviewBoxProps {
   sponsorRequestsCount: number;
 }
 
-const cardClass =
-  "elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-3 mb-4";
-
-const linkClass =
-  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
-  "px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] transition-colors duration-150 " +
-  "hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 " +
-  "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2";
-
 export default function BoxesToReviewBox({
   reviewingBoxCount,
   photosCount,
@@ -48,14 +40,14 @@ export default function BoxesToReviewBox({
   if (reviewingBoxCount === 0) return null;
 
   return (
-    <div className={cardClass}>
+    <div className={`${cardSlimClass} mb-4`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-[var(--color-ink-700)]">
           {reviewingBoxCount} to review: {pluralize(photosCount, "photo")}
           {flaggedPhotosCount > 0 && ` (${flaggedPhotosCount} reported by a visitor)`} and{" "}
           {pluralize(sponsorRequestsCount, "sponsor request")}
         </p>
-        <Link href="/admin/boxes?show=review" className={linkClass}>
+        <Link href="/admin/boxes?show=review" className={primaryButtonClass}>
           Show them
         </Link>
       </div>

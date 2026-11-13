@@ -10,6 +10,17 @@
 
 import Link from "next/link";
 import {
+  cardClass,
+  focusRingClass,
+  linkClass,
+  secondaryButtonClass,
+  sectionTitleClass,
+  tagClass,
+  tapLinkClass,
+  type TagTone,
+} from "@/lib/adminCardStyles";
+import { ADMIN_PRIMARY_BUTTON, ADMIN_SECONDARY_BUTTON, inputBase, inputBorder, labelClass } from "@/components/formClasses";
+import {
   ACTIVITY_TYPES,
   describeDevice,
   describeFailure,
@@ -34,22 +45,12 @@ const AUTOMATIC_ACTOR_LABELS: Record<string, string> = {
 /** Runs of this many or more consecutive same-tag actions collapse. */
 const COLLAPSE_RUN = 3;
 
-const cardClass = "elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4";
-const fieldLabelClass = "mb-1 block text-sm font-medium text-[var(--color-ink-700)]";
-const inputClass =
-  "block w-full min-h-12 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-3 text-base text-[var(--color-ink-900)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
-const tagTone = {
-  neutral: "bg-[var(--color-bone-100)] text-[var(--color-ink-700)]",
-  good: "bg-[var(--color-sage-50)] text-[var(--color-sage-700)]",
-  bad: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]",
-} as const;
+const inputClass = `${inputBase} ${inputBorder(false)}`;
+// activityLog.ts's three tones mapped onto the shared tag tones (#926 decision 12).
+const TAG_TONE: Record<"neutral" | "good" | "bad", TagTone> = { neutral: "neutral", good: "calm", bad: "attention" };
 
-function Tag({ tone, children }: { tone: keyof typeof tagTone; children: React.ReactNode }) {
-  return (
-    <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold ${tagTone[tone]}`}>
-      {children}
-    </span>
-  );
+function Tag({ tone, children }: { tone: keyof typeof TAG_TONE; children: React.ReactNode }) {
+  return <span className={`${tagClass(TAG_TONE[tone])} shrink-0`}>{children}</span>;
 }
 
 function Ip({ ip }: { ip: string | null }) {
@@ -77,7 +78,7 @@ function DeviceLine({ row }: { row: AuthEventRow }) {
 }
 
 function ActionLine({ item }: { item: ActivityItem }) {
-  const time = <span className="w-16 shrink-0 text-sm tabular-nums text-[var(--color-ink-500)]">{formatTime(item.at)}</span>;
+  const time = <span className="w-16 shrink-0 whitespace-nowrap text-sm tabular-nums text-[var(--color-ink-500)]">{formatTime(item.at)}</span>;
   if (item.kind === "auth") {
     const label =
       item.row.event === "sign_out" ? "Signed out" : item.row.event === "passkey_added" ? "Added a passkey" : "Removed a passkey";
@@ -99,7 +100,7 @@ function ActionLine({ item }: { item: ActivityItem }) {
           {row.venue_id && row.venue_name ? (
             <Link
               href={`/admin/venues/${encodeURIComponent(row.venue_id)}/edit`}
-              className="text-sm font-medium text-[var(--color-sage-700)] underline-offset-2 hover:underline"
+              className={`${linkClass} text-sm`}
             >
               {row.venue_name}
             </Link>
@@ -108,7 +109,7 @@ function ActionLine({ item }: { item: ActivityItem }) {
           ) : null}
           {summary.note && <span className="text-sm text-[var(--color-ink-500)]">{summary.note}</span>}
           {summary.prUrl && (
-            <a href={summary.prUrl} className="text-sm text-[var(--color-sage-700)] underline" rel="noreferrer" target="_blank">
+            <a href={summary.prUrl} className={`${linkClass} text-sm`} rel="noreferrer" target="_blank">
               GitHub PR
             </a>
           )}
@@ -147,7 +148,9 @@ function ItemList({ items }: { items: ActivityItem[] }) {
         run.length >= COLLAPSE_RUN && run[0].kind === "action" ? (
           <li key={`${run[0].at}-${run.length}`} className="py-2">
             <details>
-              <summary className="min-h-12 cursor-pointer py-2 text-sm font-medium text-[var(--color-ink-700)]">
+              <summary
+                className={`min-h-12 cursor-pointer rounded-[var(--radius-sm)] py-2 text-sm font-medium text-[var(--color-ink-700)] ${focusRingClass}`}
+              >
                 {itemTag(run[0])} {run.length} · show all
               </summary>
               <ul className="divide-y divide-[var(--color-bone-200)]">
@@ -171,7 +174,7 @@ function GroupCard({ group }: { group: ActivityGroup }) {
     return (
       <li className={`${cardClass} border-[var(--color-danger)]`}>
         <p className="text-sm font-semibold text-[var(--color-danger)]">
-          {formatTime(row.created_at)} · Failed sign-in{row.email ? ` — ${row.email}` : ""}
+          {formatTime(row.created_at)} · Failed sign-in{row.email ? `: ${row.email}` : ""}
         </p>
         <p className="mt-0.5 text-sm text-[var(--color-danger)]">{describeFailure(row)}</p>
         <DeviceLine row={row} />
@@ -198,13 +201,13 @@ function GroupCard({ group }: { group: ActivityGroup }) {
         {signIn.method && METHOD_LABELS[signIn.method] ? ` with ${METHOD_LABELS[signIn.method]}` : ""}
       </>
     ) : (
-      <>{group.email ?? "Unknown account"} — signed in before sign-ins were recorded</>
+      <>{group.email ?? "Unknown account"} signed in before sign-ins were recorded</>
     );
     sub = signIn ? <DeviceLine row={signIn} /> : null;
   } else if (group.kind === "automatic") {
-    heading = <>Automatic — {AUTOMATIC_ACTOR_LABELS[group.actor] ?? group.actor}</>;
+    heading = <>Automatic: {AUTOMATIC_ACTOR_LABELS[group.actor] ?? group.actor}</>;
   } else {
-    heading = <>{group.email} — before sign-ins were recorded</>;
+    heading = <>{group.email}, before sign-ins were recorded</>;
   }
   return (
     <li className={cardClass}>
@@ -221,14 +224,16 @@ export interface ActivityLogProps {
   people: string[];
   /** href for the next "Show older" page, or null. */
   olderHref: string | null;
+  /** True when the address carried any filter, so an empty result offers Clear filters. */
+  filtered?: boolean;
 }
 
-export default function ActivityLog({ days, filters, people, olderHref }: ActivityLogProps) {
+export default function ActivityLog({ days, filters, people, olderHref, filtered = false }: ActivityLogProps) {
   return (
     <div className="mx-auto max-w-3xl">
       <form method="get" action="/admin/activity" className={`${cardClass} mb-6 grid gap-4 sm:grid-cols-2`}>
         <div>
-          <label htmlFor="activity-person" className={fieldLabelClass}>
+          <label htmlFor="activity-person" className={labelClass}>
             Person
           </label>
           <select id="activity-person" name="person" defaultValue={filters.person} className={inputClass}>
@@ -242,7 +247,7 @@ export default function ActivityLog({ days, filters, people, olderHref }: Activi
           </select>
         </div>
         <div>
-          <label htmlFor="activity-type" className={fieldLabelClass}>
+          <label htmlFor="activity-type" className={labelClass}>
             Activity
           </label>
           <select id="activity-type" name="type" defaultValue={filters.type} className={inputClass}>
@@ -254,45 +259,46 @@ export default function ActivityLog({ days, filters, people, olderHref }: Activi
           </select>
         </div>
         <div>
-          <label htmlFor="activity-from" className={fieldLabelClass}>
+          <label htmlFor="activity-from" className={labelClass}>
             From
           </label>
           <input id="activity-from" type="date" name="from" defaultValue={filters.from} className={inputClass} />
         </div>
         <div>
-          <label htmlFor="activity-to" className={fieldLabelClass}>
+          <label htmlFor="activity-to" className={labelClass}>
             To
           </label>
           <input id="activity-to" type="date" name="to" defaultValue={filters.to} className={inputClass} />
         </div>
         <div className="sm:col-span-2">
-          <label htmlFor="activity-q" className={fieldLabelClass}>
+          <label htmlFor="activity-q" className={labelClass}>
             Place or box name
           </label>
           <input id="activity-q" type="search" name="q" defaultValue={filters.q} className={inputClass} />
         </div>
         <div className="flex gap-3 sm:col-span-2">
-          <button
-            type="submit"
-            className="h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] font-semibold text-[var(--color-bone-50)] hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
-          >
+          <button type="submit" className={`${ADMIN_PRIMARY_BUTTON} flex-1`}>
             Show activity
           </button>
-          <Link
-            href="/admin/activity"
-            className="inline-flex h-12 items-center rounded-[var(--radius-md)] px-4 text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-200)]"
-          >
+          <Link href="/admin/activity" className={ADMIN_SECONDARY_BUTTON}>
             Reset
           </Link>
         </div>
       </form>
 
       {days.length === 0 ? (
-        <p className="text-sm text-[var(--color-ink-500)]">No activity matches these filters.</p>
+        <div className="flex flex-wrap items-center gap-x-3">
+          <p className="text-sm text-[var(--color-ink-500)]">No activity matches these filters.</p>
+          {filtered && (
+            <Link href="/admin/activity" className={`${tapLinkClass} text-sm`}>
+              Clear filters
+            </Link>
+          )}
+        </div>
       ) : (
         days.map((day) => (
           <section key={day.ymd} className="mb-8" aria-labelledby={`day-${day.ymd}`}>
-            <h2 id={`day-${day.ymd}`} className="wordmark mb-3 text-lg text-[var(--color-ink-900)]">
+            <h2 id={`day-${day.ymd}`} className={`${sectionTitleClass} mb-3`}>
               {day.label}
             </h2>
             <ul className="space-y-3">
@@ -307,7 +313,7 @@ export default function ActivityLog({ days, filters, people, olderHref }: Activi
       {olderHref && (
         <Link
           href={olderHref}
-          className="inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-4 text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+          className={secondaryButtonClass}
         >
           Show older
         </Link>

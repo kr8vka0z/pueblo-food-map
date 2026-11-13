@@ -27,9 +27,11 @@
  * built-in wordings (Spanish built in) or Custom with English and Spanish
  * boxes. Suggest Spanish includes the custom words only when Custom is chosen.
  *
- * Status actions: create = Save draft / Publish; edit = Save (+ Publish for a
- * draft, Cancel event for a published one — which reveals the required
- * cancel note) and Archive. The `updated_at` precondition (`expectedUpdatedAt`)
+ * Status actions (#926 layout): the save row is Cancel (a link back to the
+ * list, saves nothing) beside Save draft / Publish on create and on a draft,
+ * or beside Save changes otherwise. Cancel event (published only, reveals the
+ * required cancel note there) and Archive event (asks on the page first,
+ * AdminConfirm) sit apart in a Danger zone at the foot. The `updated_at` precondition (`expectedUpdatedAt`)
  * is refreshed from each successful save, so consecutive saves don't 409
  * against the admin's own previous save; a real 409 shows the server message
  * and a Reload button, leaving the admin's unsaved edits on screen.
@@ -49,7 +51,26 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
-import { ADMIN_PRIMARY_BUTTON, errorClass, inputBase, inputBorder, labelClass } from "@/components/formClasses";
+import {
+  ADMIN_PRIMARY_BUTTON,
+  ADMIN_SECONDARY_BUTTON,
+  errorClass,
+  inputBase,
+  inputBorder,
+  labelClass,
+  saveRowClass,
+} from "@/components/formClasses";
+import {
+  cardSlimClass,
+  dangerButtonClass,
+  focusRingClass,
+  secondaryButtonClass,
+  sectionTitleClass,
+  tapLinkClass,
+} from "@/lib/adminCardStyles";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import AdminConfirm, { useAdminConfirm } from "@/components/AdminConfirm";
+import AdminSegmented from "@/components/AdminSegmented";
 import EventFlyerField from "@/components/EventFlyerField";
 import type { PublicFlyer } from "@/lib/events";
 import type { VenueChoice } from "@/lib/adminEventReads";
@@ -97,6 +118,8 @@ export interface EventFormProps {
   initialFlyer?: PublicFlyer | null;
   /** Create mode only: the public submission this draft comes from (#883). */
   submissionId?: string;
+  /** A short instruction shown in a box at the top of the form (the ?from= submission flow). */
+  notice?: string;
 }
 
 // Keys match the server's error map (adminEventValidation.ts): snake_case field names, `place`, `starts_at`, `ends_at`, `_form`.
@@ -121,16 +144,19 @@ const LINK_LABEL_OPTIONS: [EventLinkLabel, string][] = [
 ];
 
 const hintClass = "font-normal text-[var(--color-ink-400)]";
-const secondaryButtonClass =
-  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
-  "px-4 text-sm font-medium text-[var(--color-sage-600)] bg-transparent transition-colors duration-150 " +
-  "hover:bg-[var(--color-sage-50)] focus-visible:outline-none focus-visible:ring-2 " +
-  "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
-const dangerButtonClass =
-  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] px-4 " +
-  "text-sm font-medium text-[var(--color-danger)] bg-transparent transition-colors duration-150 " +
-  "hover:bg-[var(--color-danger)] hover:text-[var(--color-bone-50)] focus-visible:outline-none focus-visible:ring-2 " +
-  "focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
+// SHARED-GAP: a full-width, left-aligned, two-line outline option (a place or
+// address match in a picker list). secondaryButtonClass centres its words, and
+// appending justify-start/text-left would fight it in stylesheet order.
+const pickerOptionClass =
+  "block w-full min-h-12 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-4 py-2 text-left text-sm " +
+  "text-[var(--color-ink-700)] transition-colors duration-150 hover:bg-[var(--color-sage-100)] " +
+  PRESS_FEEDBACK +
+  " " +
+  focusRingClass;
+// SHARED-GAP: the red-edged failure box at the top of a form (cardClass's bone 200 edge can't be overridden by appending).
+const failureBoxClass = "rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 py-3";
+// Two form buttons sharing the save row's two-thirds cell: full width, words centred if they wrap on a phone.
+const pairButton = "w-full text-center";
 
 interface TextFieldProps {
   id: string;
@@ -195,7 +221,7 @@ function validateClient(v: EventFormValues, cancelling: boolean): FieldErrors {
   return e;
 }
 
-export default function EventForm({ venues, eventId, initialValues, status: initialStatus, expectedUpdatedAt, justSaved, initialFlyer, submissionId }: EventFormProps) {
+export default function EventForm({ venues, eventId, initialValues, status: initialStatus, expectedUpdatedAt, justSaved, initialFlyer, submissionId, notice }: EventFormProps) {
   const router = useRouter();
   const isEdit = eventId !== undefined;
   const [values, setValues] = useState<EventFormValues>(() => {
@@ -211,6 +237,9 @@ export default function EventForm({ venues, eventId, initialValues, status: init
   const [status, setStatus] = useState<EventStatus>(initialStatus ?? "draft");
   const [version, setVersion] = useState(expectedUpdatedAt);
   const [cancelling, setCancelling] = useState(false);
+  // Shown inside the archive confirm, so a failure is seen where the admin pressed (the box at the top stays for Reload).
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const { asking: askingArchive, ask: askArchive, cancel: cancelArchive, triggerRef: archiveRef } = useAdminConfirm();
   const [suggest, setSuggest] = useState<"idle" | "busy" | "done" | "none" | "full" | "error">("idle");
   const [placeMode, setPlaceMode] = useState<"venue" | "address">(initialValues?.venueId ? "venue" : "address");
   const [venueQuery, setVenueQuery] = useState("");
@@ -314,10 +343,10 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         setSaved({ id: eventId as string });
       } else {
         const data = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
-        setFailure({ message: data?.message ?? "Something went wrong. The event was not saved. Try again.", code: data?.error ?? null });
+        setFailure({ message: data?.message ?? "The event was not saved. Try again.", code: data?.error ?? null });
       }
     } catch {
-      setFailure({ message: "Something went wrong. The event was not saved. Try again.", code: null });
+      setFailure({ message: "The event was not saved. Try again.", code: null });
     } finally {
       setBusy(false);
     }
@@ -368,10 +397,15 @@ export default function EventForm({ venues, eventId, initialValues, status: init
     }
   }
 
+  // Runs only from the on-page confirm's Archive event button: that second press is the gate.
   async function archive() {
-    if (!window.confirm("Archive this event? It leaves the map and the list of live events, and stays in the admin history.")) return;
     setBusy(true);
     setFailure(null);
+    setArchiveError(null);
+    const fail = (message: string, code: string | null) => {
+      setFailure({ message, code });
+      setArchiveError(message);
+    };
     try {
       const res = await fetch(`/api/admin/events/${eventId}/archive`, {
         method: "POST",
@@ -384,9 +418,9 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         return;
       }
       const data = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
-      setFailure({ message: data?.message ?? "Something went wrong. The event was not archived. Try again.", code: data?.error ?? null });
+      fail(data?.message ?? "The event was not archived. Try again.", data?.error ?? null);
     } catch {
-      setFailure({ message: "Something went wrong. The event was not archived. Try again.", code: null });
+      fail("The event was not archived. Try again.", null);
     } finally {
       setBusy(false);
     }
@@ -397,6 +431,25 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       ? venues.filter((x) => `${x.name} ${x.address}`.toLowerCase().includes(venueQuery.trim().toLowerCase())).slice(0, 8)
       : [];
 
+  // Save draft gets Publish beside it on a new event (not one from a submission: the route refuses
+  // Publish then) and on a draft; otherwise the save button stands alone.
+  const hasPublish = isEdit ? status === "draft" : !submissionId;
+
+  const cancelNoteFields = (
+    <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] p-4">
+      <legend className={`${labelClass} px-1`}>Cancellation note</legend>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <TextField id="event-cancel-note" multiline required label="Note (English)" value={values.cancelNote} onChange={(v) => set("cancelNote", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note} />
+        <TextField id="event-cancel-note-es" multiline lang="es" label="Note (Spanish)" value={values.cancelNoteEs} onChange={(v) => set("cancelNoteEs", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note_es} />
+      </div>
+      {cancelling && (
+        <button type="button" disabled={busy} onClick={() => void send("cancel")} className={`mt-3 ${dangerButtonClass}`}>
+          {busy ? "Cancelling…" : "Confirm cancel event"}
+        </button>
+      )}
+    </fieldset>
+  );
+
   return (
     <form
       onSubmit={(e) => {
@@ -406,15 +459,17 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       noValidate
       className="max-w-2xl space-y-5"
     >
+      {notice && <p className={`${cardSlimClass} text-sm text-[var(--color-ink-700)]`}>{notice}</p>}
+
       {saved && (
         <div role="status" className="rounded-[var(--radius-md)] border border-[var(--color-sage-500)] bg-[var(--color-sage-50)] px-4 py-3 text-sm text-[var(--color-sage-700)]">
           <p className="font-medium">Saved.</p>
-          <p className="mt-1 flex flex-wrap gap-x-4">
+          <p className="flex flex-wrap gap-x-4">
             {/* ?event=<id> opens this event's card on the map (#758). */}
-            <Link href={`/?event=${saved.id}`} className="font-medium underline underline-offset-2">
+            <Link href={`/?event=${saved.id}`} className={tapLinkClass}>
               View on map
             </Link>
-            <Link href="/admin/events" className="font-medium underline underline-offset-2">
+            <Link href="/admin/events" className={tapLinkClass}>
               Back to events
             </Link>
           </p>
@@ -422,7 +477,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       )}
 
       {failure && (
-        <div role="alert" className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 py-3">
+        <div role="alert" className={failureBoxClass}>
           <p className="text-sm font-medium text-[var(--color-danger)]">{failure.message}</p>
           {failure.code === "conflict" && (
             <button type="button" onClick={() => window.location.reload()} className={`mt-2 ${dangerButtonClass}`}>
@@ -452,7 +507,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <TextField id="event-name" label="Name (English)" required value={values.name} onChange={(v) => set("name", v)} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.name} />
         <TextField id="event-name-es" label="Name (Spanish)" lang="es" value={values.nameEs} onChange={(v) => set("nameEs", v)} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.name_es} />
-        <TextField id="event-host" label="Host (English)" hint="who is running it" value={values.host} onChange={(v) => set("host", v)} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.host} />
+        <TextField id="event-host" label="Host (English)" hint="(optional) who is running it" value={values.host} onChange={(v) => set("host", v)} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.host} />
         <TextField id="event-host-es" label="Host (Spanish)" lang="es" value={values.hostEs} onChange={(v) => set("hostEs", v)} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.host_es} />
       </div>
 
@@ -472,15 +527,22 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         <legend className={`${labelClass} px-1`}>
           Where <span aria-hidden className="text-[var(--color-danger)]">*</span>
         </legend>
-        <div className="mb-3 flex flex-wrap gap-4 text-sm text-[var(--color-ink-700)]">
-          <label className="flex min-h-12 cursor-pointer items-center gap-2">
-            <input type="radio" name="place-mode" checked={placeMode === "venue"} onChange={() => { setPlaceMode("venue"); clearPlace(); }} />
-            A place already on the map
-          </label>
-          <label className="flex min-h-12 cursor-pointer items-center gap-2">
-            <input type="radio" name="place-mode" checked={placeMode === "address"} onChange={() => { setPlaceMode("address"); clearPlace(); }} />
-            A different address
-          </label>
+        {/* WHY short words: the slider's two halves are equal and never wrap, so at 360 wide the
+            longer "A place already on the map" would push the page sideways. The legend carries the meaning. */}
+        <div className="mb-3">
+          <AdminSegmented
+            name="place-mode"
+            legend="Choose a place already on the map, or type a different address"
+            options={[
+              { value: "venue", label: "On the map" },
+              { value: "address", label: "Other address" },
+            ]}
+            value={placeMode}
+            onChange={(v) => {
+              setPlaceMode(v as "venue" | "address");
+              clearPlace();
+            }}
+          />
         </div>
 
         {placeMode === "venue" ? (
@@ -517,7 +579,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
                         <button
                           type="button"
                           onClick={() => pickVenue(m)}
-                          className="w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-left text-sm text-[var(--color-ink-700)] hover:border-[var(--color-sage-500)] hover:bg-[var(--color-sage-50)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                          className={pickerOptionClass}
                         >
                           <span className="font-medium text-[var(--color-ink-900)]">{m.name}</span>
                           <br />
@@ -565,7 +627,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
                     <button
                       type="button"
                       onClick={() => applyMatch(m)}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-left text-sm text-[var(--color-ink-700)] hover:border-[var(--color-sage-500)] hover:bg-[var(--color-sage-50)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                      className={pickerOptionClass}
                     >
                       {m.matchedAddress}
                     </button>
@@ -584,7 +646,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
           <TextField
             id="event-venue-name"
             label="Venue name"
-            hint="optional, shown in bold above the address"
+            hint="(optional) shown in bold above the address"
             value={values.venueName}
             onChange={(v) => set("venueName", v)}
             max={FIELD_LIMITS.SUGGEST_VENUE_NAME}
@@ -594,9 +656,9 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       </fieldset>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <TextField id="event-description" multiline label="Description (English)" value={values.description} onChange={(v) => set("description", v)} max={FIELD_LIMITS.SUGGEST_NOTES} error={errors.description} />
+        <TextField id="event-description" multiline label="Description (English)" hint="(optional)" value={values.description} onChange={(v) => set("description", v)} max={FIELD_LIMITS.SUGGEST_NOTES} error={errors.description} />
         <TextField id="event-description-es" multiline lang="es" label="Description (Spanish)" value={values.descriptionEs} onChange={(v) => set("descriptionEs", v)} max={FIELD_LIMITS.SUGGEST_NOTES} error={errors.description_es} />
-        <TextField id="event-bring" multiline label="What to bring (English)" value={values.whatToBring} onChange={(v) => set("whatToBring", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.what_to_bring} />
+        <TextField id="event-bring" multiline label="What to bring (English)" hint="(optional)" value={values.whatToBring} onChange={(v) => set("whatToBring", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.what_to_bring} />
         <TextField id="event-bring-es" multiline lang="es" label="What to bring (Spanish)" value={values.whatToBringEs} onChange={(v) => set("whatToBringEs", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.what_to_bring_es} />
       </div>
 
@@ -604,7 +666,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4">
         <legend className={`${labelClass} px-1`}>Action button</legend>
         <div className="space-y-4">
-          <TextField id="event-link" type="url" label="Link" hint="optional, starts with https://" value={values.linkUrl} onChange={(v) => set("linkUrl", v)} max={FIELD_LIMITS.SUGGEST_CONTACT} error={errors.link_url} />
+          <TextField id="event-link" type="url" label="Link" hint="(optional) starts with https://" value={values.linkUrl} onChange={(v) => set("linkUrl", v)} max={FIELD_LIMITS.SUGGEST_CONTACT} error={errors.link_url} />
           <div>
             <label htmlFor="event-link-label" className={labelClass}>Button says</label>
             <select
@@ -613,7 +675,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
               onChange={(e) => set("linkLabel", e.target.value)}
               aria-invalid={errors.link_label ? "true" : undefined}
               aria-describedby={errors.link_label ? "event-link-label-error" : undefined}
-              className={`${inputBase} ${inputBorder(!!errors.link_label)} min-h-12`}
+              className={`${inputBase} ${inputBorder(!!errors.link_label)}`}
             >
               {LINK_LABEL_OPTIONS.map(([key, label]) => (
                 <option key={key} value={key}>{label}</option>
@@ -637,20 +699,9 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       {/* Saves on its own; hands the new `updated_at` up so the next Save doesn't 409 (#760). */}
       <EventFlyerField eventId={eventId} version={version} onVersion={setVersion} initialFlyer={initialFlyer} />
 
-      {showCancelNote && (
-        <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] p-4">
-          <legend className={`${labelClass} px-1`}>Cancellation note</legend>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <TextField id="event-cancel-note" multiline required label="Note (English)" value={values.cancelNote} onChange={(v) => set("cancelNote", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note} />
-            <TextField id="event-cancel-note-es" multiline lang="es" label="Note (Spanish)" value={values.cancelNoteEs} onChange={(v) => set("cancelNoteEs", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note_es} />
-          </div>
-          {cancelling && (
-            <button type="button" disabled={busy} onClick={() => void send("cancel")} className={`mt-3 ${dangerButtonClass}`}>
-              {busy ? "Cancelling…" : "Confirm cancel event"}
-            </button>
-          )}
-        </fieldset>
-      )}
+      {/* A cancelled event's note is edited here and saved with Save changes. While cancelling a
+          published one, the same fields open in the lower section instead (never both at once: same ids). */}
+      {status === "cancelled" && !cancelling && cancelNoteFields}
 
       {errors._form && (
         <p role="alert" className={errorClass}>
@@ -658,49 +709,74 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         </p>
       )}
 
-      {/* Actions */}
-      <div className="flex flex-wrap items-center gap-3">
-        {!isEdit && (
-          <>
-            <button type="submit" disabled={busy} className={secondaryButtonClass}>
+      {/* Cancel (a link: saves nothing) then the save buttons. Save draft / Save changes stays the
+          form's first type="submit", so Enter in a box saves. */}
+      <div className={saveRowClass}>
+        <Link href="/admin/events" className={ADMIN_SECONDARY_BUTTON}>
+          Cancel
+        </Link>
+        {hasPublish ? (
+          <div className="grid grid-cols-2 gap-2">
+            <button type="submit" disabled={busy} className={`${ADMIN_SECONDARY_BUTTON} ${pairButton}`}>
               {busy ? "Saving…" : "Save draft"}
             </button>
-            {!submissionId && (
-              <button type="button" disabled={busy} onClick={() => void send("publish")} className={ADMIN_PRIMARY_BUTTON}>
-                Publish
-              </button>
-            )}
-          </>
-        )}
-        {isEdit && (
-          <>
-            <button type="submit" disabled={busy} className={status === "draft" ? secondaryButtonClass : ADMIN_PRIMARY_BUTTON}>
-              {busy ? "Saving…" : status === "draft" ? "Save draft" : "Save changes"}
+            <button type="button" disabled={busy} onClick={() => void send("publish")} className={`${ADMIN_PRIMARY_BUTTON} ${pairButton}`}>
+              Publish
             </button>
-            {status === "draft" && (
-              <button type="button" disabled={busy} onClick={() => void send("publish")} className={ADMIN_PRIMARY_BUTTON}>
-                Publish
-              </button>
-            )}
-            {status === "published" && !cancelling && (
-              <button type="button" disabled={busy} onClick={() => setCancelling(true)} className={dangerButtonClass}>
-                Cancel event
-              </button>
-            )}
-          </>
+          </div>
+        ) : (
+          <button type="submit" disabled={busy} className={`${ADMIN_PRIMARY_BUTTON} ${pairButton}`}>
+            {busy ? "Saving…" : isEdit && status !== "draft" ? "Save changes" : "Save draft"}
+          </button>
         )}
-        <Link href="/admin/events" className="inline-flex min-h-12 items-center text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2">
-          Back to events
-        </Link>
       </div>
 
+      {/* WHY Cancel event lives down here, apart from the save row: it marks the EVENT cancelled,
+          and beside Save it would read as "leave this form". */}
       {isEdit && (
-        <div className="border-t border-[var(--color-bone-200)] pt-5">
-          <h3 className="mb-2 text-sm font-semibold text-[var(--color-ink-700)]">Danger zone</h3>
-          <button type="button" disabled={busy} onClick={() => void archive()} className={dangerButtonClass}>
-            Archive event
-          </button>
-        </div>
+        <section aria-labelledby="event-danger-zone" className="space-y-3 border-t border-[var(--color-bone-200)] pt-5">
+          <h3 id="event-danger-zone" className={sectionTitleClass}>
+            Danger zone
+          </h3>
+          {status === "published" && !cancelling && (
+            <button type="button" disabled={busy} onClick={() => setCancelling(true)} className={dangerButtonClass}>
+              Cancel event
+            </button>
+          )}
+          {cancelling && cancelNoteFields}
+          <div>
+            <button
+              ref={archiveRef}
+              type="button"
+              hidden={askingArchive}
+              disabled={busy}
+              onClick={() => {
+                setArchiveError(null);
+                askArchive();
+              }}
+              className={dangerButtonClass}
+            >
+              Archive event
+            </button>
+            {askingArchive && (
+              <AdminConfirm
+                title="Archive this event?"
+                confirmLabel="Archive event"
+                busyLabel="Archiving…"
+                tone="danger"
+                busy={busy}
+                error={archiveError}
+                onConfirm={() => void archive()}
+                onCancel={() => {
+                  setArchiveError(null);
+                  cancelArchive();
+                }}
+              >
+                It leaves the map and the list of live events, and stays in the admin history.
+              </AdminConfirm>
+            )}
+          </div>
+        </section>
       )}
     </form>
   );

@@ -48,7 +48,7 @@ describe("LanguageToggle slider", () => {
     const button = screen.getByRole("button", { name: "Language: English" });
     expect(layout(link)).toBe(layout(button));
     expect(link.className).toContain("inline-flex");
-    expect(link.className).toContain("leading-5");
+    expect(link.className).toContain("leading-[20px]");
   });
 
   test("the thumb sits under the page's language", () => {

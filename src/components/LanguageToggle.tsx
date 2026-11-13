@@ -59,7 +59,7 @@ const SR_LABELS: Record<Locale, string> = {
 // meet in the middle without overlapping (#233).
 const SEGMENT_CLASS =
   "relative inline-flex h-[40px] w-12 items-center justify-center rounded-[var(--radius-md)] " +
-  "text-sm font-semibold leading-5 transition-colors duration-250 ease-out-circ motion-reduce:transition-none " +
+  "text-sm font-semibold leading-[20px] transition-colors duration-250 ease-out-circ motion-reduce:transition-none " +
   "before:absolute before:inset-x-0 before:-inset-y-1 " +
   PRESS_FEEDBACK + " " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
@@ -173,6 +173,9 @@ export default function LanguageToggle() {
               // #485 PR 2: only an ACTUAL switch counts — tapping the
               // already-active pill is a no-op tap, not a language change.
               if (l !== locale) void track(EVENTS.LOCALE_SWITCHED, { to: l });
+              // A mirrored-link tap whose page load was cancelled left the thumb
+              // on that word; tapping the current word puts it back.
+              setPending(null);
               setLocale(l);
             }}
             aria-pressed={active}

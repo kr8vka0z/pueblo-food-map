@@ -135,7 +135,7 @@ const errors = pat({
     "<b>A send or save failed:</b> a red box at the top of the form says it wasn't sent and offers Try again. Public forms also give an email address to write to. What was typed stays.",
     "<b>Too many sends:</b> say how long to wait, an hour.",
     "<b>Something can't work on this phone:</b> fall back and say so, not as an error. When the map can't load, the list shows instead with a plain line.",
-    "<b>Admin:</b> the red line says what did not happen (The place was not saved), then what to do. No admin message says Something went wrong. A page that fails to load shows the admin error page: nothing was changed, Try again, Go to the Dashboard.",
+    "<b>Admin:</b> the red line says what did not happen (The place was not saved), then what to do. A problem with something typed, or a lookup that found nothing (No match found), is the small line under its box or button, like the field errors; an action on a card or list that failed is the larger red line. No admin message says Something went wrong. A page that fails to load shows the admin error page: nothing was changed, Try again, Go to the Dashboard.",
     "<b>Never a pop-up that fades</b> for a failure, and never a code.",
   ],
   example: `<div class="pb-pg card"><div class="pb-err"><b>Something went wrong</b><p>Your suggestion couldn't be sent. Please try again, or email us directly at suggestions@pueblofoodmap.com.</p></div>${field("Place name *", "Eastside Community Pantry")}${sage("Submit suggestion", "w")}${outline("Try again")}</div>`,
@@ -206,7 +206,7 @@ const waiting = pat({
   screens: ["The map screen while the map loads, and Near me while it locates", "Every send and save button", "A box card while its details load; the Share an event address and flyer checks"],
   steps: [
     "<b>The map loading:</b> a plain bone 100 block where the map will be, with Loading map… gently pulsing (still for anyone who turns motion off).",
-    "<b>A button that started something</b> fades, says what it's doing (Sending…, Saving…, Removing…) and can't be pressed twice.",
+    "<b>A button that started something</b> fades, says what it's doing (Sending…, Saving…, Removing…) and can't be pressed twice. On the admin it keeps the keyboard on it while it works (marked off, not switched off), so nobody is dropped back to the top of the page.",
     "<b>Near me while locating:</b> its icon becomes a turning spinner, it can't be pressed again, and a hidden line tells screen readers Locating…. Its word stays Near me.",
     "<b>A spinner only inside the control that started the wait.</b> Never one over the whole map, and no grey placeholder shapes.",
     "Words end in a real ellipsis (…), never three dots.",
@@ -243,8 +243,8 @@ const confirm = pat({
     "It <b>names the thing and says exactly what happens</b>, and what doesn't: it leaves the map; the record is kept.",
     "Two buttons, 48 tall: half the row each from 640 pixels wide, stacked full width on a phone. <b>Cancel comes first</b> (on top on a phone), so Enter on the first button never removes anything.",
     "The risky button <b>names the action</b>: Remove from map, not Yes or OK. Removals are red; Publish and Approve all are green.",
-    "While it works it says what it's doing (Removing…) and can't be pressed twice. If it fails, the red line says what did not happen.",
-    "In a Reject, Remove photo or Decline step too, <b>Cancel comes first</b> and the red Confirm second; in the Cancel event step, Keep event first, then the red Confirm cancel event. Escape closes any of these steps unless its request is running, and Cancel, Keep event or Escape clears what was typed.",
+    "While it works it says what it's doing (Removing…) and can't be pressed twice, yet the keyboard stays on it. If it fails, the red line says what did not happen.",
+    "In a Reject, Remove photo or Decline step too, <b>Cancel comes first</b> and the red Confirm second; in the Cancel event step, Keep event first, then the red Confirm cancel event, in a box with the confirm's look. The Reject, Remove photo and Decline steps are one shared part (AdminRejectStep). Escape closes any of these steps unless its request is running, and Cancel, Keep event or Escape clears what was typed.",
   ],
   example: ruleConfirm,
   words: [

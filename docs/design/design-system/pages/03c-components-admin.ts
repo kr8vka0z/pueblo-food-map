@@ -41,10 +41,11 @@ const confirmBox = (o: { title: string; body: string; action: string; tone: "dan
 const liveOpen = (btn: string) => btn.replace("<button ", `<button onclick="${q("this.hidden=true;const c=this.closest('.pa-cw').querySelector('.pa-confirm');c.hidden=false;c.querySelector('button').focus()")}" `).replace('class="', 'class="open ');
 const liveBox = (box: string, gap = 0) => box.replace('<div class="pa-confirm', `<div hidden${gap ? ` style="margin-top:${gap}px"` : ""} class="pa-confirm`);
 const confirmLive = (btn: string, box: string) => `<div class="pa-cw">${liveOpen(btn)}${liveBox(box)}</div>`;
-/** AdminSegmented: real radios in a fieldset with a hidden legend. */
-const seg = (legend: string, opts: string[], on: number, cls: string[] = []) => {
+/** AdminSegmented: real radios in a fieldset; its legend is hidden, or shown as the slider's label (legendClass:
+ *  "pa-label" on a form, "pa-clab" above a filter). Full width on a phone, its own width from 640. */
+const seg = (legend: string, opts: string[], on: number, cls: string[] = [], show?: "pa-label" | "pa-clab") => {
   const name = `pa-seg-${++uid}`;
-  return `<fieldset class="pa-seg"><legend>${legend}</legend>${opts.map((o, i) => `<label${cls[i] ? ` class="${cls[i]}"` : ""}><input type="radio" name="${name}"${i === on ? " checked" : ""}>${o}</label>`).join("")}</fieldset>`;
+  return `<fieldset class="pa-segf"><legend${show ? ` class="${show}"` : ""}>${legend}</legend><div class="pa-seg">${opts.map((o, i) => `<label${cls[i] ? ` class="${cls[i]}"` : ""}><input type="radio" name="${name}"${i === on ? " checked" : ""}>${o}</label>`).join("")}</div></fieldset>`;
 };
 const empty = (lines: string[], btn = "") => `<div class="pa-empty">${lines.map((l) => `<p>${l}</p>`).join("")}${btn}</div>`;
 
@@ -344,6 +345,7 @@ const publishEntry = entry({
 
 // ── Change cards (ProposalCard, SubmissionCard, PhotoReviewCard, SponsorRequestCard) ─────────────────────────
 type Act = { busy?: boolean; cls?: string; live?: boolean; err?: string };
+/** AdminRejectStep: the one reason step on all four cards, Cancel first, then the red Confirm. */
 const rejectBox = (danger: string) => `<div class="pa-rej"><label class="pa-clab" for="pa-rr-${++uid}">Reason <span style="font-weight:400;text-transform:none;color:var(--color-ink-400)">(optional, for your own notes)</span></label>
   <textarea id="pa-rr-${uid}" class="pa-in" rows="2"></textarea>
   <div class="pa-btns" style="margin-top:8px"><button type="button" class="pa-bs pa-ring">Cancel</button><button type="button" class="pa-bd pa-ring">${danger}</button></div></div>`;
@@ -370,7 +372,7 @@ const btnRow = (html: string) => `<div class="pa-btns" style="background:#fff;pa
 
 const changeEntry = entry({
   id: "admin-change", name: "Change cards (ProposalCard, SubmissionCard, PhotoReviewCard, SponsorRequestCard)", status: "built",
-  statusNote: "Live as is (#926). One button height, 48, on all four cards; Reject, Cancel, Remove photo and Decline take the light green tint under the pointer; in every reject step Cancel comes first and the red Confirm second; Archive this venue asks in a red box on the page; every tag is fully round.",
+  statusNote: "Live as is (#926). One button height, 48, on all four cards; Reject, Cancel, Remove photo and Decline take the light green tint under the pointer; every Reject, Remove photo and Decline step is one shared part (AdminRejectStep), Cancel first and the red Confirm second; a working button keeps the keyboard on it; Archive this venue asks in a red box on the page; every tag is fully round.",
   purpose: "One card for each thing waiting on a person: a change the weekly data check found, a place or problem the public sent in, a box photo, a sponsor request. Each card shares the white card shell and the same order: tags and when it arrived, what it is, then the decision buttons, with the yes button first.",
   instead: [
     "It's a count of everything waiting: use a summary box.",
@@ -385,7 +387,7 @@ const changeEntry = entry({
     wide("A sponsor request (SponsorRequestCard); the email is a real link with the green ring.", sponsor),
   states:
     demo("Approve: resting, pointer over it (sage 700), keyboard", btnRow(`<button type="button" class="pa-bp pa-ring">Approve</button><button type="button" class="pa-bp pa-ring is-hover">Approve</button><button type="button" class="pa-bp pa-ring is-focus">Approve</button>`)) +
-    demo("Working: Applying…, faded; Reject is still there", btnRow(`<button type="button" class="pa-bp" disabled>Applying…</button><button type="button" class="pa-bs">Reject</button>`)) +
+    demo("Working: Applying…, faded; the keyboard stays on it, and Reject is still there", btnRow(`<button type="button" class="pa-bp" disabled>Applying…</button><button type="button" class="pa-bs">Reject</button>`)) +
     demo("Reject: resting, pointer over it (sage 100), keyboard", btnRow(`<button type="button" class="pa-bs pa-ring">Reject</button><button type="button" class="pa-bs pa-ring is-hover">Reject</button><button type="button" class="pa-bs pa-ring is-focus">Reject</button>`)) +
     demo("Confirm reject: resting, pointer over it (fills red), keyboard (a red ring)", btnRow(`<button type="button" class="pa-bd pa-ring">Confirm reject</button><button type="button" class="pa-bd is-hover">Confirm reject</button><button type="button" class="pa-bd is-focus">Confirm reject</button>`)) +
     wide("Reject opened: an optional reason, then Cancel first and Confirm reject", proposal({ reject: true })) +
@@ -405,6 +407,7 @@ const changeEntry = entry({
     "The yes button says what it does: Approve, Approve rename, Mark done, Keep photo, Approve sponsor. A data change that removes a place says Archive this venue, and asks: Archive Southside Food Shelf? It stops showing on the public map at the next publish. Its record is kept, not deleted.",
     "No is Reject, Remove photo (a reported photo), Decline or Remove (a sponsor). Its second step says Confirm reject, Confirm remove or Confirm decline, after Cancel.",
     "The reason is optional and says who reads it: (optional, for your own notes).",
+    "A field the venue told us about leads with its own label: Phone: the venue told us this itself on Oct 1, 2026 (manager, by phone). Approve only if you trust this source over the venue.",
     "Errors say what did not happen, then Try again: This change was not applied. This suggestion was not rejected. This report was not marked done. The photo was not removed. The request was not declined.",
   ],
   everyone: [
@@ -420,7 +423,7 @@ const changeEntry = entry({
   code: [
     "src/lib/adminCardStyles.ts (cardClass, cardNameClass, tagClass, primaryButtonClass, secondaryButtonClass, dangerButtonClass)",
     "src/components/ProposalCard.tsx (SOURCE_BADGE and LANE_BADGE tags as tones, the diff, the preview column, the Archive this venue AdminConfirm), SubmissionCard.tsx, PhotoReviewCard.tsx, SponsorRequestCard.tsx",
-    "src/components/AdminConfirm.tsx (useAdminStep: the reason step's focus)",
+    "src/components/AdminConfirm.tsx (AdminRejectStep: the reason step on all four cards; useAdminStep: its focus)",
   ],
 });
 
@@ -436,10 +439,10 @@ const field = (o: { label: string; req?: boolean; hint?: string; value?: string;
 const checkbox = (label: string, on = false, cls = "") => `<label class="pa-cb${cls ? ` ${cls}` : ""}"><input type="checkbox"${on ? " checked" : ""}>${label}</label>`;
 const CATS = ["Select a category", "Food Pantry", "Grocery / Supermarket", "Convenience Store", "Farm / Market", "Community Garden", "Edible Landscape", "Meal Site", "Blessing Box"];
 const saveBtn = (o: { busy?: boolean; cls?: string; live?: boolean; label?: string } = {}) => `<button type="button" class="pa-bfull pa-ring${o.cls ? ` ${o.cls}` : ""}"${o.busy ? " disabled" : ""}${o.live ? say("Mockup: nothing is saved.") : ""}>${o.busy ? "Saving…" : (o.label ?? "Save changes")}</button>`;
-const cancelLink = (o: { live?: boolean; busy?: boolean; where?: string; cls?: string } = {}) => `<a class="pa-bs big pa-ring${o.cls ? ` ${o.cls}` : ""}" href="#admin-forms"${o.busy ? ' aria-disabled="true" tabindex="-1" style="opacity:.6;cursor:not-allowed"' : ""}${o.live ? say(`Mockup: this would go back to ${o.where ?? "Places"} and save nothing.`) : ""}>Cancel</a>`;
+const cancelLink = (o: { live?: boolean; busy?: boolean; where?: string; cls?: string } = {}) => `<a class="pa-bs big pa-ring${o.cls ? ` ${o.cls}` : ""}" href="#admin-forms"${o.busy ? ' aria-disabled="true" tabindex="-1" style="opacity:.5;cursor:not-allowed"' : ""}${o.live ? say(`Mockup: this would go back to ${o.where ?? "Places"} and save nothing.`) : ""}>Cancel</a>`;
 const savePair = (o: { live?: boolean; busy?: boolean } = {}) => `<div class="pa-savepair">${cancelLink(o)}${saveBtn(o)}</div>`;
 const eventSaveRow = (live = false) => `<div class="pa-savepair">${cancelLink({ live, where: "Events" })}<div class="two"><button type="button" class="pa-bs big pa-ring"${live ? say("Mockup: nothing is saved.") : ""}>Save draft</button><button type="button" class="pa-bp big pa-ring"${live ? say("Mockup: nothing is published.") : ""}>Publish</button></div></div>`;
-const snapField = (on: number) => `<div style="width:100%"><p class="pa-label" aria-hidden="true">Accepts SNAP</p>${seg("Accepts SNAP", ["Unknown", "Yes", "No"], on)}</div>`;
+const snapField = (on: number) => `<div style="width:100%">${seg("Accepts SNAP", ["Unknown", "Yes", "No"], on, [], "pa-label")}</div>`;
 const venueForm = (live = false) => `<form class="pa-form" onsubmit="return false" novalidate>
   ${field({ label: "Name", req: true, value: "Eastside Community Pantry" })}
   ${field({ label: "Category", req: true, select: CATS, value: "Food Pantry" })}
@@ -450,7 +453,7 @@ const venueForm = (live = false) => `<form class="pa-form" onsubmit="return fals
 
 const formsEntry = entry({
   id: "admin-forms", name: "Admin form fields and the save button (formClasses.ts)", status: "built",
-  statusNote: "Live as is (#926). Cancel sits beside Save on every admin form (owner's ruling: Cancel beside Save); text boxes are 48 tall with a darker ink 400 edge; tick boxes are 20 pixels in 48-tall rows; SNAP, WIC and an event's place are sliders; the event form says Cancel, not Back to events.",
+  statusNote: "Live as is (#926). Cancel sits beside Save on every admin form (owner's ruling: Cancel beside Save); text boxes are 48 tall with a darker ink 400 edge; tick boxes are 20 pixels in 48-tall rows; SNAP, WIC and an event's place are sliders; the event form says Cancel, not Back to events; a working button (Saving…, Looking up…, Suggesting…) is faded but keeps the keyboard on it.",
   purpose: "The boxes, labels, error lines, tick boxes and the Cancel and Save row every admin form shares: Add a place and its edit page, Add event and Edit event, an event's flyer, host alert emails, and sign-in. One set of classes, so the forms look the same and can't drift apart.",
   instead: [
     "It's a public form (Suggest a place, Report a problem, Share an event): use the public form fields, with the Turnstile check.",
@@ -470,7 +473,7 @@ const formsEntry = entry({
     demo("Slider: resting, pointer over a choice (sage 100), keyboard", `<div style="display:flex;flex-direction:column;gap:12px;align-items:flex-start">${seg("Accepts WIC, resting", ["Unknown", "Yes", "No"], 0)}${seg("Accepts WIC, pointer", ["Unknown", "Yes", "No"], 0, ["", "is-hover"])}${seg("Accepts WIC, keyboard", ["Unknown", "Yes", "No"], 0, ["is-focus"])}</div>`) +
     demo("Save changes: resting, pointer over it (sage 700), keyboard", `<div style="display:flex;flex-direction:column;gap:12px;width:100%">${saveBtn()}${saveBtn({ cls: "is-hover" })}${saveBtn({ cls: "is-focus" })}</div>`) +
     demo("Cancel: resting, pointer over it (sage 100), keyboard", `<div style="display:flex;flex-direction:column;gap:12px;width:100%">${cancelLink()}${cancelLink({ cls: "is-hover" })}${cancelLink({ cls: "is-focus" })}</div>`) +
-    demo("Working: Saving…, faded; Cancel is off too, so nobody leaves while the save lands", `<div style="width:100%">${savePair({ busy: true })}</div>`),
+    demo("Working: Saving…, faded but still holding the keyboard (it ignores presses); Cancel is off too, so nobody leaves while the save lands", `<div style="width:100%">${savePair({ busy: true })}</div>`),
   colors:
     sw("White", "white", "Every box") +
     sw("Ink 400 edge", "color-ink-400", `A box's edge at rest. ${r("color-ink-400", "white", 3)} on white (edge): the edge is the only thing that shows where the box is`) +
@@ -482,16 +485,17 @@ const formsEntry = entry({
     sw("Sage 600", "color-sage-600", `Save changes, Publish, the tick, the slider's chosen part. Bone 50 words ${r("color-bone-50", "color-sage-600")}; sage 700 under the pointer ${r("color-bone-50", "color-sage-700")}`) +
     sw("Sage 100", "color-sage-100", `Cancel, Save draft and a slider choice under the pointer. Ink 700 words ${r("color-ink-700", "color-sage-100")}`) +
     sw("Bone 200", "color-bone-200", `The slider's track, ink 700 words on it ${r("color-ink-700", "color-bone-200")}`),
-  sizes: "Labels 14 pixels, medium, 4 above the box. Boxes full width, corners 10, 8 by 12 padding, 16-pixel words on a phone so it doesn't zoom in (14 from 768 wide), at least 48 pixels tall. Fields 24 pixels apart; a form page is one 672-pixel column. Tick boxes 20 pixels in a 48-pixel row. The slider is 48 tall. The save row: Cancel a third, Save two thirds, both 48 tall with 16-pixel words; on a new or draft event the two thirds hold Save draft and Publish, half each with 8 pixels at the sides, so Cancel, Save draft and Publish sit on one row, one line each, at 360. The Location block on a place's form: the address full width, latitude and longitude side by side under it, then the map, at most 420 wide.",
+  sizes: "Labels 14 pixels, medium, 4 above the box. Boxes full width, corners 10, 8 by 12 padding, 16-pixel words on a phone so it doesn't zoom in (14 from 768 wide), at least 48 pixels tall. Fields 24 pixels apart; a form page is one 672-pixel column. Tick boxes 20 pixels in a 48-pixel row. The slider is 48 tall, full width on a phone and its own width from 640. The save row: Cancel a third, Save two thirds, both 48 tall with 16-pixel words; on a new or draft event the two thirds hold Save draft and Publish, half each with 8 pixels at the sides, so Cancel, Save draft and Publish sit on one row, one line each, at 360. The Location block on a place's form: the address full width, latitude and longitude side by side under it, then the map, at most 420 wide.",
   wording: [
     "Labels are one or two words. Optional fields say (optional) in ink 400; required ones get a red star that screen readers skip (they hear required instead).",
     "Errors say what to do: Name is required. Enter a start date and time. The end must be after the start. A failed save says what did not happen: The place was not saved. Try again.",
+    "A problem with something typed is the small red line under its box or button, sign-in's lines and No match found under Find location included; an action that failed on a card or list is the larger red line.",
     "The save button names the action: Add venue on a new place, Save changes on an existing one, Save draft and Publish on an event. Working: Saving….",
     "Cancel, never Back or Discard, beside Save. It saves nothing.",
   ],
   everyone: [
-    "Keyboard: fields go top to bottom in screen order; Enter in a box saves (Cancel is a link, so Save stays the form's first send button). Every box, tick box, slider and button shows the green ring. After a refused save the cursor goes to the first wrong box, which stays red while it has focus. Add host keeps the keyboard on it while it adds, then puts the cursor back in the empty email box.",
-    "Screen reader: every box has a real label; required boxes say so; a wrong box is marked invalid and its error is read out. A slider is a group of real radios with its own name.",
+    "Keyboard: fields go top to bottom in screen order; Enter in a box saves (Cancel is a link, so Save stays the form's first send button). Every box, tick box, slider and button shows the green ring. After a refused save the cursor goes to the first wrong box, which stays red while it has focus. A button that is working keeps the keyboard on it (it is marked off, not switched off), and a press that removes the control it was on moves the keyboard to what replaced it: a picked place to Change, Change to the search box, a picked address back to Find location. Add host keeps the keyboard on it while it adds, then puts the cursor back in the empty email box.",
+    "Screen reader: every box has a real label; required boxes say so; a wrong box is marked invalid and its error is read out. A slider is a group of real radios named by its legend, which is also its visible label where it has one.",
     "Touch: every box, tick box row, slider and button is 48 pixels tall.",
     "Color is never the only sign: a red edge always comes with a written error.",
   ],
@@ -500,8 +504,8 @@ const formsEntry = entry({
     [`<div class="pa" style="width:100%">${saveBtn()}</div>`, "Save alone. The only way out is the browser's back button, and nobody knows whether that keeps the changes (made-up example)."],
   ),
   code: [
-    "src/components/formClasses.ts (inputBase, inputBorder, labelClass, errorClass, hintClass, requiredMarkClass, checkboxRowClass, checkboxClass, ADMIN_PRIMARY_BUTTON, ADMIN_SECONDARY_BUTTON, saveRowClass, cancelLinkProps)",
-    "src/components/AddVenueForm.tsx (Cancel goes to afterSaveHref; Reload is dangerButtonClass; SNAP and WIC are AdminSegmented)",
+    "src/components/formClasses.ts (inputBase, inputBorder, inputClass, labelClass, errorClass, hintClass, requiredMarkClass, checkboxRowClass, checkboxClass, ADMIN_PRIMARY_BUTTON, ADMIN_SECONDARY_BUTTON, saveRowClass, busyButtonProps, cancelLinkProps)",
+    "src/components/AddVenueForm.tsx (Cancel goes to afterSaveHref; Reload is dangerButtonClass; SNAP and WIC are AdminSegmented with legendClass)",
     "src/components/EventForm.tsx (Cancel to Events; the place choice is AdminSegmented; Cancel event and Archive event sit apart under Danger zone)",
     "src/components/EventFlyerField.tsx, HostAlertsAdminPanel.tsx (the same fields and buttons)",
     "Known live issue: src/components/PublicForm.tsx (lines 33 to 42) keeps a separate copy of the field styles with the bone 300 edge; the public forms were outside #926, so the admin and public boxes now differ",
@@ -520,25 +524,25 @@ const CAT_COLOR: Record<string, string> = { "Food Pantry": "var(--color-cat-pant
 const catLabel = (cat: string, benefits: string[] = []) => `<span style="font-weight:600;white-space:nowrap"><span style="color:${CAT_COLOR[cat]}">${cat}</span>${benefits.map((b) => `<span aria-hidden="true" style="color:var(--color-ink-400)"> · </span><span style="color:var(--color-sage-700)">${b}</span>`).join("")}</span>`;
 const vRow = (o: { name: string; cat: string; benefits?: string[]; st: string; review?: string; addr: string; ver: string; cls?: string; newPlace?: boolean }) =>
   `<tr${o.cls ? ` class="${o.cls}"` : ""}><td style="font-weight:500"><a class="nm" href="#admin-lists">${o.name}</a></td><td>${catLabel(o.cat, o.benefits)}</td><td>${o.newPlace ? `<span class="pa-btns" style="gap:4px"><span class="pa-tag t-clay">Suggested new place</span><span class="pa-tag t-clay">Public</span></span>` : stTag(o.st)}</td><td>${o.review ? `<span style="display:flex;align-items:center;gap:6px;font-size:12px;line-height:16px">${o.review}</span>` : `<span style="color:var(--color-ink-400)">—</span>`}</td><td class="m5">${o.addr}</td><td class="m5 nw">${o.ver}</td></tr>`;
-const placesTable = (hoverRow = "") => `<div class="pa-tw el"><table style="min-width:680px"><thead><tr><th scope="col">Name</th><th scope="col">Category</th><th scope="col">Status</th><th scope="col">To review</th><th scope="col">Address</th><th scope="col">Last verified</th></tr></thead><tbody class="hov">
+const placesTable = (hoverRow = "") => `<div class="pa-tw el"><table style="min-width:1080px"><thead><tr><th scope="col" style="min-width:240px">Name</th><th scope="col">Category</th><th scope="col">Status</th><th scope="col">To review</th><th scope="col" style="min-width:200px">Address</th><th scope="col">Last verified</th></tr></thead><tbody class="hov">
   ${vRow({ name: "Eastside Community Pantry", cat: "Food Pantry", benefits: ["SNAP"], st: "waiting", review: `Hours <span class="pa-tag t-sage">Plentiful</span>`, addr: "100 Example Ave", ver: "Oct 28, 2026", cls: hoverRow })}
   ${vRow({ name: "Northside Free Fridge", cat: "Food Pantry", st: "", newPlace: true, review: `New place <span class="pa-tag t-clay">Public report</span>`, addr: "200 Sample Rd", ver: "—" })}
   ${vRow({ name: "Mesa Street Community Garden", cat: "Community Garden", st: "live", addr: "300 Mesa St", ver: "Sep 14, 2026" })}
   ${vRow({ name: "Riverside Grocery", cat: "Grocery / Supermarket", benefits: ["SNAP", "WIC"], st: "draft", addr: "410 River Ln", ver: "—" })}</tbody></table></div>`;
 const BOX_ST: Record<string, [string, string]> = { ok: ["OK", "t-sage"], low: ["Low", "t-low"], empty: ["Empty", "t-empty"], problem: ["Problem", "t-clay"], quiet: ["Quiet", "t-bone"] };
 const fb = (label: string, o: { on?: boolean; dis?: boolean; cls?: string } = {}) => `<button type="button" class="pa-fb pa-ring${o.cls ? ` ${o.cls}` : ""}" aria-pressed="${o.on ? "true" : "false"}"${o.dis ? " disabled" : ""}>${label}</button>`;
-const boxRow = (name: string, addr: string, st: string, last: string, sponsor: string, review = "") => `<tr><td><a class="nm" href="#admin-lists">${name}</a><p class="pa-small">${addr}</p></td><td><span class="pa-tag ${BOX_ST[st][1]}">${BOX_ST[st][0]}</span></td><td class="nw">${last}</td><td>${sponsor}</td><td>${review}</td></tr>`;
+const boxRow = (name: string, addr: string, st: string, last: string, sponsor: string, review = "") => `<tr><td><a class="nm" href="#admin-lists">${name}</a><p class="pa-small">${addr}</p></td><td><span class="pa-tag ${BOX_ST[st][1]}">${BOX_ST[st][0]}</span></td><td class="nw">${last}</td><td${sponsor === "Needs a sponsor" ? ' class="nw"' : ""}>${sponsor}</td><td>${review}</td></tr>`;
 const boxesTable = `<div class="pa-chips" role="group" aria-label="Filter boxes by status">${fb("All (5)")}${fb("To review (1)", { on: true })}${fb("Needs help (3)")}${fb("Empty (1)")}${fb("Problem (1)")}${fb("Low (1)")}${fb("Quiet (0)", { dis: true })}${fb("OK (2)")}</div>
-  <div style="margin-top:12px"><span class="pa-clab" aria-hidden="true">Sponsor</span>${seg("Sponsor", ["Any", "Has one", "Needs one"], 0)}</div>
+  <div style="margin-top:12px">${seg("Sponsor", ["Any", "Has one", "Needs one"], 0, [], "pa-clab")}</div>
   <p style="margin:12px 0 8px;color:var(--color-ink-500)" aria-live="polite">Showing 5 of 5 boxes</p>
-  <div class="pa-tw el"><table style="min-width:720px"><thead><tr><th scope="col">Box</th><th scope="col">Status</th><th scope="col">Last report</th><th scope="col">Sponsor</th><th scope="col">To review</th></tr></thead><tbody class="hov">
+  <div class="pa-tw el"><table style="min-width:800px"><thead><tr><th scope="col" style="min-width:240px">Box</th><th scope="col">Status</th><th scope="col">Last report</th><th scope="col" style="min-width:160px">Sponsor</th><th scope="col">To review</th></tr></thead><tbody class="hov">
   ${boxRow("Elm Street Blessing Box", "12 Elm St", "empty", "6 days ago", "Needs a sponsor", `<span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500"><span style="width:48px;height:48px;border-radius:6px;border:1px solid var(--color-bone-200);background:var(--color-sage-100)"></span>Photo reported (2×)</span>`)}
   ${boxRow("Maple Court Blessing Box", "88 Maple Ct", "problem", "2 days ago", "The Ortiz family")}
   ${boxRow("Hillside Blessing Box", "5 Hillside Dr", "low", "Today", "Grace Bakery, Lopez family")}
   ${boxRow("Lakeview Blessing Box", "31 Lake Rd", "ok", "1 day ago", "Lakeview Neighbors, +2 more")}</tbody></table></div>`;
 const evTag: Record<string, [string, string]> = { draft: ["Draft", "t-bone2"], published: ["Published", "t-sage"], cancelled: ["Cancelled", "t-clay"], archived: ["Archived", "t-bone"] };
-const eventsTable = `<a class="pa-bp big pa-ring" href="#admin-lists" style="margin-bottom:16px">Add event</a>
-  <div class="pa-tw el"><table style="min-width:640px"><thead><tr><th scope="col">Event</th><th scope="col">Starts (Pueblo time)</th><th scope="col">Status</th><th scope="col"><span class="sr">Edit</span></th></tr></thead><tbody class="hov">
+const eventsTable = `<div class="pa-titlerow"><h3 class="wm">All events</h3><a class="pa-bp big pa-ring" href="#admin-lists">Add event</a></div>
+  <div class="pa-tw el"><table style="min-width:640px"><thead><tr><th scope="col" style="min-width:240px">Event</th><th scope="col">Starts (Pueblo time)</th><th scope="col">Status</th><th scope="col"><span class="sr">Edit</span></th></tr></thead><tbody class="hov">
   ${([["Fall Turkey Drive", "Sat, Nov 21, 10:00 AM", "published"], ["Winter Coat and Food Giveaway", "Sat, Dec 12, 9:00 AM", "draft"], ["Harvest Pop-up Market", "Sat, Oct 10, 8:00 AM", "cancelled"]] as [string, string, string][]).map(([n, w, s]) => `<tr><td class="m9">${n}</td><td class="nw">${w}</td><td><span class="pa-tag ${evTag[s][1]}">${evTag[s][0]}</span></td><td style="text-align:right"><a class="nm" href="#admin-lists">Edit</a></td></tr>`).join("")}</tbody></table></div>`;
 const esubBody = `<div class="fly">Flyer</div><div class="txt"><p>Hosted by Grace Neighbors Church</p><p><span class="b9">Fri, Nov 20, 5:00 PM</span> to Fri, Nov 20, 7:00 PM (Pueblo time)</p><p><span class="b9">Grace Neighbors Church, </span>700 Example Blvd, Pueblo, CO 81004</p><p>Hot soup and bread for anyone who comes.</p><p><span class="pa-lab2">Bring </span>A bowl if you have one</p><p style="color:var(--color-ink-500);overflow-wrap:anywhere">Sent by Lee Park &lt;lee@example.com&gt; on Fri, Nov 6, 3:12 PM</p></div>`;
 const dotsMenu = (name: string) => `<div class="pa-dotw"><button type="button" class="dots pa-dots" aria-label="More actions for ${name}" aria-expanded="false" aria-haspopup="menu">⋮</button><div class="menu" role="menu"><button type="button" role="menuitem" data-say="Mockup: this would make a draft event and open it.">Make it a draft event</button><hr><button type="button" role="menuitem" class="dng" data-say="Mockup: this would dismiss it.">Dismiss</button></div></div>`;
@@ -554,13 +558,14 @@ const listsEntry = entry({
     "It's picking one of two or three choices: a slider (the Sponsor filter here).",
   ],
   versions:
-    wide("Places (VenueListView): the status key, the quick filters, search and category, then the table. The Category column is the colored category words, with SNAP and WIC when the place takes them. The table is 680 pixels wide, so on a phone it scrolls sideways inside its own box; the page doesn't. Point at a row.", `<div style="display:flex;flex-direction:column;gap:12px">${statusKey}${placesChips}${placesSearch}${placesTable()}<p class="pa-meta" style="margin-top:0">4 of 48 places</p></div>`) +
+    wide("Places (VenueListView): the status key, the quick filters, search and category, then the table. The Category column is the colored category words, with SNAP and WIC when the place takes them. The table is at least 1080 pixels wide, the name column 240 and the address 200, so a name takes two lines at most and on a phone the table scrolls sideways inside its own box; the page doesn't. Point at a row.", `<div style="display:flex;flex-direction:column;gap:12px">${statusKey}${placesChips}${placesSearch}${placesTable()}<p class="pa-meta" style="margin-top:0">4 of 48 places</p></div>`) +
     wide("Blessing Boxes (AllBoxesTable): status filters with counts (an empty one can't be pressed), the Sponsor slider, then the boxes. Low is dark words on yellow.", boxesTable) +
-    wide("Events (EventsList): Add event, then the table with one Edit link per row.", eventsTable) +
+    wide("Events (EventsList): the All events title with Add event at its right (it wraps under the title on a narrow phone), then the table with one Edit link per row.", eventsTable) +
     wide("Sent in by the public (EventSubmissionsList): each item's two actions in one three-dot menu, Dismiss last under a line. Tap the dots.", `<h3 class="wm" style="margin-bottom:12px">Sent in by the public</h3>${esub}`),
   states:
     demo("Filter chip: resting, pointer over it (sage 100), keyboard, on, none to show", `<div class="pa-chips">${fb("Low (1)")}${fb("Low (1)", { cls: "is-hover" })}${fb("Low (1)", { cls: "is-focus" })}${fb("To review (1)", { on: true })}${fb("Quiet (0)", { dis: true })}</div>`) +
     wide("A Places row: resting, pointer over it (sage 100). The name link with the keyboard ring.", `<div class="pa-tw"><table style="min-width:520px"><tbody class="hov">${vRow({ name: "Mesa Street Community Garden", cat: "Community Garden", st: "live", addr: "300 Mesa St", ver: "Sep 14, 2026" })}${vRow({ name: "Mesa Street Community Garden", cat: "Community Garden", st: "live", addr: "300 Mesa St", ver: "Sep 14, 2026", cls: "is-hover" }).replace('class="nm"', 'class="nm is-focus"')}</tbody></table></div>`) +
+    demo("Menu choice: resting, pointer over it (sage 100), keyboard (sage 100 and the green ring inside its edge)", `<div class="pa-dotw" style="margin:0"><div class="menu" style="display:block;position:static"><button type="button" role="menuitem">Make it a draft event</button><button type="button" role="menuitem" class="is-hover">Make it a draft event</button><button type="button" role="menuitem" class="is-focus">Make it a draft event</button></div></div>`) +
     demo("Three-dot button: resting, pointer over it, keyboard", `<div style="display:flex;gap:12px;background:#fff;padding:8px;border-radius:10px"><button type="button" class="dots pa-dots" aria-label="More actions, resting">⋮</button><button type="button" class="dots pa-dots" style="background:var(--color-sage-100);color:var(--color-ink-700)" aria-label="More actions, pointer">⋮</button><button type="button" class="dots pa-dots pa-ring is-focus" aria-label="More actions, keyboard">⋮</button></div>`) +
     demo("Nothing matches a filter: the shared empty box with Clear filters", `<div style="width:100%">${empty(["No places match your search or filters."], `<button type="button" class="pa-bs pa-ring">Clear filters</button>`)}</div>`) +
     demo("Nothing there yet", `<div style="width:100%">${empty(["No blessing boxes yet.", "Add a place with the category Blessing Box and it shows up here."])}</div>`) +
@@ -576,20 +581,20 @@ const listsEntry = entry({
     sw("Bone 100", "color-bone-100", `Removed, Quiet and Archived tags, ink 500 words ${r("color-ink-500", "color-bone-100")}`) +
     sw("Bone 300", "color-bone-300", `Chip edges, ${contrast(H("color-bone-300"), H("white")).toFixed(1)} to 1 on white: decoration, the words carry the chip. The search box has the ink 400 edge of every admin text box`) +
     swr("Sage 500", "color-sage-500", "The edge of the chip that's on, and keyboard rings", "white", 3),
-  sizes: "Tables: 14-pixel words, cells 12 by 16 pixels, headings 11-pixel capitals over a bone 200 line, bone 200 row lines, corners 14, the level 1 shadow, at least 680 (Places), 720 (Boxes) or 640 (Events) pixels wide inside a box that scrolls sideways, so the page never does; the Box and Event name columns at least 240. Column headings, dates (Last verified, Last report, Starts), times and tags stay on one line. A row tints only if it links somewhere, and a click anywhere on it opens its link; the link stays the keyboard path. The Places status key is a flat white box with a hairline (no shadow, on purpose); the Places chips sit in three rows, status, source and lane, each wrapping on its own, with no divider. Chips are 14-pixel words, 48 tall, fully round. Tags 12 pixels, fully round, on one line. The Sponsor slider and the three-dot button (48 by 48) are 48 tall; the menu's choices are 48 tall. The Events Edit link sits in its cell as an inline link with the ring.",
+  sizes: "Tables: 14-pixel words, cells 12 by 16 pixels, headings 11-pixel capitals over a bone 200 line, bone 200 row lines, corners 14, the level 1 shadow, at least 1080 (Places), 800 (Boxes) or 640 (Events) pixels wide inside a box that scrolls sideways, so the page never does; the Name, Box and Event columns at least 240, the Places Address column 200, the Boxes Sponsor column 160, so Needs a sponsor stays on one line. Blessing Boxes and Events title their tables (All boxes, All events, Fraunces 18); Add event sits at the right of its title row. Column headings, dates (Last verified, Last report, Starts), times and tags stay on one line. A row tints only if it links somewhere, and a click anywhere on it opens its link; the link stays the keyboard path. The Places status key is a flat white box with a hairline (no shadow, on purpose); the Places chips sit in three rows, status, source and lane, each wrapping on its own, with no divider. Chips are 14-pixel words, 48 tall, fully round. Tags 12 pixels, fully round, on one line. The Sponsor slider (its own legend, Sponsor, is its label; full width on a phone) and the three-dot button (48 by 48) are 48 tall; the menu's choices are 48 tall and show the green ring inside their edge when reached by keyboard. The Events Edit link sits in its cell as an inline link with the ring.",
   wording: [
     "Filters show their count: To review (12), Low (1). Statuses are one or two words, explained once in the Places key. The Sponsor slider says Any, Has one, Needs one.",
     "Last report reads Today, 1 day ago, 6 days ago, or No reports yet. A box with no sponsor says Needs a sponsor.",
     "Nothing found: No places match your search or filters. No boxes match these filters. Each with Clear filters. Nothing yet: No places yet. No blessing boxes yet. No events yet.",
   ],
   everyone: [
-    "Keyboard: filters, then search, then each row's link. Chips say whether they're pressed; one with nothing in it is skipped. The three-dot menu opens with Enter, Space or the down arrow; the arrows move; Escape closes it.",
+    "Keyboard: filters, then search, then each row's link. Chips say whether they're pressed; one with nothing in it is skipped. The three-dot menu opens with Enter, Space or the down arrow; the arrows move, and the choice the keyboard is on shows the green ring as well as the light green fill; Escape closes it. While the item's request runs the three-dot button is off but keeps the keyboard on it.",
     "Screen reader: real tables with column headings; Showing 5 of 5 boxes is announced as filters change; the three-dot button is named after the item it belongs to; Clear filters puts the cursor back in the search box.",
     "Touch: chips, the slider and the three-dot button are 48 pixels. On a phone the wide tables scroll sideways inside their own box.",
     "Color is never the only sign: every status is a word; the category is its name in words.",
   ],
   dd: dodont(
-    [`<div class="pa" style="width:100%"><div class="pa-esub"><div class="top"><p class="pa-name" style="padding-top:12px">Community Soup Night</p>${dotsMenu("Community Soup Night")}</div></div></div>`, "One three-dot menu per item, the risky choice last."],
+    [`<div class="pa" style="width:100%"><div class="pa-esub"><div class="top"><p class="pa-name" style="padding-top:12px">Community Soup Night</p>${dotsMenu("Community Soup Night")}</div></div></div>`, "One three-dot menu per item, the risky choice passed last, under a line."],
     [`<div class="pa" style="width:100%"><div class="pa-esub"><p class="pa-name">Community Soup Night</p><div class="pa-btns" style="margin-top:12px"><button type="button" class="pa-bp big">Make it a draft event</button><button type="button" class="pa-bs">Edit</button><button type="button" class="pa-bs">Dismiss</button><button type="button" class="pa-bs">Email sender</button></div></div></div>`, "A row of buttons on every item. A long list becomes a wall of buttons (made-up example)."],
   ),
   code: [
@@ -617,7 +622,7 @@ const period = (on = 1, cls: string[] = []) => seg("Time period", ["7 days", "30
 
 const dashEntry = entry({
   id: "admin-dash", name: "Dashboard numbers (DashboardNeedsStrip, KpiCard, DailyBars, BarList, BoxReportsChart)", status: "built",
-  statusNote: "Live as is (#926), with made-up figures. The Needs you cards take the light green tint under the pointer and the green keyboard ring; a number card's change wraps under the number on a phone instead of running past the edge; the time period (7, 30, 90 days) is a slider, still kept in the page address.",
+  statusNote: "Live as is (#926), with made-up figures. The Needs you cards take the light green tint under the pointer and the green keyboard ring; a number card's change wraps under the number on a phone instead of running past the edge; cards in a row are one height with the number at the bottom, so numbers line up when one label wraps; the time period (7, 30, 90 days) is a slider, still kept in the page address.",
   purpose: "The Dashboard's numbers: under the greeting, the period slider, then the four Needs you cards (what's waiting on a person, each one a way into that list), then plain number cards with the change since the last period, and small charts: visitors per day and ranked bars (where people came from, which places were opened, what they searched). Blessing box reports per week sit on the Blessing Boxes page.",
   instead: [
     "It's one thing to act on: use a change card or a list, not a number.",
@@ -626,7 +631,7 @@ const dashEntry = entry({
   versions:
     wide("The period slider under the greeting (DashboardPeriodPicker). Pick one: on the site the page reloads its numbers for that period and the address keeps it (?period=7d).", `<h2 class="wm" style="font-size:20px;line-height:28px;margin-bottom:12px">Hi dana</h2>${period()}`) +
     wide("Needs you (DashboardNeedsStrip): one column on a phone, two from 640 pixels, four from 1024. Each card is a link. Point at one.", needsStrip) +
-    wide("Number cards (KpiCard), two across on a phone, four from 640. about marks a sampled number; the change is green when up, red when down; new when there was nothing before. On a narrow card the change drops under the number.", `<div class="pa-kgrid">${kpi("Visitors", "214", ["+12.5%", "up"], true)}${kpi("Page views", "12655", ["-3.1%", "down"], true)}${kpi("Near me taps", "96", ["new", "up"], false, [2, 5, 4, 8, 7, 11, 9])}${kpi("On a phone", "81%", undefined, true)}</div>`) +
+    wide("Number cards (KpiCard), two across on a phone, four from 640. about marks a sampled number; the change is green when up, red when down; new when there was nothing before. On a narrow card the change drops under the number, and when one label wraps the numbers still line up.", `<div class="pa-kgrid">${kpi("Visitors", "214", ["+12.5%", "up"], true)}${kpi("Page views", "12655", ["-3.1%", "down"], true)}${kpi("Place cards opened", "96", ["new", "up"], false, [2, 5, 4, 8, 7, 11, 9])}${kpi("On a phone", "81%", undefined, true)}</div>`) +
     wide("Visitors per day (DailyBars), inside its section card: a section title (Fraunces 18) and a group heading (Public Sans 14 semi-bold)", `<section class="pa-sec"><h3 class="wm">Visitors</h3><div style="margin-top:12px"><h4 class="pa-gt">Visitors per day</h4>${daily}</div></section>`) +
     mid("Ranked bars (BarList). Plain names, or links to a place's edit page with the green ring.", `<h4 class="pa-gt">How people found the site</h4>${bars([["Google", 58, "58 visits"], ["Facebook", 21, "21 visits"], ["Direct", 17, "17 visits"], ["pueblo-example.org", 6, "6 visits"]])}<h4 class="pa-gt" style="margin-top:16px">Most opened places</h4>${bars([["Eastside Community Pantry", 41, "41 opens"], ["Mesa Street Community Garden", 23, "23 opens"]], true)}`) +
     mid("Box reports per week (BoxReportsChart), on the Blessing Boxes page: OK in green, needs attention in clay, 8 weeks", weeks),
@@ -649,7 +654,7 @@ const dashEntry = entry({
     sw("Bone 200", "color-bone-200", `The period slider's track, ink 700 words ${r("color-ink-700", "color-bone-200")}`) +
     swr("Ink 400", "color-ink-400", "Week labels, 10 pixels") +
     sw("Sage 100", "color-sage-100", `Fill under the pointer on a Needs you card and a period. Ink 900 numbers ${r("color-ink-900", "color-sage-100")}, ink 500 labels ${r("color-ink-500", "color-sage-100")}`),
-  sizes: "Tiles: corners 14, 16 pixels of padding at every width (section cards 24 from 640 wide), the card shadow, 12 pixels apart; a Needs you card is at least 48 tall. Labels 12-pixel capitals; numbers 24 pixels semi-bold; changes 12. The page title (the greeting) is Fraunces 20, section titles Fraunces 18, group headings Public Sans 14 semi-bold. The period slider is 48 tall. Sparkline 64 by 20. Daily bars 64 pixels tall, full width. Ranked bars: names 112 pixels wide (cut with … when long), an 8-pixel track, values in a 64-pixel column. Weekly chart 128 pixels tall, week labels 10 pixels.",
+  sizes: "Tiles: corners 14, 16 pixels of padding at every width (section cards 24 from 640 wide), the card shadow, 12 pixels apart; a Needs you card is at least 48 tall. Labels 12-pixel capitals on top; numbers 24 pixels semi-bold, pushed to the bottom of the card; changes 12. The period slider is full width on a phone. The page title (the greeting) is Fraunces 20, section titles Fraunces 18, group headings Public Sans 14 semi-bold. The period slider is 48 tall. Sparkline 64 by 20. Daily bars 64 pixels tall, full width. Ranked bars: names 112 pixels wide (cut with … when long), an 8-pixel track, values in a 64-pixel column. Weekly chart 128 pixels tall, week labels 10 pixels.",
   wording: [
     "Labels name the thing in plain words: Places to review, Waiting to publish, Boxes empty or low, Near me taps, Phone page load.",
     "Sampled numbers say about. Changes are a percent with a sign, or new. Missing numbers show —.",
@@ -667,7 +672,7 @@ const dashEntry = entry({
   ),
   code: [
     "src/components/DashboardNeedsStrip.tsx (tileCardClass, the sage 100 hover, focusRingClass)",
-    "src/components/KpiCard.tsx (tileCardClass, tileLabelClass; the number row wraps)",
+    "src/components/KpiCard.tsx (tileCardClass, tileLabelClass; the number row wraps and sits at the bottom)",
     "src/components/DashboardPeriodPicker.tsx (the period slider, AdminSegmented; keeps the other address values)",
     "src/components/DailyBars.tsx, BarList.tsx; src/components/BoxReportsChart.tsx (on admin/boxes/page.tsx)",
     "src/app/(site)/admin/page.tsx (labels and layout)",
@@ -678,6 +683,8 @@ const dashEntry = entry({
 const removeConfirm = (o: { busy?: boolean; err?: boolean; live?: boolean } = {}) => confirmBox({ title: "Remove Eastside Community Pantry from the map?", body: "It will stop appearing on the next publish. Its record is kept, not deleted, and this can be reviewed later.", action: "Remove from map", tone: "danger", busy: o.busy ? "Removing…" : undefined, err: o.err ? "The place was not removed. Try again." : undefined, live: o.live });
 const removeBtn = (cls = "") => `<button type="button" class="pa-bd pa-ring${cls ? ` ${cls}` : ""}">Remove from map</button>`;
 const dangerZone = (inner: string) => `<div class="pa-danger"><h3 class="wm">Danger zone</h3>${inner}</div>`;
+/** The Cancel event step, in the confirm's look (a red 1-pixel edge, corners 10, the confirm's button row). */
+const cancelStep = () => `<fieldset class="pa-confirm pa-cstep"><legend class="pa-label">Cancellation note</legend>${field({ label: "Note (English)", req: true, textarea: true, value: "Rained out. We will post a new date." })}${field({ label: "Note (Spanish)", textarea: true })}<div class="two"><button type="button" class="pa-bs pa-ring">Keep event</button><button type="button" class="pa-bd pa-ring">Confirm cancel event</button></div></fieldset>`;
 const eventDanger = (live = false) => dangerZone(`<div style="display:flex;flex-direction:column;gap:12px;align-items:stretch"><div><button type="button" class="pa-bd pa-ring"${live ? say("Mockup: this would open the cancellation note.") : ""}>Cancel event</button></div>${confirmLive(`<button type="button" class="pa-bd pa-ring">Archive event</button>`, confirmBox({ title: "Archive this event?", body: "It leaves the map and the list of live events, and stays in the admin history.", action: "Archive event", tone: "danger", live }))}</div>`);
 const flyerConfirm = () => `<div style="display:flex;flex-direction:column;gap:12px"><div class="pa-esub" style="padding:8px;max-width:180px"><div class="fly" style="height:120px">Flyer</div></div><div><button type="button" class="pa-bs pa-ring">Replace image</button></div>${confirmLive(`<button type="button" class="pa-bd pa-ring">Remove</button>`, confirmBox({ title: "Remove this flyer?", body: "The event stays. Only the picture is removed.", action: "Remove flyer", tone: "danger", live: true }))}</div>`;
 
@@ -686,19 +693,20 @@ const confirmEntry = entry({
   statusNote: "Live as is (#926). Every risky admin action asks in a box on the page, right where its button was, Cancel first (owner's ruling: say what will happen, safe button first; never the browser's pop-up). The admin has no browser pop-up left.",
   purpose: "Asks before an admin action that changes what the public sees or can't easily be undone. The first press hides the button and opens the box in its place: the question names the thing, one line says what happens and what doesn't, then Cancel first and the action. Nothing is sent until the action button is pressed. Six places use it: Remove from map, Archive this venue, Publish, Approve all date-only updates, Archive event and Remove this flyer.",
   instead: [
-    "It needs a reason typed (Reject, Remove photo, Decline): the reason step on the change card, which opens in place the same way, Cancel first.",
+    "It needs a reason typed (Reject, Remove photo, Decline): the shared reason step on the change card (AdminRejectStep), which opens in place the same way, Cancel first. Cancel event's note is a step too, drawn in this box's look.",
     "It's easy to undo (Hide a check-in, Remove a host email): it acts at once.",
     "It's on the public site: the photo report there still uses the browser's pop-up (DESIGN.md Known drift).",
   ],
   versions:
     mid("Remove from map, alone under Danger zone at the foot of a place's edit page. Tap it: the box opens on the page, Cancel first.", dangerZone(confirmLive(removeBtn(), removeConfirm({ live: true })))) +
     mid("Archive event and Cancel event sit apart under Danger zone on an event's edit page. Tap Archive event. (Cancel event opens a step instead: the cancellation note, then Keep event first and the red Confirm cancel event.)", eventDanger(true)) +
+    mid("The Cancel event step, opened: the note, then Keep event first and the red Confirm cancel event. It sits beside the Archive event confirm, so it takes the confirm's look: the same red edge, corners and button row.", dangerZone(cancelStep())) +
     mid("Remove this flyer, under an event's flyer. Tap Remove.", flyerConfirm()) +
     mid("Publish and Approve all use the green version (see Publish bar and Admin cards). Open:", pubConfirm()),
   states:
     demo("Remove from map: resting, pointer over it (fills red), keyboard (a red ring)", `<div class="pa-btns">${removeBtn()}${removeBtn("is-hover")}${removeBtn("is-focus")}</div>`) +
     mid("Open: the keyboard starts on Cancel", removeConfirm()) +
-    mid("Working: Removing…, both buttons faded, Escape does nothing", removeConfirm({ busy: true })) +
+    mid("Working: Removing…, both buttons faded, Escape does nothing; the keyboard stays on Removing…", removeConfirm({ busy: true })) +
     mid("Failed: what did not happen, in red under the buttons", removeConfirm({ err: true })) +
     demo("Already off the map: a plain line, no button and no Danger zone heading", `<p style="color:var(--color-ink-500);margin:0">This place is removed from the map.</p>`),
   colors:
@@ -713,7 +721,7 @@ const confirmEntry = entry({
   wording: [
     "The question names the thing: Remove Eastside Community Pantry from the map? Archive Southside Food Shelf? Archive this event? Remove this flyer? Publish 2 new places and 5 edited places to the public map? Approve all 6 date-only updates?",
     "The line says exactly what happens and what doesn't: it stops appearing on the next publish; the record is kept, not deleted. The event stays. Only the picture is removed.",
-    "The action button names the action, never Yes or OK: Remove from map, Archive this venue, Archive event, Remove flyer, Publish, Approve 6 updates. Working: Removing…, Archiving…, Publishing…, Approving….",
+    "The action button names the action, never Yes or OK: Remove from map, Archive this venue, Archive event, Remove flyer, Publish, Approve 6 updates. Working: Removing…, Archiving…, Publishing…, Approving…; the working button keeps the keyboard on it.",
     "On a place's page the red button says what it does to the public: Remove from map, never Archive or Delete. A failure says what did not happen: The place was not removed. Try again.",
   ],
   everyone: [
@@ -727,7 +735,8 @@ const confirmEntry = entry({
     [`<div class="pa" style="width:100%"><div class="pa-confirm"><p class="t">Are you sure?</p><div class="two"><button type="button" class="pa-bd">Yes</button><button type="button" class="pa-bs">No</button></div></div></div>`, "Are you sure? Yes / No. Nobody knows what Yes does, and the risky button comes first (made-up example)."],
   ),
   code: [
-    "src/components/AdminConfirm.tsx (AdminConfirm, useAdminConfirm; useAdminStep for the reason steps)",
+    "src/components/AdminConfirm.tsx (AdminConfirm, useAdminConfirm; AdminRejectStep and useAdminStep for the reason steps)",
+    "src/components/formClasses.ts (busyButtonProps: the action button keeps focus while it works)",
     "src/components/ArchiveVenueButton.tsx and the Danger zone of src/app/(site)/admin/venues/[id]/edit/page.tsx",
     "Also used in ProposalCard.tsx (Archive this venue), PublishPanel.tsx, ToReviewSummaryBox.tsx, EventForm.tsx (Archive event) and EventFlyerField.tsx (Remove this flyer)",
   ],
@@ -753,7 +762,8 @@ export const pages: Page[] = [{
     "The light green tint (sage 100) under the pointer everywhere a grey was: menu tabs, Use a passkey, Reject and Cancel, rows, filter chips, the Needs you cards.",
     "One button height, 48 pixels, and 48-pixel text boxes, tick box rows, chips and links. The green keyboard ring on everything you can reach.",
     "Cancel beside Save on every form. Every risky action asks in a box on the page, Cancel first: Remove from map, Archive this venue, Publish, Approve all, Archive event, Remove this flyer.",
-    "One three-dot menu per event sent in by the public; sliders for the Dashboard period, SNAP and WIC, an event's place, the Boxes Sponsor filter and a host email's language.",
+    "One three-dot menu per event sent in by the public; sliders for the Dashboard period, SNAP and WIC, an event's place, the Boxes Sponsor filter and a host email's language, each full width on a phone and showing its own legend as its label.",
+    "A button that is working keeps the keyboard on it, and one Reject, Remove photo and Decline step is shared by all four change cards.",
     "Every page has a title at one size, section titles one size smaller. Errors say what did not happen and what to do, with no long dashes; a page that fails to load shows the admin error page.",
   ],
   kept: ["Only staff see these pages, after signing in.", "The admin is English only.", "The phone view is 360 pixels wide.", "Every person, place and number is made up."],

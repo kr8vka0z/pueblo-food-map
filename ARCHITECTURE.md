@@ -1807,12 +1807,21 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   change cards' reason steps and the event form's Cancel event step the
   same focus handling; Escape closes a step through the step's own Cancel
   (so what was typed is cleared) and does nothing while its request runs.
-  No modal dependency.
+  The four change cards share one reason step, `AdminRejectStep`, in the
+  same file. No modal dependency.
+- **A working admin button keeps keyboard focus** (#926). A button that
+  stays on the page while its own request runs is marked `aria-disabled`,
+  not natively disabled (`busyButtonProps` in `src/components/formClasses.ts`):
+  a natively disabled button drops focus to the page body. Its presses are
+  stopped in the capture phase, before its own `onClick`, and their default
+  is prevented, so a busy submit button (or Enter in a field) sends nothing:
+  the same double-press gate `disabled` gave.
 - **One set of admin UI parts** (#926). Class strings live in
   `src/lib/adminCardStyles.ts` (titles, page bodies, cards, tables,
   buttons, links, tags, chips, failure and empty states) and
   `src/components/formClasses.ts` (fields, tick boxes, the Cancel + Save
-  row); the shared components are `AdminConfirm`, `AdminRowMenu` (the
+  row, `busyButtonProps`); the form buttons there are built from the same
+  base as the 14-pixel buttons (`buttonClass`); the shared components are `AdminConfirm`, `AdminRowMenu` (the
   three-dot menu) and `AdminSegmented` (a two- or three-way slider of real
   radios). Three small helpers sit beside them: `src/lib/rowLinkClick.ts`
   (a click on a table row opens the row's own link), `src/lib/fieldLabels.ts`

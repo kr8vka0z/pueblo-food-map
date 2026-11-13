@@ -577,7 +577,7 @@ textarea.pa-in{resize:vertical}
 .pa-bs{border:1px solid var(--color-bone-300)!important;font-weight:500!important;color:var(--color-ink-700)!important}
 .pa-bd{border:1px solid var(--color-danger)!important;font-weight:500!important;color:var(--color-danger)!important}
 .pa-bp:active,.pa-bs:active,.pa-bd:active,.pa-bfull:active{filter:brightness(.95)}
-.pa-bp:disabled,.pa-bs:disabled,.pa-bd:disabled{opacity:.5;cursor:not-allowed}.pa-bfull:disabled,.pa-bp.big:disabled{opacity:.6;cursor:not-allowed}
+.pa-bp:disabled,.pa-bs:disabled,.pa-bd:disabled{opacity:.5;cursor:not-allowed}.pa-bfull:disabled,.pa-bp.big:disabled{opacity:.5;cursor:not-allowed}
 @media (hover:hover){.pa-bp:not(:disabled):hover,.pa-bfull:not(:disabled):hover{background:var(--color-sage-700)!important}.pa-bs:not(:disabled):hover{background:var(--color-sage-100)}.pa-bd:not(:disabled):hover{background:var(--color-danger);color:var(--color-bone-50)!important}}
 .pa-bp.is-hover,.pa-bfull.is-hover{background:var(--color-sage-700)!important}.pa-bs.is-hover{background:var(--color-sage-100)}.pa-bd.is-hover{background:var(--color-danger);color:var(--color-bone-50)!important}
 .pa-bp:focus-visible,.pa-bp.is-focus,.pa-bs:focus-visible,.pa-bs.is-focus,.pa-bfull:focus-visible,.pa-bfull.is-focus,.pa-bline:focus-visible,.pa-bline.is-focus{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--color-sage-500)}
@@ -609,9 +609,13 @@ textarea.pa-in{resize:vertical}
 .pa-empty{display:flex;flex-direction:column;align-items:center;gap:12px;border-radius:14px;border:1px solid var(--color-bone-200);background:#fff;box-shadow:0 1px 2px rgba(26,24,23,.04),0 0 0 1px rgba(26,24,23,.05);padding:48px 16px;text-align:center;color:var(--color-ink-500)}
 .pa-clab{display:block;margin-bottom:4px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.025em;color:var(--color-ink-400)}
 .ds .pa h4.pa-gt{margin:0 0 4px;font-family:inherit;font-size:14px;line-height:20px;font-weight:600;letter-spacing:normal;text-transform:none;color:var(--color-ink-700)}
-/* AdminSegmented: real radios; the chosen part carries the sage 600 fill (:has(:checked)), as the live thumb does */
-.pa-seg{display:inline-grid;grid-auto-flow:column;grid-auto-columns:1fr;border:0;margin:0;padding:4px;border-radius:9999px;background:var(--color-bone-200);min-width:0}
-.pa-seg legend{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+/* AdminSegmented: a fieldset (.pa-segf) whose legend is hidden, or shown as the label (.pa-label, .pa-clab), then the
+   track (.pa-seg): full width on a phone, its own width from 640. The chosen part carries the sage 600 fill
+   (:has(:checked)), as the live thumb does. */
+.pa-segf{border:0;margin:0;padding:0;min-width:0}.pa-segf legend{padding:0}
+.pa-segf legend:not([class]){position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.pa-seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;padding:4px;border-radius:9999px;background:var(--color-bone-200);min-width:0}
+@container pa (min-width:640px){.pa-seg{display:inline-grid}}
 .pa-seg label{position:relative;display:flex;align-items:center;justify-content:center;height:40px;padding:0 16px;border-radius:9999px;white-space:nowrap;font-size:14px;line-height:20px;font-weight:600;color:var(--color-ink-700);cursor:pointer;transition:background-color .25s cubic-bezier(.32,.72,0,1),color .25s cubic-bezier(.32,.72,0,1)}
 .pa-seg label::before{content:"";position:absolute;inset:-4px 0}
 .pa-seg input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
@@ -694,7 +698,13 @@ textarea.pa-in{resize:vertical}
 .pa .pa-dots:focus-visible{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--color-sage-500)}
 .pa-dotw .menu{right:0;top:52px;min-width:200px;padding:4px 0;border-color:var(--color-bone-200);border-radius:14px;box-shadow:0 4px 12px rgba(26,24,23,.06),0 0 0 1px rgba(26,24,23,.06)}
 .pa .menu button{min-height:48px;padding:8px 16px;border-radius:0;color:var(--color-ink-700)}.pa .menu hr{margin:0}.pa .menu .dng{color:var(--color-danger)}.pa .menu hr{border-top-color:var(--color-bone-200)}
-@media (hover:hover){.pa .menu button:hover{background:var(--color-sage-100)}}
+@media (hover:hover){.pa .menu button:hover{background:var(--color-sage-100)}}.pa .menu button.is-hover{background:var(--color-sage-100)}
+/* A choice reached by keyboard: the fill plus an inset sage 500 ring, so focus never looks like hover. */
+.pa .menu button:focus-visible,.pa .menu button.is-focus{outline:none;background:var(--color-sage-100);box-shadow:inset 0 0 0 2px var(--color-sage-500)}
+/* A table's title row: the section title, its one action at the right (wraps under it on a narrow phone). */
+.pa-titlerow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+/* The Cancel event step in the confirm's look: .pa-confirm's edge and corners, a fieldset with its legend on the edge. */
+.pa-cstep{margin:0;min-width:0}.pa-cstep legend{padding:0 4px;margin-bottom:0}
 
 /* Dashboard numbers */
 .pa-sec{border-radius:14px;border:1px solid var(--color-bone-200);background:#fff;padding:16px;box-shadow:0 1px 2px rgba(26,24,23,.04),0 0 0 1px rgba(26,24,23,.05)}
@@ -707,7 +717,7 @@ textarea.pa-in{resize:vertical}
 @container pa (min-width:640px){.pa-kgrid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .pa-kpi{border-radius:14px;border:1px solid var(--color-bone-200);background:#fff;padding:16px;box-shadow:0 1px 2px rgba(26,24,23,.04),0 0 0 1px rgba(26,24,23,.05)}
 .pa-kpi .l{font-size:12px;line-height:16px;font-weight:500;text-transform:uppercase;letter-spacing:.025em;color:var(--color-ink-500)}
-.pa-kpi{min-width:0}.pa-kpi .v{margin-top:4px;display:flex;flex-wrap:wrap;align-items:baseline;column-gap:8px}.pa-kpi .n{font-size:24px;line-height:32px;font-weight:600;color:var(--color-ink-900)}
+.pa-kpi{min-width:0;display:flex;flex-direction:column}.pa-kpi .v{margin-top:auto;padding-top:4px;display:flex;flex-wrap:wrap;align-items:baseline;column-gap:8px}.pa-kpi .n{font-size:24px;line-height:32px;font-weight:600;color:var(--color-ink-900)}
 .pa-kpi .ab{margin-right:4px;font-size:14px;font-weight:400;color:var(--color-ink-500)}
 .pa-kpi .d{font-size:12px;line-height:16px;font-weight:500}.pa-kpi .d.up{color:var(--color-sage-700)}.pa-kpi .d.down{color:var(--color-danger)}.pa-kpi .d.flat{color:var(--color-ink-500);font-weight:400}
 .pa-kpi svg{display:block;margin-top:4px;color:var(--color-sage-500)}

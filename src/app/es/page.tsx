@@ -21,6 +21,7 @@ export const metadata: Metadata = buildPageMetadata({
   path: "/es",
   locale: "es",
   mirrored: true,
+  absoluteTitle: true,
 });
 
 export default function EsHomePage() {

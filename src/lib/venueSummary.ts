@@ -149,8 +149,15 @@ export function buildVenueTitle(venue: Venue, locale: Locale = "en"): string {
   const connector = t("summary.title.in", locale);
   const categoryFull = t(`category.full.${venue.category}`, locale);
   const categoryShort = t(`summary.title.category.${venue.category}`, locale);
+  // #921: a SNAP store leads with what searchers ask ("does loaf n jug take
+  // ebt"); a long name drops ", CO", then the verb, then falls back to the
+  // same ladder as every other venue. Every SNAP rung keeps the place (#921).
+  const snap = venue.accepts_snap === true ? t("summary.title.acceptsSnap", locale) : null;
 
   const candidates = [
+    ...(snap
+      ? [`${venue.name}, ${city}, CO: ${snap}`, `${venue.name}, ${city}: ${snap}`, `${venue.name}, ${city}: SNAP/EBT`]
+      : []),
     `${venue.name} – ${categoryFull} ${connector} ${city}, CO`,
     `${venue.name} – ${categoryShort} ${connector} ${city}, CO`,
     `${venue.name} ${connector} ${city}, CO`,
@@ -432,7 +439,14 @@ export function buildVenueMetaDescription(
   locale: Locale = "en",
   maxLen = 160,
 ): string {
-  const sentences = buildVenueSummary(venue, locale);
+  let sentences = buildVenueSummary(venue, locale);
+  // #921: a SNAP store's description opens with the SNAP/WIC fact, named
+  // (the on-page summary and JSON-LD keep the #704 order and "It accepts").
+  if (venue.accepts_snap === true) {
+    const snapWic = buildSnapWicSentence(venue, locale);
+    const key = venue.accepts_wic === true ? "summary.meta.snapAndWic" : "summary.meta.snap";
+    sentences = [t(key, locale, { name: venue.name }), ...sentences.filter((s) => s !== snapWic)];
+  }
   let result = "";
   for (const sentence of sentences) {
     const candidate = result ? `${result} ${sentence}` : sentence;

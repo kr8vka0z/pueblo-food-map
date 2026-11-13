@@ -22,6 +22,7 @@ export const metadata: Metadata = buildPageMetadata({
   path: "/",
   // #689 PR 2: this page has an /es counterpart — carries hreflang now.
   mirrored: true,
+  absoluteTitle: true,
 });
 
 export default function HomePage() {

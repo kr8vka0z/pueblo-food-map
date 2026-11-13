@@ -14,9 +14,9 @@
 const es: Record<string, string> = {
   // App
   "app.name": "Pueblo Food Map",
-  "app.documentTitle": "Pueblo Food Map — Recursos de alimentos en el Condado de Pueblo, CO",
+  "app.documentTitle": "Pueblo Food Map · Comida gratis, despensas y tiendas con SNAP en el Condado de Pueblo, CO", // [CHECK]
 
-  "meta.home.title": "Pueblo Food Map — Recursos de alimentos en el Condado de Pueblo, CO",
+  "meta.home.title": "Pueblo Food Map · Comida gratis, despensas y tiendas con SNAP en el Condado de Pueblo, CO", // [CHECK]
   "meta.home.description":
     "Encuentra comida gratis y de bajo costo cerca de ti en el Condado de Pueblo, CO — despensas, huertos comunitarios, supermercados y comedores comunitarios, con información sobre SNAP/WIC y direcciones.", // [CHECK]
 
@@ -885,6 +885,9 @@ const es: Record<string, string> = {
   "summary.snap": "Acepta SNAP/EBT.", // [CHECK]
   "summary.wic": "Acepta WIC.", // [CHECK]
   "summary.snapAndWic": "Acepta SNAP/EBT y WIC.", // [CHECK]
+  "summary.title.acceptsSnap": "Acepta SNAP/EBT", // [CHECK]
+  "summary.meta.snap": "{name} acepta SNAP/EBT.", // [CHECK]
+  "summary.meta.snapAndWic": "{name} acepta SNAP/EBT y WIC.", // [CHECK]
   "summary.lastVerified": "Última verificación: {month}.", // [CHECK]
   "summary.and": "y", // [CHECK]
   "summary.title.in": "en", // [CHECK]

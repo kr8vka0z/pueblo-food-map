@@ -158,6 +158,11 @@ export function buildPageMetadata(opts: {
   locale?: Locale;
   mirrored?: boolean;
   /**
+   * Skip the layout's "%s · Pueblo Food Map" template: the homepage title
+   * already starts with the brand (#921).
+   */
+  absoluteTitle?: boolean;
+  /**
    * The share-preview image, absolute URL. Defaults to the brand image; an
    * event page passes its flyer so a shared link previews the flyer (#762).
    */
@@ -183,7 +188,7 @@ export function buildPageMetadata(opts: {
   }
 
   return {
-    title: opts.title,
+    title: opts.absoluteTitle ? { absolute: opts.title } : opts.title,
     description: opts.description,
     alternates,
     openGraph: {

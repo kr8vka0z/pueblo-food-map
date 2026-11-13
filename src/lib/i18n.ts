@@ -25,18 +25,18 @@ export type Locale = "en" | "es";
 const enClient: Record<string, string> = {
   // App
   "app.name": "Pueblo Food Map",
-  // Homepage <title> (#589) — the ONE page whose SSR title isn't run through
-  // layout.tsx's "%s · Pueblo Food Map" template (it equals the layout
-  // default verbatim), so this holds the FULL string per locale rather than
-  // a short title + pageDocumentTitle() suffix like every other page.
-  "app.documentTitle": "Pueblo Food Map — Food Resources in Pueblo County, CO",
+  // Homepage <title> (#589), set client-side by MapWrapper. The homepage's
+  // SSR title is absolute (buildPageMetadata absoluteTitle, #921: the layout's
+  // "%s · Pueblo Food Map" template doubled the brand), so this holds the
+  // FULL string, the same as meta.home.title.
+  "app.documentTitle": "Pueblo Food Map · Free Food, Pantries and SNAP Stores in Pueblo County, CO",
 
   // Per-page <title>/<meta description> for /, /about, /resources and
   // /venues. Both trees read these keys (the EN page.tsx with "en", the /es
   // thin wrapper with "es", #689 PR 2), the same way the SEO hub pages do,
   // so the two languages can't drift apart and the ES side gets the same
   // native-speaker [CHECK] review as every other locale-facing string.
-  "meta.home.title": "Pueblo Food Map — Food Resources in Pueblo County, CO",
+  "meta.home.title": "Pueblo Food Map · Free Food, Pantries and SNAP Stores in Pueblo County, CO",
   "meta.home.description":
     "Find free and low-cost food near you in Pueblo County, CO — pantries, community gardens, grocery stores, and meal sites, with SNAP/WIC info and directions.",
 
@@ -1137,6 +1137,12 @@ const enClient: Record<string, string> = {
   "summary.snap": "It accepts SNAP/EBT.",
   "summary.wic": "It accepts WIC.",
   "summary.snapAndWic": "It accepts SNAP/EBT and WIC.",
+  // #921: a SNAP store's venue <title> and the sentence its meta description
+  // opens with (buildVenueTitle / buildVenueMetaDescription). Name-led,
+  // because a description opening "It accepts..." has nothing for "it".
+  "summary.title.acceptsSnap": "Accepts SNAP/EBT",
+  "summary.meta.snap": "{name} accepts SNAP/EBT.",
+  "summary.meta.snapAndWic": "{name} accepts SNAP/EBT and WIC.",
   "summary.lastVerified": "Last verified {month}.",
   "summary.and": "and",
   "summary.title.in": "in",

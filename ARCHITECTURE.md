@@ -576,11 +576,10 @@ User taps "Near me" (BottomNav)
   → handleLocateRequest()
     → stamps userRequestedAtRef
     → increments recenterRequestId  (Map.tsx flyTo fires even if position unchanged)
-    → calls geo.request()   (first try high accuracy, ≤60 s cached fix; a timeout /
-                              unavailable error retries ONCE at low accuracy, ≤5 min cached fix;
-                              code 1 is the only "denied"; a second failure is GeoState
-                              {permission:'failed', reason:'timeout'|'unavailable'}, which the
-                              next tap simply retries — #738)
+    → calls geo.request()   (ONE try at low accuracy, ≤5 min cached fix, 5 s timeout, #921;
+                              code 1 is the only "denied"; a timeout / unavailable error is
+                              GeoState {permission:'failed', reason:'timeout'|'unavailable'} at
+                              once, which the next tap simply retries — #738)
   → useEffect watches geo.state
     → clears isLocating when permission resolves
     → sets locationFailure (LocationHelpCard) if permission is 'denied' OR 'failed' AND a fresh user request was pending; clears it on a granted position (#739)
@@ -759,14 +758,21 @@ no client-only `Intl`). It's called from **both** sides of the render: the
 server (`buildVenueJsonLd`'s `description`, `venuePageMetadataFields`'s meta
 description) and the client (`VenueContent`'s on-page paragraph, at the
 page's own current `locale`) — the same function, so the three can never
-drift apart. `{ includeAddress: false }` drops the street address from the
+drift apart. One deliberate exception (#921): for a SNAP store,
+`buildVenueMetaDescription` moves the SNAP/WIC fact first and names the store
+("Loaf 'N Jug accepts SNAP/EBT."), because a description opening "It
+accepts..." has nothing for "it"; the on-page paragraph and JSON-LD keep the
+summary's order and wording. `{ includeAddress: false }` drops the street address from the
 sentence (VenueContent passes this — the address is already shown in the
 header just above); the default (`true`, used by meta/JSON-LD) keeps it.
 
 - **City parsing** (`parseVenueCityCore`/`parseVenueCity`): pulls the city
   out of a free-text address for the page `<title>`
   (`"{Name} – {category} in {City}, CO"`, ladder-shortened to fit ≤ 70
-  rendered chars, never truncating the name) and the no-address sentence.
+  rendered chars, never truncating the name; a SNAP store first tries
+  `"{Name}, {City}, CO: Accepts SNAP/EBT"`, then `"{Name}, {City}: Accepts
+  SNAP/EBT"`, then `"{Name}, {City}: SNAP/EBT"`, then the normal ladder, so
+  the place is never dropped, #921) and the no-address sentence.
   The core returns `string | null`; `buildVenueJsonLd`'s `addressLocality`
   uses the core directly and OMITS the field on `null` rather than emit
   fallback prose ("Pueblo County") as a structured-data city name.

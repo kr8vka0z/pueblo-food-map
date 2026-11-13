@@ -19,7 +19,7 @@ in, one public link. Public pages need none of this.
 
 `start.sh` must exit 0 after `SELF-CHECK OK` and, with a tunnel, print a `Public:` line. A failure once it has
 started (build, seed, secrets check, self-check, tunnel not answering) exits non-zero, prints no public link and
-stops the tunnel; a refusal before that (bad flag, missing tool, a `.env` refusal) changes nothing. Fix it before
+stops the tunnel; a refusal before that (bad flag, missing tool, an env-file refusal) changes nothing. Fix it before
 sending anything.
 
 **Hard rules:**
@@ -35,8 +35,12 @@ sending anything.
   `.wrangler/admin-preview/state` (recreated empty each start, never the ordinary `.wrangler/state`), and the
   Worker loads only the tool's fresh three-key secrets file, copied over whatever the build left beside it. Never
   add a key to that list, point the preview at the ordinary store, or skip the check before the Worker starts.
-- It never changes your `.dev.vars` / `.env` files, and their values never reach the preview's Worker. If it refuses because a repo-root `.env` file sets a
-  `CLOUDFLARE_*` or `WRANGLER_*` variable, ask before moving that file.
+- It never changes your `.dev.vars` / `.env` files, and their values never reach the preview's Worker. It
+  refuses to start if any repo-root `.env*` or `.dev.vars*` file other than `.env.example` contains the text
+  `CLOUDFLARE_` or `WRANGLER_` anywhere (any letter case, comments included). That is a plain text search on
+  purpose, not a dotenv parser: vite, vinext and wrangler each accept forms another doesn't (`KEY: value`, a
+  byte-order mark, `export`, CRLF), and matching one grammar kept missing another. Never narrow it back to a
+  key match. If it refuses, ask before moving that file.
 - Never commit what it writes: `.wrangler/admin-preview/` and `dist/` are gitignored.
 - Stop it (`stop.sh`) when the owner is done; the link stays open while the tunnel runs.
 

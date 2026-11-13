@@ -25,8 +25,10 @@
 #   That file is overwritten after every build with WORKER_VARS, written fresh here with exactly ALLOWED_KEYS,
 #   and checked just before the Worker starts. The developer's own .dev.vars / .env files never reach it.
 # - Everything is local: `wrangler d1 ... --local`, `r2 ... --local`, `vite preview`. Never `wrangler deploy`,
-#   never `--remote`. Every tool runs with an empty environment (CLEAN_ENV below), and the start refuses if a
-#   repo-root .env file would put a CLOUDFLARE_*/WRANGLER_* variable back in. Nothing here reads 1Password.
+#   never `--remote`. Every tool runs with an empty environment (CLEAN_ENV below), and the start refuses if any
+#   repo-root .env* or .dev.vars* file (other than .env.example) contains the text CLOUDFLARE_ or WRANGLER_
+#   anywhere, since the build tools would load it back in (a plain text search, see below). Nothing here reads
+#   1Password.
 # - The public link is a signed-in sandbox on made-up data. It goes to the site owner in chat only, never into
 #   a pull request or an issue.
 set -euo pipefail
@@ -73,13 +75,20 @@ if [ "$TUNNEL" = 1 ]; then
 fi
 [ -x "$REPO/node_modules/.bin/vite" ] || die "node_modules missing; run npm ci in $REPO first"
 
-# WHY: the Cloudflare vite plugin and wrangler load CLOUDFLARE_*/WRANGLER_* variables from the repo-root .env
-# files into their own process (vite.loadEnv), undoing the empty environment below. Such a variable could carry
-# an API token or switch what the Worker loads, so the start refuses. Names only, never values.
-for f in "$REPO"/.env*; do
-  [ -f "$f" ] && [ "$(basename "$f")" != .env.example ] || continue
-  keys=$(grep -oE '^[[:space:]]*(export[[:space:]]+)?(CLOUDFLARE_|WRANGLER_)[A-Za-z0-9_]*[[:space:]]*=' "$f" | sed -E 's/^[[:space:]]*(export[[:space:]]+)?//; s/[[:space:]]*=$//' | sort -u | tr '\n' ' ' || true)
-  [ -z "$keys" ] || die "$f sets ${keys% }; the preview would load it. Move that file aside (or remove those lines) and run again."
+# WHY: the build tools load repo-root env files into their own process, undoing the empty environment below:
+# vite's loadEnv (.env, .env.local, .env.<mode>[.local]; the Cloudflare plugin asks it for CLOUDFLARE_*) and
+# wrangler's getVarsForDev (.dev.vars[.<env>], .env[.local], .env.<env>[.local]). A CLOUDFLARE_*/WRANGLER_*
+# variable could carry an API token or switch what the Worker loads, so the start refuses.
+# WHY a plain text search and not a parser: those loaders each parse differently (`KEY: value`, a byte-order
+# mark, `export`, quotes, CRLF all count as keys to one or another), and imitating one grammar kept missing
+# another. So any root .env*/.dev.vars* file (not .env.example, which no loader opens: mode is never "example")
+# that holds the text anywhere, in any letter case, even in a comment, is refused. NUL bytes are dropped first
+# so a UTF-16 copy is caught too. Never prints a value or a line.
+for f in "$REPO"/.env* "$REPO"/.dev.vars*; do
+  [ "$(basename "$f")" != .env.example ] && [ -e "$f" ] && [ ! -d "$f" ] || continue # no file, broken link, folder
+  [ -f "$f" ] && [ -r "$f" ] || die "$f is not a readable plain file; move it aside and run again."
+  found=$(tr -d '\000' <"$f" | LC_ALL=C grep -a -i -o -F -e CLOUDFLARE_ -e WRANGLER_ | LC_ALL=C tr '[:lower:]' '[:upper:]' | sort -u | tr '\n' ' ' || true)
+  [ -z "$found" ] || die "$f mentions ${found% } (any letter case, comments count too), and the preview's build tools read that file. Move it aside, or remove every line that mentions it, while the preview runs, then run again."
 done
 
 if [ "$STAGING" = 1 ]; then

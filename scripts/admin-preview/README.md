@@ -89,8 +89,13 @@ Logs and the made-up data stay in `.wrangler/admin-preview/` (gitignored) until 
   changed. Each start writes a fresh secrets file with exactly three entries (a random `BETTER_AUTH_SECRET`, and
   the made-up admin as the only allowed and owner email), puts it beside the built app in place of whatever the
   build copied there, and checks just before the app starts that nothing else is there. The self-check confirms
-  the app loaded only that file. If a repo-root `.env` file sets any `CLOUDFLARE_*` or `WRANGLER_*` variable, the
-  start refuses and names the file and variable (never its value), because the build tools would load it.
+  the app loaded only that file. If any repo-root `.env*` or `.dev.vars*` file (other than `.env.example`)
+  contains the text `CLOUDFLARE_` or `WRANGLER_` anywhere, in any letter case, the start refuses before building
+  and names the file and the word (never a value or a line), because the build tools would load it. It is a
+  plain text search, not a reading of the file's settings: the build tools each read these files their own way
+  (`KEY: value`, an invisible byte-order mark at the start, `export`, Windows line endings), and a search for the
+  word catches every way at once. So a comment that only mentions the word is refused too: move the file aside,
+  or remove that line, while the preview runs.
 - Everything is local: nothing runs `wrangler deploy` or touches a remote database, and every tool starts with an
   empty environment, so no Cloudflare token can reach it.
 
@@ -100,7 +105,7 @@ Logs and the made-up data stay in `.wrangler/admin-preview/` (gitignored) until 
 |---|---|
 | `start.sh` | Builds, seeds and starts everything, then runs the self-check |
 | `stop.sh` | Stops everything (systemd units and `--foreground` processes, by saved PID) and deletes the secrets file |
-| `selfcheck.sh` | The one check: sign-in lands on /admin, ten admin pages, three images, one admin save, a foreign Origin refused, Suggest Spanish blocked, sign-out, the app with no cookie shows no admin content, and the app loaded only the tool's secrets file. `selfcheck.sh --lifecycle` runs the start/stop proofs (own storage, fake keys never reach the app, `--no-tunnel` stops a tunnel, a failed tunnel exits with an error); run it after changing `start.sh` or `stop.sh` |
+| `selfcheck.sh` | The one check: sign-in lands on /admin, ten admin pages, three images, one admin save, a foreign Origin refused, Suggest Spanish blocked, sign-out, the app with no cookie shows no admin content, and the app loaded only the tool's secrets file. `selfcheck.sh --lifecycle` runs the start/stop proofs (a root env file mentioning a Cloudflare or wrangler setting is refused, in fourteen forms, own storage, fake keys never reach the app, `--no-tunnel` stops a tunnel, a failed tunnel exits with an error); run it after changing `start.sh` or `stop.sh` |
 | `proxy.ts` | The Bun proxy in front of the app: rewrites the address, signs the session cookie, blocks analytics and AI calls, drops visitor IP headers |
 | `seed-preview.sql` | Made-up rows for every admin state (ids start `pv-`, or sit in 900000-900999) |
 | `seed-session.sh` | Adds the made-up admin and one session to the local database |

@@ -8,7 +8,9 @@
 #                                         while the preview is running; only talks to 127.0.0.1)
 #   selfcheck.sh --lifecycle [--foreground]
 #       the start/stop proofs, run by hand after changing start.sh or stop.sh (several builds, a few minutes):
-#       a repo-root .env with a CLOUDFLARE_* key makes start refuse; fake keys in the root .dev.vars,
+#       a table of root .env*/.dev.vars files mentioning CLOUDFLARE_/WRANGLER_ (KEY: value, a byte-order mark,
+#       export, a tab, lower case, CRLF, a symlink...) each makes start refuse before the build without printing
+#       the value, and one with only unrelated keys does not; fake keys in the root .dev.vars,
 #       .dev.vars.staging and .env.local never reach the Worker (Publish says its key isn't set up, no fake value
 #       anywhere in the build output or the preview's storage); the ordinary .wrangler/state is not touched; a
 #       place and an event made in the preview are gone after the next start; when cloudflared is installed,
@@ -51,21 +53,44 @@ lifecycle() {
     [ -e "$f" ] && [ "$(basename "$f")" != .env.example ] && { echo "lifecycle: move $f aside first (this check writes fake key files in the repo root)"; exit 2; }
   done
   out=$(mktemp "$STATE/.out.XXXXXX"); stub=$(mktemp -d "$STATE/.stub.XXXXXX")
-  trap 'rm -f "$JAR" "$BODY" "$out" "$REPO/.env" "$REPO/.dev.vars" "$REPO/.dev.vars.staging" "$REPO/.env.local"; rm -rf "$stub"; "$HERE/stop.sh" >/dev/null' EXIT
+  trap 'rm -f "$JAR" "$BODY" "$out" "$REPO/.env" "$REPO/.dev.vars" "$REPO/.dev.vars.staging" "$REPO/.env.local" "$REPO/.env.production"; rm -rf "$stub"; "$HERE/stop.sh" >/dev/null' EXIT
   run() { "$HERE/start.sh" ${extra[@]+"${extra[@]}"} "$@" >"$out" 2>&1; }
 
-  echo "-- L1 a CLOUDFLARE_* key in a root .env makes start refuse"
-  printf 'CLOUDFLARE_API_TOKEN=%s-cloudflare\n' "$sent" > "$REPO/.env"
-  if run --no-tunnel; then fail "L1 start did not refuse"
-  elif grep -q 'sets CLOUDFLARE_API_TOKEN' "$out" && ! grep -q "$sent" "$out"; then pass "L1 refused: $(grep -o 'sets CLOUDFLARE_API_TOKEN.*' "$out" | head -c 60)..."
-  else fail "L1 unexpected refusal: $(tail -2 "$out")"; fi
-  rm -f "$REPO/.env"
+  echo "-- L1 a root env file that mentions CLOUDFLARE_/WRANGLER_ makes start refuse (before the build), naming no value or line"
+  # label | file in the repo root (@link = .env as a symlink to a file outside it) | word expected | printf format (%s = sentinel)
+  local label file want fmt
+  while IFS='|' read -r label file want fmt; do
+    if [ "$file" = @link ]; then printf "$fmt" "$sent" > "$stub/linked-env"; ln -s "$stub/linked-env" "$REPO/.env"; file=.env
+    else printf "$fmt" "$sent" > "$REPO/$file"; fi
+    if [ -z "$want" ]; then # must NOT refuse: a full start
+      if run --no-tunnel && grep -q 'SELF-CHECK OK' "$out" && ! grep -q ' mentions ' "$out"; then pass "L1 $label: not refused, SELF-CHECK OK"
+      else fail "L1 $label: $(tail -2 "$out")"; fi
+    elif run --no-tunnel; then fail "L1 $label: start did not refuse"
+    elif grep -q "$file mentions $want" "$out" && ! grep -qiE "$sent|API_TOKEN|INCLUDE_PROCESS|WRANGLER_LOG" "$out" && ! grep -q '^== building' "$out"; then
+      pass "L1 $label: refused before the build, $(grep -o "$file mentions [A-Z_ ]*" "$out")"
+    else fail "L1 $label: unexpected output: $(tail -2 "$out")"; fi
+    rm -f "$REPO/$file"
+  done <<'TABLE'
+KEY=value|.env|CLOUDFLARE_|CLOUDFLARE_API_TOKEN=%s\n
+KEY: value|.env|CLOUDFLARE_|CLOUDFLARE_API_TOKEN: %s\n
+byte-order mark|.env|CLOUDFLARE_|\357\273\277CLOUDFLARE_API_TOKEN=%s\n
+export|.env|CLOUDFLARE_|export CLOUDFLARE_API_TOKEN=%s\n
+leading tab|.env|CLOUDFLARE_|\tCLOUDFLARE_API_TOKEN=%s\n
+WRANGLER_LOG|.env|WRANGLER_|WRANGLER_LOG=%s\n
+INCLUDE_PROCESS_ENV|.env|CLOUDFLARE_|CLOUDFLARE_INCLUDE_PROCESS_ENV=true\n
+lower case|.env|CLOUDFLARE_|cloudflare_api_token=%s\n
+CRLF|.env|CLOUDFLARE_|A=1\r\nCLOUDFLARE_API_TOKEN=%s\r\n
+.env.local|.env.local|CLOUDFLARE_|CLOUDFLARE_API_TOKEN=%s\n
+.env.production|.env.production|CLOUDFLARE_|CLOUDFLARE_API_TOKEN=%s\n
+.dev.vars|.dev.vars|CLOUDFLARE_|CLOUDFLARE_API_TOKEN=%s\n
+symlinked .env|@link|CLOUDFLARE_|CLOUDFLARE_API_TOKEN=%s\n
+unrelated keys only|.env.local||NEXT_PUBLIC_EXAMPLE=1\n
+TABLE
 
   echo "-- L2 fake keys in the root .dev.vars, .dev.vars.staging and .env.local never reach the Worker"
   for f in .dev.vars .dev.vars.staging .env.local; do
     printf 'RESEND_API_KEY=%s-resend\nGITHUB_PUBLISH_TOKEN=%s-github\nPOSTHOG_PERSONAL_API_KEY=%s-posthog\n' "$sent" "$sent" "$sent" > "$REPO/$f"
   done
-  printf 'CLOUDFLARE_API_TOKEN=%s-cloudflare\n' "$sent" >> "$REPO/.dev.vars"
   touch "$STATE/.ordinary-stamp"; sleep 1
   if ! run --no-tunnel; then fail "L2 start failed: $(tail -5 "$out")"; return; fi
   grep -q 'SELF-CHECK OK' "$out" && pass "L2 start with fake keys present -> SELF-CHECK OK" || fail "L2 no SELF-CHECK OK"

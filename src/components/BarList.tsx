@@ -12,7 +12,9 @@ import { linkClass } from "@/lib/adminCardStyles";
 
 // The name column: 112 px on a phone; from 640 up 40% of the row (never under
 // 112), so ordinary names fit where the row has room instead of being cut
-// to 112 at every width (#926).
+// to 112 at every width (#926). A longer name wraps onto a second line
+// instead of being cut off: DESIGN.md says 320 must not cut anything off, and
+// box names ("Preview Box — Riverside Trailhead") ran past 112 at every width.
 const NAME_WIDTH = "w-28 sm:w-[max(7rem,40%)]";
 
 export interface BarListItem {
@@ -43,13 +45,13 @@ export default function BarList({ items, emptyMessage }: BarListProps) {
           {item.href ? (
             <a
               href={item.href}
-              className={`${linkClass} ${NAME_WIDTH} flex-none truncate text-sm`}
+              className={`${linkClass} ${NAME_WIDTH} flex-none break-words text-sm`}
               title={item.label}
             >
               {item.label}
             </a>
           ) : (
-            <span className={`${NAME_WIDTH} flex-none truncate text-sm text-[var(--color-ink-700)]`} title={item.label}>
+            <span className={`${NAME_WIDTH} flex-none break-words text-sm text-[var(--color-ink-700)]`} title={item.label}>
               {item.label}
             </span>
           )}

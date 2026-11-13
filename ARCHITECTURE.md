@@ -1833,7 +1833,12 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   a natively disabled button drops focus to the page body. Its presses are
   stopped in the capture phase, before its own `onClick`, and their default
   is prevented, so a busy submit button (or Enter in a field) sends nothing:
-  the same double-press gate `disabled` gave.
+  the same double-press gate `disabled` gave. The button is not the only
+  gate: every admin write handler also returns at once while its own
+  request (or a sibling decision on the same card or form) is running, so
+  a direct form submit, a sibling button with its own busy flag, or a
+  second row's press cannot start a second write
+  (`src/components/adminWriteGates.test.tsx`).
 - **One set of admin UI parts** (#926). Class strings live in
   `src/lib/adminCardStyles.ts` (titles, page bodies, cards, tables,
   buttons, links, tags, chips, failure and empty states) and

@@ -29,6 +29,7 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { getCheckinClientToken } from "@/lib/checkinClientToken";
 import { useQueuedTurnstileSubmit, useTurnstile } from "@/lib/useTurnstile";
 import CardFormTurnstile from "@/components/CardFormTurnstile";
+import { track, EVENTS } from "@/lib/analytics";
 import { PRIMARY_BTN, SECONDARY_BTN } from "@/components/BoxCheckinPanel";
 
 type SubmitState = "idle" | "submitting" | "success" | "error" | "rateLimited";
@@ -85,6 +86,7 @@ export default function AdoptBoxForm({ boxId, open, onOpenChange }: AdoptBoxForm
       });
       const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (data?.ok) {
+        void track(EVENTS.BOX_ADOPTED, { boxId });
         setState("success");
       } else if (data?.error && RATE_LIMIT_ERRORS.has(data.error)) {
         setState("rateLimited");

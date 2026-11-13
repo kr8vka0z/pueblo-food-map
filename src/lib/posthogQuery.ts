@@ -10,10 +10,9 @@
  * the key is missing, only this section shows 'Usage numbers are
  * unavailable right now'").
  *
- * HARD RULE (issue #681, Kyle's 2026-09-26 comment): PostHog runs in
- * memory-only mode (#485/analytics.ts) — every page load is a brand-new
- * anonymous PostHog "person," so PostHog can never report a unique-visitor
- * count. Every number this file returns is therefore an EVENT count or a
+ * HARD RULE (issue #681, Kyle's 2026-09-26 comment): PostHog keeps no ID
+ * past the browser tab (sessionStorage since #919, memory before) and makes
+ * no person profiles, so PostHog can never report a unique-visitor count. Every number this file returns is therefore an EVENT count or a
  * SESSION count (uniq($session_id)), never a person/visitor count. Any
  * "% of visitors" the Dashboard needs (Switched to Spanish, Filters people
  * use) divides one of these event counts by Cloudflare's own visitor count
@@ -40,9 +39,9 @@
  *     `$pageview` too (posthog-js's built-in campaign-params capture) —
  *     confirmed the same way. Grouped by `uniq($session_id)` ("sessions"),
  *     not `count()`, since a flyer scan is one session that may re-fire
- *     `$pageview` more than once (client-side navigation) and memory
- *     persistence means the utm params may not persist onto every one of
- *     that session's later pageviews — sessions is the honest unit here,
+ *     `$pageview` more than once (client-side navigation) and the utm
+ *     params may not persist onto every one of that session's later
+ *     pageviews — sessions is the honest unit here,
  *     and "sessions" per Kyle's rule ("counts are events or sessions,
  *     never unique visitors") is exactly what's labeled in the UI.
  *
@@ -119,6 +118,9 @@ export interface CardActionCounts {
   save: number;
   share: number;
   report: number;
+  /** #919: taps on a /venue/<id> page (`surface: "venue_page"`), kept out of the map-card counts above, which are shares of cards opened. That page has no website link. */
+  venuePageDirections: number;
+  venuePageCall: number;
 }
 
 export interface FilterUsageRow {
@@ -248,13 +250,21 @@ export function buildTopSearches(rows: readonly unknown[][]): TopSearchRow[] {
     .filter((r) => r.term !== "");
 }
 
-/** Rows: [event, mode, count] — `mode` is only set on `directions_clicked`, null for the rest. */
+/**
+ * Rows: [event, mode, count, surface] — `mode` is only set on map-card
+ * `directions_clicked`, null for the rest. `surface` (#919) is checked first:
+ * a venue-page tap has no travel mode, and a null surface is a map-card tap
+ * sent before #919.
+ */
 export function buildCardActions(rows: readonly unknown[][]): CardActionCounts {
-  const counts: CardActionCounts = { directionsWalk: 0, directionsBus: 0, directionsDrive: 0, call: 0, website: 0, save: 0, share: 0, report: 0 };
+  const counts: CardActionCounts = { directionsWalk: 0, directionsBus: 0, directionsDrive: 0, call: 0, website: 0, save: 0, share: 0, report: 0, venuePageDirections: 0, venuePageCall: 0 };
   for (const row of rows) {
-    const [event, mode, count] = row as [string, string | null, number];
+    const [event, mode, count, surface] = row as [string, string | null, number, string | null];
     const n = count ?? 0;
-    if (event === EVENTS.DIRECTIONS_CLICKED) {
+    if (surface === "venue_page") {
+      if (event === EVENTS.DIRECTIONS_CLICKED) counts.venuePageDirections += n;
+      else if (event === EVENTS.CALL_CLICKED) counts.venuePageCall += n;
+    } else if (event === EVENTS.DIRECTIONS_CLICKED) {
       if (mode === "walk") counts.directionsWalk += n;
       else if (mode === "bus") counts.directionsBus += n;
       else if (mode === "drive") counts.directionsDrive += n;
@@ -332,11 +342,13 @@ const TOP_SEARCHES_QUERY = `
   LIMIT ${TOP_SEARCHES_LIMIT}
 `;
 
+// `surface` (#919) was added without a live run against the project; it is a
+// plain string like `mode`, and null on every tap sent before #919.
 const CARD_ACTIONS_QUERY = `
-  SELECT event, properties.mode AS mode, count() AS n
+  SELECT event, properties.mode AS mode, count() AS n, properties.surface AS surface
   FROM events
   WHERE event IN {events} AND properties.$host = {host} AND timestamp >= {since} AND timestamp < {until}
-  GROUP BY event, mode
+  GROUP BY event, mode, surface
 `;
 
 const FILTERS_QUERY = `

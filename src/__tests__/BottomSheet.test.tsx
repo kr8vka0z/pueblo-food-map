@@ -467,7 +467,7 @@ describe("BottomSheet — analytics", () => {
     render(<BottomSheet venue={venue} onClose={() => {}} />);
     await user.click(screen.getByRole("button", { name: /show details/i }));
     await user.click(screen.getByRole("link", { name: /555-0122/ }));
-    expect(track).toHaveBeenCalledWith(EVENTS.CALL_CLICKED, { venueId: venue.id });
+    expect(track).toHaveBeenCalledWith(EVENTS.CALL_CLICKED, { venueId: venue.id, surface: "map" });
   });
 
   test("clicking the Plentiful website link fires website_clicked", async () => {
@@ -476,6 +476,6 @@ describe("BottomSheet — analytics", () => {
     render(<BottomSheet venue={venue} onClose={() => {}} />);
     await user.click(screen.getByRole("button", { name: /show details/i }));
     await user.click(screen.getByRole("link", { name: /plentiful/i }));
-    expect(track).toHaveBeenCalledWith(EVENTS.WEBSITE_CLICKED, { venueId: venue.id });
+    expect(track).toHaveBeenCalledWith(EVENTS.WEBSITE_CLICKED, { venueId: venue.id, surface: "map" });
   });
 });

@@ -152,6 +152,7 @@ import { shrinkImageToJpeg, UnsupportedImageError } from "@/lib/imageResize";
 import ReportPhotoButton from "@/components/ReportPhotoButton";
 import { PENDING_SUBMIT_TIMEOUT_MS, useTurnstile } from "@/lib/useTurnstile";
 import { NEED_KEYS, type BoxStatus, type CheckinKind, type NeedKey } from "@/lib/blessingBoxes";
+import { track, EVENTS } from "@/lib/analytics";
 
 const { BOX_CHECKIN_NOTE } = FIELD_LIMITS;
 
@@ -443,6 +444,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
       turnstile.reset();
 
       if (data.ok) {
+        void track(EVENTS.BOX_CHECKIN, { boxId, kind });
         setSubmitState("success");
         setOpenKind(null);
         setNote("");
@@ -499,6 +501,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
 
       const data = (await res.json()) as { ok: boolean };
       if (data.ok) {
+        void track(EVENTS.BOX_PHOTO_UPLOADED, { boxId });
         setPhotoSubmitState("success");
         setPhotoOpen(false);
         standalonePhoto.clear();

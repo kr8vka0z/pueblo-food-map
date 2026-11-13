@@ -41,6 +41,7 @@ import type { Venue } from "@/types/venue";
 import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
 import SiteFooter from "@/components/SiteFooter";
+import { track, EVENTS } from "@/lib/analytics";
 
 interface VenueContentProps {
   venue: Venue;
@@ -214,6 +215,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
             </h2>
             <a
               href={`tel:${v.phone}`}
+              onClick={() => void track(EVENTS.CALL_CLICKED, { venueId: v.id, surface: "venue_page" })}
               className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
             >
               <Phone size={15} className="text-[var(--color-sage-600)]" aria-hidden />
@@ -286,6 +288,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
         <div className="flex flex-col gap-3 pt-2">
           <a
             href={directionsHref}
+            onClick={() => void track(EVENTS.DIRECTIONS_CLICKED, { venueId: v.id, surface: "venue_page" })}
             target="_blank"
             rel="noopener noreferrer"
             className={

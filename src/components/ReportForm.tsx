@@ -19,6 +19,7 @@ import { EMAIL_RE } from "@/lib/email";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import PublicForm, { Field, PrivacyNote, type FieldErrors } from "@/components/PublicForm";
+import { track, EVENTS } from "@/lib/analytics";
 
 const { REPORT_DESCRIPTION, EMAIL } = FIELD_LIMITS;
 
@@ -61,6 +62,7 @@ export default function ReportForm({ venueId }: ReportFormProps) {
       fieldIds={FIELD_IDS}
       rateLimitField="description"
       validate={validate}
+      onSuccess={() => void track(EVENTS.REPORT_SENT, { venueId, issueType })}
       // venueName and venueAddress intentionally omitted: the server looks
       // them up from venueId to prevent client-side subject-line injection.
       body={() => ({

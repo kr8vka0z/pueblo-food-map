@@ -85,6 +85,7 @@ import { readSplashGate, markSplashSeen, resolveVenueId, shouldSkipSplash, type 
 import SplashScreen from '@/components/SplashScreen';
 import type { LocationFailure } from '@/lib/useGeolocation';
 import MapScreenStandIn, { type StandInLabels } from '@/components/MapScreenStandIn';
+import { track, EVENTS } from '@/lib/analytics';
 
 // What MapWrapper's `loading` placeholder shows (#730): the map-screen stand-in
 // for a visitor with no splash, nothing behind a splash. A context because
@@ -213,6 +214,8 @@ export default function HomePageClient({ standInLabels }: { standInLabels?: Stan
    * map container; the tour takes focus itself and returns it there at the end.
    */
   const startTourFromSplash = useCallback(() => {
+    // #919: "Take a tour" is the splash's only exit that skips "Find food near me".
+    void track(EVENTS.WELCOME_CLOSED_WITHOUT_NEAR_ME, { via: 'tour' });
     markSplashSeen();
     setViewport('pueblo-center');
     setSplashShown(false);

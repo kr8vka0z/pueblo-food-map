@@ -124,7 +124,7 @@ export default function VenueCardBody({
           href={safeUrl(venue.url)!}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={() => void track(EVENTS.WEBSITE_CLICKED, { venueId: venue.id })}
+          onClick={() => void track(EVENTS.WEBSITE_CLICKED, { venueId: venue.id, surface: "map" })}
           className={
             // min-h-12: one line of text + py-3 is 46px on wide phones; the floor is 48 (#659).
             "flex items-center justify-between gap-2 w-full min-h-12 " +

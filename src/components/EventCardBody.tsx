@@ -92,6 +92,7 @@ import EventFlyer from "@/components/EventFlyer";
 import type { PublicEventDetail } from "@/lib/events";
 import { HIDDEN_UNTIL_FOCUS, PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { eventShareUrl, shareLink } from "@/lib/share";
+import { track, EVENTS } from "@/lib/analytics";
 import { useMinuteClock } from "@/lib/useMinuteClock";
 
 export interface EventCardBodyProps {
@@ -229,6 +230,7 @@ export default function EventCardBody({
     if (copiedTimer.current !== null) clearTimeout(copiedTimer.current);
   }, []);
   async function handleShare() {
+    void track(EVENTS.EVENT_SHARED, { eventId: event.id });
     const url = eventShareUrl(event.id, locale);
     const result = await shareLink({ url, title: text.name, text: `${text.name} — Pueblo Food Map` });
     // Neither a share sheet nor a clipboard: show the link to copy by hand
@@ -487,7 +489,14 @@ export default function EventCardBody({
           {copied ? <Check size={16} aria-hidden /> : <Share2 size={16} aria-hidden />}
           {copied ? t("events.card.shareCopied", locale) : t("events.card.share", locale)}
         </button>
-        <button type="button" onClick={() => downloadEventCalendar(event, locale)} className={SECONDARY_BUTTON}>
+        <button
+          type="button"
+          onClick={() => {
+            void track(EVENTS.EVENT_CALENDAR_ADDED, { eventId: event.id, surface: "map" });
+            downloadEventCalendar(event, locale);
+          }}
+          className={SECONDARY_BUTTON}
+        >
           <CalendarPlus size={16} aria-hidden />
           {t("events.card.calendar", locale)}
         </button>

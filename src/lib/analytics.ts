@@ -31,6 +31,9 @@
  * regardless of where it's eventually called from.
  */
 
+import { computeVenueOpenStatus } from "@/lib/hours";
+import type { Venue } from "@/types/venue";
+
 const INTERNAL_DEVICE_STORAGE_KEY = "pfm_internal";
 const RETURNING_STORAGE_KEY = "pfm_returning";
 
@@ -152,6 +155,21 @@ export const EVENTS = {
   FILTER_TOGGLED: "filter_toggled",
   LOCALE_SWITCHED: "locale_switched",
   SEARCH_USED: "search_used",
+  // #919: the rest of what people do on the site. Taps that also exist off
+  // the map (call, directions, website) carry `surface: "map" | "venue_page"`.
+  BOX_CHECKIN: "box_checkin",
+  BOX_PHOTO_UPLOADED: "box_photo_uploaded",
+  BOX_ADOPTED: "box_adopted",
+  EVENT_OPENED: "event_opened",
+  EVENT_SHARED: "event_shared",
+  EVENT_CALENDAR_ADDED: "event_calendar_added",
+  SUGGESTION_SENT: "suggestion_sent",
+  REPORT_SENT: "report_sent",
+  VIEW_SWITCHED: "view_switched",
+  NAV_TAB: "nav_tab",
+  WELCOME_CLOSED_WITHOUT_NEAR_ME: "welcome_closed_without_near_me",
+  MAP_MOVED: "map_moved",
+  NEAREST_FOOD: "nearest_food",
 } as const;
 
 export type EventName = (typeof EVENTS)[keyof typeof EVENTS];
@@ -172,6 +190,25 @@ export function sanitizeSearchTerm(raw: string | undefined): string | undefined 
   if (term.length === 0 || term.length > 40) return undefined;
   if (/[0-9@]/.test(term)) return undefined;
   return term;
+}
+
+/**
+ * The `nearest_food` event's whole payload (#919): how far the nearest
+ * open place is, rounded to the half mile, and how many places are within
+ * a mile. Built from distances alone so no coordinate or place id can leave,
+ * since a place plus a distance would draw a ring around the visitor.
+ */
+export function nearestFoodProps(
+  venues: readonly (Pick<Venue, "hours_weekly" | "hours_irregular"> & { distanceMiles: number })[],
+  now: Date = new Date(),
+): { nearest_open_miles: number | null; within_1_mile: number } {
+  let nearest = Infinity;
+  let within = 0;
+  for (const v of venues) {
+    if (v.distanceMiles <= 1) within++;
+    if (v.distanceMiles < nearest && computeVenueOpenStatus(v, now).state === "open") nearest = v.distanceMiles;
+  }
+  return { nearest_open_miles: nearest === Infinity ? null : Math.round(nearest * 2) / 2, within_1_mile: within };
 }
 
 /**

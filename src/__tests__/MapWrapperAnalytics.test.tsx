@@ -104,9 +104,12 @@ describe("MapWrapper — venue_opened", () => {
     });
     await user.click(venueButton);
 
+    // #919 item 8: "venue_opened gets open_now and has_hours" (their values follow the real venue's hours and the clock).
     expect(track).toHaveBeenCalledWith(EVENTS.VENUE_OPENED, {
       category: REAL_VENUE_CATEGORY,
       venueId: REAL_VENUE_ID,
+      open_now: expect.any(Boolean),
+      has_hours: expect.any(Boolean),
     });
     expect(
       vi.mocked(track).mock.calls.filter((c) => c[0] === EVENTS.VENUE_OPENED),

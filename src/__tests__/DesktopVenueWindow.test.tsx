@@ -314,7 +314,7 @@ describe("DesktopVenueWindow — analytics", () => {
     const venue = makeVenue({ phone: "(719) 555-0164" });
     renderWindow({ venue });
     await user.click(screen.getByRole("link", { name: /555-0164/ }));
-    expect(track).toHaveBeenCalledWith(EVENTS.CALL_CLICKED, { venueId: venue.id });
+    expect(track).toHaveBeenCalledWith(EVENTS.CALL_CLICKED, { venueId: venue.id, surface: "map" });
   });
 
   test("clicking the Plentiful website link fires website_clicked", async () => {
@@ -322,6 +322,6 @@ describe("DesktopVenueWindow — analytics", () => {
     const venue = makeVenue({ source: "plentiful", url: "https://example.com/pantry" });
     renderWindow({ venue });
     await user.click(screen.getByRole("link", { name: /plentiful/i }));
-    expect(track).toHaveBeenCalledWith(EVENTS.WEBSITE_CLICKED, { venueId: venue.id });
+    expect(track).toHaveBeenCalledWith(EVENTS.WEBSITE_CLICKED, { venueId: venue.id, surface: "map" });
   });
 });

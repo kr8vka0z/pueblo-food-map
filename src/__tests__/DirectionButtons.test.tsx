@@ -864,6 +864,7 @@ describe("DirectionButtons — analytics", () => {
     expect(track).toHaveBeenCalledWith(EVENTS.DIRECTIONS_CLICKED, {
       mode: "walk",
       venueId: venue.id,
+      surface: "map",
     });
   });
 
@@ -891,6 +892,7 @@ describe("DirectionButtons — analytics", () => {
     expect(track).toHaveBeenCalledWith(EVENTS.DIRECTIONS_CLICKED, {
       mode: "bus",
       venueId: venue.id,
+      surface: "map",
     });
   });
 
@@ -902,6 +904,7 @@ describe("DirectionButtons — analytics", () => {
     expect(track).toHaveBeenCalledWith(EVENTS.DIRECTIONS_CLICKED, {
       mode: "drive",
       venueId: venue.id,
+      surface: "map",
     });
   });
 });

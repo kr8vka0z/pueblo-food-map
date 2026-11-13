@@ -27,8 +27,8 @@ describe("#549 — route-active BottomSheet height matches vaul's window.innerHe
     expect(src).toMatch(/import ScrollSheet, \{ MAP_PEEK_PX \} from "@\/components\/ScrollSheet";/);
   });
 
-  // #882: the card mode uses vaul snap points too (Maps-style sheet), so the
-  // one height now serves both modes; it must still be the 100dvh one.
+  // Route mode's vaul drawer sets this height (card mode is ScrollSheet's
+  // track, #923, with the same calc); it must still be the 100dvh one.
   test("the sheet height uses 100dvh, not var(--viewport-small)", () => {
     const height = src.match(/style=\{\{\s*height:\s*`([^`]+)`/);
     expect(height, "expected the sheet's height calc string").not.toBeNull();

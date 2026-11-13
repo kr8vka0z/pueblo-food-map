@@ -391,7 +391,7 @@ export default function BottomSheet({
             // Special-event card (#759). Same scroller as the place card
             // below, so the swipe/overscroll behavior (#553) is identical.
             <div data-sheet-scroller="" className={scrollerClass}>
-              {/* data-sheet-content: see "Maps-style sheet" — the persistent, measured wrapper. */}
+              {/* data-sheet-content: #882's measured wrapper; nothing selects it since #923 (ScrollSheet measures its own [data-sheet], ARCHITECTURE.md "Phone card sheet"). */}
               <div data-sheet-content="">
                 <EventCardBody
                   event={event}

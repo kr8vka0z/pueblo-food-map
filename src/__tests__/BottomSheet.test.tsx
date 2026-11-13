@@ -251,7 +251,7 @@ describe("BottomSheet — grab bar expand / collapse toggle (#666)", () => {
   });
 });
 
-// ─── Drag (#882: Maps-style sheet on vaul snap points) ───────────────────────
+// ─── Drag (#882 vaul snap points; card mode is #923's native scroll sheet) ───
 // vaul runs the drag itself now (mocked here), so the swipe recognizers and
 // the expanded-dismiss veto these describes used to test are gone. What is
 // still ours: a mouse drag that ends on the bar must not also toggle it, and a

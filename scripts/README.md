@@ -135,6 +135,7 @@ unfamiliar reader doesn't mistake them for part of the flow above:
 | `check-pages-serve.sh` | `vite build`, serves the Worker in local workerd, and requests real venue/report pages (200 with the venue name) and unknown ids (404) — `ci.yml` runs it so a `next` / vinext / vite bump that breaks them fails its PR |
 | `smoke.sh` | Post-deploy smoke test of a deployed Worker origin (200s, `/es` bodies, 404s, noindex policy) — run by `deploy-prod.yml` and `deploy-dev.yml` |
 | `check-design-drift.mjs` | Token parity check between `globals.css` and `DESIGN.md` — `npm run design:drift`, a blocking CI gate |
+| `admin-preview/` | Signed-in admin preview on made-up data in local workerd, with one public link — `admin-preview/start.sh`; see its README |
 
 ## Not built: GTFS transit data
 

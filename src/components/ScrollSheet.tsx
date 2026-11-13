@@ -309,14 +309,32 @@ export default function ScrollSheet({
     if (active instanceof HTMLElement && active !== document.body && !trackRef.current?.contains(active)) {
       returnFocus.current = active;
     }
-    if (focusName) {
-      const name = sheetRef.current?.querySelector<HTMLElement>("h2");
-      if (name) {
-        if (!name.hasAttribute("tabindex")) name.tabIndex = -1;
-        // preventScroll: focusing inside a scroll-snap track would scroll it.
-        name.focus({ preventScroll: true });
-      }
+    const sheet = sheetRef.current;
+    if (!focusName || !sheet) return;
+    function focusHeading(name: HTMLElement) {
+      if (!name.hasAttribute("tabindex")) name.tabIndex = -1;
+      // preventScroll: focusing inside a scroll-snap track would scroll it.
+      name.focus({ preventScroll: true });
     }
+    const name = sheet.querySelector<HTMLElement>("h2");
+    if (name) {
+      focusHeading(name);
+      return;
+    }
+    // No heading yet: a box's first opening shows "Loading…" until the record
+    // and the card's code arrive, and nothing this effect depends on changes
+    // then (PR #925). Focus the name once it mounts, unless the person has
+    // moved focus to a control meanwhile.
+    const mo = new MutationObserver(() => {
+      const late = sheet.querySelector<HTMLElement>("h2");
+      if (!late) return;
+      mo.disconnect();
+      const now = document.activeElement;
+      if (now && now !== document.body && now !== returnFocus.current && now !== trackRef.current) return;
+      focusHeading(late);
+    });
+    mo.observe(sheet, { childList: true, subtree: true });
+    return () => mo.disconnect();
   }, [open, contentKey, focusName]);
   useEffect(() => {
     if (open) return;

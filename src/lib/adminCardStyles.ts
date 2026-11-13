@@ -42,6 +42,7 @@
  *   pickerOptionClass              a full-width, left-aligned outline option in a picker list (a place or address match)
  *   linkClass                      inline link (in a sentence or a table cell), sage 100 under the pointer
  *   bannerLinkClass                linkClass without its colour: takes the banner's own (Publish bot banner)
+ *   keepTogetherClass              keeps one short typed value whole when it fits, wraps it when it does not
  *   tapLinkClass                   standalone link with a 48 tall tap area
  *   tagClass(tone)                 round tag; tone "calm" | "attention" | "quiet" | "neutral" | "caution" | "danger"
  *   chipClass(on)                  48 tall round filter chip; put aria-pressed={on} on the button
@@ -126,8 +127,10 @@ export const controlLabelClass = fieldLabelClass + " mb-1 block";
 export const tableHeadRowClass = "border-b border-[var(--color-bone-200)] " + fieldLabelClass;
 export const tableRowClass = "border-b border-[var(--color-bone-200)] last:border-b-0";
 // cursor-pointer: the whole row opens its link (src/lib/rowLinkClick.ts).
+// group: words inside that fail on the tint swap colour with group-hover
+// (the Places category words, VenueListView's CategoryCell).
 export const tableLinkRowClass =
-  tableRowClass + " cursor-pointer transition-colors duration-150 hover:bg-[var(--color-sage-100)]";
+  tableRowClass + " group cursor-pointer transition-colors duration-150 hover:bg-[var(--color-sage-100)]";
 export const tableCellClass = "px-4 py-3";
 // font-medium on the th itself: a browser draws th bold by default.
 // whitespace-nowrap: a column heading stays on one line; the table scrolls
@@ -178,13 +181,24 @@ export const pickerOptionClass =
   focusRingClass;
 
 // box-decoration-clone: a link that wraps draws its ring and hover tint
-// whole on every line, not in ragged pieces.
+// whole on every line, not in ragged pieces. The sage 100 tint under the
+// pointer (#926 decision 1) is here, so the banner's links get it too: its
+// two word colours both read on the tint (ink 700 10.2 to 1, danger red 4.6).
 export const bannerLinkClass =
-  "rounded-[var(--radius-sm)] font-medium underline underline-offset-2 box-decoration-clone " + focusRingClass;
+  "rounded-[var(--radius-sm)] font-medium underline underline-offset-2 box-decoration-clone " +
+  "transition-colors duration-150 hover:bg-[var(--color-sage-100)] " +
+  focusRingClass;
 
-// The sage 100 tint under the pointer (#926 decision 1); sage 700 words on it stay readable.
-export const linkClass =
-  bannerLinkClass + " text-[var(--color-sage-700)] transition-colors duration-150 hover:bg-[var(--color-sage-100)]";
+// Sage 700 words read on the tint (7.5 to 1).
+export const linkClass = bannerLinkClass + " text-[var(--color-sage-700)]";
+
+// One short unit kept whole (one phone value, one "Day: hours" piece) without
+// ever forcing a line longer than its box: it moves whole to the next line
+// when it does not fit, and wraps inside itself only when wider than the box.
+// WHY not whitespace-nowrap: these values are typed or imported text (a
+// monthly note runs to 280 characters, a phone field holds several numbers),
+// and nowrap pushed them past a 320 px screen.
+export const keepTogetherClass = "inline-block max-w-full [overflow-wrap:anywhere]";
 
 export const tapLinkClass = "inline-flex min-h-12 items-center " + linkClass;
 

@@ -30,7 +30,7 @@
 import { Fragment } from "react";
 import { categoryLabels } from "@/lib/categories";
 import { formatFieldValue } from "@/components/ProposalCard";
-import { clayNoticeClass } from "@/lib/adminCardStyles";
+import { clayNoticeClass, keepTogetherClass } from "@/lib/adminCardStyles";
 import type { VenueCategory } from "@/types/venue";
 
 export interface WaitingToPublishChange {
@@ -53,18 +53,24 @@ function readable(field: string, value: string): string {
 }
 
 /**
- * One side as it is drawn (#926): a phone number never breaks, and hours
- * ("Mon: 5pm – 7pm · Wed: …") break only between days, the dot staying at
- * the end of a line instead of starting the next one.
+ * One side as it is drawn (#926): the phone value is kept whole, and hours
+ * ("Mon: 5pm – 7pm · Wed: …") break between days first, the dot staying at
+ * the end of a line instead of starting the next one. Each unit still wraps
+ * inside itself when it is wider than the box (keepTogetherClass): both are
+ * typed text, and a monthly note runs to 280 characters.
+ *
+ * WHY `struck` repeats the strike on each unit: a line-through on the outer
+ * span does not reach into an inline-block.
  */
-function ValueText({ field, text }: { field: string; text: string }) {
-  if (field === "phone") return <span className="whitespace-nowrap">{text}</span>;
+function ValueText({ field, text, struck }: { field: string; text: string; struck: boolean }) {
+  const unit = keepTogetherClass + (struck ? " line-through decoration-1" : "");
+  if (field === "phone") return <span className={unit}>{text}</span>;
   if (field !== "hours_weekly" && field !== "hours_irregular") return text;
   const pieces = text.split(" · ");
   return pieces.map((piece, i) => (
     <Fragment key={i}>
       {i > 0 && " "}
-      <span className="whitespace-nowrap">
+      <span className={unit}>
         {piece}
         {i < pieces.length - 1 && " ·"}
       </span>
@@ -88,11 +94,11 @@ export default function WaitingToPublishBox({ changes }: WaitingToPublishBoxProp
             <dt className="font-semibold">{change.label}</dt>
             <dd className="mt-0.5">
               <span className="line-through decoration-1">
-                <ValueText field={change.field} text={change.onMapNow} />
+                <ValueText field={change.field} text={change.onMapNow} struck />
               </span>
               {" → "}
               <span className="font-medium">
-                <ValueText field={change.field} text={change.afterPublish} />
+                <ValueText field={change.field} text={change.afterPublish} struck={false} />
               </span>
               <span className="block text-xs text-[var(--color-ink-500)]">Changed by {change.who}</span>
             </dd>

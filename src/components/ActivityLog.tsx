@@ -13,6 +13,7 @@ import {
   cardClass,
   emptyStateClass,
   focusRingClass,
+  keepTogetherClass,
   linkClass,
   secondaryButtonClass,
   sectionTitleClass,
@@ -117,8 +118,9 @@ function ActionLine({ item }: { item: ActivityItem }) {
         {summary.changes.length > 0 && (
           <ul className="mt-1 space-y-0.5 text-sm text-[var(--color-ink-700)]">
             {summary.changes.map((c) => {
-              // A phone number never breaks mid-number (#926); other values may wrap.
-              const keep = c.field === "phone" ? "whitespace-nowrap" : undefined;
+              // The phone value is kept whole when it fits, but may wrap: it is
+              // free text and can hold several numbers (#926).
+              const keep = c.field === "phone" ? keepTogetherClass : undefined;
               return (
                 <li key={c.field} className="break-words">
                   <span className="font-medium">{fieldLabel(c.field)}</span>:{" "}
@@ -154,7 +156,9 @@ function ItemList({ items }: { items: ActivityItem[] }) {
           <li key={`${run[0].at}-${run.length}`} className="py-2">
             <details>
               <summary
-                className={`min-h-12 cursor-pointer rounded-[var(--radius-sm)] py-2 text-sm font-medium text-[var(--color-ink-700)] ${focusRingClass}`}
+                // The shared sage 100 tint under the pointer (#926 decision 1); -mx-2 px-2
+                // gives the tint room around the words without moving them.
+                className={`-mx-2 min-h-12 cursor-pointer rounded-[var(--radius-sm)] px-2 py-2 text-sm font-medium text-[var(--color-ink-700)] transition-colors duration-150 hover:bg-[var(--color-sage-100)] ${focusRingClass}`}
               >
                 {itemTag(run[0])} {run.length} · show all
               </summary>

@@ -64,6 +64,7 @@ import {
   failureLineClass,
   fieldLabelClass,
   formatSubmittedAt,
+  keepTogetherClass,
   linkClass,
   primaryButtonClass,
   secondaryButtonClass,
@@ -439,7 +440,8 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
  * worse than no link. A web address may wrap anywhere (it has no spaces),
  * so it never blows out the card width; overflow-wrap:anywhere, not
  * break-all, so ordinary words beside it are not broken mid-word (#926).
- * A phone number never breaks (whitespace-nowrap).
+ * The phone value is kept whole when it fits (keepTogetherClass) but may
+ * wrap: the field is free text and can hold several numbers.
  */
 function renderFieldValue(field: string | undefined, formatted: string): React.ReactNode {
   if (field === "url") {
@@ -454,7 +456,7 @@ function renderFieldValue(field: string | undefined, formatted: string): React.R
   }
   if (field === "phone" && formatted !== "(empty)") {
     return (
-      <a href={`tel:${formatted}`} className={`${linkClass} whitespace-nowrap`}>
+      <a href={`tel:${formatted}`} className={`${linkClass} ${keepTogetherClass}`}>
         {formatted}
       </a>
     );

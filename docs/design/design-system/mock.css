@@ -676,6 +676,9 @@ textarea.pa-in{resize:vertical}
 .pa-tw thead tr{border-bottom:1px solid var(--color-bone-200);font-size:11px;text-transform:uppercase;letter-spacing:.025em;color:var(--color-ink-400)}
 .pa-tw tbody tr{border-bottom:1px solid var(--color-bone-200);transition:background-color .15s}.pa-tw tbody tr:last-child{border-bottom:0}
 @media (hover:hover){.pa-tw tbody.hov tr:hover{background:var(--color-sage-100)}}.pa-tw tbody tr.is-hover{background:var(--color-sage-100)}
+/* The Places category words (inline colors, like CategoryLabel) turn ink 700 on a tinted row: no category color, and not the ink 400 dots, reads on sage 100. */
+.pa-cat span{transition:color .15s}
+@media (hover:hover){.pa-tw tbody.hov tr:hover .pa-cat span{color:var(--color-ink-700)!important}}.pa-tw tbody tr.is-hover .pa-cat span{color:var(--color-ink-700)!important}
 .pa-tw .nw{white-space:nowrap}
 .pa-tw .nm{font-weight:500;color:var(--color-sage-700)!important;text-decoration:underline!important;text-underline-offset:2px;border-radius:4px}
 .pa-tw .nm:focus-visible,.pa-tw .nm.is-focus{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--color-sage-500)}

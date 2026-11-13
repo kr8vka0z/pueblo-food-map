@@ -103,6 +103,11 @@ describe("token contrast (WCAG AA)", () => {
     ["ink-500", "sage-100", WCAG_AA_NORMAL_TEXT],
     ["ink-700", "sage-100", WCAG_AA_NORMAL_TEXT],
     ["sage-700", "sage-100", WCAG_AA_NORMAL_TEXT],
+    // Words inside a tinted row or link: the stuck publish banner's red link,
+    // Boxes' "Removed from service", an Events row's name.
+    ["danger", "sage-100", WCAG_AA_NORMAL_TEXT],
+    ["clay-700", "sage-100", WCAG_AA_NORMAL_TEXT],
+    ["ink-900", "sage-100", WCAG_AA_NORMAL_TEXT],
     ["clay-700", "clay-100", WCAG_AA_NORMAL_TEXT],
     ["danger", "clay-100", WCAG_AA_NORMAL_TEXT],
     ["ink-900", "brand-yellow", WCAG_AA_NORMAL_TEXT],

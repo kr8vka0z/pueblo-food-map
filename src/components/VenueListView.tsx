@@ -557,8 +557,18 @@ export default function VenueListView({
 function CategoryCell({ category, snap = false, wic = false }: { category: VenueCategory | null; snap?: boolean; wic?: boolean }) {
   if (!category) return <span className="text-[var(--color-ink-500)]">—</span>;
   const benefits = [snap && "SNAP", wic && "WIC"].filter((b): b is string => typeof b === "string");
-  return <CategoryLabel category={category} label={categoryLabels[category]} benefits={benefits} />;
+  return <CategoryLabel category={category} label={categoryLabels[category]} benefits={benefits} className={CATEGORY_ON_ROW_CLASS} />;
 }
+
+// While the row is tinted sage 100 under the pointer (tableLinkRowClass is a
+// `group`), every word in the label turns ink 700 (10.2 to 1) and returns to
+// its colour when the pointer leaves, at the row's own 150 ms. WHY: on sage
+// 100 the category colours fall to 3.4-4.1 to 1 and the ink 400 dots to 4.2
+// (DESIGN.md Colors: category words never sit on the hover fill). WHY `!`:
+// CategoryLabel sets the category colour as an inline style, which only an
+// important rule beats; `*:` reaches its spans, which are direct children.
+const CATEGORY_ON_ROW_CLASS =
+  "text-sm *:transition-colors *:duration-150 group-hover:*:text-[var(--color-ink-700)]!";
 
 function VenueRow({ row, statusByVenueId }: { row: Row; statusByVenueId: Record<string, AdminDisplayStatus> }) {
   if (row.kind === "new") {

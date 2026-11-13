@@ -59,12 +59,16 @@ Browser
         │     Bus/Drive: Google Maps deep links)
         ├── SearchBar / ViewSuggestion / SearchResultsPopover / FilterPanel
         │     (Filters button opens FilterPanel — categories + Open now/SNAP/
-        │     WIC, #513. No standing Map/List control, #514: an empty focused
+        │     WIC, #513; slides in from the left and out, held mounted and
+        │     showing its last open content while it slides out —
+        │     src/lib/usePresence.ts, #917 round 3. No standing Map/List control, #514: an empty focused
         │     bar offers the other view, a typed one adds "See all N matches
         │     as a list", and the Menu has a List/Map line)
         ├── HamburgerMenu    (shell: mobile full-height sheet, or desktop
         │     dropdown on non-map pages via PageNav — position, backdrop,
-        │     focus trap/return, Escape, scroll lock. Renders
+        │     focus trap/return, Escape, scroll lock; on a phone it slides in
+        │     from the right and out, keeping the view it closed on, Saved or
+        │     Menu, until the slide ends — usePresence.ts, #917 round 3. Renders
         │     HamburgerMenuContent — List/Map line, saved places, links,
         │     language — split out by #682 8b so the SAME content also
         │     renders inside DesktopSidePanel on the map page's desktop
@@ -1440,8 +1444,11 @@ review** (see "Shared events" below).
   counts (never while a finger is down). When the measurement leaves one
   resting height (a short screen, or a first view taller than the sheet), the
   card is laid out as expanded: nothing `inert`, the content scrolls, and the
-  grab bar is made invisible but keeps its space (removing it moved the
-  content, which flipped the measurement back: a render loop). Clamped text
+  grab bar stays drawn as the swipe handle but its button is disabled,
+  `aria-hidden` and `pointer-events-none`, so a touch on it drags the sheet
+  (#917 round 3: a box card's check-in fills the sheet on most phones, and the
+  bar used to go invisible there). It keeps its space either way (removing it
+  moved the content, which flipped the measurement back: a render loop). Clamped text
   in the sheet (About, a place's notes) is `pointer-events: none`: on iOS
   Safari a flick that starts on text whose overflow is clipped never scrolls
   the sheet's content (found on the simulator).

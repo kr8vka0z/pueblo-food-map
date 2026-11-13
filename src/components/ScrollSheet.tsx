@@ -108,6 +108,9 @@ export default function ScrollSheet({
   // reading yet, so it keeps re-reading until it has one: frozen at its first
   // frame, a box measured before its check-in panel finished drawing kept a
   // collapsed height its full layout doesn't have (agent-browser, 360 wide).
+  // Only a reading that found the detail section counts: a box's "Loading…"
+  // placeholder has none, and a null frozen there gave the loaded box one
+  // resting height for good once the placeholder had rested open (PR #925).
   const firstViewCollapsed = useRef(false);
 
   // ── The top edge's shadow at full height ───────────────────────────────
@@ -142,7 +145,7 @@ export default function ScrollSheet({
     // view taller than it will be once collapsed again.
     if (!expandedRef.current || !firstViewCollapsed.current) {
       firstView.current = detail ? detail.getBoundingClientRect().top - top + Number(detail.dataset.peekPx ?? 64) : null;
-      firstViewCollapsed.current = !expandedRef.current;
+      firstViewCollapsed.current = !expandedRef.current && detail !== null;
     }
     const next = sheetDetents({
       trackHeight: track.clientHeight,

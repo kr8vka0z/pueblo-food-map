@@ -1441,7 +1441,10 @@ review** (see "Shared events" below).
   is "top of `#bottomsheet-detail` + its `data-peek-px`", read only while
   collapsed (expanded, "Read more" can make the first view taller than it
   will be once collapsed; reading it then left one snap point, so a flick
-  down sprang back, found on the iOS simulator); full is the sheet's own
+  down sprang back, found on the iOS simulator). It is re-read until one
+  reading is taken collapsed with the detail section present: a card that
+  opens expanded, or a box still showing "Loading…" (no detail section yet),
+  never freezes an incomplete first view; full is the sheet's own
   height or the track's, whichever is shorter. A ResizeObserver on the track
   and the sheet re-measures, so a lazily loaded card body still counts
   (never while a finger is down). `restingAt` names the detent a settled

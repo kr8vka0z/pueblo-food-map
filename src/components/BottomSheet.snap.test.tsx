@@ -12,6 +12,8 @@
  * - fully open stops at a short card's own height (PR #884 review);
  * - a lazily loaded card that arrives after the first measurement still
  *   re-measures (PR #884 review: nothing observed resized);
+ * - a box "Loading…" placeholder that rests fully open before the box loads
+ *   does not freeze its missing first view (PR #925 review: one height);
  * - one resting height lays the card out as expanded (PR #884 review: the
  *   lower controls stayed `inert` and the bar toggled nothing).
  */
@@ -21,6 +23,8 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import BottomSheet from "@/components/BottomSheet";
 import type { Venue } from "@/types/venue";
 import type { PublicEventDetail } from "@/lib/events";
+import type { PublicBlessingBox } from "@/lib/blessingBoxes";
+import { waitForBoxCard } from "@/lib/testing/waitForBoxCard.testutil";
 
 const venue: Venue = {
   id: "v1",
@@ -54,6 +58,29 @@ const event: PublicEventDetail = {
   status: "published",
   cancel_note: null,
   cancel_note_es: null,
+};
+
+const box: PublicBlessingBox = {
+  id: "box-1",
+  name: "Elm Street Blessing Box",
+  category: "blessing_box",
+  lat: 38.27,
+  lng: -104.61,
+  address: "300 Example Ln, Pueblo, CO 81001",
+  source: "manual",
+  last_verified: "2026-09-01T00:00:00.000Z",
+  box: {
+    hostName: null,
+    hostNote: null,
+    mostNeeded: "Canned food",
+    installedOn: "2026-01-01",
+    removedOn: null,
+    status: "stocked",
+    lastFilledAt: "2026-09-17T09:00:00.000Z",
+    recentCheckins: [],
+    latestPhoto: null,
+    adopters: [],
+  },
 };
 
 // Geometry (viewport px). `contentHeight` is the card's own height, or 0 for
@@ -112,6 +139,7 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -160,6 +188,33 @@ describe("BottomSheet resting heights", () => {
 
     // Collapsed: 400 - 100 + 96px event peek. Fully open: the card's own 600, not the track's 640.
     expect(detents()).toEqual([396, 600]);
+  });
+
+  test("a box placeholder that rests before the box loads does not freeze a missing first view (PR #925 review)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("turnstile", { render: vi.fn(() => "widget-id-1"), reset: vi.fn(), remove: vi.fn() });
+    const boxVenue: Venue = { ...venue, id: "box-1", category: "blessing_box" };
+    const onExpandedChange = vi.fn();
+    vi.useFakeTimers();
+    const view = render(<BottomSheet venue={boxVenue} box={null} onClose={() => {}} onExpandedChange={onExpandedChange} />);
+    // The "Loading…" line: no detail section, no heading, so the sheet is just the 60px grab-bar row.
+    expect(detents()).toEqual([60]);
+    const track = document.querySelector<HTMLElement>("[data-scroll-sheet]")!;
+    let top = 0;
+    Object.defineProperty(track, "scrollTop", { get: () => top, set: (v: number) => (top = v), configurable: true });
+    track.scrollTo = vi.fn() as unknown as typeof track.scrollTo;
+    top = 60;
+    fireEvent.scroll(track);
+    act(() => vi.advanceTimersByTime(200));
+    expect(onExpandedChange).toHaveBeenLastCalledWith(true); // the placeholder rested "full"
+    vi.useRealTimers();
+
+    view.rerender(<BottomSheet venue={boxVenue} box={box} onClose={() => {}} onExpandedChange={onExpandedChange} />);
+    await waitForBoxCard();
+    fireResize();
+
+    // Collapsed: 400 - 100 + 96px box peek. Fully open: the whole 640 track.
+    expect(detents()).toEqual([396, 640]);
   });
 
   test("one resting height: the card is laid out expanded (no inert controls, content scrolls, grab bar drawn but not a control)", () => {

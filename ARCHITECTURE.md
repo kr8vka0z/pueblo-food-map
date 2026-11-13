@@ -1842,8 +1842,8 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   `/admin/places?show=review`, and the third is pending photos + sponsor
   requests, linking to `/admin/boxes?show=review`), a **Visitors** section reading
   Cloudflare's GraphQL Analytics API server-side (`cfAnalytics.ts` — the
-  ONLY source of unique-visitor numbers in this app; PostHog is
-  memory-only and counts every page load as a new visitor — AGENTS.md
+  ONLY source of unique-visitor numbers in this app; PostHog keeps
+  no ID past the browser tab and makes no person profiles — AGENTS.md
   "Scheduled jobs and observability", PostHog bullet), a **Blessing boxes** numbers section reusing
   `boxStats.ts` (the
   same math the public Boxes page uses), and a **Map data health** section

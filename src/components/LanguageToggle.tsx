@@ -1,11 +1,16 @@
 "use client";
 
 /**
- * LanguageToggle — EN | ES segmented pill toggle.
+ * LanguageToggle — EN | ES two-way slider (#917 round 3, the design system's
+ * slider: owner ruling "sliders for a two- or three-way switch").
  *
- * Consumes LocaleContext via useLocale(). Renders a segmented button group:
- *   - Active locale has a filled background.
- *   - Inactive locale is outlined / text-only.
+ * Consumes LocaleContext via useLocale(). Renders a button group on a
+ * bone 200 track with a sage 600 thumb behind the active word:
+ *   - The thumb slides to the other word in 250 ms on --ease-out-circ (R5).
+ *   - Both segments are the same 48 by 40 box, inline-flex centered with a
+ *     fixed line height, whether a <button> or an <a> (below), so the words
+ *     never shift. Before, a mirrored page's <a> segment was inline (not
+ *     centered like the <button>), so EN and ES sat at different heights.
  *   - Keyboard accessible: Tab to focus, Enter/Space to activate.
  *   - Screen reader: announces "Language: English, button" / "Language: Spanish, button".
  *
@@ -28,6 +33,7 @@
  * original buttons: byte-identical to pre-#689 behavior.
  */
 
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useLocale } from "@/lib/LocaleContext";
 import { t, type Locale } from "@/lib/i18n";
@@ -46,43 +52,67 @@ const SR_LABELS: Record<Locale, string> = {
   es: "Spanish",
 };
 
-// WHY identical for both <button> and <a>: this must render byte-identical
-// to the pre-#689 button-only markup for the non-mirrored-page and
-// current-tree-segment cases — no new layout classes, so nothing visually
-// shifts for the vast majority of renders this change doesn't touch.
+// WHY identical for both <button> and <a>: the two must draw the same box,
+// or the words sit at different heights (the #917 round 3 jump). 48 wide,
+// 40 tall, 14px semibold on a fixed 20px line; the ::before reaches the
+// track's 4px padding above and below, so each taps at 48 by 48 and the two
+// meet in the middle without overlapping (#233).
 const SEGMENT_CLASS =
-  "relative px-3 text-xs font-semibold transition-colors duration-150 h-full " +
-  "first:rounded-l-full last:rounded-r-full " +
-  // #233: 26px-tall segments → 48px hit areas. 11px up/down, and
-  // 10px outward only (EN left, ES right) so each clears 48 wide
-  // while the two still meet at the divider rather than overlap.
-  "before:absolute before:inset-x-0 before:-inset-y-[11px] " +
-  "first:before:-left-2.5 last:before:-right-2.5 " +
+  "relative inline-flex h-[40px] w-12 items-center justify-center rounded-[var(--radius-md)] " +
+  "text-sm font-semibold leading-5 transition-colors duration-250 ease-out-circ motion-reduce:transition-none " +
+  "before:absolute before:inset-x-0 before:-inset-y-1 " +
   PRESS_FEEDBACK + " " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset " +
-  "focus-visible:ring-[var(--color-sage-500)] ";
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
+  "focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bone-200)] ";
 
 function segmentColorClass(active: boolean): string {
+  // The active word sits on the thumb; R1: the other one takes the sage 100
+  // hover fill (words stay ink 700 on it).
   return active
-    ? "bg-[var(--color-ink-700)] text-[var(--color-bone-50)]"
-    : "text-[var(--color-ink-500)] hover:text-[var(--color-ink-700)]";
+    ? "text-[var(--color-bone-50)]"
+    : "text-[var(--color-ink-700)] hover:bg-[var(--color-sage-100)]";
 }
 
 export default function LanguageToggle() {
   const { locale, setLocale, tree } = useLocale();
   const pathname = usePathname();
   const counterpartHref = pathname ? mirroredCounterpartHref(pathname, tree) : null;
+  // The mirrored link is a full page load, so `locale` never changes on this
+  // page. Moving the thumb to the tapped word right away lets it slide while
+  // the next page loads, instead of nothing happening until it arrives.
+  const [pending, setPending] = useState<Locale | null>(null);
+  // Back to this page from the browser's back/forward cache: the thumb must
+  // sit on the page's real language again, not the one tapped before leaving.
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) setPending(null);
+    };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, []);
+  const thumbOn = pending ?? locale;
 
   return (
     <div
       role="group"
       aria-label={t("lang.toggle.label", locale)}
-      // No overflow-hidden (#233): it would clip the segments' ::before tap
-      // overlays below. Each segment rounds its own outer end instead, which
-      // draws the same pill.
-      className="flex items-center rounded-full border border-[var(--color-bone-300)] bg-[var(--color-bone-100)]"
-      style={{ height: 28 }}
+      // The design system's slider (docs/design/design-system/mock.css `.rs`):
+      // a bone 200 track, corners radius-lg, 4px padding. No overflow-hidden
+      // (#233): it would clip the segments' ::before tap overlays.
+      className="relative inline-flex rounded-[var(--radius-lg)] bg-[var(--color-bone-200)] p-1"
     >
+      {/* The thumb: sage 600 (primary), corners radius-md (the track's minus
+          its 4px padding), behind the active word; first in the DOM so the
+          segments paint over it. */}
+      <span
+        aria-hidden
+        className={
+          "pointer-events-none absolute left-1 top-1 bottom-1 w-12 rounded-[var(--radius-md)] " +
+          "bg-[var(--color-sage-600)] shadow-[0_2px_6px_rgba(26,24,23,0.25)] " +
+          "transition-transform duration-250 ease-out-circ motion-reduce:transition-none " +
+          (thumbOn === "es" ? "translate-x-[48px]" : "translate-x-0")
+        }
+      />
       {(["en", "es"] as Locale[]).map((l) => {
         const active = locale === l;
 
@@ -118,6 +148,7 @@ export default function LanguageToggle() {
                 if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
                 writeLocaleCookie(l);
                 void track(EVENTS.LOCALE_SWITCHED, { to: l });
+                setPending(l);
                 e.preventDefault();
                 window.location.assign(counterpartHref + window.location.search + window.location.hash);
               }}
@@ -127,7 +158,7 @@ export default function LanguageToggle() {
               // currently-shown language."
               aria-current={active ? "true" : undefined}
               aria-label={`Language: ${SR_LABELS[l]}`}
-              className={SEGMENT_CLASS + segmentColorClass(active)}
+              className={SEGMENT_CLASS + segmentColorClass(l === thumbOn)}
             >
               {LABELS[l]}
             </a>
@@ -146,7 +177,7 @@ export default function LanguageToggle() {
             }}
             aria-pressed={active}
             aria-label={`Language: ${SR_LABELS[l]}`}
-            className={SEGMENT_CLASS + segmentColorClass(active)}
+            className={SEGMENT_CLASS + segmentColorClass(l === thumbOn)}
           >
             {LABELS[l]}
           </button>

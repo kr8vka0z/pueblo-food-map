@@ -660,11 +660,11 @@ These five rulings apply to the whole site. All five are live on the public site
 
 `src/components/LanguageToggle.tsx`, placed on the Menu's Language / Idioma row (`src/components/HamburgerMenuContent.tsx`).
 
-- **Status:** Live as is (R2: `SEGMENT_CLASS`'s `PRESS_FEEDBACK` is the press dim only). The other part keeps darkening its words under the pointer.
-- **For:** English and Spanish. A two-part pill: `bone-100` fill, `bone-300` edge, fully round, 28 tall; each part 12-pixel bold capitals; the part you're reading is `ink-700` with `bone-50` words, the other `ink-500`. It lives in the Menu, never on the map.
-- **Use something else when:** two or three choices inside a form (a slider); the event page (one link to the other language).
-- **Sizes:** each part taps at 48 by 48 (the tap area reaches 11 above and below and 10 outward).
-- **Wording:** EN and ES, never flags. Heard as Language: English, Language: Spanish, in a group called Language selection; the part you're reading is pressed.
+- **Status:** Live as is (#917 round 3: rebuilt as the design system's two-way slider, the owner ruling "sliders for a two- or three-way switch"; it was a 28-tall `bone-100` pill whose EN and ES sat at different heights on mirrored pages, where one part is a link and the other a button). R1 on the part you aren't reading; R2: `SEGMENT_CLASS`'s `PRESS_FEEDBACK` is the press dim only.
+- **For:** English and Spanish. The slider from `docs/design/design-system/mock.css` (`.rs`, `.thumb`): a `bone-200` track, corners `radius-lg`, 4 padding; a `sage-600` (primary) thumb, corners `radius-md`, a soft shadow, behind the part you're reading, whose word is `bone-50`; the other word `ink-700`, with the sage 100 hover fill. The thumb slides between the two in 250 ms on `--ease-out-circ` (R5), none with reduced motion. On a mirrored page the other language is a full page load: the thumb moves to the tapped word at once, so it slides while the next page loads, and goes back if the browser restores the page from its back/forward cache. It lives in the Menu, never on the map.
+- **Use something else when:** two or three choices inside a form (a slider of real radios); the event page (one link to the other language).
+- **Sizes:** 104 by 48 overall; each part 48 wide and 40 tall (`w-12 h-[40px]`), the same box whether it is a link or a button (`inline-flex`, centered, words 14-pixel semibold on a fixed 20-pixel line, so nothing shifts on hover, press or switch); each taps at 48 by 48 (the tap area reaches the track's 4 padding above and below; the two meet in the middle).
+- **Wording:** EN and ES, never flags. Heard as Language: English, Language: Spanish, in a group called Language selection; the part you're reading is pressed (on a mirrored page, the link to the other language is a link, and the current one is marked current).
 
 ### Hub page list rows (HubPages, VenuesDirectoryContent)
 

@@ -50,7 +50,7 @@ import {
   inputBorder,
   labelClass,
 } from "@/components/formClasses";
-import { tapLinkClass } from "@/lib/adminCardStyles";
+import { failureLineClass, signInCardClass, tapLinkClass } from "@/lib/adminCardStyles";
 
 type FormStatus = "idle" | "sending" | "sent" | "error";
 type CodeStatus = "idle" | "verifying" | "error";
@@ -78,9 +78,6 @@ function codeErrorMessage(error: { code?: string; status?: number } | null | und
 
 const primaryButtonClass = `${ADMIN_PRIMARY_BUTTON} w-full`;
 const secondaryButtonClass = `${ADMIN_SECONDARY_BUTTON} w-full`;
-// SHARED-GAP: a lifted card (elevation 2) for the sign-in box. cardClass is
-// elevation 1; the design page pictures the sign-in card lifted (#926 decision 14).
-const signInCardClass = "elevation-2 rounded-[var(--radius-lg)] bg-white p-6 sm:p-8";
 // The small text buttons under the code box: 48 tall tap area plus the ring.
 const textButtonClass = `${tapLinkClass} text-sm disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60`;
 
@@ -398,7 +395,7 @@ export default function AdminLoginForm() {
             {formStatus === "sending" ? "Sending…" : "Email me a code"}
           </button>
           {formStatus === "error" && (
-            <p className={errorClass} role="alert">
+            <p className={`mt-2 ${failureLineClass}`} role="alert">
               The code was not sent. Try again.
             </p>
           )}
@@ -420,7 +417,7 @@ export default function AdminLoginForm() {
               : "Use a passkey"}
           </button>
           {passkeySignIn === "error" && (
-            <p className={errorClass} role="alert">
+            <p className={`mt-2 ${failureLineClass}`} role="alert">
               Passkey sign-in didn&apos;t work. Use an email code instead.
             </p>
           )}

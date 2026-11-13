@@ -25,7 +25,7 @@ import { loadEventList } from "@/lib/adminEventReads";
 import AdminNav from "@/components/AdminNav";
 import EventsList from "@/components/EventsList";
 import EventSubmissionsList from "@/components/EventSubmissionsList";
-import { pageTitleClass } from "@/lib/adminCardStyles";
+import { pageBodyClass, pageTitleClass } from "@/lib/adminCardStyles";
 import { loadPendingEventSubmissions } from "@/lib/eventSubmissions";
 
 export default async function AdminEventsPage() {
@@ -39,7 +39,7 @@ export default async function AdminEventsPage() {
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="events" counts={navCounts} showActivity={identity.isOwner === true} />
-      <div className="space-y-4 px-4 py-6 sm:px-6">
+      <div className={pageBodyClass}>
         <h2 className={pageTitleClass}>Events</h2>
         <EventSubmissionsList items={submissions} />
         <EventsList events={events} />

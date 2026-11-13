@@ -25,7 +25,7 @@ import {
 } from "@/lib/activityLog";
 import AdminNav from "@/components/AdminNav";
 import ActivityLog from "@/components/ActivityLog";
-import { pageTitleClass } from "@/lib/adminCardStyles";
+import { pageBodyClass, pageTitleClass } from "@/lib/adminCardStyles";
 
 /** The filter fields the form sends; "until" is paging, not a filter. */
 const FILTER_KEYS = ["person", "type", "from", "to", "q"];
@@ -69,8 +69,8 @@ export default async function ActivityPage({
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="activity" counts={navCounts} showActivity />
-      <div className="px-4 py-6 sm:px-6">
-        <h2 className={`${pageTitleClass} mx-auto mb-4 max-w-3xl`}>Activity</h2>
+      <div className={pageBodyClass}>
+        <h2 className={pageTitleClass}>Activity</h2>
         <ActivityLog
           days={days}
           filters={filters}

@@ -122,7 +122,7 @@ export default function ToReviewSummaryBox({ reviewRowCount, proposals, submissi
   const submitting = bulkState.status === "submitting";
 
   return (
-    <div className={`${cardSlimClass} mb-4`}>
+    <div className={cardSlimClass}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-[var(--color-ink-700)]">
           {reviewRowCount} to review · {proposals.length} from the data refresh, {submissionCount} from the public

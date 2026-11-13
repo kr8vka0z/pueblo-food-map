@@ -21,7 +21,7 @@ import AdminNav from "@/components/AdminNav";
 import EventForm, { type EventFormValues } from "@/components/EventForm";
 import { loadPendingEventSubmission, parseSubmissionPayload } from "@/lib/eventSubmissions";
 import { utcIsoToPuebloLocal } from "@/lib/eventTime";
-import { pageTitleClass } from "@/lib/adminCardStyles";
+import { formPageBodyClass, pageTitleClass } from "@/lib/adminCardStyles";
 
 export default async function NewEventPage({ searchParams }: { searchParams?: Promise<{ from?: string }> }) {
   const { from } = searchParams ? await searchParams : {};
@@ -51,7 +51,7 @@ export default async function NewEventPage({ searchParams }: { searchParams?: Pr
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="events" counts={navCounts} showActivity={identity.isOwner === true} />
-      <div className="space-y-6 px-4 py-6 sm:px-6">
+      <div className={formPageBodyClass}>
         <h2 className={pageTitleClass}>Add event</h2>
         {/* WHY a notice inside the form, not a line under the title: admin page titles carry no subtitle (#926 decision 5). */}
         <EventForm

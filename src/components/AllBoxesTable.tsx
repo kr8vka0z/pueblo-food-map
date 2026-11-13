@@ -22,11 +22,15 @@ import Link from "next/link";
 import { NEEDS_HELP_STATUSES, type BoxHealthEntry, type BoxHealthStatus } from "@/lib/boxHealth";
 import type { BoxReviewSummary } from "@/lib/adminBoxes";
 import {
-  cardClass,
   chipClass,
-  fieldLabelClass,
+  controlLabelClass,
+  emptyStateClass,
   linkClass,
   secondaryButtonClass,
+  tableCellClass,
+  tableHeadCellClass,
+  tableHeadRowClass,
+  tableLinkRowClass,
   tableWrapClass,
   tagClass,
   type TagTone,
@@ -246,13 +250,9 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
 
   if (entries.length === 0) {
     return (
-      <div className={`${cardClass} text-center`}>
-        <div className="py-6">
-          <p className="text-sm text-[var(--color-ink-500)]">No blessing boxes yet.</p>
-          <p className="text-sm text-[var(--color-ink-500)]">
-            Add a place with the category Blessing Box and it shows up here.
-          </p>
-        </div>
+      <div className={emptyStateClass}>
+        <p>No blessing boxes yet.</p>
+        <p>Add a place with the category Blessing Box and it shows up here.</p>
       </div>
     );
   }
@@ -285,7 +285,7 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
 
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <div className="min-w-0 flex-1 sm:max-w-xs">
-          <label htmlFor="boxes-search" className={`${fieldLabelClass} mb-1 block`}>
+          <label htmlFor="boxes-search" className={controlLabelClass}>
             Search boxes
           </label>
           <input
@@ -301,7 +301,7 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
         <div>
           {/* The slider's legend is read by screen readers; this caption is
               its visible twin, so it is hidden from them. */}
-          <p aria-hidden="true" className={`${fieldLabelClass} mb-1`}>
+          <p aria-hidden="true" className={controlLabelClass}>
             Sponsor
           </p>
           <AdminSegmented
@@ -313,7 +313,7 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
           />
         </div>
         <div>
-          <label htmlFor="boxes-sort" className={`${fieldLabelClass} mb-1 block`}>
+          <label htmlFor="boxes-sort" className={controlLabelClass}>
             Sort
           </label>
           <select
@@ -338,32 +338,30 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
       {/* Nothing matches: its own box, not a cell of the 560-wide table, so
           the message and Clear filters are never cut off on a phone. */}
       {filtered.length === 0 ? (
-        <div className={`${cardClass} text-center`}>
-          <div className="flex flex-col items-center gap-3 py-6">
-            <p className="text-sm text-[var(--color-ink-500)]">No boxes match these filters.</p>
-            <button type="button" onClick={clearFilters} className={secondaryButtonClass}>
-              Clear filters
-            </button>
-          </div>
+        <div className={emptyStateClass}>
+          <p>No boxes match these filters.</p>
+          <button type="button" onClick={clearFilters} className={secondaryButtonClass}>
+            Clear filters
+          </button>
         </div>
       ) : (
         <div className={tableWrapClass}>
           <table className="w-full min-w-[560px] text-left text-sm">
             <thead>
-              <tr className="border-b border-[var(--color-bone-200)] text-xs uppercase tracking-wide text-[var(--color-ink-400)]">
-                <th scope="col" className="px-4 py-3 font-medium">
+              <tr className={tableHeadRowClass}>
+                <th scope="col" className={tableHeadCellClass}>
                   Box
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
+                <th scope="col" className={tableHeadCellClass}>
                   Status
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
+                <th scope="col" className={tableHeadCellClass}>
                   Last report
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
+                <th scope="col" className={tableHeadCellClass}>
                   Sponsor
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
+                <th scope="col" className={tableHeadCellClass}>
                   To review
                 </th>
               </tr>
@@ -373,8 +371,8 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
                 const badge = STATUS_BADGE[entry.health.status];
                 const review = reviewByVenueId[entry.venueId];
                 return (
-                  <tr key={entry.venueId} className="border-b border-[var(--color-bone-100)] last:border-b-0">
-                    <td className="px-4 py-3">
+                  <tr key={entry.venueId} className={tableLinkRowClass}>
+                    <td className={tableCellClass}>
                       {/* Box name IS the edit link (#671, same "name = edit link"
                           change #672 made to the Places tab) — the separate
                           trailing Edit column/link is gone. */}
@@ -386,12 +384,12 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
                         <p className="text-xs font-medium text-[var(--color-clay-700)]">Removed from service</p>
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className={tableCellClass}>
                       <span className={tagClass(badge.tone)}>{badge.label}</span>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-[var(--color-ink-700)]">{formatLastReport(entry)}</td>
-                    <td className="px-4 py-3 text-[var(--color-ink-700)]">{formatSponsors(entry.sponsors)}</td>
-                    <td className="px-4 py-3">
+                    <td className={`${tableCellClass} whitespace-nowrap text-[var(--color-ink-700)]`}>{formatLastReport(entry)}</td>
+                    <td className={`${tableCellClass} text-[var(--color-ink-700)]`}>{formatSponsors(entry.sponsors)}</td>
+                    <td className={tableCellClass}>
                       <ReviewCell summary={review} />
                     </td>
                   </tr>

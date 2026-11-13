@@ -39,14 +39,18 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAdminStep } from "@/components/AdminConfirm";
 import { categoryLabels } from "@/lib/categories";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import type { VenueCategory } from "@/types/venue";
 import type { ClosurePayload, NewVenuePayload, ReviewSubmission } from "@/lib/publicSubmissions";
-import { inputBase, inputBorder } from "@/components/formClasses";
+import { hintClass, inputBase, inputBorder } from "@/components/formClasses";
 import {
   cardClass,
+  cardNameClass,
+  controlLabelClass,
   dangerButtonClass,
+  failureLineClass,
   fieldLabelClass,
   formatSubmittedAt,
   primaryButtonClass,
@@ -91,7 +95,9 @@ type ActionState = { status: "idle" } | { status: "submitting" } | { status: "er
 
 export default function SubmissionCard({ submission }: SubmissionCardProps) {
   const router = useRouter();
-  const [rejectOpen, setRejectOpen] = useState(false);
+  // Focus goes to the reason box on open and back to the button on Cancel (#926).
+  const { open: rejectOpen, openStep: openReject, closeStep: closeReject, triggerRef: rejectRef, fieldRef: reasonRef } =
+    useAdminStep();
   const [reason, setReason] = useState("");
   const [rejectState, setRejectState] = useState<ActionState>({ status: "idle" });
   const [doneState, setDoneState] = useState<ActionState>({ status: "idle" });
@@ -171,25 +177,24 @@ export default function SubmissionCard({ submission }: SubmissionCardProps) {
             {doneState.status === "submitting" ? "Marking done…" : "Mark done"}
           </button>
         )}
-        {!rejectOpen && (
-          <button type="button" onClick={() => setRejectOpen(true)} className={secondaryButtonClass}>
-            Reject
-          </button>
-        )}
+        <button ref={rejectRef} type="button" hidden={rejectOpen} onClick={openReject} className={secondaryButtonClass}>
+          Reject
+        </button>
       </div>
 
       {doneState.status === "error" && (
-        <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
+        <p role="alert" className={`mt-2 ${failureLineClass}`}>
           {doneState.message}
         </p>
       )}
 
       {rejectOpen && (
         <div className="mt-4 border-t border-[var(--color-bone-200)] pt-4">
-          <label htmlFor={reasonFieldId} className={`${fieldLabelClass} mb-1 block`}>
-            Reason <span className="font-normal normal-case text-[var(--color-ink-400)]">(optional, for your own notes)</span>
+          <label htmlFor={reasonFieldId} className={controlLabelClass}>
+            Reason <span className={`${hintClass} normal-case`}>(optional, for your own notes)</span>
           </label>
           <textarea
+            ref={reasonRef}
             id={reasonFieldId}
             rows={2}
             value={reason}
@@ -201,9 +206,9 @@ export default function SubmissionCard({ submission }: SubmissionCardProps) {
             <button
               type="button"
               onClick={() => {
-                setRejectOpen(false);
                 setReason("");
                 setRejectState({ status: "idle" });
+                closeReject();
               }}
               disabled={rejectState.status === "submitting"}
               className={secondaryButtonClass}
@@ -220,7 +225,7 @@ export default function SubmissionCard({ submission }: SubmissionCardProps) {
             </button>
           </div>
           {rejectState.status === "error" && (
-            <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
+            <p role="alert" className={`mt-2 ${failureLineClass}`}>
               {rejectState.message}
             </p>
           )}
@@ -247,7 +252,7 @@ function NewVenueDetails({ payload }: { payload: NewVenuePayload }) {
   const categoryLabel = categoryLabels[payload.category as VenueCategory] ?? payload.category;
   return (
     <div className="space-y-1">
-      <p className="text-base font-semibold text-[var(--color-ink-700)]">{payload.venueName}</p>
+      <p className={cardNameClass}>{payload.venueName}</p>
       <DetailRow label="Address" value={payload.address} />
       <DetailRow label="Category" value={categoryLabel} />
       {payload.hours && <DetailRow label="Hours" value={payload.hours} />}
@@ -263,7 +268,7 @@ function ClosureDetails({ payload }: { payload: ClosurePayload }) {
   const issueLabel = ISSUE_TYPES[payload.issueType as IssueTypeKey] ?? payload.issueType;
   return (
     <div className="space-y-1">
-      <p className="text-base font-semibold text-[var(--color-ink-700)]">{payload.venueName}</p>
+      <p className={cardNameClass}>{payload.venueName}</p>
       <DetailRow label="Address" value={payload.venueAddress} />
       <DetailRow label="Issue" value={issueLabel} />
       <DetailRow label="Description" value={payload.description} />

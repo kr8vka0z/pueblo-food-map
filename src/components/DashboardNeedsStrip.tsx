@@ -10,8 +10,7 @@
  */
 
 import Link from "next/link";
-import { focusRingClass } from "@/lib/adminCardStyles";
-import { tileCardClass, tileLabelClass } from "@/components/KpiCard";
+import { focusRingClass, tileCardClass, tileLabelClass } from "@/lib/adminCardStyles";
 
 export interface NeedsCardData {
   key: string;

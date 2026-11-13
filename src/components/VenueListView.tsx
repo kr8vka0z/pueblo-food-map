@@ -70,9 +70,15 @@ import CategoryLabel from "@/components/CategoryLabel";
 import { inputBase, inputBorder } from "@/components/formClasses";
 import {
   chipClass,
-  fieldLabelClass,
+  controlLabelClass,
+  emptyStateClass,
   linkClass,
   secondaryButtonClass,
+  tableCellClass,
+  tableHeadCellClass,
+  tableHeadRowClass,
+  tableLinkRowClass,
+  tableRowClass,
   tableWrapClass,
   tagClass,
   type TagTone,
@@ -458,8 +464,8 @@ export default function VenueListView({
 
       {/* Search + category filter */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="flex flex-1 flex-col gap-1">
-          <label htmlFor="venue-search" className={fieldLabelClass}>
+        <div className="flex-1">
+          <label htmlFor="venue-search" className={controlLabelClass}>
             Search
           </label>
           <input
@@ -472,8 +478,8 @@ export default function VenueListView({
             className={controlInputClass}
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="venue-category-filter" className={fieldLabelClass}>
+        <div>
+          <label htmlFor="venue-category-filter" className={controlLabelClass}>
             Category
           </label>
           <select
@@ -493,7 +499,7 @@ export default function VenueListView({
       </div>
 
       {sorted.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-12 text-center text-sm text-[var(--color-ink-500)]">
+        <div className={emptyStateClass}>
           <p>{hasFilters ? "No places match your search or filters." : "No places yet."}</p>
           {hasFilters && (
             <button type="button" onClick={clearFilters} className={secondaryButtonClass}>
@@ -505,23 +511,23 @@ export default function VenueListView({
         <div className={tableWrapClass}>
           <table className="w-full min-w-[680px] text-left text-sm">
             <thead>
-              <tr className={`border-b border-[var(--color-bone-200)] ${fieldLabelClass}`}>
-                <th scope="col" className="px-4 py-3 font-medium">
+              <tr className={tableHeadRowClass}>
+                <th scope="col" className={tableHeadCellClass}>
                   Name
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
+                <th scope="col" className={tableHeadCellClass}>
                   Category
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
+                <th scope="col" className={tableHeadCellClass}>
                   Status
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
+                <th scope="col" className={tableHeadCellClass}>
                   To review
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
+                <th scope="col" className={tableHeadCellClass}>
                   Address
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
+                <th scope="col" className={tableHeadCellClass}>
                   Last verified
                 </th>
               </tr>
@@ -542,12 +548,6 @@ export default function VenueListView({
   );
 }
 
-// The row tint under the pointer is sage 100 (#926 decision 1); the name
-// link inside is the row's one pressable part.
-// SHARED-GAP: a table row hover string (AllBoxesTable and EventsList could share it).
-const ROW_CLASS =
-  "border-b border-[var(--color-bone-200)] last:border-0 transition-colors duration-150 hover:bg-[var(--color-sage-100)]";
-
 /** The kind of place in its public colored words (CategoryLabel, R3); SNAP and WIC only when the row says so. */
 function CategoryCell({ category, snap = false, wic = false }: { category: VenueCategory | null; snap?: boolean; wic?: boolean }) {
   if (!category) return <span className="text-[var(--color-ink-500)]">—</span>;
@@ -559,26 +559,26 @@ function VenueRow({ row, statusByVenueId }: { row: Row; statusByVenueId: Record<
   if (row.kind === "new") {
     const { item } = row;
     return (
-      <tr className={ROW_CLASS}>
-        <td className="px-4 py-3 font-medium">
+      <tr className={tableLinkRowClass}>
+        <td className={`${tableCellClass} font-medium`}>
           <Link href={newItemHref(item)} className={linkClass}>
             {rowName(row)}
           </Link>
         </td>
-        <td className="px-4 py-3 text-[var(--color-ink-700)]">
+        <td className={`${tableCellClass} text-[var(--color-ink-700)]`}>
           <CategoryCell category={rowCategory(row)} />
         </td>
-        <td className="px-4 py-3">
+        <td className={tableCellClass}>
           <div className="flex flex-wrap items-center gap-1">
             <span className={tagClass("attention")}>Suggested new place</span>
             {item.kind === "submission" && <span className={tagClass(PUBLIC_TONE)}>Public</span>}
           </div>
         </td>
-        <td className="px-4 py-3">
+        <td className={tableCellClass}>
           <ReviewCell items={[item]} />
         </td>
-        <td className="px-4 py-3 text-[var(--color-ink-500)]">{rowAddress(row) || "—"}</td>
-        <td className="px-4 py-3 text-[var(--color-ink-500)]">—</td>
+        <td className={`${tableCellClass} text-[var(--color-ink-500)]`}>{rowAddress(row) || "—"}</td>
+        <td className={`${tableCellClass} text-[var(--color-ink-500)]`}>—</td>
       </tr>
     );
   }
@@ -595,8 +595,9 @@ function VenueRow({ row, statusByVenueId }: { row: Row; statusByVenueId: Record<
   const isArchivedRowLinkable = venue.status !== "archived" || items.length > 0;
 
   return (
-    <tr className={ROW_CLASS}>
-      <td className="px-4 py-3 font-medium">
+    // The row tint under the pointer only where the name links somewhere (#926 decision 1).
+    <tr className={isArchivedRowLinkable ? tableLinkRowClass : tableRowClass}>
+      <td className={`${tableCellClass} font-medium`}>
         {isArchivedRowLinkable ? (
           <Link href={`/admin/venues/${venue.id}/edit`} className={linkClass}>
             {venue.name}
@@ -605,17 +606,17 @@ function VenueRow({ row, statusByVenueId }: { row: Row; statusByVenueId: Record<
           <span className="text-[var(--color-ink-700)]">{venue.name}</span>
         )}
       </td>
-      <td className="px-4 py-3 text-[var(--color-ink-700)]">
+      <td className={`${tableCellClass} text-[var(--color-ink-700)]`}>
         <CategoryCell category={venue.category} snap={venue.accepts_snap === 1} wic={venue.accepts_wic === 1} />
       </td>
-      <td className="px-4 py-3">
+      <td className={tableCellClass}>
         <StatusBadge status={statusByVenueId[venue.id]} />
       </td>
-      <td className="px-4 py-3">
+      <td className={tableCellClass}>
         <ReviewCell items={items} />
       </td>
-      <td className="px-4 py-3 text-[var(--color-ink-500)]">{venue.address}</td>
-      <td className="px-4 py-3 text-[var(--color-ink-500)]">{formatLastVerified(venue.last_verified)}</td>
+      <td className={`${tableCellClass} text-[var(--color-ink-500)]`}>{venue.address}</td>
+      <td className={`${tableCellClass} text-[var(--color-ink-500)]`}>{formatLastVerified(venue.last_verified)}</td>
     </tr>
   );
 }

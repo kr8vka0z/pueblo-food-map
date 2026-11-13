@@ -25,7 +25,7 @@
 
 import Link from "next/link";
 import type { AdminNavCounts } from "@/lib/adminNavCounts";
-import { focusRingClass } from "@/lib/adminCardStyles";
+import { adminNameClass, focusRingClass } from "@/lib/adminCardStyles";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 export type AdminActiveTab = "dashboard" | "boxes" | "places" | "events" | "activity";
@@ -127,7 +127,7 @@ export default function AdminNav({ email, active, counts, showActivity = false }
   return (
     <header className="border-b border-[var(--color-bone-200)] bg-white">
       <div className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <h1 className="wordmark text-2xl text-[var(--color-ink-900)]">Pueblo Food Map Admin</h1>
+        <h1 className={adminNameClass}>Pueblo Food Map Admin</h1>
         <p className="text-sm text-[var(--color-ink-500)]">
           Signed in as <span className="font-medium text-[var(--color-sage-700)]">{email}</span>
         </p>
@@ -172,7 +172,7 @@ export function AdminNavSkeleton() {
   return (
     <header className="border-b border-[var(--color-bone-200)] bg-white">
       <div className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <p className="wordmark text-2xl text-[var(--color-ink-900)]">Pueblo Food Map Admin</p>
+        <p className={adminNameClass}>Pueblo Food Map Admin</p>
         <p className="text-sm text-[var(--color-ink-500)]" aria-hidden>
           &nbsp;
         </p>

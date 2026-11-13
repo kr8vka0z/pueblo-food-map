@@ -39,9 +39,9 @@ export default function SuggestionsBox({ items, venue }: SuggestionsBoxProps) {
   if (items.length === 0) return null;
 
   return (
-    <div className="max-w-2xl">
+    <section>
       {/* h3: the edit page's own title is the h2 (#926 decision 5). */}
-      <h3 className={`${sectionTitleClass} mb-2`}>Suggestions to review ({items.length})</h3>
+      <h3 className={`${sectionTitleClass} mb-3`}>Suggestions to review ({items.length})</h3>
       <ul className="flex flex-col gap-4">
         {items.map((item) => (
           <li key={reviewItemKey(item)}>
@@ -53,6 +53,6 @@ export default function SuggestionsBox({ items, venue }: SuggestionsBoxProps) {
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   );
 }

@@ -8,11 +8,15 @@
  *   inputBase                text box / select / textarea: 48 tall, 16 px words on phones (14 from md)
  *   inputBorder(hasError)    its edge: ink 400 at rest (3:1 on white), danger red on error
  *   labelClass, errorClass   the label above a field and the red line under it
+ *   hintClass                the "(optional)" hint inside a label, ink 400 (DESIGN.md Forms)
+ *   requiredMarkClass        the red star after a required field's label (aria-hidden; the field says aria-required)
+ *   fieldGroupClass          the hairline box around a <fieldset> of related fields
  *   checkboxRowClass         a 48 tall <label> row around a tick box and its words
  *   checkboxClass            the tick box <input type="checkbox"> itself, 20 px
  *   ADMIN_PRIMARY_BUTTON     the form-level green button (Save), 16 px words, 48 tall
- *   ADMIN_SECONDARY_BUTTON   its outline partner (Cancel beside Save)
+ *   ADMIN_SECONDARY_BUTTON   its outline partner (Cancel beside Save); also dims when aria-disabled
  *   saveRowClass             the Cancel (a third) + Save (two thirds) row
+ *   cancelLinkProps(busy)    spread on the Cancel <Link> so it is off while a save runs
  */
 
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
@@ -32,6 +36,10 @@ export const inputBorder = (hasError: boolean) =>
   hasError ? "border-[var(--color-danger)]" : "border-[var(--color-ink-400)]";
 export const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
 export const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
+export const hintClass = "font-normal text-[var(--color-ink-400)]";
+export const requiredMarkClass = "text-[var(--color-danger)]";
+
+export const fieldGroupClass = "rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4";
 
 export const checkboxRowClass = "flex min-h-12 cursor-pointer items-center gap-2 text-sm text-[var(--color-ink-700)]";
 // size-[20px], not size-5: this theme remaps --spacing-5 to 24 px.
@@ -44,7 +52,7 @@ export const checkboxClass =
 /** Sage-filled form-level primary button (Save, Send code, Add event). */
 export const ADMIN_PRIMARY_BUTTON =
   "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] px-4 " +
-  "text-base font-semibold text-[var(--color-bone-50)] transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
+  "text-center text-base font-semibold text-[var(--color-bone-50)] transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
   "disabled:opacity-60 disabled:cursor-not-allowed " +
   PRESS_FEEDBACK;
@@ -52,11 +60,25 @@ export const ADMIN_PRIMARY_BUTTON =
 /** Outline partner of ADMIN_PRIMARY_BUTTON: Cancel beside Save. */
 export const ADMIN_SECONDARY_BUTTON =
   "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-bone-300)] " +
-  "bg-transparent px-4 text-base font-medium text-[var(--color-ink-700)] transition-colors duration-150 " +
+  "bg-transparent px-4 text-center text-base font-medium text-[var(--color-ink-700)] transition-colors duration-150 " +
   "hover:bg-[var(--color-sage-100)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-  "disabled:opacity-60 disabled:cursor-not-allowed " +
+  // aria-disabled: Cancel is a link, which has no native disabled state.
+  "disabled:opacity-60 disabled:cursor-not-allowed aria-disabled:opacity-60 aria-disabled:cursor-not-allowed " +
   PRESS_FEEDBACK;
 
 /** Cancel (a third) then Save (two thirds). Keep Save the form's first submit button. */
 export const saveRowClass = "grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2";
+
+/**
+ * Spread on the Cancel <Link> beside Save: while the save runs it is off, so
+ * nobody leaves the page while the save still lands. A link cannot be
+ * disabled natively, so it is marked aria-disabled, taken out of the tab
+ * order, and its click is stopped (next/link skips navigating when the
+ * click's default is prevented).
+ */
+export function cancelLinkProps(busy: boolean) {
+  return busy
+    ? { "aria-disabled": true, tabIndex: -1, onClick: (e: { preventDefault: () => void }) => e.preventDefault() }
+    : {};
+}

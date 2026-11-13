@@ -28,7 +28,7 @@
  */
 
 import type { PublishBotPrState } from "@/lib/publishVenues";
-import { focusRingClass } from "@/lib/adminCardStyles";
+import { bannerLinkClass } from "@/lib/adminCardStyles";
 
 export interface PublishBotStatusBannerProps {
   prNumber: number;
@@ -41,9 +41,7 @@ const STUCK_COPY: Record<Exclude<PublishBotPrState, "in_progress">, string> = {
   stuck_checks: "Publish is stuck: checks failing or pending too long.",
 };
 
-// SHARED-GAP: linkClass without its sage color. The design page has these
-// links take the banner's own color (red when stuck).
-const bannerLinkClass = `rounded-[var(--radius-sm)] font-medium underline underline-offset-2 ${focusRingClass}`;
+// The links take the banner's own color (red when stuck), as the design page pictures.
 
 export default function PublishBotStatusBanner({ prNumber, prUrl, state }: PublishBotStatusBannerProps) {
   const isStuck = state !== "in_progress";
@@ -51,7 +49,7 @@ export default function PublishBotStatusBanner({ prNumber, prUrl, state }: Publi
   return (
     <section
       role={isStuck ? "alert" : undefined}
-      className={`mb-3 rounded-[var(--radius-lg)] border px-4 py-3 text-sm sm:px-6 ${
+      className={`rounded-[var(--radius-lg)] border px-4 py-3 text-sm sm:px-6 ${
         isStuck
           ? "border-[var(--color-danger)] bg-white text-[var(--color-danger)]"
           : "border-[var(--color-bone-200)] bg-white text-[var(--color-ink-700)]"

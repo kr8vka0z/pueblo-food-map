@@ -161,6 +161,20 @@ describe("EventForm edit mode", () => {
     expect(nameInput()).toHaveValue("My unsaved edit");
   });
 
+  // #926: nobody leaves the page while a save still lands.
+  test("while a save runs, Cancel is off and its click is stopped", async () => {
+    fetchMock.mockReturnValue(new Promise(() => {})); // the save never answers
+    render(<EventForm {...props} />);
+    const cancel = screen.getByRole("link", { name: "Cancel" });
+    expect(cancel).not.toHaveAttribute("aria-disabled");
+
+    await userEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => expect(cancel).toHaveAttribute("aria-disabled", "true"));
+    expect(cancel).toHaveAttribute("tabindex", "-1");
+    expect(fireEvent.click(cancel)).toBe(false); // preventDefault: the link does not navigate
+  });
+
   test("a server field error (422) is shown next to its field", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: false, errors: { link_url: "bad link" } }), { status: 422 }));
     render(<EventForm {...props} />);

@@ -9,7 +9,7 @@
  * Nothing is sent until the action button is pressed: that press is the
  * gate window.confirm used to be.
  *
- * Two parts:
+ * Three parts:
  *   useAdminConfirm()  -> { asking, ask, cancel, triggerRef }
  *     ask()       opens it (call from the trigger's onClick).
  *     cancel()    closes it and puts focus back on the trigger. Also call it
@@ -20,6 +20,9 @@
  *     triggerRef  put on the trigger button. Keep the trigger MOUNTED with
  *                 hidden={asking} (not unmounted), or focus has nowhere to
  *                 return to.
+ *   useAdminStep()     -> { open, openStep, closeStep, triggerRef, fieldRef }
+ *                 the same for an inline reason step that is not a confirm:
+ *                 opening focuses fieldRef, closing returns to the trigger.
  *   <AdminConfirm title body confirmLabel busyLabel tone busy error onConfirm onCancel />
  *     title         the question, naming the thing ("Remove Eastside Pantry from the map?")
  *     children      optional body: what happens and what does not
@@ -52,7 +55,7 @@
  */
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
-import { dangerButtonClass, primaryButtonClass, secondaryButtonClass } from "@/lib/adminCardStyles";
+import { dangerButtonClass, failureLineClass, primaryButtonClass, secondaryButtonClass } from "@/lib/adminCardStyles";
 
 export function useAdminConfirm<T extends HTMLElement = HTMLButtonElement>(): {
   asking: boolean;
@@ -75,6 +78,29 @@ export function useAdminConfirm<T extends HTMLElement = HTMLButtonElement>(): {
     }
   }, [asking]);
   return { asking, ask, cancel, triggerRef };
+}
+
+/**
+ * useAdminStep — the same focus handling for an inline step that opens in
+ * place of its button but is not a confirm box (the Reject, Remove photo and
+ * Decline reason steps on the change cards). Opening moves focus to the
+ * step's first field (fieldRef); closeStep() hands it back to the trigger.
+ * As with useAdminConfirm, keep the trigger MOUNTED with hidden={open}.
+ *   const { open, openStep, closeStep, triggerRef, fieldRef } = useAdminStep();
+ */
+export function useAdminStep<F extends HTMLElement = HTMLTextAreaElement>(): {
+  open: boolean;
+  openStep: () => void;
+  closeStep: () => void;
+  triggerRef: RefObject<HTMLButtonElement | null>;
+  fieldRef: RefObject<F | null>;
+} {
+  const { asking, ask, cancel, triggerRef } = useAdminConfirm();
+  const fieldRef = useRef<F | null>(null);
+  useEffect(() => {
+    if (asking) fieldRef.current?.focus();
+  }, [asking]);
+  return { open: asking, openStep: ask, closeStep: cancel, triggerRef, fieldRef };
 }
 
 type AdminConfirmProps = {
@@ -141,7 +167,7 @@ export default function AdminConfirm({
         </button>
       </div>
       {error && (
-        <p role="alert" className="text-sm text-[var(--color-danger)]">
+        <p role="alert" className={failureLineClass}>
           {error}
         </p>
       )}

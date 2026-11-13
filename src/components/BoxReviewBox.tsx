@@ -36,8 +36,9 @@ export default function BoxReviewBox({ photos, adopters }: BoxReviewBoxProps) {
   if (total === 0) return null;
 
   return (
-    <div className="max-w-2xl">
-      <h2 className={`${sectionTitleClass} mb-3`}>Things to review ({total})</h2>
+    <section>
+      {/* h3: the edit page's own title is the h2 (#926 decision 5). */}
+      <h3 className={`${sectionTitleClass} mb-3`}>Things to review ({total})</h3>
       <ul className="flex flex-col gap-4">
         {photos.map((photo) => (
           <li key={`photo-${photo.id}`}>
@@ -50,6 +51,6 @@ export default function BoxReviewBox({ photos, adopters }: BoxReviewBoxProps) {
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   );
 }

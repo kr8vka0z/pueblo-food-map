@@ -40,7 +40,7 @@ export default function BoxesToReviewBox({
   if (reviewingBoxCount === 0) return null;
 
   return (
-    <div className={`${cardSlimClass} mb-4`}>
+    <div className={cardSlimClass}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-[var(--color-ink-700)]">
           {reviewingBoxCount} to review: {pluralize(photosCount, "photo")}

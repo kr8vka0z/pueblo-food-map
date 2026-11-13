@@ -28,7 +28,7 @@
  * boxes. Suggest Spanish includes the custom words only when Custom is chosen.
  *
  * Status actions (#926 layout): the save row is Cancel (a link back to the
- * list, saves nothing) beside Save draft / Publish on create and on a draft,
+ * list, saves nothing, off while a save runs) beside Save draft / Publish on create and on a draft,
  * or beside Save changes otherwise. Cancel event (published only, reveals the
  * required cancel note there) and Archive event (asks on the page first,
  * AdminConfirm) sit apart in a Danger zone at the foot. The `updated_at` precondition (`expectedUpdatedAt`)
@@ -54,21 +54,26 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import {
   ADMIN_PRIMARY_BUTTON,
   ADMIN_SECONDARY_BUTTON,
+  cancelLinkProps,
   errorClass,
+  fieldGroupClass,
+  hintClass,
   inputBase,
   inputBorder,
   labelClass,
+  requiredMarkClass,
   saveRowClass,
 } from "@/components/formClasses";
 import {
   cardSlimClass,
   dangerButtonClass,
-  focusRingClass,
+  failureBoxClass,
+  failureLineClass,
+  pickerOptionClass,
   secondaryButtonClass,
   sectionTitleClass,
   tapLinkClass,
 } from "@/lib/adminCardStyles";
-import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import AdminConfirm, { useAdminConfirm } from "@/components/AdminConfirm";
 import AdminSegmented from "@/components/AdminSegmented";
 import EventFlyerField from "@/components/EventFlyerField";
@@ -143,20 +148,6 @@ const LINK_LABEL_OPTIONS: [EventLinkLabel, string][] = [
   ["custom", "Custom (type your own)"],
 ];
 
-const hintClass = "font-normal text-[var(--color-ink-400)]";
-// SHARED-GAP: a full-width, left-aligned, two-line outline option (a place or
-// address match in a picker list). secondaryButtonClass centres its words, and
-// appending justify-start/text-left would fight it in stylesheet order.
-const pickerOptionClass =
-  "block w-full min-h-12 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-4 py-2 text-left text-sm " +
-  "text-[var(--color-ink-700)] transition-colors duration-150 hover:bg-[var(--color-sage-100)] " +
-  PRESS_FEEDBACK +
-  " " +
-  focusRingClass;
-// SHARED-GAP: the red-edged failure box at the top of a form (cardClass's bone 200 edge can't be overridden by appending).
-const failureBoxClass = "rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 py-3";
-// Two form buttons sharing the save row's two-thirds cell: full width, words centred if they wrap on a phone.
-const pairButton = "w-full text-center";
 
 interface TextFieldProps {
   id: string;
@@ -191,7 +182,7 @@ function TextField({ id, label, value, onChange, max, error, required, multiline
       <label htmlFor={id} className={labelClass}>
         {label}
         {required && (
-          <span aria-hidden className="text-[var(--color-danger)]">
+          <span aria-hidden className={requiredMarkClass}>
             {" "}*
           </span>
         )}
@@ -237,7 +228,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
   const [status, setStatus] = useState<EventStatus>(initialStatus ?? "draft");
   const [version, setVersion] = useState(expectedUpdatedAt);
   const [cancelling, setCancelling] = useState(false);
-  // Shown inside the archive confirm, so a failure is seen where the admin pressed (the box at the top stays for Reload).
+  // Shown inside the archive confirm, so a failure is seen where the admin pressed (a conflict goes to the top box, with Reload, instead).
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const { asking: askingArchive, ask: askArchive, cancel: cancelArchive, triggerRef: archiveRef } = useAdminConfirm();
   const [suggest, setSuggest] = useState<"idle" | "busy" | "done" | "none" | "full" | "error">("idle");
@@ -402,9 +393,11 @@ export default function EventForm({ venues, eventId, initialValues, status: init
     setBusy(true);
     setFailure(null);
     setArchiveError(null);
+    // Shown once: inside the confirm, where the admin pressed; a conflict
+    // goes only to the top box instead, the one that carries Reload.
     const fail = (message: string, code: string | null) => {
-      setFailure({ message, code });
-      setArchiveError(message);
+      if (code === "conflict") setFailure({ message, code });
+      else setArchiveError(message);
     };
     try {
       const res = await fetch(`/api/admin/events/${eventId}/archive`, {
@@ -457,7 +450,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         void send(isEdit ? "save" : "save_draft");
       }}
       noValidate
-      className="max-w-2xl space-y-5"
+      className="space-y-5"
     >
       {notice && <p className={`${cardSlimClass} text-sm text-[var(--color-ink-700)]`}>{notice}</p>}
 
@@ -478,7 +471,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
 
       {failure && (
         <div role="alert" className={failureBoxClass}>
-          <p className="text-sm font-medium text-[var(--color-danger)]">{failure.message}</p>
+          <p className={`${failureLineClass} font-medium`}>{failure.message}</p>
           {failure.code === "conflict" && (
             <button type="button" onClick={() => window.location.reload()} className={`mt-2 ${dangerButtonClass}`}>
               Reload
@@ -512,7 +505,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       </div>
 
       {/* Start / end — Pueblo time, converted to UTC by the server. */}
-      <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4">
+      <fieldset className={fieldGroupClass}>
         <legend className={`${labelClass} px-1`}>
           When <span className={hintClass}>(Pueblo time, Mountain Time)</span>
         </legend>
@@ -523,9 +516,9 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       </fieldset>
 
       {/* Place — pick an existing venue, or type an address and find its location. */}
-      <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4">
+      <fieldset className={fieldGroupClass}>
         <legend className={`${labelClass} px-1`}>
-          Where <span aria-hidden className="text-[var(--color-danger)]">*</span>
+          Where <span aria-hidden className={requiredMarkClass}>*</span>
         </legend>
         {/* WHY short words: the slider's two halves are equal and never wrap, so at 360 wide the
             longer "A place already on the map" would push the page sideways. The legend carries the meaning. */}
@@ -663,7 +656,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       </div>
 
       {/* The link becomes the card's green action button (#882); no link, no button. */}
-      <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4">
+      <fieldset className={fieldGroupClass}>
         <legend className={`${labelClass} px-1`}>Action button</legend>
         <div className="space-y-4">
           <TextField id="event-link" type="url" label="Link" hint="(optional) starts with https://" value={values.linkUrl} onChange={(v) => set("linkUrl", v)} max={FIELD_LIMITS.SUGGEST_CONTACT} error={errors.link_url} />
@@ -712,20 +705,21 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       {/* Cancel (a link: saves nothing) then the save buttons. Save draft / Save changes stays the
           form's first type="submit", so Enter in a box saves. */}
       <div className={saveRowClass}>
-        <Link href="/admin/events" className={ADMIN_SECONDARY_BUTTON}>
+        {/* The list, where Archive lands too (a save stays on the form). Off while a save runs. */}
+        <Link href="/admin/events" className={ADMIN_SECONDARY_BUTTON} {...cancelLinkProps(busy)}>
           Cancel
         </Link>
         {hasPublish ? (
           <div className="grid grid-cols-2 gap-2">
-            <button type="submit" disabled={busy} className={`${ADMIN_SECONDARY_BUTTON} ${pairButton}`}>
+            <button type="submit" disabled={busy} className={`${ADMIN_SECONDARY_BUTTON} w-full`}>
               {busy ? "Saving…" : "Save draft"}
             </button>
-            <button type="button" disabled={busy} onClick={() => void send("publish")} className={`${ADMIN_PRIMARY_BUTTON} ${pairButton}`}>
+            <button type="button" disabled={busy} onClick={() => void send("publish")} className={`${ADMIN_PRIMARY_BUTTON} w-full`}>
               Publish
             </button>
           </div>
         ) : (
-          <button type="submit" disabled={busy} className={`${ADMIN_PRIMARY_BUTTON} ${pairButton}`}>
+          <button type="submit" disabled={busy} className={`${ADMIN_PRIMARY_BUTTON} w-full`}>
             {busy ? "Saving…" : isEdit && status !== "draft" ? "Save changes" : "Save draft"}
           </button>
         )}

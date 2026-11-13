@@ -12,9 +12,9 @@
  * own form/route split. Its field, label, error, tick-box and save-row
  * classes come from formClasses.ts and its smaller buttons from
  * src/lib/adminCardStyles.ts, shared with the other admin forms (#926; the
- * public forms use PublicForm.tsx's). The save row is Cancel (a link back
- * to Places that saves nothing) then the submit, which stays the form's
- * first submit button so Enter saves.
+ * public forms use PublicForm.tsx's). The save row is Cancel (a link that
+ * saves nothing, back to where a save would land, off while a save runs)
+ * then the submit, which stays the form's first submit button so Enter saves.
  *
  * ONE component serves both modes (#255 explicitly asked for this, not a
  * forked near-identical form) — create and edit submit the identical field
@@ -22,7 +22,8 @@
  * endpoint/method to call and what to say on the button. The optional
  * `venueId` prop is the mode switch: absent -> POST /api/admin/venues
  * (create); present -> PATCH /api/admin/venues/<venueId> (edit). Both modes
- * share the same success handling: redirect to /admin + router.refresh() so
+ * share the same success handling: redirect to `afterSaveHref` (the Places
+ * list, or its To review filter after a hand-off) + router.refresh() so
  * the Server Component's venues query re-runs and the change is visible
  * immediately. `initialValues` (pre-#255) already covered pre-filling the
  * form; edit mode is just that same prop combined with `venueId`, wired by
@@ -80,15 +81,19 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import {
   ADMIN_PRIMARY_BUTTON,
   ADMIN_SECONDARY_BUTTON,
+  cancelLinkProps,
   checkboxClass,
   checkboxRowClass,
   errorClass,
+  fieldGroupClass,
+  hintClass,
   inputBase,
   inputBorder,
   labelClass,
+  requiredMarkClass,
   saveRowClass,
 } from "@/components/formClasses";
-import { secondaryButtonClass } from "@/lib/adminCardStyles";
+import { dangerButtonClass, failureBoxClass, failureLineClass, secondaryButtonClass } from "@/lib/adminCardStyles";
 import { EMAIL_RE } from "@/lib/email";
 import type { IrregularSchedule, VenueCategory, WeeklyHours } from "@/types/venue";
 
@@ -525,6 +530,22 @@ export default function AddVenueForm({
     }
   }
 
+  // Where a successful save lands, and where Cancel goes (#926: the same
+  // place, so leaving a review hand-off either way returns to its list).
+  // #259/#390/#674/#675: a create that approved a submission returns to the
+  // Places tab's "To review" + "The public" filters (/admin/submissions is
+  // now a redirect there, #675); either mode approving a change_proposals row
+  // returns to the Places tab's plain "To review" filter (#674 folded
+  // /admin/flags into Places), so the admin picks up the next pending item in
+  // either case. Otherwise /admin/places: a venue-edit flow lands back on the
+  // venue list, not the Dashboard at /admin.
+  const afterSaveHref =
+    !isEditMode && submissionId != null
+      ? "/admin/places?show=review&from=public"
+      : proposalId != null
+        ? "/admin/places?show=review"
+        : "/admin/places";
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -603,21 +624,7 @@ export default function AddVenueForm({
       });
 
       if (res.status === successStatus) {
-        // #259/#390/#674/#675: a create that approved a submission returns
-        // to the Places tab's "To review" + "The public" filters
-        // (/admin/submissions is now a redirect there, #675); either mode
-        // approving a change_proposals row returns to the Places tab's
-        // plain "To review" filter (#674 folded /admin/flags into Places) —
-        // so the admin picks up the next pending item in either case,
-        // rather than the plain venue list.
-        // Default target is /admin/places (moved from /admin, admin
-        // dashboard build — /admin is now the Dashboard, a different
-        // screen; a venue-edit flow should land back on the venue list, not
-        // the to-do list).
-        let redirectTo = "/admin/places";
-        if (!isEditMode && submissionId != null) redirectTo = "/admin/places?show=review&from=public";
-        else if (proposalId != null) redirectTo = "/admin/places?show=review";
-        router.push(redirectTo);
+        router.push(afterSaveHref);
         router.refresh();
         return;
       }
@@ -657,21 +664,17 @@ export default function AddVenueForm({
     error: "text-[var(--color-clay-700)]",
   };
   const requiredMark = (
-    <span aria-hidden className="text-[var(--color-danger)]">
+    <span aria-hidden className={requiredMarkClass}>
       {" "}
       *
     </span>
   );
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="max-w-2xl space-y-5">
+    <form onSubmit={handleSubmit} noValidate className="space-y-5">
       {status === "error" && (
-        <div role="alert" className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 py-3">
-          {errorMessage ? (
-            <p className="text-sm font-medium text-[var(--color-danger)]">{errorMessage}</p>
-          ) : (
-            <p className="text-sm font-medium text-[var(--color-danger)]">The place was not saved. Try again.</p>
-          )}
+        <div role="alert" className={failureBoxClass}>
+          <p className={`${failureLineClass} font-medium`}>{errorMessage || "The place was not saved. Try again."}</p>
           {/* #265: a real reload, not router.refresh() — the admin needs the
               CURRENT venue row + a fresh expectedUpdatedAt from the server
               component, not just a client re-render. The form (and every
@@ -679,7 +682,7 @@ export default function AddVenueForm({
               actually click this — nothing here clears `values` — so
               they can copy their unsaved changes out first. */}
           {errorCode === "conflict" && (
-            <button type="button" onClick={() => window.location.reload()} className={`mt-2 ${secondaryButtonClass}`}>
+            <button type="button" onClick={() => window.location.reload()} className={`mt-2 ${dangerButtonClass}`}>
               Reload
             </button>
           )}
@@ -747,7 +750,7 @@ export default function AddVenueForm({
 
           <div>
             <label htmlFor="box-host-name" className={labelClass}>
-              Host name
+              Host name <span className={hintClass}>(optional)</span>
             </label>
             <input
               type="text"
@@ -762,7 +765,7 @@ export default function AddVenueForm({
 
           <div>
             <label htmlFor="box-host-note" className={labelClass}>
-              Public note from the host
+              Public note from the host <span className={hintClass}>(optional)</span>
             </label>
             <textarea
               id="box-host-note"
@@ -778,7 +781,7 @@ export default function AddVenueForm({
           <div>
             <label htmlFor="box-host-contact" className={labelClass}>
               Host contact{" "}
-              <span className="font-normal text-[var(--color-ink-400)]">(private, never shown publicly)</span>
+              <span className={hintClass}>(optional, private, never shown publicly)</span>
             </label>
             <input
               type="text"
@@ -793,7 +796,7 @@ export default function AddVenueForm({
 
           <div>
             <label htmlFor="box-most-needed" className={labelClass}>
-              Most needed
+              Most needed <span className={hintClass}>(optional)</span>
             </label>
             <input
               type="text"
@@ -809,7 +812,7 @@ export default function AddVenueForm({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="box-installed-on" className={labelClass}>
-                Installed on
+                Installed on <span className={hintClass}>(optional)</span>
               </label>
               <input
                 type="date"
@@ -821,7 +824,7 @@ export default function AddVenueForm({
             </div>
             <div>
               <label htmlFor="box-removed-on" className={labelClass}>
-                Removed on
+                Removed on <span className={hintClass}>(optional)</span>
               </label>
               <input
                 type="date"
@@ -840,7 +843,7 @@ export default function AddVenueForm({
           the DEBOUNCED coordinates above (never raw values.lat/lng — see
           that state's own comment) so it redraws after typing or after
           "Find location from address" sets both fields at once. */}
-      <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4">
+      <fieldset className={fieldGroupClass}>
         <legend className={labelClass.replace("mb-1", "mb-2 px-1")}>Location</legend>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <div className="min-w-0 flex-1 space-y-4">
@@ -1009,7 +1012,7 @@ export default function AddVenueForm({
       {/* Hours — basic per-day text, not a scheduler (kept lean per #254) */}
       <fieldset className="space-y-2">
         <legend className={labelClass.replace("mb-1", "mb-2")}>
-          Hours <span className="font-normal text-[var(--color-ink-400)]">(optional)</span>
+          Hours <span className={hintClass}>(optional)</span>
         </legend>
         <p className="text-xs text-[var(--color-ink-400)] mb-2">
           Comma-separated time ranges per day, e.g. &quot;9:00-17:00&quot;. Leave a day blank if closed or unknown.
@@ -1045,7 +1048,7 @@ export default function AddVenueForm({
           have both. */}
       <fieldset className="space-y-3">
         <legend className={labelClass.replace("mb-1", "mb-2")}>
-          Monthly schedule <span className="font-normal text-[var(--color-ink-400)]">(optional)</span>
+          Monthly schedule <span className={hintClass}>(optional)</span>
         </legend>
         <p className="text-xs text-[var(--color-ink-400)] mb-2">
           For a schedule hours_weekly can&apos;t express, e.g. &quot;4th Tuesday of each month.&quot;
@@ -1186,7 +1189,7 @@ export default function AddVenueForm({
       {/* Phone */}
       <div>
         <label htmlFor="venue-phone" className={labelClass}>
-          Phone
+          Phone <span className={hintClass}>(optional)</span>
         </label>
         <input
           type="tel"
@@ -1201,7 +1204,7 @@ export default function AddVenueForm({
       {/* Email */}
       <div>
         <label htmlFor="venue-email" className={labelClass}>
-          Email
+          Email <span className={hintClass}>(optional)</span>
         </label>
         <input
           type="email"
@@ -1226,7 +1229,7 @@ export default function AddVenueForm({
       {/* Website */}
       <div>
         <label htmlFor="venue-url" className={labelClass}>
-          Website
+          Website <span className={hintClass}>(optional)</span>
         </label>
         <input
           type="url"
@@ -1241,7 +1244,7 @@ export default function AddVenueForm({
       {/* Operator */}
       <div>
         <label htmlFor="venue-operator" className={labelClass}>
-          Operator
+          Operator <span className={hintClass}>(optional)</span>
         </label>
         <input
           type="text"
@@ -1256,7 +1259,7 @@ export default function AddVenueForm({
       {/* Notes */}
       <div>
         <label htmlFor="venue-notes" className={labelClass}>
-          Notes
+          Notes <span className={hintClass}>(optional)</span>
         </label>
         <textarea
           id="venue-notes"
@@ -1325,7 +1328,7 @@ export default function AddVenueForm({
           {venueToldUs && (
             <div>
               <label htmlFor="venue-told-us-note" className={labelClass}>
-                Who told us, and how <span className="font-normal text-[var(--color-ink-400)]">(optional)</span>
+                Who told us, and how <span className={hintClass}>(optional)</span>
               </label>
               <input
                 type="text"
@@ -1342,9 +1345,10 @@ export default function AddVenueForm({
       )}
 
       {/* Cancel, then submit (#926 decision 6). Cancel is a link, so the
-          submit stays the form's first submit button and Enter still saves. */}
+          submit stays the form's first submit button and Enter still saves.
+          It goes where a save would land, and is off while a save runs. */}
       <div className={saveRowClass}>
-        <Link href="/admin/places" className={ADMIN_SECONDARY_BUTTON}>
+        <Link href={afterSaveHref} className={ADMIN_SECONDARY_BUTTON} {...cancelLinkProps(status === "submitting")}>
           Cancel
         </Link>
         <button

@@ -260,6 +260,26 @@ describe("EditVenuePage — blessing box check-ins panel (slice 2)", () => {
     expect(screen.getByTestId("box-checkins-panel-stub").getAttribute("data-count")).toBe("3");
   });
 
+  // #926 heading rule: the page title is the one h2; every section under it is an h3.
+  test("heading levels: the title is the only h2, and each section is an h3", async () => {
+    mockGetAdminDb.mockResolvedValue({
+      db: makeBoxCheckinsDb(makeRow({ category: "blessing_box" }), []),
+      identity: { email: "admin@example.com" },
+    });
+
+    render(
+      await EditVenuePage({
+        params: Promise.resolve({ id: "manual-abc" }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual([expect.stringMatching(/^Edit /)]);
+    for (const name of ["Check-ins", "Host alert emails", "Danger zone"]) {
+      expect(screen.getByRole("heading", { level: 3, name })).toBeDefined();
+    }
+  });
+
   test("an ordinary (non-box) venue renders no check-ins panel, and box_checkins is never queried", async () => {
     const throwIfCalled = () => {
       throw new Error("box_checkins should never be queried for a non-blessing_box venue");

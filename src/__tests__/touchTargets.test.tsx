@@ -468,6 +468,7 @@ describe("admin shared class strings", () => {
     ["chipClass(true)", adminStyles.chipClass(true)],
     ["chipClass(false)", adminStyles.chipClass(false)],
     ["tapLinkClass", adminStyles.tapLinkClass],
+    ["pickerOptionClass", adminStyles.pickerOptionClass],
     ["inputBase", formClasses.inputBase],
     ["checkboxRowClass", formClasses.checkboxRowClass],
   ];

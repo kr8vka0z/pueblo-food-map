@@ -11,12 +11,12 @@
 import Link from "next/link";
 import {
   cardClass,
+  emptyStateClass,
   focusRingClass,
   linkClass,
   secondaryButtonClass,
   sectionTitleClass,
   tagClass,
-  tapLinkClass,
   type TagTone,
 } from "@/lib/adminCardStyles";
 import { ADMIN_PRIMARY_BUTTON, ADMIN_SECONDARY_BUTTON, inputBase, inputBorder, labelClass } from "@/components/formClasses";
@@ -230,8 +230,9 @@ export interface ActivityLogProps {
 
 export default function ActivityLog({ days, filters, people, olderHref, filtered = false }: ActivityLogProps) {
   return (
-    <div className="mx-auto max-w-3xl">
-      <form method="get" action="/admin/activity" className={`${cardClass} mb-6 grid gap-4 sm:grid-cols-2`}>
+    // Its parts sit 24 apart, the same gap as the page body's (#926).
+    <div className="flex flex-col gap-5">
+      <form method="get" action="/admin/activity" className={`${cardClass} grid gap-4 sm:grid-cols-2`}>
         <div>
           <label htmlFor="activity-person" className={labelClass}>
             Person
@@ -287,20 +288,21 @@ export default function ActivityLog({ days, filters, people, olderHref, filtered
       </form>
 
       {days.length === 0 ? (
-        <div className="flex flex-wrap items-center gap-x-3">
-          <p className="text-sm text-[var(--color-ink-500)]">No activity matches these filters.</p>
+        <div className={emptyStateClass}>
+          <p>No activity matches these filters.</p>
           {filtered && (
-            <Link href="/admin/activity" className={`${tapLinkClass} text-sm`}>
+            <Link href="/admin/activity" className={secondaryButtonClass}>
               Clear filters
             </Link>
           )}
         </div>
       ) : (
         days.map((day) => (
-          <section key={day.ymd} className="mb-8" aria-labelledby={`day-${day.ymd}`}>
-            <h2 id={`day-${day.ymd}`} className={`${sectionTitleClass} mb-3`}>
+          <section key={day.ymd} aria-labelledby={`day-${day.ymd}`}>
+            {/* h3: the page title is the h2 (#926 decision 5). */}
+            <h3 id={`day-${day.ymd}`} className={`${sectionTitleClass} mb-3`}>
               {day.label}
-            </h2>
+            </h3>
             <ul className="space-y-3">
               {day.groups.map((group) => (
                 <GroupCard key={group.key} group={group} />
@@ -311,10 +313,7 @@ export default function ActivityLog({ days, filters, people, olderHref, filtered
       )}
 
       {olderHref && (
-        <Link
-          href={olderHref}
-          className={secondaryButtonClass}
-        >
+        <Link href={olderHref} className={`${secondaryButtonClass} self-start`}>
           Show older
         </Link>
       )}

@@ -63,7 +63,9 @@ describe("EventSubmissionsList", () => {
     expect(fetchMock.mock.calls[0][0]).toBe(`/api/admin/event-submissions/s1/${path}`);
   });
 
-  test("while a choice is in flight, the other sends nothing", async () => {
+  // #926 integration: the three-dot button itself is disabled while busy, so
+  // the menu cannot even open for a second choice.
+  test("while a choice is in flight, the menu button is off and nothing more is sent", async () => {
     const user = userEvent.setup();
     fetchMock.mockReturnValue(new Promise(() => {})); // never answers
     render(<EventSubmissionsList items={[item("s1", soupNight)]} />);
@@ -71,9 +73,10 @@ describe("EventSubmissionsList", () => {
 
     await user.click(menuButton());
     await user.click(screen.getByRole("menuitem", { name: "Make it a draft event" }));
+    expect(menuButton()).toBeDisabled();
     await user.click(menuButton());
-    await user.click(screen.getByRole("menuitem", { name: "Dismiss" }));
 
+    expect(screen.queryByRole("menu")).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

@@ -47,7 +47,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { PublishChangeSummary } from "@/lib/adminVenues";
 import { pluralize } from "@/lib/pluralize";
-import { cardClass, linkClass, primaryButtonClass, tapLinkClass } from "@/lib/adminCardStyles";
+import { cardClass, failureLineClass, linkClass, primaryButtonClass, tapLinkClass } from "@/lib/adminCardStyles";
 import AdminConfirm, { useAdminConfirm } from "@/components/AdminConfirm";
 
 export interface PublishPanelProps {
@@ -173,7 +173,7 @@ export default function PublishPanel({ summary, reviewHref }: PublishPanelProps)
   }
 
   return (
-    <section className={`${cardClass} mb-6`}>
+    <section className={cardClass}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-[var(--color-ink-700)]">
           {upToDate ? (
@@ -236,7 +236,7 @@ export default function PublishPanel({ summary, reviewHref }: PublishPanelProps)
       )}
 
       {state.status === "error" && (
-        <p role="alert" className="mt-3 text-sm text-[var(--color-danger)]">
+        <p role="alert" className={`mt-3 ${failureLineClass}`}>
           {state.message}
         </p>
       )}

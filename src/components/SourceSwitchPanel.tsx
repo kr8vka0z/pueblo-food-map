@@ -21,7 +21,7 @@ export function SourceSwitchList({ states }: { states: SwitchState[] | null }) {
   const bySource = new Map<string, SwitchState[]>();
   for (const s of states) bySource.set(s.source, [...(bySource.get(s.source) ?? []), s]);
   return (
-    <div className={`${cardSlimClass} mb-4`}>
+    <div className={cardSlimClass}>
       {[...bySource].map(([source, pairs]) => (
         <div key={source} className="text-sm">
           <p className={groupTitleClass}>

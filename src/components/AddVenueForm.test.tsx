@@ -158,6 +158,25 @@ describe("AddVenueForm — submit", () => {
     expect(mockPush).toHaveBeenCalledWith("/admin/places");
   });
 
+  // #926: nobody leaves the page while a save still lands, and Cancel goes
+  // where that save would have gone (a review hand-off returns to its list).
+  test("while a save runs, Cancel is off and its click is stopped; it points where Save lands", async () => {
+    mockFetch.mockReturnValueOnce(new Promise(() => {})); // the save never answers
+    const user = userEvent.setup();
+    render(<AddVenueForm venueId="manual-abc" proposalId={748} />);
+    const cancel = screen.getByRole("link", { name: "Cancel" });
+    expect(cancel.getAttribute("href")).toBe("/admin/places?show=review");
+    expect(cancel).not.toHaveAttribute("aria-disabled");
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /Save changes/i }));
+
+    await waitFor(() => expect(cancel).toHaveAttribute("aria-disabled", "true"));
+    expect(cancel).toHaveAttribute("tabindex", "-1");
+    // fireEvent returns false when a handler called preventDefault: the link does not navigate.
+    expect(fireEvent.click(cancel)).toBe(false);
+  });
+
   test("a server 422 response renders the returned per-field error inline, no redirect", async () => {
     mockFetch.mockResolvedValueOnce({
       status: 422,

@@ -54,11 +54,14 @@ import type {
   ReviewLane,
 } from "@/lib/adminProposals";
 import type { VenueLookup } from "@/lib/adminVenueLookup";
-import AdminConfirm, { useAdminConfirm } from "@/components/AdminConfirm";
-import { inputBase, inputBorder } from "@/components/formClasses";
+import AdminConfirm, { useAdminConfirm, useAdminStep } from "@/components/AdminConfirm";
+import { hintClass, inputBase, inputBorder } from "@/components/formClasses";
 import {
   cardClass,
+  cardNameClass,
+  controlLabelClass,
   dangerButtonClass,
+  failureLineClass,
   fieldLabelClass,
   formatSubmittedAt,
   linkClass,
@@ -207,7 +210,9 @@ export interface ProposalCardProps {
 
 export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
   const router = useRouter();
-  const [rejectOpen, setRejectOpen] = useState(false);
+  // Focus goes to the reason box on open and back to the button on Cancel (#926).
+  const { open: rejectOpen, openStep: openReject, closeStep: closeReject, triggerRef: rejectRef, fieldRef: reasonRef } =
+    useAdminStep();
   const [reason, setReason] = useState("");
   const [rejectState, setRejectState] = useState<ActionState>({ status: "idle" });
   const [approveState, setApproveState] = useState<ActionState>({ status: "idle" });
@@ -305,7 +310,7 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
             need to scope queries to one column or the other rather than
             asserting on now-legitimately-duplicated text. */}
         <div data-testid="proposal-detail" className="min-w-0 flex-1">
-          <p className="text-base font-semibold text-[var(--color-ink-700)]">{venueName}</p>
+          <p className={cardNameClass}>{venueName}</p>
           {/* Address alongside the name — recognising the actual place, not just
               matching an id, is what lets an admin judge the change at all. */}
           {venue?.address && <p className="text-sm text-[var(--color-ink-500)]">{venue.address}</p>}
@@ -397,26 +402,25 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
           </>
         )}
         {/* Hidden while the archive confirm is open: one decision at a time. */}
-        {!rejectOpen && !asking && (
-          <button type="button" onClick={() => setRejectOpen(true)} className={secondaryButtonClass}>
-            Reject
-          </button>
-        )}
+        <button ref={rejectRef} type="button" hidden={rejectOpen || asking} onClick={openReject} className={secondaryButtonClass}>
+          Reject
+        </button>
       </div>
 
       {/* The removal's own failure shows inside its confirm instead. */}
       {approveState.status === "error" && !asking && (
-        <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
+        <p role="alert" className={`mt-2 ${failureLineClass}`}>
           {approveState.message}
         </p>
       )}
 
       {rejectOpen && (
         <div className="mt-4 border-t border-[var(--color-bone-200)] pt-4">
-          <label htmlFor={reasonFieldId} className={`${fieldLabelClass} mb-1 block`}>
-            Reason <span className="font-normal normal-case text-[var(--color-ink-400)]">(optional, for your own notes)</span>
+          <label htmlFor={reasonFieldId} className={controlLabelClass}>
+            Reason <span className={`${hintClass} normal-case`}>(optional, for your own notes)</span>
           </label>
           <textarea
+            ref={reasonRef}
             id={reasonFieldId}
             rows={2}
             value={reason}
@@ -428,9 +432,9 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
             <button
               type="button"
               onClick={() => {
-                setRejectOpen(false);
                 setReason("");
                 setRejectState({ status: "idle" });
+                closeReject();
               }}
               disabled={rejectState.status === "submitting"}
               className={secondaryButtonClass}
@@ -447,7 +451,7 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
             </button>
           </div>
           {rejectState.status === "error" && (
-            <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
+            <p role="alert" className={`mt-2 ${failureLineClass}`}>
               {rejectState.message}
             </p>
           )}

@@ -21,17 +21,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAdminStep } from "@/components/AdminConfirm";
 import type { AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import {
   cardClass,
+  cardNameClass,
+  controlLabelClass,
   dangerButtonClass,
+  failureLineClass,
   fieldLabelClass,
   formatSubmittedAt,
   primaryButtonClass,
   secondaryButtonClass,
   tagClass,
 } from "@/lib/adminCardStyles";
-import { inputBase, inputBorder } from "@/components/formClasses";
+import { hintClass, inputBase, inputBorder } from "@/components/formClasses";
 
 export interface PhotoReviewCardProps {
   photo: AdminBoxPhotoRow;
@@ -46,7 +50,9 @@ type ActionState =
 
 export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
   const router = useRouter();
-  const [rejectOpen, setRejectOpen] = useState(false);
+  // Focus goes to the reason box on open and back to the button on Cancel (#926).
+  const { open: rejectOpen, openStep: openReject, closeStep: closeReject, triggerRef: rejectRef, fieldRef: reasonRef } =
+    useAdminStep();
   const [reason, setReason] = useState("");
   const [state, setState] = useState<ActionState>({ status: "idle" });
 
@@ -103,7 +109,7 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
           className="h-56 w-full rounded-[var(--radius-md)] border border-[var(--color-bone-200)] object-cover sm:h-48 sm:w-48 sm:flex-none"
         />
         <div className="space-y-1">
-          <p className="text-base font-semibold text-[var(--color-ink-700)]">{photo.venue_name}</p>
+          <p className={cardNameClass}>{photo.venue_name}</p>
           {photo.checkin_kind && (
             <p className="text-sm text-[var(--color-ink-700)]">
               <span className={fieldLabelClass}>Attached to check-in: </span>
@@ -129,24 +135,25 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
               ? "Keep photo"
               : "Approve"}
         </button>
-        {!rejectOpen && (
-          <button
-            type="button"
-            onClick={() => setRejectOpen(true)}
-            disabled={state.status === "submitting"}
-            className={secondaryButtonClass}
-          >
-            {isFlagged ? "Remove photo" : "Reject"}
-          </button>
-        )}
+        <button
+          ref={rejectRef}
+          type="button"
+          hidden={rejectOpen}
+          onClick={openReject}
+          disabled={state.status === "submitting"}
+          className={secondaryButtonClass}
+        >
+          {isFlagged ? "Remove photo" : "Reject"}
+        </button>
       </div>
 
       {rejectOpen && (
         <div className="mt-4 border-t border-[var(--color-bone-200)] pt-4">
-          <label htmlFor={reasonFieldId} className={`${fieldLabelClass} mb-1 block`}>
-            Reason <span className="font-normal normal-case text-[var(--color-ink-400)]">(optional, for your own notes)</span>
+          <label htmlFor={reasonFieldId} className={controlLabelClass}>
+            Reason <span className={`${hintClass} normal-case`}>(optional, for your own notes)</span>
           </label>
           <textarea
+            ref={reasonRef}
             id={reasonFieldId}
             rows={2}
             value={reason}
@@ -158,9 +165,9 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
             <button
               type="button"
               onClick={() => {
-                setRejectOpen(false);
                 setReason("");
                 setState({ status: "idle" });
+                closeReject();
               }}
               disabled={state.status === "submitting"}
               className={secondaryButtonClass}
@@ -182,7 +189,7 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
       )}
 
       {state.status === "error" && (
-        <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
+        <p role="alert" className={`mt-2 ${failureLineClass}`}>
           {state.message}
         </p>
       )}

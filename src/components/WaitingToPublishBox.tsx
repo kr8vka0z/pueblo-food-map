@@ -14,6 +14,8 @@
  * PublishPanel).
  */
 
+import { clayNoticeClass } from "@/lib/adminCardStyles";
+
 export interface WaitingToPublishChange {
   field: string;
   label: string;
@@ -25,12 +27,6 @@ export interface WaitingToPublishChange {
 export interface WaitingToPublishBoxProps {
   changes: WaitingToPublishChange[];
 }
-
-// SHARED-GAP: the clay notice box (clay 100 fill, clay 500 edge, radius lg,
-// clay 700 words), used here and by the edit page's dead-link banner;
-// belongs in src/lib/adminCardStyles.ts.
-export const clayNoticeClass =
-  "max-w-2xl rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]";
 
 export default function WaitingToPublishBox({ changes }: WaitingToPublishBoxProps) {
   if (changes.length === 0) return null;

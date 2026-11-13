@@ -13,15 +13,7 @@
  * browser state.
  */
 
-// SHARED-GAP: a tile card with 16 px padding at every width (the design
-// page's .pa-kpi and .pa-need tiles; DashboardNeedsStrip imports it too).
-// cardClass steps to 24 px from 640 wide, which squeezes four tiles across
-// inside a section card; cardSlimClass is 12 by 16.
-export const tileCardClass =
-  "elevation-1 min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4";
-// SHARED-GAP: the tile's 12 px capitals label in ink 500 (the design page's
-// .pa-kpi .l and .pa-need .l). fieldLabelClass is 11 px in ink 400.
-export const tileLabelClass = "text-xs font-medium uppercase tracking-wide text-[var(--color-ink-500)]";
+import { tileCardClass, tileLabelClass } from "@/lib/adminCardStyles";
 
 export interface KpiCardProps {
   label: string;

@@ -23,7 +23,7 @@ import { publicFlyerOf, type EventRow } from "@/lib/events";
 import AdminNav from "@/components/AdminNav";
 import EventForm, { type EventFormValues } from "@/components/EventForm";
 import EventsList from "@/components/EventsList";
-import { cardClass, pageTitleClass, tapLinkClass } from "@/lib/adminCardStyles";
+import { cardClass, formPageBodyClass, pageTitleClass, tapLinkClass } from "@/lib/adminCardStyles";
 
 function toFormValues(e: EventRow): Partial<EventFormValues> {
   return {
@@ -73,13 +73,13 @@ export default async function EditEventPage({
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="events" counts={navCounts} showActivity={identity.isOwner === true} />
-      <div className="space-y-6 px-4 py-6 sm:px-6">
+      <div className={formPageBodyClass}>
         <h2 className={pageTitleClass}>Edit event</h2>
         {event === undefined ? (
           // null list = EventsList's shared "couldn't load / Retry" panel (Retry re-runs this page's read).
           <EventsList events={null} />
         ) : event.status === "archived" ? (
-          <div className={`max-w-xl ${cardClass}`}>
+          <div className={cardClass}>
             <p className="text-sm text-[var(--color-ink-700)]">
               <span className="font-medium text-[var(--color-ink-900)]">{event.name}</span> is archived. Archiving is final, so it can&rsquo;t be edited.
             </p>

@@ -50,7 +50,7 @@ import AdminNav from "@/components/AdminNav";
 import BoxesToReviewBox from "@/components/BoxesToReviewBox";
 import BoxReportsChart from "@/components/BoxReportsChart";
 import AllBoxesTable from "@/components/AllBoxesTable";
-import { cardClass, pageTitleClass, sectionTitleClass } from "@/lib/adminCardStyles";
+import { cardClass, pageBodyClass, pageTitleClass, sectionTitleClass } from "@/lib/adminCardStyles";
 
 /** The chart's own window — src/lib/adminDashboard.ts's bucketCheckinsByWeek default. */
 const CHART_WEEKS = 8;
@@ -96,8 +96,8 @@ export default async function BoxesPage({
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="boxes" counts={navCounts} showActivity={identity.isOwner === true} />
-      <div className="px-4 py-6 sm:px-6">
-        <h2 className={`${pageTitleClass} mb-4`}>Blessing Boxes</h2>
+      <div className={pageBodyClass}>
+        <h2 className={pageTitleClass}>Blessing Boxes</h2>
 
         <BoxesToReviewBox
           reviewingBoxCount={reviewingBoxCount}
@@ -107,7 +107,7 @@ export default async function BoxesPage({
         />
 
         {/* Sections are h3: the page title above is this page's h2 (#926 decision 5). */}
-        <section className={`${cardClass} mb-6`}>
+        <section className={cardClass}>
           <h3 className={sectionTitleClass}>Box reports, last 8 weeks</h3>
           <div className="mt-3">
             <BoxReportsChart buckets={weeklyBuckets} />

@@ -89,8 +89,10 @@ import DailyBars from "@/components/DailyBars";
 import DashboardPeriodPicker from "@/components/DashboardPeriodPicker";
 import {
   cardClass,
+  clayNoticeClass,
   groupTitleClass,
   linkClass,
+  pageBodyClass,
   pageTitleClass,
   sectionTitleClass,
   tapLinkClass,
@@ -305,7 +307,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="dashboard" counts={navCounts} showActivity={identity.isOwner === true} />
-      <div className="flex flex-col gap-6 px-4 py-6 sm:px-6">
+      <div className={pageBodyClass}>
         {publishBotStatus && (
           <PublishBotStatusBanner
             prNumber={publishBotStatus.number}
@@ -317,7 +319,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           // Same copy as /admin/places' own staging banner (#673 pt.6) —
           // one consistent message wherever an admin might expect a Publish
           // panel on this test site.
-          <p className="rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]">
+          <p className={clayNoticeClass}>
             Test site: publishing is turned off here.
           </p>
         ) : (
@@ -335,9 +337,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </section>
 
         <section aria-labelledby="visitors-heading" className={cardClass}>
-          <h2 id="visitors-heading" className={sectionTitleClass}>
+          <h3 id="visitors-heading" className={sectionTitleClass}>
             Visitors
-          </h2>
+          </h3>
           {visitors ? (
             <div className="mt-3 flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -363,11 +365,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 </p>
               )}
               <div>
-                <h3 className={groupTitleClass}>Visitors per day</h3>
+                <h4 className={groupTitleClass}>Visitors per day</h4>
                 <DailyBars points={visitors.dailyVisitors.map((d) => ({ date: d.date, value: d.visits }))} emptyMessage="No visitor data yet for this period." />
               </div>
               <div>
-                <h3 className={groupTitleClass}>How people found the site</h3>
+                <h4 className={groupTitleClass}>How people found the site</h4>
                 <BarList
                   items={visitors.referrers.map((r) => ({ label: r.label, value: r.visits, displayValue: `${r.visits} visits` }))}
                   emptyMessage="No referrer data yet for this period."
@@ -381,9 +383,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         <section aria-labelledby="map-usage-heading" className={cardClass}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 id="map-usage-heading" className={sectionTitleClass}>
+            <h3 id="map-usage-heading" className={sectionTitleClass}>
               What people do on the map
-            </h2>
+            </h3>
             {mapUsage && posthogProjectId && (
               <a
                 href={`https://us.posthog.com/project/${posthogProjectId}`}
@@ -411,7 +413,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <h3 className={groupTitleClass}>Most opened places</h3>
+                  <h4 className={groupTitleClass}>Most opened places</h4>
                   <BarList
                     items={placeUsage.slice(0, 6).map((p) => ({
                       label: p.name ?? "Removed place",
@@ -423,7 +425,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   />
                 </div>
                 <div>
-                  <h3 className={groupTitleClass}>Top searches</h3>
+                  <h4 className={groupTitleClass}>Top searches</h4>
                   <BarList
                     items={mapUsage.topSearches.map((s) => ({
                       label: s.term,
@@ -440,7 +442,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <h3 className={groupTitleClass}>After opening a card, people…</h3>
+                  <h4 className={groupTitleClass}>After opening a card, people…</h4>
                   <BarList
                     items={[
                       { label: "Directions (walk)", value: mapUsage.cardActions.directionsWalk, displayValue: formatPct(pctOf(mapUsage.cardActions.directionsWalk, mapUsage.headline.cardsOpened)) },
@@ -456,7 +458,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   />
                   <p className="mt-1 text-xs text-[var(--color-ink-500)]">Share of cards opened this period.</p>
                   {/* #919: taps on a place's own page, as plain counts: that page isn't a card, so a share of cards opened would mislead. */}
-                  <h3 className={`${groupTitleClass} mt-4`}>On a place&apos;s own page, people…</h3>
+                  <h4 className={`${groupTitleClass} mt-4`}>On a place&apos;s own page, people…</h4>
                   <BarList
                     items={[
                       { label: "Directions", value: mapUsage.cardActions.venuePageDirections },
@@ -466,7 +468,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   />
                 </div>
                 <div>
-                  <h3 className={groupTitleClass}>Filters people use</h3>
+                  <h4 className={groupTitleClass}>Filters people use</h4>
                   <BarList
                     items={mapUsage.filters.map((f) => ({
                       label: filterLabel(f.filter),
@@ -480,7 +482,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <h3 className={groupTitleClass}>Location shared?</h3>
+                  <h4 className={groupTitleClass}>Location shared?</h4>
                   <BarList
                     items={[
                       { label: "Granted", value: mapUsage.location.granted, displayValue: `${mapUsage.location.granted}` },
@@ -493,7 +495,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   />
                 </div>
                 <div>
-                  <h3 className={groupTitleClass}>Came from a flyer or link tag</h3>
+                  <h4 className={groupTitleClass}>Came from a flyer or link tag</h4>
                   <BarList
                     items={mapUsage.utmSources.map((u) => ({
                       label: u.campaign ? `${u.source} · ${u.campaign}` : u.source,
@@ -511,9 +513,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </section>
 
         <section aria-labelledby="boxes-heading" className={cardClass}>
-          <h2 id="boxes-heading" className={sectionTitleClass}>
+          <h3 id="boxes-heading" className={sectionTitleClass}>
             Blessing boxes
-          </h2>
+          </h3>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <KpiCard label="Times filled" displayValue={String(counts.fills)} value={counts.fills} previousValue={previousCounts.fills} />
             <KpiCard label="Times used" displayValue={String(counts.uses)} value={counts.uses} previousValue={previousCounts.uses} />
@@ -537,7 +539,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           )}
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <h3 className={groupTitleClass}>Longest since last filled</h3>
+              <h4 className={groupTitleClass}>Longest since last filled</h4>
               <BarList
                 items={longestSinceFill.map((b) => ({
                   label: b.name,
@@ -548,7 +550,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               />
             </div>
             <div>
-              <h3 className={groupTitleClass}>Most-needed items</h3>
+              <h4 className={groupTitleClass}>Most-needed items</h4>
               <BarList
                 items={mostNeeded.map((n) => ({ label: t(`box.needs.${n.key}`, "en"), value: n.count, displayValue: `${n.count} asks` }))}
                 emptyMessage="Not enough check-ins yet to say."
@@ -558,9 +560,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </section>
 
         <section aria-labelledby="map-health-heading" className={cardClass}>
-          <h2 id="map-health-heading" className={sectionTitleClass}>
+          <h3 id="map-health-heading" className={sectionTitleClass}>
             Map data health
-          </h2>
+          </h3>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <KpiCard label="Places on the map" displayValue={String(publishedVenues.length)} value={publishedVenues.length} previousValue={publishedVenues.length - newPlacesThisPeriod} />
             <KpiCard label="New this period" displayValue={String(newPlacesThisPeriod)} value={newPlacesThisPeriod} />

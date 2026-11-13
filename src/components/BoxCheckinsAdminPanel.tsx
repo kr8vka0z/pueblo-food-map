@@ -28,7 +28,7 @@ import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { parseAdminNeeds, type AdminCheckinRow } from "@/lib/blessingBoxes";
 import { t } from "@/lib/i18n";
-import { secondaryButtonClass, tagClass } from "@/lib/adminCardStyles";
+import { emptyStateClass, failureLineClass, secondaryButtonClass, tagClass } from "@/lib/adminCardStyles";
 
 interface BoxCheckinsAdminPanelProps {
   checkins: AdminCheckinRow[];
@@ -74,11 +74,9 @@ export default function BoxCheckinsAdminPanel({ checkins }: BoxCheckinsAdminPane
 
   if (checkins.length === 0) {
     return (
-      <div>
-        <p className="text-sm text-[var(--color-ink-500)]">No check-ins yet.</p>
-        <p className="text-sm text-[var(--color-ink-500)]">
-          They show up here when someone reports on this box from its card on the map.
-        </p>
+      <div className={emptyStateClass}>
+        <p>No check-ins yet.</p>
+        <p>They show up here when someone reports on this box from its card on the map.</p>
       </div>
     );
   }
@@ -113,7 +111,7 @@ export default function BoxCheckinsAdminPanel({ checkins }: BoxCheckinsAdminPane
                 </p>
               )}
               {errorId === row.id && (
-                <p role="alert" className="mt-1 text-xs text-[var(--color-danger)]">
+                <p role="alert" className={`mt-1 ${failureLineClass}`}>
                   {row.visibility === "visible"
                     ? "The check-in was not hidden. Try again."
                     : "The check-in is still hidden. Try again."}

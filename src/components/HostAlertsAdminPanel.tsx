@@ -29,7 +29,7 @@
 import { useId, useState } from "react";
 import AdminSegmented from "@/components/AdminSegmented";
 import { inputBase, inputBorder } from "@/components/formClasses";
-import { dangerButtonClass, fieldLabelClass, primaryButtonClass } from "@/lib/adminCardStyles";
+import { controlLabelClass, dangerButtonClass, emptyStateClass, failureLineClass, primaryButtonClass } from "@/lib/adminCardStyles";
 
 interface HostRow {
   id: number;
@@ -106,11 +106,9 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
   return (
     <div>
       {hosts.length === 0 ? (
-        <div>
-          <p className="text-sm text-[var(--color-ink-500)]">No host emails on file yet.</p>
-          <p className="text-sm text-[var(--color-ink-500)]">
-            Add one below to email the host when this box is reported empty, filled or with a problem.
-          </p>
+        <div className={emptyStateClass}>
+          <p>No host emails on file yet.</p>
+          <p>Add one below to email the host when this box is reported empty, filled or with a problem.</p>
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -143,7 +141,7 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
 
       <form onSubmit={handleAdd} className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="min-w-0 flex-1">
-          <label htmlFor="host-alert-email" className={`${fieldLabelClass} mb-1 block`}>
+          <label htmlFor="host-alert-email" className={controlLabelClass}>
             Add a host email
           </label>
           <input
@@ -159,7 +157,7 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
         <div>
           {/* The slider's legend is read by screen readers; this caption is
               its visible twin, so it is hidden from them. */}
-          <p aria-hidden="true" className={`${fieldLabelClass} mb-1`}>
+          <p aria-hidden="true" className={controlLabelClass}>
             Email language
           </p>
           <AdminSegmented
@@ -176,7 +174,7 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
       </form>
 
       {state.status === "error" && (
-        <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
+        <p role="alert" className={`mt-2 ${failureLineClass}`}>
           {state.message}
         </p>
       )}

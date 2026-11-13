@@ -17,13 +17,14 @@
  */
 
 import { AdminNavSkeleton } from "@/components/AdminNav";
+import { loadingLineClass, pageBodyClass } from "@/lib/adminCardStyles";
 
 export default function AdminLoading() {
   return (
     <main aria-busy="true" className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNavSkeleton />
-      <div className="px-4 py-6 sm:px-6">
-        <p role="status" className="text-sm text-[var(--color-ink-400)] motion-safe:animate-pulse">
+      <div className={pageBodyClass}>
+        <p role="status" className={loadingLineClass}>
           Loading…
         </p>
       </div>

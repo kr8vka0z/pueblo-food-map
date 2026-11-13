@@ -16,6 +16,9 @@
  *               given order, except danger items, which always go last under
  *               a bone 200 line (the risky choice last). Keyboard order is
  *               the rendered order.
+ *   disabled    optional; disables the three-dot button itself (natively),
+ *               for example while the row's own request runs. The menu never
+ *               shows while it is set.
  *
  * Keyboard (the WAI-ARIA menu-button pattern): Enter, Space or ArrowDown on
  * the button opens and focuses the first item; ArrowUp opens on the last;
@@ -54,14 +57,17 @@ export type AdminRowMenuItem = {
 type AdminRowMenuProps = {
   labelledBy: string;
   items: AdminRowMenuItem[];
+  disabled?: boolean;
 };
 
-export default function AdminRowMenu({ labelledBy, items }: AdminRowMenuProps) {
+export default function AdminRowMenu({ labelledBy, items, disabled = false }: AdminRowMenuProps) {
   const baseId = useId();
   const buttonId = `${baseId}-button`;
   const menuId = `${baseId}-menu`;
   const prefixId = `${baseId}-prefix`;
-  const [open, setOpen] = useState(false);
+  const [openState, setOpen] = useState(false);
+  // A disabled menu never shows, even if it was open when `disabled` turned on.
+  const open = openState && !disabled;
   // Which item to focus once the menu has rendered.
   const focusOnOpen = useRef<"first" | "last">("first");
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -158,6 +164,7 @@ export default function AdminRowMenu({ labelledBy, items }: AdminRowMenuProps) {
         ref={buttonRef}
         id={buttonId}
         type="button"
+        disabled={disabled}
         aria-labelledby={`${prefixId} ${labelledBy}`}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -170,7 +177,7 @@ export default function AdminRowMenu({ labelledBy, items }: AdminRowMenuProps) {
           PRESS_FEEDBACK +
           " " +
           focusRingClass +
-          " " +
+          " disabled:cursor-not-allowed disabled:opacity-50 " +
           (open ? "bg-[var(--color-sage-100)] text-[var(--color-ink-700)]" : "text-[var(--color-ink-500)]")
         }
       >

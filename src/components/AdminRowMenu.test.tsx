@@ -84,6 +84,24 @@ describe("AdminRowMenu", () => {
     expect(button).toHaveFocus();
   });
 
+  test("disabled: the button is natively off and neither a press nor a key opens the menu", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(
+      <div>
+        <h3 id="busy-name">Busy item</h3>
+        <AdminRowMenu labelledBy="busy-name" disabled items={[{ label: "Dismiss", onSelect, danger: true }]} />
+      </div>,
+    );
+    const button = screen.getByRole("button", { name: "More actions for Busy item" });
+    expect(button).toBeDisabled();
+    await user.click(button);
+    button.focus();
+    await user.keyboard("{Enter}{ArrowDown}");
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   test("a press outside closes it without choosing", async () => {
     const { user, button, draft, dismiss } = setup();
     await user.click(button);

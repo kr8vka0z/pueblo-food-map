@@ -25,7 +25,7 @@ import { useEffect, useRef, useState } from "react";
 import { shrinkFlyerToJpeg, UnsupportedImageError } from "@/lib/imageResize";
 import type { PublicFlyer } from "@/lib/events";
 import { dangerButtonClass, secondaryButtonClass } from "@/lib/adminCardStyles";
-import { errorClass, inputBase, inputBorder, labelClass } from "@/components/formClasses";
+import { errorClass, fieldGroupClass, hintClass, inputBase, inputBorder, labelClass } from "@/components/formClasses";
 import AdminConfirm, { useAdminConfirm } from "@/components/AdminConfirm";
 
 export interface EventFlyerFieldProps {
@@ -65,7 +65,7 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
 
   if (eventId === undefined || version === undefined) {
     return (
-      <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4">
+      <fieldset className={fieldGroupClass}>
         <legend className={`${labelClass} px-1`}>Flyer or photo</legend>
         <p className="text-sm text-[var(--color-ink-500)]">Save the event first, then add a flyer here.</p>
       </fieldset>
@@ -152,9 +152,9 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
   }
 
   return (
-    <fieldset className="space-y-3 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4">
+    <fieldset className={`space-y-3 ${fieldGroupClass}`}>
       <legend className={`${labelClass} px-1`}>
-        Flyer or photo <span className="font-normal text-[var(--color-ink-400)]">(optional) shown at the top of the event card</span>
+        Flyer or photo <span className={hintClass}>(optional) shown at the top of the event card</span>
       </legend>
 
       {flyer && (
@@ -223,13 +223,13 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
         <div>
           <label htmlFor="event-flyer-alt" className={labelClass}>
-            Describe the picture (English) <span className="font-normal text-[var(--color-ink-400)]">for screen readers</span>
+            Describe the picture (English) <span className={hintClass}>for screen readers</span>
           </label>
           <input id="event-flyer-alt" type="text" value={alt} maxLength={200} onChange={(e) => setAlt(e.target.value)} className={inputClass} />
         </div>
         <div>
           <label htmlFor="event-flyer-alt-es" className={labelClass}>
-            Describe the picture (Spanish) <span className="font-normal text-[var(--color-ink-400)]">(optional)</span>
+            Describe the picture (Spanish) <span className={hintClass}>(optional)</span>
           </label>
           <input id="event-flyer-alt-es" type="text" lang="es" value={altEs} maxLength={200} onChange={(e) => setAltEs(e.target.value)} className={inputClass} />
         </div>

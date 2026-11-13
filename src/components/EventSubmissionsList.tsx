@@ -18,7 +18,7 @@ import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatEventWhen } from "@/lib/eventTime";
 import type { PendingEventSubmission } from "@/lib/eventSubmissions";
-import { cardClass, fieldLabelClass, secondaryButtonClass, sectionTitleClass } from "@/lib/adminCardStyles";
+import { cardClass, cardNameClass, failureLineClass, fieldLabelClass, secondaryButtonClass, sectionTitleClass } from "@/lib/adminCardStyles";
 import AdminRowMenu from "@/components/AdminRowMenu";
 
 const FAILED: Record<"convert" | "dismiss", string> = {
@@ -73,7 +73,7 @@ function SubmissionCard({ item }: { item: PendingEventSubmission }) {
           <div className="min-w-0 flex-1 space-y-2 text-sm text-[var(--color-ink-700)]">
             {p ? (
               <>
-                <h4 id={nameId} className="text-base font-semibold text-[var(--color-ink-900)]">
+                <h4 id={nameId} className={cardNameClass}>
                   {p.name}
                 </h4>
                 <p>Hosted by {p.host}</p>
@@ -109,17 +109,19 @@ function SubmissionCard({ item }: { item: PendingEventSubmission }) {
           </div>
         </div>
         {p && (
+          // disabled: while one choice runs, the three-dot button itself is off.
           <AdminRowMenu
             labelledBy={nameId}
+            disabled={busy}
             items={[
-              { label: "Make it a draft event", onSelect: () => void act("convert"), disabled: busy },
-              { label: "Dismiss", onSelect: () => void act("dismiss"), danger: true, disabled: busy },
+              { label: "Make it a draft event", onSelect: () => void act("convert") },
+              { label: "Dismiss", onSelect: () => void act("dismiss"), danger: true },
             ]}
           />
         )}
       </div>
       {message && (
-        <p role="alert" className="mt-3 text-sm text-[var(--color-danger)]">
+        <p role="alert" className={`mt-3 ${failureLineClass}`}>
           {message}
         </p>
       )}
@@ -135,8 +137,8 @@ function SubmissionCard({ item }: { item: PendingEventSubmission }) {
 export default function EventSubmissionsList({ items }: { items: PendingEventSubmission[] }) {
   if (items.length === 0) return null;
   return (
-    <section aria-labelledby="event-submissions-heading" className="max-w-3xl space-y-3">
-      <h3 id="event-submissions-heading" className={sectionTitleClass}>
+    <section aria-labelledby="event-submissions-heading">
+      <h3 id="event-submissions-heading" className={`${sectionTitleClass} mb-3`}>
         Sent in by the public
       </h3>
       <ul className="space-y-3">

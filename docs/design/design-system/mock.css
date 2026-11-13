@@ -566,7 +566,7 @@ textarea.pa-in{resize:vertical}
 .pa-tl{display:inline-flex;align-items:center;min-height:48px;font-size:14px;line-height:20px;font-weight:500;color:var(--color-sage-700)!important;text-decoration:underline!important;text-underline-offset:2px}
 .pa-tl:disabled{cursor:not-allowed;text-decoration:none!important;opacity:.6}
 .pa-tl:focus-visible,.pa-tl.is-focus{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--color-sage-500);border-radius:2px}
-.pa-links{margin-top:16px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.pa-links{margin-top:16px;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
 
 /* Shared buttons (adminCardStyles.ts primaryButtonClass, secondaryButtonClass, dangerButtonClass): one height, 48
    (min-h-12), 8 by 16 padding, centred words that may wrap on a narrow phone. .big = formClasses.ts's 16-pixel form
@@ -627,6 +627,9 @@ textarea.pa-in{resize:vertical}
 @container pa (min-width:640px){.pa-pub{padding:16px 32px}.pa-pub .in{flex-direction:row;align-items:center;justify-content:space-between}}
 .pa-pub .ok{margin-top:12px;color:var(--color-sage-700)}.pa-pub .bad{margin-top:12px;color:var(--color-danger)}
 .pa-lnk{font-weight:500;text-decoration:underline!important;text-underline-offset:2px}
+/* Text links (linkClass, tapLinkClass): the sage 100 tint under the pointer, and a link that wraps draws its tint and ring around each line whole. */
+.pa-lnk,.pa-tl,.pa-tw .nm{transition:background-color .15s;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+@media (hover:hover){.pa-lnk:hover,.pa-tl:not(:disabled):hover,.pa-tw .nm:hover{background:var(--color-sage-100)}}
 .pa-bot{border-radius:14px;border:1px solid var(--color-bone-200);background:#fff;padding:12px 16px;color:var(--color-ink-700)}
 .pa-bot.stuck{border-color:var(--color-danger);color:var(--color-danger)}
 @container pa (min-width:640px){.pa-bot{padding:12px 32px}}

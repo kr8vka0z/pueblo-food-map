@@ -1804,14 +1804,22 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   action button, the same gate the browser pop-up gave. Used by Remove from
   map, Archive this venue, Publish, Approve all date-only updates, Archive
   event and Remove this flyer. `useAdminStep` in the same file gives the
-  change cards' reason steps the same focus handling. No modal dependency.
+  change cards' reason steps and the event form's Cancel event step the
+  same focus handling; Escape closes a step through the step's own Cancel
+  (so what was typed is cleared) and does nothing while its request runs.
+  No modal dependency.
 - **One set of admin UI parts** (#926). Class strings live in
   `src/lib/adminCardStyles.ts` (titles, page bodies, cards, tables,
   buttons, links, tags, chips, failure and empty states) and
   `src/components/formClasses.ts` (fields, tick boxes, the Cancel + Save
   row); the shared components are `AdminConfirm`, `AdminRowMenu` (the
   three-dot menu) and `AdminSegmented` (a two- or three-way slider of real
-  radios). Pages import them instead of typing classes, and
+  radios). Three small helpers sit beside them: `src/lib/rowLinkClick.ts`
+  (a click on a table row opens the row's own link), `src/lib/fieldLabels.ts`
+  (the plain name of a venue field, kept out of `ProposalCard` because the
+  server-rendered Activity page needs it too) and
+  `src/lib/focusFirstProblem.ts` (after a refused save, focus to the first
+  wrong box). Pages import them instead of typing classes, and
   `src/__tests__/touchTargets.test.tsx` holds the 48-pixel floor and the
   hover rules on them. DESIGN.md has the look.
 - **Public (unauthenticated) routes that touch D1** — the suggest/report

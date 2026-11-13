@@ -184,7 +184,7 @@ const loginEntry = entry({
     "Never say whether an email is an admin's. The next step looks the same for every address.",
   ],
   everyone: [
-    "Keyboard: the cursor starts in the code box on step 2. Enter sends either step. Every button and link shows the green ring.",
+    "Keyboard: the cursor starts in the code box on step 2. Enter sends either step. Every button and link shows the green ring. A missing or wrong email puts the cursor in the email box; a short, wrong or failed code puts it in the code box. While Resend code counts down a press does nothing, but the keyboard stays on it.",
     "Screen reader: each box has a real label; a wrong value is marked invalid and its reason is read out right away. The We sent a code line is announced when it appears.",
     "Touch: every button and link is 48 pixels tall. The code box opens the number pad and offers the code from a text message or email. The email box offers saved passkeys.",
     "Color is never the only sign: a red edge always comes with a written reason.",
@@ -257,7 +257,7 @@ const cardsEntry = entry({
   wording: [
     "A summary says the total, then where it came from: 14 to review · 11 from the data refresh, 3 from the public.",
     "Its button says how many it acts on: Approve all 6 date-only updates. It asks first: Approve all 6 date-only updates? These only update the last-verified date. Real changes are not included. Show them opens the list.",
-    "Waiting to publish names each field, crosses out what's on the map now and says who changed it.",
+    "Waiting to publish names each field, crosses out what's on the map now and says who changed it. The category reads as its own name (Meal Site) and hours as days and times, never the stored code; a row whose two sides read the same is left out. Everywhere else a field is named (change cards, the Places To review column, Activity) it reads as plain words through src/lib/fieldLabels.ts: Accepts SNAP, Website, Hours.",
     "The error page: This page didn't load. Nothing was changed. Try again, or go back to the Dashboard.",
   ],
   everyone: [
@@ -408,7 +408,7 @@ const changeEntry = entry({
     "Errors say what did not happen, then Try again: This change was not applied. This suggestion was not rejected. This report was not marked done. The photo was not removed. The request was not declined.",
   ],
   everyone: [
-    "Keyboard: the order on screen is the tab order; the preview is skipped, since it can't be used. Opening a reason step puts the cursor in its box; Cancel puts the keyboard back on the button that opened it.",
+    "Keyboard: the order on screen is the tab order; the preview is skipped, since it can't be used. Opening a reason step puts the cursor in its box; Cancel, or Escape anywhere in the step, closes it, clears what was typed and puts the keyboard back on the button that opened it. While its request runs, Escape does nothing.",
     "Screen reader: the arrow between old and new values is hidden, so the two values are read in order. Errors are read out at once. The reason box has a real label.",
     "Touch: the cards stack everything in one column on a phone. Every button is 48 pixels.",
     "Color is never the only sign: every tag is words, and the old value is crossed out as well as colored.",
@@ -482,7 +482,7 @@ const formsEntry = entry({
     sw("Sage 600", "color-sage-600", `Save changes, Publish, the tick, the slider's chosen part. Bone 50 words ${r("color-bone-50", "color-sage-600")}; sage 700 under the pointer ${r("color-bone-50", "color-sage-700")}`) +
     sw("Sage 100", "color-sage-100", `Cancel, Save draft and a slider choice under the pointer. Ink 700 words ${r("color-ink-700", "color-sage-100")}`) +
     sw("Bone 200", "color-bone-200", `The slider's track, ink 700 words on it ${r("color-ink-700", "color-bone-200")}`),
-  sizes: "Labels 14 pixels, medium, 4 above the box. Boxes full width, corners 10, 8 by 12 padding, 16-pixel words on a phone so it doesn't zoom in (14 from 768 wide), at least 48 pixels tall. Fields 24 pixels apart; a form page is one 672-pixel column. Tick boxes 20 pixels in a 48-pixel row. The slider is 48 tall. The save row: Cancel a third, Save two thirds, both 48 tall with 16-pixel words; on a new or draft event the two thirds hold Save draft and Publish, half each.",
+  sizes: "Labels 14 pixels, medium, 4 above the box. Boxes full width, corners 10, 8 by 12 padding, 16-pixel words on a phone so it doesn't zoom in (14 from 768 wide), at least 48 pixels tall. Fields 24 pixels apart; a form page is one 672-pixel column. Tick boxes 20 pixels in a 48-pixel row. The slider is 48 tall. The save row: Cancel a third, Save two thirds, both 48 tall with 16-pixel words; on a new or draft event the two thirds hold Save draft and Publish, half each with 8 pixels at the sides, so Cancel, Save draft and Publish sit on one row, one line each, at 360. The Location block on a place's form: the address full width, latitude and longitude side by side under it, then the map, at most 420 wide.",
   wording: [
     "Labels are one or two words. Optional fields say (optional) in ink 400; required ones get a red star that screen readers skip (they hear required instead).",
     "Errors say what to do: Name is required. Enter a start date and time. The end must be after the start. A failed save says what did not happen: The place was not saved. Try again.",
@@ -490,7 +490,7 @@ const formsEntry = entry({
     "Cancel, never Back or Discard, beside Save. It saves nothing.",
   ],
   everyone: [
-    "Keyboard: fields go top to bottom in screen order; Enter in a box saves (Cancel is a link, so Save stays the form's first send button). Every box, tick box, slider and button shows the green ring.",
+    "Keyboard: fields go top to bottom in screen order; Enter in a box saves (Cancel is a link, so Save stays the form's first send button). Every box, tick box, slider and button shows the green ring. After a refused save the cursor goes to the first wrong box, which stays red while it has focus. Add host keeps the keyboard on it while it adds, then puts the cursor back in the empty email box.",
     "Screen reader: every box has a real label; required boxes say so; a wrong box is marked invalid and its error is read out. A slider is a group of real radios with its own name.",
     "Touch: every box, tick box row, slider and button is 48 pixels tall.",
     "Color is never the only sign: a red edge always comes with a written error.",
@@ -531,14 +531,14 @@ const boxRow = (name: string, addr: string, st: string, last: string, sponsor: s
 const boxesTable = `<div class="pa-chips" role="group" aria-label="Filter boxes by status">${fb("All (5)")}${fb("To review (1)", { on: true })}${fb("Needs help (3)")}${fb("Empty (1)")}${fb("Problem (1)")}${fb("Low (1)")}${fb("Quiet (0)", { dis: true })}${fb("OK (2)")}</div>
   <div style="margin-top:12px"><span class="pa-clab" aria-hidden="true">Sponsor</span>${seg("Sponsor", ["Any", "Has one", "Needs one"], 0)}</div>
   <p style="margin:12px 0 8px;color:var(--color-ink-500)" aria-live="polite">Showing 5 of 5 boxes</p>
-  <div class="pa-tw el"><table style="min-width:560px"><thead><tr><th scope="col">Box</th><th scope="col">Status</th><th scope="col">Last report</th><th scope="col">Sponsor</th><th scope="col">To review</th></tr></thead><tbody class="hov">
+  <div class="pa-tw el"><table style="min-width:720px"><thead><tr><th scope="col">Box</th><th scope="col">Status</th><th scope="col">Last report</th><th scope="col">Sponsor</th><th scope="col">To review</th></tr></thead><tbody class="hov">
   ${boxRow("Elm Street Blessing Box", "12 Elm St", "empty", "6 days ago", "Needs a sponsor", `<span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500"><span style="width:48px;height:48px;border-radius:6px;border:1px solid var(--color-bone-200);background:var(--color-sage-100)"></span>Photo reported (2×)</span>`)}
   ${boxRow("Maple Court Blessing Box", "88 Maple Ct", "problem", "2 days ago", "The Ortiz family")}
   ${boxRow("Hillside Blessing Box", "5 Hillside Dr", "low", "Today", "Grace Bakery, Lopez family")}
   ${boxRow("Lakeview Blessing Box", "31 Lake Rd", "ok", "1 day ago", "Lakeview Neighbors, +2 more")}</tbody></table></div>`;
 const evTag: Record<string, [string, string]> = { draft: ["Draft", "t-bone2"], published: ["Published", "t-sage"], cancelled: ["Cancelled", "t-clay"], archived: ["Archived", "t-bone"] };
 const eventsTable = `<a class="pa-bp big pa-ring" href="#admin-lists" style="margin-bottom:16px">Add event</a>
-  <div class="pa-tw el"><table style="min-width:32rem"><thead><tr><th scope="col">Event</th><th scope="col">Starts (Pueblo time)</th><th scope="col">Status</th><th scope="col"><span class="sr">Edit</span></th></tr></thead><tbody class="hov">
+  <div class="pa-tw el"><table style="min-width:640px"><thead><tr><th scope="col">Event</th><th scope="col">Starts (Pueblo time)</th><th scope="col">Status</th><th scope="col"><span class="sr">Edit</span></th></tr></thead><tbody class="hov">
   ${([["Fall Turkey Drive", "Sat, Nov 21, 10:00 AM", "published"], ["Winter Coat and Food Giveaway", "Sat, Dec 12, 9:00 AM", "draft"], ["Harvest Pop-up Market", "Sat, Oct 10, 8:00 AM", "cancelled"]] as [string, string, string][]).map(([n, w, s]) => `<tr><td class="m9">${n}</td><td class="nw">${w}</td><td><span class="pa-tag ${evTag[s][1]}">${evTag[s][0]}</span></td><td style="text-align:right"><a class="nm" href="#admin-lists">Edit</a></td></tr>`).join("")}</tbody></table></div>`;
 const esubBody = `<div class="fly">Flyer</div><div class="txt"><p>Hosted by Grace Neighbors Church</p><p><span class="b9">Fri, Nov 20, 5:00 PM</span> to Fri, Nov 20, 7:00 PM (Pueblo time)</p><p><span class="b9">Grace Neighbors Church, </span>700 Example Blvd, Pueblo, CO 81004</p><p>Hot soup and bread for anyone who comes.</p><p><span class="pa-lab2">Bring </span>A bowl if you have one</p><p style="color:var(--color-ink-500);overflow-wrap:anywhere">Sent by Lee Park &lt;lee@example.com&gt; on Fri, Nov 6, 3:12 PM</p></div>`;
 const dotsMenu = (name: string) => `<div class="pa-dotw"><button type="button" class="dots pa-dots" aria-label="More actions for ${name}" aria-expanded="false" aria-haspopup="menu">⋮</button><div class="menu" role="menu"><button type="button" role="menuitem" data-say="Mockup: this would make a draft event and open it.">Make it a draft event</button><hr><button type="button" role="menuitem" class="dng" data-say="Mockup: this would dismiss it.">Dismiss</button></div></div>`;
@@ -576,7 +576,7 @@ const listsEntry = entry({
     sw("Bone 100", "color-bone-100", `Removed, Quiet and Archived tags, ink 500 words ${r("color-ink-500", "color-bone-100")}`) +
     sw("Bone 300", "color-bone-300", `Chip edges, ${contrast(H("color-bone-300"), H("white")).toFixed(1)} to 1 on white: decoration, the words carry the chip. The search box has the ink 400 edge of every admin text box`) +
     swr("Sage 500", "color-sage-500", "The edge of the chip that's on, and keyboard rings", "white", 3),
-  sizes: "Tables: 14-pixel words, cells 12 by 16 pixels, headings 11-pixel capitals over a bone 200 line, bone 200 row lines, corners 14, the level 1 shadow, at least 680 (Places), 560 (Boxes) or 512 (Events) pixels wide inside a box that scrolls sideways. A row tints only if it links somewhere. Chips are 14-pixel words, 48 tall, fully round. Tags 12 pixels, fully round, on one line. The Sponsor slider and the three-dot button (48 by 48) are 48 tall; the menu's choices are 48 tall. The Events Edit link sits in its cell as an inline link with the ring.",
+  sizes: "Tables: 14-pixel words, cells 12 by 16 pixels, headings 11-pixel capitals over a bone 200 line, bone 200 row lines, corners 14, the level 1 shadow, at least 680 (Places), 720 (Boxes) or 640 (Events) pixels wide inside a box that scrolls sideways, so the page never does; the Box and Event name columns at least 240. Column headings, dates (Last verified, Last report, Starts), times and tags stay on one line. A row tints only if it links somewhere, and a click anywhere on it opens its link; the link stays the keyboard path. The Places status key is a flat white box with a hairline (no shadow, on purpose); the Places chips sit in three rows, status, source and lane, each wrapping on its own, with no divider. Chips are 14-pixel words, 48 tall, fully round. Tags 12 pixels, fully round, on one line. The Sponsor slider and the three-dot button (48 by 48) are 48 tall; the menu's choices are 48 tall. The Events Edit link sits in its cell as an inline link with the ring.",
   wording: [
     "Filters show their count: To review (12), Low (1). Statuses are one or two words, explained once in the Places key. The Sponsor slider says Any, Has one, Needs one.",
     "Last report reads Today, 1 day ago, 6 days ago, or No reports yet. A box with no sponsor says Needs a sponsor.",

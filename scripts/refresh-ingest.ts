@@ -715,7 +715,11 @@ async function main(): Promise<void> {
         console.error(`\n${source}: ABORTED after ${got.requests} request(s) (writes nothing for this source): ${got.reason}`);
         continue;
       }
-      const built = buildBenefitListProposals({ source, entries: got.entries, venues: benefitRows, runId, today, fetchedAt: got.fetchedAt });
+      // Approved "maybe" matches (venue_id_aliases, written on approve) count as the same place.
+      const aliases = schemaReady
+        ? d1Query<IdAliasRow>(dbMode, `SELECT source, upstream_id, venue_id FROM venue_id_aliases WHERE source = '${source}'`)
+        : [];
+      const built = buildBenefitListProposals({ source, entries: got.entries, venues: benefitRows, runId, today, fetchedAt: got.fetchedAt, aliases });
       const st = built.stats;
       console.log(
         `\n${source}: list_in_county=${got.entries.length} compared=${st.compared} listed=${st.listed} still_listed=${st.stillListed} ` +

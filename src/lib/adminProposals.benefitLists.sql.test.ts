@@ -54,6 +54,22 @@ describe("approving SNAP/WIC list cards", () => {
     expect((db.prepare(`SELECT ${column} AS v FROM venues WHERE id = 'osm-1'`).get() as { v: number }).v).toBe(1);
   });
 
+  test("approving a 'maybe' card records the list record as this venue, so next month reads it as known", async () => {
+    const db = buildDb(null, null);
+    const venue = db.prepare("SELECT * FROM venues WHERE id = 'osm-1'").get() as BenefitVenueRow;
+    // Same street number, different name: an uncertain match.
+    const entries = [{ upstreamId: "wic-x", name: "Corner Grocer", street: "1110 Bonforte Blvd.", city: "Pueblo", zip: "81001", lat: null, lng: null }];
+    const [maybe] = buildBenefitListProposals({ source: WIC_SOURCE, entries, venues: [venue], runId: "r1", today: "2026-11-13", fetchedAt: "2026-11-13T07:00:00.000Z" }).proposals;
+    for (const s of buildProposalWriteStatements(maybe, "2026-11-13T07:00:00.000Z", sqlText, { observationsReady: true }).statements) db.exec(s);
+    const row = db.prepare("SELECT * FROM change_proposals WHERE status = 'pending'").get() as ChangeProposalRow;
+    expect((await applyApprovedProposal(sqliteD1(db), row, { email: "kyle@example.com" })).ok).toBe(true);
+    const aliases = db.prepare("SELECT source, upstream_id, venue_id FROM venue_id_aliases").all() as { source: string; upstream_id: string; venue_id: string }[];
+    expect(aliases).toEqual([{ source: "cdphe_wic", upstream_id: "wic-x", venue_id: "osm-1" }]);
+    const ticked = db.prepare("SELECT * FROM venues WHERE id = 'osm-1'").get() as BenefitVenueRow;
+    const next = buildBenefitListProposals({ source: WIC_SOURCE, entries, venues: [ticked], runId: "r2", today: "2026-12-15", fetchedAt: "2026-12-15T07:00:00.000Z", aliases });
+    expect(next.proposals.filter((p) => p.proposedDiff.meta?.needs_review)).toEqual([]);
+  });
+
   test("approving a 'not on the list' card leaves the tick at yes", async () => {
     const db = buildDb(1, null);
     const row = writeCard(db, SNAP_SOURCE, false);

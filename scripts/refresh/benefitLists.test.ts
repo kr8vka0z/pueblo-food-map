@@ -210,6 +210,19 @@ describe("buildBenefitListProposals", () => {
     expect(cardFor(r, "v").filter((p) => p.proposedDiff.fields_changed.length > 1 || p.proposedDiff.meta?.needs_review)).toEqual([]);
   });
 
+  test("an approved 'maybe' match counts as the same place next month (no false 'not on the list' card)", () => {
+    const valley = entry("wic-valley", { name: "VALLEY MARKET", street: "4493 Bent Brothers Blvd", city: "COLORADO CITY", zip: "81019", lat: null, lng: null });
+    const ours = (wic: number | null) => venue("v", { name: "Valley Market", category: "grocery", address: "Address not in OpenStreetMap", accepts_wic: wic });
+    const [maybe] = cardFor(build(WIC_SOURCE, [valley], [ours(null)]), "v");
+    expect(maybe.proposedDiff.meta?.match).toEqual({ upstream_id: "wic-valley" });
+    // Approving it records the alias (applyApprovedProposal) and ticks the box; next month:
+    const next = buildBenefitListProposals({
+      source: WIC_SOURCE, entries: [valley], venues: [ours(1)], runId: "r2", today: "2026-12-15", fetchedAt: FETCHED,
+      aliases: [{ source: WIC_SOURCE, upstream_id: "wic-valley", venue_id: "v" }],
+    });
+    expect(cardFor(next, "v").filter((p) => p.proposedDiff.meta?.needs_review)).toEqual([]);
+  });
+
   test("WIC (no coordinates) matches on name and the same street number", () => {
     const r = build(WIC_SOURCE, [entry("wic-1", { name: "ALBERTSONS #816", street: "1601 HIGHWAY 50 WEST", lat: null, lng: null })], [venue("v", { name: "Albertsons", address: "1601 US 50, Pueblo, CO 81008", category: "grocery" })]);
     const [card] = cardFor(r, "v");

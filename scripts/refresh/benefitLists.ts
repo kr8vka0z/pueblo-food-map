@@ -47,7 +47,7 @@
 import type { Venue } from "@/types/venue";
 import { checkSanityGuardrail, computeDiffHash, type CurrentVenueRow, type ProposalDraft } from "./diffEngine";
 import { nameScore, STRONG_DISTANCE_M, STRONG_NAME_SCORE, streetKey } from "./careAndShare";
-import { haversineDistanceKm } from "./renamePairs";
+import { haversineDistanceKm, type IdAliasRow } from "./renamePairs";
 
 export const SNAP_SOURCE = "usda_snap" as const;
 export const WIC_SOURCE = "cdphe_wic" as const;
@@ -246,6 +246,8 @@ export function sameStreet(a: string, b: string): boolean {
 
 interface Evidence {
   entry: ListEntry;
+  /** Kyle approved this record as this venue before (an alias). */
+  known?: boolean;
   name_score: number;
   same_street: boolean;
   distance_m: number | null;
@@ -262,6 +264,7 @@ function evidenceFor(e: ListEntry, v: BenefitVenueRow): Evidence {
 
 /** The same place: a strong name AND (close by, or the same street number). WIC has no distance, so it needs the street. */
 function isStrong(ev: Evidence): boolean {
+  if (ev.known) return true;
   if (ev.name_score < STRONG_NAME_SCORE) return false;
   return ev.same_street || (ev.distance_m !== null && ev.distance_m <= STRONG_DISTANCE_M);
 }
@@ -299,6 +302,13 @@ export interface BenefitListBuildParams {
   runId: string;
   today: string;
   fetchedAt: string;
+  /**
+   * venue_id_aliases rows. Approving a "maybe" card records its list record
+   * as that venue (meta.match, applyApprovedProposal), and that link then
+   * counts as the same place: otherwise a name-only match approved once
+   * would come back as "not on the list" the month after the tick is set.
+   */
+  aliases?: IdAliasRow[];
 }
 
 export interface BenefitListBuildResult {
@@ -314,7 +324,11 @@ const entryAddress = (e: ListEntry) => `${e.street}, ${e.city}, CO ${e.zip}`;
 export function buildBenefitListProposals(p: BenefitListBuildParams): BenefitListBuildResult {
   const field = FIELD[p.source];
   const pool = p.venues.filter((v) => MATCHABLE_CATEGORIES.has(v.category));
-  const scored = pool.map((v) => ({ v, evs: p.entries.map((e) => evidenceFor(e, v)) }));
+  const known = new Set((p.aliases ?? []).filter((a) => a.source === p.source).map((a) => `${a.upstream_id}->${a.venue_id}`));
+  const scored = pool.map((v) => ({
+    v,
+    evs: p.entries.map((e) => ({ ...evidenceFor(e, v), known: known.has(`${e.upstreamId}->${v.id}`) })),
+  }));
   // A record that strongly matches one venue is that venue's: never offered
   // to another (a chain's own record would otherwise "maybe" its siblings).
   const claimedBy = new Map<string, Set<string>>();
@@ -401,7 +415,12 @@ export function buildBenefitListProposals(p: BenefitListBuildParams): BenefitLis
     if (best) {
       stats.maybe++;
       const benefit: BenefitListMeta = { field, finding: "maybe_listed", entry: describe(best) };
-      proposals.push(card(v, { benefit_list: benefit, needs_review: [`not sure this is the same place`] }, true, { match: best.entry.upstreamId }));
+      // meta.match: approving records the record as this venue (an alias), read back above as `known`.
+      proposals.push(
+        card(v, { benefit_list: benefit, needs_review: [`not sure this is the same place`], match: { upstream_id: best.entry.upstreamId } }, true, {
+          match: best.entry.upstreamId,
+        }),
+      );
       report.push(`  maybe       ${v.id} "${v.name}" ? "${best.entry.name}" ${entryAddress(best.entry)} (name ${best.name_score}, ${best.distance_m ?? "?"}m${best.same_street ? ", same street" : ""})`);
     }
   }

@@ -148,7 +148,7 @@ CI enforces this automatically (blocking gate).
 | Gardens + landscapes | Pueblo Food Project CGSP page | Manual |
 | Pantries + meal sites | Plentiful public directory (`directory.plentiful.org/colorado/pueblo`); Care and Share Food Bank's Find Food map for its partner pantries (since 2026-10) | Automated (see below) |
 | Grocery / convenience / farms | OpenStreetMap Overpass API | Automated (see below) |
-| SNAP / WIC flags | USDA FNS + CDPHE public data (matched into D1 by migration `0014`, #597) | Admin-editable in D1 directly |
+| SNAP / WIC flags | USDA FNS + CDPHE public data (matched into D1 by migration `0014`, #597) | Admin-editable in D1; checked monthly against USDA's SNAP retailer list and Colorado WIC's store map, review cards only (`refresh-snap-wic.yml`) |
 
 PFP garden coordinates were geocoded against Nominatim (OpenStreetMap) on
 2026-05-14 by a one-time script, since removed; the audit trail is in

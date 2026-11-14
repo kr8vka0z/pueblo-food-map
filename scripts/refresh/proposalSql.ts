@@ -84,7 +84,9 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  */
 export function pinsTouchedBy(proposal: ProposalDraft, pins: PinRow[], now: string): PinMeta[] {
   const mine = pins.filter((p) => p.venue_id === proposal.targetVenueId);
-  const asked = (proposal.proposedDiff.meta?.benefit_list as { field?: unknown } | undefined)?.field;
+  // Only the "not on the list" check asks about its field; a still-listed row carries the same meta and must stay silent.
+  const list = proposal.proposedDiff.meta?.benefit_list as { field?: unknown; finding?: unknown } | undefined;
+  const asked = list?.finding === "not_listed" ? list.field : undefined;
   const touched =
     proposal.changeType === "remove"
       ? mine

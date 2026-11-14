@@ -126,7 +126,14 @@ async function getText(deps: ListFetchDeps, url: string, what: string): Promise<
     throw new ListStop(`${what} request failed: ${err instanceof Error ? err.message : String(err)}`);
   }
   if (!res.ok) throw new ListStop(`${what} returned HTTP ${res.status}`);
-  return res.text();
+  // The body streams after the headers: a dropped connection or the timeout
+  // can fail here, and that is the same failed download, not a crash
+  // (Codex review of PR #939: it escaped and took the other list down).
+  try {
+    return await res.text();
+  } catch (err) {
+    throw new ListStop(`${what} failed while reading the response: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v.trim().replace(/\s+/g, " ") : "");
@@ -188,7 +195,13 @@ export async function fetchWicList(deps: ListFetchDeps): Promise<ListFetchResult
     // changed export shape, which fails loudly below (every placemark must
     // yield a name, street, city and ZIP). Upgrade path: a real XML parser.
     if (!/<kml[\s>]/.test(doc) || !/<Document[\s>]/.test(doc)) throw new ListStop("WIC map download isn't KML");
+    // A download cut off mid-file can still hold well over the statewide
+    // minimum of complete placemarks: require the closing tags, and every
+    // opened placemark to be closed.
+    if (!/<\/Document>\s*<\/kml>\s*$/.test(doc)) throw new ListStop("WIC map download is cut off (no closing </Document></kml>) — a partial read");
     const placemarks = [...doc.matchAll(/<Placemark[\s>]([\s\S]*?)<\/Placemark>/g)].map((m) => m[1]);
+    const opened = doc.match(/<Placemark[\s>]/g)?.length ?? 0;
+    if (opened !== placemarks.length) throw new ListStop(`WIC map has ${opened - placemarks.length} unclosed placemark(s) — a partial read`);
     if (placemarks.length < WIC_MIN_STATEWIDE) throw new ListStop(`WIC map has ${placemarks.length} store(s) statewide (expected at least ${WIC_MIN_STATEWIDE}) — a partial read`);
     const all = placemarks.map((p, i) => {
       const data = (n: string) => xmlText((p.match(new RegExp(`<Data name="${n}">\\s*<value>([\\s\\S]*?)</value>`)) ?? [])[1] ?? "");
@@ -222,6 +235,9 @@ const SAME_SPOT_M = 50;
 /** A chain's same-name store this far away is worth a question, never proof. */
 const NEAR_NAME_M = 2000;
 const GENERIC_STREET_WORDS = new Set(["st", "ave", "blvd", "rd", "dr", "ln", "ct", "pl", "hwy", "pkwy", "cir", "ste", "w", "e", "n", "s", "us"]);
+const DIRECTIONS = new Set(["n", "s", "e", "w"]);
+/** Spellings streetKey (shared with Care and Share) leaves apart that the lists and the map both use. */
+const STREET_ALIASES: Record<string, string> = { plaza: "plz" };
 
 /** Possessive apostrophes split words in nameScore ("Farm's" -> "farm s"); drop them first. */
 const cleanName = (s: string) => s.replace(/['’]/g, "");
@@ -231,17 +247,28 @@ function houseNumber(address: string): string | null {
   return /^\d+$/.test(first) ? first : null;
 }
 
+function streetIdentity(address: string): { number: string | null; dirs: Set<string>; names: Set<string> } {
+  const words = streetKey(address).split(" ").filter(Boolean);
+  const number = /^\d+$/.test(words[0] ?? "") ? words[0] : null;
+  const rest = words.slice(number ? 1 : 0).map((w) => STREET_ALIASES[w] ?? w);
+  return { number, dirs: new Set(rest.filter((w) => DIRECTIONS.has(w))), names: new Set(rest.filter((w) => !GENERIC_STREET_WORDS.has(w))) };
+}
+
 /**
- * Same house number and at least one shared street word. Looser than
- * streetKey equality on purpose: the lists write "1601 HIGHWAY 50 WEST"
- * where we have "1601 US 50". Never ZIP: the lists and the map disagree on
- * ZIPs (King Soopers #12 is 81004 on WIC's list, 81005 on ours).
+ * The same street address: same house number, no conflicting direction
+ * ("100 N Main" is not "100 S Main"), and one side's street-name words all
+ * on the other side. Looser than streetKey equality on purpose: the lists
+ * write "1601 HIGHWAY 50 WEST" where we have "1601 US 50" (a direction on
+ * one side only is fine). Never ZIP: the lists and the map disagree on ZIPs
+ * (King Soopers #12 is 81004 on WIC's list, 81005 on ours).
  */
 export function sameStreet(a: string, b: string): boolean {
-  const na = houseNumber(a);
-  if (!na || na !== houseNumber(b)) return false;
-  const wb = new Set(streetKey(b).split(" ").slice(1));
-  return streetKey(a).split(" ").slice(1).some((w) => !GENERIC_STREET_WORDS.has(w) && wb.has(w));
+  const x = streetIdentity(a);
+  const y = streetIdentity(b);
+  if (!x.number || x.number !== y.number) return false;
+  if (x.dirs.size > 0 && y.dirs.size > 0 && ![...x.dirs].some((d) => y.dirs.has(d))) return false;
+  if (x.names.size === 0 || y.names.size === 0) return false;
+  return [...x.names].every((w) => y.names.has(w)) || [...y.names].every((w) => x.names.has(w));
 }
 
 interface Evidence {
@@ -254,11 +281,14 @@ interface Evidence {
 }
 
 function evidenceFor(e: ListEntry, v: BenefitVenueRow): Evidence {
+  const distance_m = e.lat === null || e.lng === null ? null : Math.round(haversineDistanceKm({ lat: e.lat, lng: e.lng }, v) * 1000);
   return {
     entry: e,
     name_score: Math.round(nameScore(cleanName(e.name), cleanName(v.name)) * 100) / 100,
-    same_street: sameStreet(e.street, v.address),
-    distance_m: e.lat === null || e.lng === null ? null : Math.round(haversineDistanceKm({ lat: e.lat, lng: e.lng }, v) * 1000),
+    // Where SNAP gives coordinates, a matching address kilometres away is a
+    // different place with the same street address, not this store.
+    same_street: sameStreet(e.street, v.address) && (distance_m === null || distance_m <= NEAR_NAME_M),
+    distance_m,
   };
 }
 
@@ -336,15 +366,32 @@ export function buildBenefitListProposals(p: BenefitListBuildParams): BenefitLis
     v,
     evs: p.entries.map((e) => ({ ...evidenceFor(e, v), known: known.has(`${e.upstreamId}->${v.id}`) })),
   }));
-  // A record that strongly matches one venue is that venue's: never offered
-  // to another (a chain's own record would otherwise "maybe" its siblings).
-  const claimedBy = new Map<string, Set<string>>();
+  // One list record belongs to one venue, decided before any card: among the
+  // venues it strongly matches, an approved alias wins, then the venue at its
+  // exact address; if that still leaves more than one, it is ambiguous and
+  // only ever reaches review. Every other venue never sees the record, so a
+  // chain's own record can't list, "maybe" or hide a same-name sibling
+  // (Codex review of PR #939).
+  const strongFor = new Map<string, { id: string; ev: Evidence }[]>();
   for (const { v, evs } of scored) {
     for (const ev of evs.filter(isStrong)) {
-      if (!claimedBy.has(ev.entry.upstreamId)) claimedBy.set(ev.entry.upstreamId, new Set());
-      claimedBy.get(ev.entry.upstreamId)!.add(v.id);
+      if (!strongFor.has(ev.entry.upstreamId)) strongFor.set(ev.entry.upstreamId, []);
+      strongFor.get(ev.entry.upstreamId)!.push({ id: v.id, ev });
     }
   }
+  const owners = new Map<string, Set<string>>();
+  for (const [upstreamId, claims] of strongFor) {
+    const byAlias = claims.filter((c) => c.ev.known);
+    const byAddress = claims.filter((c) => c.ev.same_street);
+    owners.set(upstreamId, new Set((byAlias.length ? byAlias : byAddress.length ? byAddress : claims).map((c) => c.id)));
+  }
+  /** "own" = this venue alone owns it; "shared" = ambiguous, review only; "other" = another venue's; "free" = nobody's. */
+  const ownership = (ev: Evidence, venueId: string): "own" | "shared" | "other" | "free" => {
+    const o = owners.get(ev.entry.upstreamId);
+    if (!o) return "free";
+    if (!o.has(venueId)) return "other";
+    return o.size === 1 ? "own" : "shared";
+  };
 
   const proposals: ProposalDraft[] = [];
   const report: string[] = [];
@@ -383,7 +430,7 @@ export function buildBenefitListProposals(p: BenefitListBuildParams): BenefitLis
   for (const { v, evs } of scored) {
     const ticked = v[field] === 1;
     if (ticked) mapYes++;
-    const strong = evs.filter(isStrong).sort((a, b) => b.name_score - a.name_score);
+    const strong = evs.filter((ev) => isStrong(ev) && ownership(ev, v.id) === "own").sort((a, b) => b.name_score - a.name_score);
     if (strong.length > 0) {
       const benefit: BenefitListMeta = { field, finding: "listed", entry: describe(strong[0]) };
       if (ticked) {
@@ -398,8 +445,8 @@ export function buildBenefitListProposals(p: BenefitListBuildParams): BenefitLis
       continue;
     }
     const mine = evs.filter((ev) => {
-      const owners = claimedBy.get(ev.entry.upstreamId);
-      return (!owners || owners.has(v.id)) && isCandidate(ev, v.address);
+      const o = ownership(ev, v.id);
+      return o === "shared" || (o === "free" && isCandidate(ev, v.address));
     });
     mine.sort(
       (a, b) =>
@@ -452,4 +499,42 @@ export function buildBenefitListProposals(p: BenefitListBuildParams): BenefitLis
     };
   }
   return { proposals, stats, report };
+}
+
+// ─── Running both lists ─────────────────────────────────────────────────────
+
+/**
+ * Reads each list and hands a good read to `onList`; a failed read (or any
+ * unexpected throw while reading) stops only that list. The orchestrator's
+ * per-list loop, here so the isolation is testable: refresh-ingest.ts runs
+ * main() at import and can't be.
+ */
+export async function readEachList(
+  lists: { source: BenefitSource; read: () => Promise<ListFetchResult> }[],
+  onList: (source: BenefitSource, got: Extract<ListFetchResult, { ok: true }>) => { proposals: ProposalDraft[]; aborted?: string },
+  out: { log: (m: string) => void; error: (m: string) => void },
+): Promise<{ proposals: ProposalDraft[]; anyAborted: boolean }> {
+  let proposals: ProposalDraft[] = [];
+  let anyAborted = false;
+  for (const { source, read } of lists) {
+    let got: ListFetchResult;
+    try {
+      got = await read();
+    } catch (err) {
+      got = { ok: false, reason: `unexpected error: ${err instanceof Error ? err.message : String(err)}`, requests: 0 };
+    }
+    if (!got.ok) {
+      anyAborted = true;
+      out.error(`\n${source}: ABORTED after ${got.requests} request(s) (writes nothing for this source): ${got.reason}`);
+      continue;
+    }
+    const built = onList(source, got);
+    if (built.aborted) {
+      anyAborted = true;
+      out.error(`${source}: ABORTED (writes nothing for this source): ${built.aborted}`);
+      continue;
+    }
+    proposals = proposals.concat(built.proposals);
+  }
+  return { proposals, anyAborted };
 }

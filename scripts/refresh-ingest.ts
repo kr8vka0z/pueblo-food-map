@@ -126,10 +126,12 @@ import {
   buildBenefitListProposals,
   fetchSnapList,
   fetchWicList,
+  readEachList,
   SNAP_SOURCE,
   WIC_SOURCE,
   type BenefitSource,
   type BenefitVenueRow,
+  type ListFetchDeps,
 } from "./refresh/benefitLists";
 
 /**
@@ -704,43 +706,39 @@ async function main(): Promise<void> {
         "AND category IN ('grocery','convenience','farm')",
     );
     benefitCurrentRows = benefitRows;
-    const lists: [BenefitSource, typeof fetchSnapList][] = [
-      [SNAP_SOURCE, fetchSnapList],
-      [WIC_SOURCE, fetchWicList],
-    ];
-    for (const [source, fetchList] of lists) {
-      const got = await fetchList({ fetch: (url, init) => fetch(url, init), log: (m) => console.log(m) });
-      if (!got.ok) {
-        anySourceAborted = true;
-        console.error(`\n${source}: ABORTED after ${got.requests} request(s) (writes nothing for this source): ${got.reason}`);
-        continue;
-      }
-      // Approved "maybe" matches (venue_id_aliases, written on approve) count as the same place.
-      const aliases = schemaReady
-        ? d1Query<IdAliasRow>(dbMode, `SELECT source, upstream_id, venue_id FROM venue_id_aliases WHERE source = '${source}'`)
-        : [];
-      const approvedKeys = humanApprovedKeys(dbMode, source);
-      const decidedKeys = new Set([...rejectedKeys, ...approvedKeys]);
-      const built = buildBenefitListProposals({ source, entries: got.entries, venues: benefitRows, runId, today, fetchedAt: got.fetchedAt, aliases, decidedKeys });
-      const st = built.stats;
-      console.log(
-        `\n${source}: list_in_county=${got.entries.length} compared=${st.compared} listed=${st.listed} still_listed=${st.stillListed} ` +
-          `maybe=${st.maybe} not_listed=${st.notListed} not_listed_already_decided=${st.notListedDecided}`,
-      );
-      for (const line of built.report) console.log(line);
-      if (built.aborted) {
-        anySourceAborted = true;
-        console.error(`${source}: ABORTED (writes nothing for this source): ${built.aborted}`);
-        continue;
-      }
-      // Rejection memory, and approval memory for the review-only "not on the list" cards (dropAlreadyReviewed).
-      const kept = dropAlreadyReviewed(
-        built.proposals.filter((p) => !rejectedKeys.has(rejectionKey(p.source, p.targetVenueId, p.diffHash))),
-        approvedKeys,
-      );
-      console.log(`${source}: proposals=${kept.length} (already-decided=${built.proposals.length - kept.length})`);
-      allProposals = allProposals.concat(kept);
-    }
+    const net: ListFetchDeps = { fetch: (url, init) => fetch(url, init), log: (m) => console.log(m) };
+    const lists = await readEachList(
+      [
+        { source: SNAP_SOURCE, read: () => fetchSnapList(net) },
+        { source: WIC_SOURCE, read: () => fetchWicList(net) },
+      ],
+      (source, got) => {
+        // Approved "maybe" matches (venue_id_aliases, written on approve) count as the same place.
+        const aliases = schemaReady
+          ? d1Query<IdAliasRow>(dbMode, `SELECT source, upstream_id, venue_id FROM venue_id_aliases WHERE source = '${source}'`)
+          : [];
+        const approvedKeys = humanApprovedKeys(dbMode, source);
+        const decidedKeys = new Set([...rejectedKeys, ...approvedKeys]);
+        const built = buildBenefitListProposals({ source, entries: got.entries, venues: benefitRows, runId, today, fetchedAt: got.fetchedAt, aliases, decidedKeys });
+        const st = built.stats;
+        console.log(
+          `\n${source}: list_in_county=${got.entries.length} compared=${st.compared} listed=${st.listed} still_listed=${st.stillListed} ` +
+            `maybe=${st.maybe} not_listed=${st.notListed} not_listed_already_decided=${st.notListedDecided}`,
+        );
+        for (const line of built.report) console.log(line);
+        if (built.aborted) return built;
+        // Rejection memory, and approval memory for the review-only "not on the list" cards (dropAlreadyReviewed).
+        const kept = dropAlreadyReviewed(
+          built.proposals.filter((p) => !rejectedKeys.has(rejectionKey(p.source, p.targetVenueId, p.diffHash))),
+          approvedKeys,
+        );
+        console.log(`${source}: proposals=${kept.length} (already-decided=${built.proposals.length - kept.length})`);
+        return { proposals: kept };
+      },
+      { log: (m) => console.log(m), error: (m) => console.error(m) },
+    );
+    if (lists.anyAborted) anySourceAborted = true;
+    allProposals = allProposals.concat(lists.proposals);
   }
 
   // The automatic switch (src/lib/sourceSwitch.ts, migration 0023). Probed

@@ -258,6 +258,8 @@ export function summarizeProposalForRow(p: Extract<ReviewItem, { kind: "proposal
   if (fields.length === 0 && list?.finding === "not_listed") {
     return `Not on the ${list.field === "accepts_wic" ? "WIC" : "SNAP"} list: please check`;
   }
+  // A ticked venue's "maybe" card (a list record that also looks like another of our places) changes no field.
+  if (fields.length === 0 && list?.finding === "maybe_listed") return `${list.field === "accepts_wic" ? "WIC" : "SNAP"} list: same place?`;
   if (fields.length === 0 && diff.meta?.match) return "Care and Share listing: same place?";
   if (fields.length === 0 && diff.meta?.needs_review) return "Hours need a look";
   if (fields.length === 0) return "Confirmed still current";

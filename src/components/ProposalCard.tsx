@@ -720,6 +720,7 @@ function benefitListNotesOf(diff: ProposedDiff, sourceLabel: string): React.Reac
   const fetched = typeof diff.meta?.fetched_at === "string" ? diff.meta.fetched_at.slice(0, 10) : null;
   const list = `${sourceLabel}${fetched ? `, downloaded ${formatLastVerified(fetched)}` : ""}`;
   const tick = fieldLabel(b.field);
+  const changesTick = diff.fields_changed.includes(b.field);
   const e = b.entry;
   const evidence = e
     ? [
@@ -732,7 +733,14 @@ function benefitListNotesOf(diff: ProposedDiff, sourceLabel: string): React.Reac
   return (
     <p className="text-sm text-[var(--color-ink-700)]">
       {b.finding === "listed" && <>The {list}, has this place as {listing}. Approving sets {tick} to Yes.</>}
-      {b.finding === "maybe_listed" && (
+      {b.finding === "maybe_listed" && !changesTick && (
+        <>
+          Not sure this is the same place: the {list}, has {listing}, and it also looks like another of our places. The map already says
+          {" "}{tick}: Yes, and approving changes nothing but links this listing to this place. If it isn&apos;t this place, check with the
+          store and reject. Either way this card won&apos;t come back.
+        </>
+      )}
+      {b.finding === "maybe_listed" && changesTick && (
         <>
           Not sure this is the same place: the {list}, has {listing}. Approve only if it is, which sets {tick} to Yes. Rejecting means
           this match isn&apos;t asked again.

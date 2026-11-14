@@ -177,6 +177,10 @@ INSERT INTO change_proposals (id, source, target_venue_id, change_type, proposed
   (900021, 'usda_snap', 'test-value-grocery-01', 'update',
    '{"before":{"last_verified":"2026-07-18"},"after":{"last_verified":"2026-11-13"},"fields_changed":["last_verified"],"meta":{"fetched_at":"2026-11-13T07:00:00.000Z","benefit_list":{"field":"accepts_snap","finding":"not_listed"},"needs_review":["not on the list"]}}',
    'pv-h21', 'preview-run-1', 0, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days'), NULL, NULL, NULL, NULL),
+  -- "maybe" on a store the map already ticks: one list record also looks like another of our places; changes no field
+  (900022, 'usda_snap', 'test-downtown-grocery-01', 'update',
+   '{"before":{"last_verified":"2026-07-18"},"after":{"last_verified":"2026-11-13"},"fields_changed":["last_verified"],"meta":{"fetched_at":"2026-11-13T07:00:00.000Z","benefit_list":{"field":"accepts_snap","finding":"maybe_listed","entry":{"name":"Union Avenue Grocery 5150 (made up)","address":"310 S Union Ave, Pueblo, CO 81003","name_score":0.5,"same_street":false,"distance_m":28}},"needs_review":["this list record also looks like another of our places"],"match":{"upstream_id":"usda-pv-7002"}}}',
+   'pv-h22', 'preview-run-1', 0, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days'), NULL, NULL, NULL, NULL),
   -- WIC "listed": Colorado WIC's map has this store (no coordinates there, so no distance)
   (900018, 'cdphe_wic', 'test-fresh-market-01', 'update',
    '{"before":{"last_verified":"2026-07-18","accepts_wic":0},"after":{"last_verified":"2026-11-13","accepts_wic":1},"fields_changed":["accepts_wic","last_verified"],"meta":{"fetched_at":"2026-11-13T07:00:00.000Z","benefit_list":{"field":"accepts_wic","finding":"listed","entry":{"name":"TEST FRESH MARKET #12 (MADE UP)","address":"2400 N ELIZABETH ST, PUEBLO, CO 81003","name_score":1,"same_street":true,"distance_m":null}}}}',

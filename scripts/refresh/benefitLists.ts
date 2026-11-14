@@ -235,7 +235,16 @@ const SAME_SPOT_M = 50;
 /** A chain's same-name store this far away is worth a question, never proof. */
 const NEAR_NAME_M = 2000;
 const GENERIC_STREET_WORDS = new Set(["st", "ave", "blvd", "rd", "dr", "ln", "ct", "pl", "hwy", "pkwy", "cir", "ste", "w", "e", "n", "s", "us"]);
-const DIRECTIONS = new Set(["n", "s", "e", "w"]);
+/**
+ * Every spelling of a direction, as its compass components. streetKey has
+ * already turned the words north/south/east/west into n/s/e/w, so "North
+ * East" arrives as "n e"; the compounds arrive as one token.
+ */
+const DIRECTION_PARTS: Record<string, string[]> = {
+  n: ["n"], s: ["s"], e: ["e"], w: ["w"],
+  ne: ["n", "e"], nw: ["n", "w"], se: ["s", "e"], sw: ["s", "w"],
+  northeast: ["n", "e"], northwest: ["n", "w"], southeast: ["s", "e"], southwest: ["s", "w"],
+};
 /** Spellings streetKey (shared with Care and Share) leaves apart that the lists and the map both use. */
 const STREET_ALIASES: Record<string, string> = { plaza: "plz" };
 
@@ -251,7 +260,18 @@ function streetIdentity(address: string): { number: string | null; dirs: Set<str
   const words = streetKey(address).split(" ").filter(Boolean);
   const number = /^\d+$/.test(words[0] ?? "") ? words[0] : null;
   const rest = words.slice(number ? 1 : 0).map((w) => STREET_ALIASES[w] ?? w);
-  return { number, dirs: new Set(rest.filter((w) => DIRECTIONS.has(w))), names: new Set(rest.filter((w) => !GENERIC_STREET_WORDS.has(w))) };
+  // Before or after the street name, one word or two: all the same components.
+  const dirs = new Set(rest.flatMap((w) => DIRECTION_PARTS[w] ?? []));
+  return { number, dirs, names: new Set(rest.filter((w) => !GENERIC_STREET_WORDS.has(w) && !DIRECTION_PARTS[w])) };
+}
+
+/**
+ * North against south, or east against west. A component on one side only
+ * is no conflict: the lists and the map often drop part of a direction
+ * ("1601 HIGHWAY 50 WEST" vs "1601 US 50", "NE" vs "N").
+ */
+function directionsConflict(a: Set<string>, b: Set<string>): boolean {
+  return (a.has("n") && b.has("s")) || (a.has("s") && b.has("n")) || (a.has("e") && b.has("w")) || (a.has("w") && b.has("e"));
 }
 
 /**
@@ -266,7 +286,7 @@ export function sameStreet(a: string, b: string): boolean {
   const x = streetIdentity(a);
   const y = streetIdentity(b);
   if (!x.number || x.number !== y.number) return false;
-  if (x.dirs.size > 0 && y.dirs.size > 0 && ![...x.dirs].some((d) => y.dirs.has(d))) return false;
+  if (directionsConflict(x.dirs, y.dirs)) return false;
   if (x.names.size === 0 || y.names.size === 0) return false;
   return [...x.names].every((w) => y.names.has(w)) || [...y.names].every((w) => x.names.has(w));
 }
@@ -392,6 +412,16 @@ export function buildBenefitListProposals(p: BenefitListBuildParams): BenefitLis
     if (!o.has(venueId)) return "other";
     return o.size === 1 ? "own" : "shared";
   };
+  // The same for a record nobody owns but that sits right by two or more of
+  // our venues (location evidence for each): it can't stand in for all of
+  // them, so it never quietly stops a ticked venue's check.
+  const nearBy = new Map<string, number>();
+  for (const { v, evs } of scored) {
+    for (const ev of evs) {
+      if (ownership(ev, v.id) === "free" && hasLocationEvidence(ev)) nearBy.set(ev.entry.upstreamId, (nearBy.get(ev.entry.upstreamId) ?? 0) + 1);
+    }
+  }
+  const contested = (ev: Evidence) => (nearBy.get(ev.entry.upstreamId) ?? 0) > 1;
 
   const proposals: ProposalDraft[] = [];
   const report: string[] = [];
@@ -456,8 +486,26 @@ export function buildBenefitListProposals(p: BenefitListBuildParams): BenefitLis
     );
     const best = mine[0];
     if (ticked) {
-      if (best && hasLocationEvidence(best)) {
-        report.push(`  probably    ${v.id} "${v.name}" ~ "${best.entry.name}" ${entryAddress(best.entry)} (no card)`);
+      // Only a record that is this venue's alone may stand in for it silently.
+      const exclusive = mine.find((ev) => ownership(ev, v.id) === "free" && hasLocationEvidence(ev) && !contested(ev));
+      if (exclusive) {
+        report.push(`  probably    ${v.id} "${v.name}" ~ "${exclusive.entry.name}" ${entryAddress(exclusive.entry)} (no card)`);
+        continue;
+      }
+      const tied = mine.find((ev) => ownership(ev, v.id) === "shared" || (hasLocationEvidence(ev) && contested(ev)));
+      if (tied) {
+        // The map already says yes, so this card changes no field: it asks
+        // whether the record is this place. Approving links them (meta.match,
+        // so next month it is this venue's own); rejecting is remembered.
+        stats.maybe++;
+        const benefit: BenefitListMeta = { field, finding: "maybe_listed", entry: describe(tied) };
+        proposals.push(
+          card(v, { benefit_list: benefit, needs_review: [`this list record also looks like another of our places`], match: { upstream_id: tied.entry.upstreamId } }, false, {
+            match: tied.entry.upstreamId,
+            shared: field,
+          }),
+        );
+        report.push(`  shared      ${v.id} "${v.name}" ? "${tied.entry.name}" ${entryAddress(tied.entry)} (map says yes; also near another of our places)`);
         continue;
       }
       const benefit: BenefitListMeta = { field, finding: "not_listed" };

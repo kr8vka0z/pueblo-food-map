@@ -24,7 +24,8 @@ export type TourStepId =
   | "boxesMap"
   | "boxCheckin"
   | "boxPhoto"
-  | "boxHelp"
+  | "boxSponsor"
+  | "boxAlerts"
   | "nearMe"
   | "saved"
   | "menu";
@@ -91,9 +92,22 @@ export const TOUR_STEPS: readonly TourStep[] = [
     scrollTarget: true,
   },
   { id: "boxPhoto", target: '[data-tour="box-photo"]', demo: "boxes", showsBox: true, needsBox: true, scrollTarget: true },
+  // Sponsor and email alerts are two beats, not one: on the desktop card the
+  // sponsor band is the first row and the email link the last, so one
+  // highlight around both ran the whole height of the card (and past the
+  // bottom of a laptop screen) at the width of the two links' text.
   {
-    id: "boxHelp",
-    target: '[data-tour="box-adopt"], [data-tour="box-alerts"]',
+    id: "boxSponsor",
+    target: '[data-tour="box-adopt"]',
+    demo: "boxes",
+    showsBox: true,
+    cardExpanded: true,
+    needsBox: true,
+    scrollTarget: true,
+  },
+  {
+    id: "boxAlerts",
+    target: '[data-tour="box-alerts"]',
     demo: "boxes",
     showsBox: true,
     cardExpanded: true,
@@ -261,9 +275,13 @@ export const TOUR_COPY: Record<Locale, TourCopy> = {
         title: "Add a photo",
         body: "You can add a photo of the box, so people can see what's inside before they go.",
       },
-      boxHelp: {
-        title: "Help a box",
-        body: "Apply to sponsor a box you'd like to look after, or ask for an email when it needs filling.",
+      boxSponsor: {
+        title: "Sponsor a box",
+        body: "If there's a box you'd like to look after, tap Apply to sponsor this box.",
+      },
+      boxAlerts: {
+        title: "Get an email",
+        body: "Tap Email me when it needs filling, and we'll email you when this box is running low or empty.",
       },
       nearMe: {
         title: "Near me",
@@ -329,9 +347,13 @@ export const TOUR_COPY: Record<Locale, TourCopy> = {
         title: "Agregar una foto", // [CHECK]
         body: "Puedes agregar una foto de la caja, para que la gente vea qué tiene antes de ir.", // [CHECK]
       },
-      boxHelp: {
-        title: "Ayuda a una caja", // [CHECK]
-        body: "Solicita ser patrocinador de una caja que quieras cuidar, o pide un correo cuando necesite surtido.", // [CHECK]
+      boxSponsor: {
+        title: "Patrocina una caja", // [CHECK]
+        body: "Si hay una caja que quieras cuidar, toca Solicitar ser patrocinador de esta caja.", // [CHECK]
+      },
+      boxAlerts: {
+        title: "Recibe un correo", // [CHECK]
+        body: "Toca Avísame cuando necesite surtido, y te mandamos un correo cuando esta caja tenga poco o esté vacía.", // [CHECK]
       },
       nearMe: {
         // Matches the ES bottom-nav label (i18n.ts nav.nearMe = "Cercanos").

@@ -1197,12 +1197,12 @@ with that chunk (the stand-in has no list), so the page's LCP is unchanged.
 
 ## Guided tour
 
-A 14-step walkthrough (#159): welcome, search, the Filters button, the open
+A 15-step walkthrough (#159): welcome, search, the Filters button, the open
 Filters panel, a pin, the place card, then Blessing Boxes (the Boxes button,
-box pins, a sample box's check-in buttons, Add a photo, sponsor + alerts),
-then Near me, Saved, Menu. Hand-rolled, no tour library. With no box in the
-live feed when the tour starts (empty, or not loaded yet) the four box
-pin/card steps are left out and it runs 10 steps.
+box pins, a sample box's check-in buttons, Add a photo, the sponsor band,
+the email-alerts link), then Near me, Saved, Menu. Hand-rolled, no tour
+library. With no box in the live feed when the tour starts (empty, or not
+loaded yet) the five box pin/card steps are left out and it runs 10 steps.
 
 ```
 Splash "Take a tour"      → HomePageClient bumps tourRequestId (gate set, no location prompt)
@@ -1240,8 +1240,12 @@ Map Menu item (phone drawer or desktop side panel) → MapWrapper.startTour dire
 - **Targets** are existing hooks (`data-testid` on SearchBar/BottomNav,
   `data-venue-id` on VenueMarker, `[data-sheet-surface]` / the desktop card's
   `aria-labelledby`, `data-tour` on SearchResultsPopover and FilterPanel's
-  switch rows). Every match of a step's selector is unioned into one
-  highlight. A missing target falls back to a centered tooltip.
+  switch rows, BoxCheckinPanel's buttons, BoxCardBody's sponsor band and
+  BoxAlertSignupForm's link). Every match of a step's selector is unioned
+  into one highlight, so a step only names targets that sit together in
+  every layout: the sponsor band and the email link are separate steps
+  because the desktop card puts one first and the other last. A missing
+  target falls back to a centered tooltip.
 - **Escape** goes through `overlayRegistry`'s claim-once stack; `raiseOverlay`
   keeps the tour on top of the card it opened itself.
 - Not built: auto-launch on a first visit (optional in the issue).

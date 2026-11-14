@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-13
+
+### Fixed
+
+- The guided tour now highlights the sponsor section and the email-alert link on a Blessing Box card one at a time, so the highlight no longer spills across the card or off the screen. ([#934](https://github.com/kr8vka0z/pueblo-food-map/pull/934))
+
 ## [1.5.0] - 2026-11-13
 
 ### New

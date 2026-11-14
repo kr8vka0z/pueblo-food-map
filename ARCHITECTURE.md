@@ -411,6 +411,32 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   logged (an add needs coordinates). The reader never supersedes 0022's
   hand-checked `website` cards. Each run ends with one `SUMMARY
   website-reader:` line in the journal.
+- **SNAP and WIC list check (Venue Data Rebuild step 4, #938,
+  `scripts/refresh/benefitLists.ts`).** Monthly, from its own workflow
+  (`refresh-snap-wic.yml`, `--only snap_wic`), not the weekly job. Compares
+  `accepts_snap` / `accepts_wic` on grocery, convenience and farm venues
+  against two public lists: USDA's retailer-locator feature service on
+  ArcGIS for SNAP (currently authorized stores only, one query for State CO,
+  County PUEBLO; not the yearly historical zip on the data page, which is up
+  to a year stale), and the Google My Maps KML that coloradowic.gov's
+  find-a-store page links for WIC (no coordinates, so in-county is a ZIP
+  list and matching is name + street number). The WIC map id is pinned and
+  checked against the page each run. Any failed, refused, truncated or empty
+  download writes nothing for that list and fails the job; the other list
+  still writes. Matching reuses Care and Share's `nameScore`/`streetKey` and
+  distance thresholds (no phone rule): **listed** (list yes, map no/unknown)
+  proposes the tick; **maybe listed** (only an uncertain match) proposes it
+  with `needs_review`; **not listed** (map yes, nothing on the list) is a
+  review-only card that changes no field, because dropping off a list never
+  means "doesn't accept". Only location evidence (same street number, or
+  within 50 m, or 150 m with a half-matching name) stops a "not listed"
+  card, so a chain's same-name store elsewhere can't hide a drop-off, and a
+  record one venue matches strongly is never offered to another. Agreeing
+  stores write the date-only "still listed" row (no card). A list missing
+  ≥ max(5, 20%) of the map's ticked stores is treated as a bad read (the
+  abnormal-drop guardrail). Cards carry the tick in column form (0/1/null),
+  so approve's stale check matches the stored row; `applyApprovedProposal`
+  applies `accepts_snap`/`accepts_wic` for these two sources only.
 - **The automatic switch (`src/lib/sourceSwitch.ts`, migration `0023`).**
   Per (source, field), counted from `change_proposals` history: each
   human-approved update that applied something adds one per field;

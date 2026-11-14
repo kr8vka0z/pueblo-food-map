@@ -53,6 +53,23 @@ change):
 npx tsx scripts/refresh-ingest.ts --db-mode local --only care_and_share --dry-run
 ```
 
+## SNAP and WIC list check — monthly (`refresh-snap-wic.yml`)
+
+**Runs in CI**, the 15th of each month (`0 7 15 * *` UTC) + manual
+`workflow_dispatch`, as `refresh-ingest.ts --only snap_wic`
+(`refresh/benefitLists.ts`). Reads USDA's SNAP retailer feature service on
+ArcGIS (one request) and the Colorado WIC store page plus its Google My Maps
+KML (two requests), and writes `usda_snap` / `cdphe_wic` review cards. Watch
+it without writing (live lists, your chosen database):
+
+```
+npx tsx scripts/refresh-ingest.ts --db-mode local --only snap_wic --dry-run
+```
+
+A local database needs migrations and venue rows first:
+`npx wrangler d1 migrations apply pueblo-food-map-admin --local`, then load
+grocery/convenience/farm rows into `venues`.
+
 ## Venue website reader — weekly on the server, not in CI
 
 `refresh/website.ts` (+ `refresh/websiteIo.ts`) runs only as

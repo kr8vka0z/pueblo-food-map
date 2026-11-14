@@ -163,13 +163,28 @@ INSERT INTO change_proposals (id, source, target_venue_id, change_type, proposed
   (900016, 'website', 'test-soup-kitchen-01', 'update',
    '{"before":{"phone":"719-555-0108"},"after":{"phone":"719-555-0118","last_verified":"2026-11-10"},"fields_changed":["phone","last_verified"],"meta":{"summary":"The contact page lists a new phone number (made up).","source_url":"https://example.org/soup-kitchen/contact","pins":[{"field":"phone","pinned_at":"2026-10-01T15:00:00.000Z","note":"made-up manager Pat, by phone","age_days":43,"stale":false}]}}',
    'pv-h16', 'preview-run-1', 0, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days'), 'needs_human', NULL, 'jev-preview', strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')),
-  -- USDA SNAP list and Colorado WIC list
+  -- SNAP and WIC list checks (scripts/refresh/benefitLists.ts), in the exact shape it writes:
+  -- the tick in column form (0/1/null), meta.benefit_list, and needs_review on the two cards for a person.
+  -- "listed": USDA's list has this store, the map says no
   (900017, 'usda_snap', 'test-corner-store-01', 'update',
-   '{"before":{"accepts_snap":false},"after":{"accepts_snap":true,"last_verified":"2026-11-10"},"fields_changed":["accepts_snap","last_verified"]}',
+   '{"before":{"last_verified":"2026-07-18","accepts_snap":0},"after":{"last_verified":"2026-11-13","accepts_snap":1},"fields_changed":["accepts_snap","last_verified"],"meta":{"fetched_at":"2026-11-13T07:00:00.000Z","benefit_list":{"field":"accepts_snap","finding":"listed","entry":{"name":"Test Corner Store 4410 (made up)","address":"822 E Abriendo Ave, Pueblo, CO 81004","name_score":1,"same_street":true,"distance_m":12}}}}',
    'pv-h17', 'preview-run-1', 0, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days'), NULL, NULL, NULL, NULL),
+  -- "maybe": only an uncertain match (same street number, different name), map says no
+  (900020, 'usda_snap', 'test-gas-and-grab-01', 'update',
+   '{"before":{"last_verified":"2026-07-18","accepts_snap":null},"after":{"last_verified":"2026-11-13","accepts_snap":1},"fields_changed":["accepts_snap","last_verified"],"meta":{"fetched_at":"2026-11-13T07:00:00.000Z","benefit_list":{"field":"accepts_snap","finding":"maybe_listed","entry":{"name":"Northern Fuel Mart 2207 (made up)","address":"3300 W Northern Ave, Pueblo, CO 81005","name_score":0,"same_street":true,"distance_m":31}},"needs_review":["not sure this is the same place"],"match":{"upstream_id":"usda-pv-7001"}}}',
+   'pv-h20', 'preview-run-1', 0, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days'), NULL, NULL, NULL, NULL),
+  -- "not on the list": the map says yes, USDA's list has nothing; changes no field
+  (900021, 'usda_snap', 'test-value-grocery-01', 'update',
+   '{"before":{"last_verified":"2026-07-18"},"after":{"last_verified":"2026-11-13"},"fields_changed":["last_verified"],"meta":{"fetched_at":"2026-11-13T07:00:00.000Z","benefit_list":{"field":"accepts_snap","finding":"not_listed"},"needs_review":["not on the list"]}}',
+   'pv-h21', 'preview-run-1', 0, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days'), NULL, NULL, NULL, NULL),
+  -- "maybe" on a store the map already ticks: one list record also looks like another of our places; changes no field
+  (900022, 'usda_snap', 'test-downtown-grocery-01', 'update',
+   '{"before":{"last_verified":"2026-07-18"},"after":{"last_verified":"2026-11-13"},"fields_changed":["last_verified"],"meta":{"fetched_at":"2026-11-13T07:00:00.000Z","benefit_list":{"field":"accepts_snap","finding":"maybe_listed","entry":{"name":"Union Avenue Grocery 5150 (made up)","address":"310 S Union Ave, Pueblo, CO 81003","name_score":0.5,"same_street":false,"distance_m":28}},"needs_review":["this list record also looks like another of our places"],"match":{"upstream_id":"usda-pv-7002"}}}',
+   'pv-h22', 'preview-run-1', 0, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days'), NULL, NULL, NULL, NULL),
+  -- WIC "listed": Colorado WIC's map has this store (no coordinates there, so no distance)
   (900018, 'cdphe_wic', 'test-fresh-market-01', 'update',
-   '{"before":{"accepts_wic":false},"after":{"accepts_wic":true,"last_verified":"2026-11-10"},"fields_changed":["accepts_wic","last_verified"]}',
-   'pv-h18', 'preview-run-1', 1, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days'), 'needs_human', NULL, 'jev-preview', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days')),
+   '{"before":{"last_verified":"2026-07-18","accepts_wic":0},"after":{"last_verified":"2026-11-13","accepts_wic":1},"fields_changed":["accepts_wic","last_verified"],"meta":{"fetched_at":"2026-11-13T07:00:00.000Z","benefit_list":{"field":"accepts_wic","finding":"listed","entry":{"name":"TEST FRESH MARKET #12 (MADE UP)","address":"2400 N ELIZABETH ST, PUEBLO, CO 81003","name_score":1,"same_street":true,"distance_m":null}}}}',
+   'pv-h18', 'preview-run-1', 0, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days'), NULL, NULL, NULL, NULL),
   -- second rename / move (OpenStreetMap), untriaged: a rename is still "Likely rename"
   (900019, 'osm', 'test-edible-park-01', 'update',
    '{"before":{"name":"Test Edible Park","address":"700 Goodnight Ave, Pueblo, CO 81004"},"after":{"name":"Test Edible Park North","address":"720 Goodnight Ave, Pueblo, CO 81004","last_verified":"2026-11-10"},"fields_changed":["name","address","last_verified"],"meta":{"rename":{"from_id":"osm-way-pv-500","to_id":"osm-way-pv-501"}}}',
@@ -182,6 +197,8 @@ INSERT INTO change_proposals (id, source, target_venue_id, change_type, proposed
   (900099, 'osm', 'test-victory-garden-01', 'update',
    '{"before":{"last_verified":"2026-07-18"},"after":{"last_verified":"2026-11-10"},"fields_changed":["last_verified"]}',
    'pv-h99', 'preview-run-1', 0, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days'), NULL, NULL, NULL, NULL);
+-- The "maybe" SNAP card's store has an unknown tick (most real ones do), so the card shows "Not known".
+UPDATE venues SET accepts_snap = NULL WHERE id = 'test-gas-and-grab-01';
 UPDATE change_proposals SET reviewed_by = 'dana@example.org', reviewed_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-8 days'), applied_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-8 days') WHERE id = 900090;
 
 -- A detail the venue told us (shown next to the website proposal above and on the edit page).

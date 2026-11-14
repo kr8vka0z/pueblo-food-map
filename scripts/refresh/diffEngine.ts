@@ -44,8 +44,9 @@ export type RefreshSource = "osm" | "plentiful";
 // care_and_share (Venue Data Rebuild step 2) proposes against our venues of
 // any source_type, so it is a ProposalSource but not a RefreshSource (it is
 // never diffed by diffSource below; scripts/refresh/careAndShare.ts owns it).
-// website (step 3, scripts/refresh/website.ts) works the same way.
-export type ProposalSource = RefreshSource | "link_health" | "care_and_share" | "website";
+// website (step 3, scripts/refresh/website.ts) works the same way, and so do
+// the SNAP/WIC list checks (step 4, scripts/refresh/benefitLists.ts).
+export type ProposalSource = RefreshSource | "link_health" | "care_and_share" | "website" | "usda_snap" | "cdphe_wic";
 export type ChangeType = "add" | "update" | "remove";
 
 /**

@@ -110,9 +110,12 @@ export function parseProposalRow(row: ChangeProposalRow): ParsedProposal {
  * qualify regardless — it is a dead-link finding routed to the venue edit
  * screen, never approved directly (see applyApprovedProposal's own header).
  * `website` (step 3): a page that loaded and changed nothing is the same
- * "still listed" fetch, recorded without a click.
+ * "still listed" fetch, recorded without a click. `usda_snap` / `cdphe_wic`
+ * (step 4): a store both the list and the map say takes SNAP/WIC is the same
+ * "still listed" fetch; their "not on the list" cards carry needs_review, so
+ * they never qualify.
  */
-const DATE_ONLY_BULK_SOURCES: ReadonlySet<string> = new Set(["osm", "plentiful", "care_and_share", "website"]);
+const DATE_ONLY_BULK_SOURCES: ReadonlySet<string> = new Set(["osm", "plentiful", "care_and_share", "website", "usda_snap", "cdphe_wic"]);
 
 /**
  * Most ids POST /api/admin/proposals/approve-date-only takes per request.
@@ -432,9 +435,19 @@ const APPLIABLE_VENUE_FIELDS = new Set<keyof Venue>([
  * "closed to new applications") there. Scraped sources never own notes
  * (AGENTS.md: the pipeline never proposes `notes`), so for them it stays
  * unappliable, as before.
+ *
+ * `accepts_snap` / `accepts_wic` apply only for the SNAP/WIC list checks
+ * (scripts/refresh/benefitLists.ts), which carry them in column form (0/1/null)
+ * so toColumnValue passes them straight through. Without this an approved
+ * list card moved only last_verified and reported success.
  */
+const BENEFIT_FIELD_BY_SOURCE: Record<string, string> = { usda_snap: "accepts_snap", cdphe_wic: "accepts_wic" };
 function isAppliableField(source: string, field: string): boolean {
-  return APPLIABLE_VENUE_FIELDS.has(field as keyof Venue) || (field === "notes" && source === "website");
+  return (
+    APPLIABLE_VENUE_FIELDS.has(field as keyof Venue) ||
+    (field === "notes" && source === "website") ||
+    BENEFIT_FIELD_BY_SOURCE[source] === field
+  );
 }
 
 /**

@@ -253,6 +253,13 @@ export function summarizeProposalForRow(p: Extract<ReviewItem, { kind: "proposal
   if (row.change_type === "add") return "Suggested new place";
   const fields = reviewableDiffFields(diff);
   // Care and Share review-only cards (scripts/refresh/careAndShare.ts) — not "still current".
+  // SNAP/WIC "not on the list" check (scripts/refresh/benefitLists.ts): it also carries needs_review, so before the hours line.
+  const list = diff.meta?.benefit_list as { field?: unknown; finding?: unknown } | undefined;
+  if (fields.length === 0 && list?.finding === "not_listed") {
+    return `Not on the ${list.field === "accepts_wic" ? "WIC" : "SNAP"} list: please check`;
+  }
+  // A ticked venue's "maybe" card (a list record that also looks like another of our places) changes no field.
+  if (fields.length === 0 && list?.finding === "maybe_listed") return `${list.field === "accepts_wic" ? "WIC" : "SNAP"} list: same place?`;
   if (fields.length === 0 && diff.meta?.match) return "Care and Share listing: same place?";
   if (fields.length === 0 && diff.meta?.needs_review) return "Hours need a look";
   if (fields.length === 0) return "Confirmed still current";

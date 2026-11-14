@@ -78,11 +78,19 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  * The pins this proposal touches: the venue's pins on any field it changes,
  * or every pin on the venue for a remove (a removal contradicts all of them).
  * `last_verified` is never pinnable, so date-only proposals never match.
+ * A SNAP/WIC "not on the list" card changes no field but asks about one
+ * (meta.benefit_list.field, scripts/refresh/benefitLists.ts), so a pin on
+ * that tick is shown on it too.
  */
 export function pinsTouchedBy(proposal: ProposalDraft, pins: PinRow[], now: string): PinMeta[] {
   const mine = pins.filter((p) => p.venue_id === proposal.targetVenueId);
+  // Only the "not on the list" check asks about its field; a still-listed row carries the same meta and must stay silent.
+  const list = proposal.proposedDiff.meta?.benefit_list as { field?: unknown; finding?: unknown } | undefined;
+  const asked = list?.finding === "not_listed" ? list.field : undefined;
   const touched =
-    proposal.changeType === "remove" ? mine : mine.filter((p) => proposal.proposedDiff.fields_changed.includes(p.field));
+    proposal.changeType === "remove"
+      ? mine
+      : mine.filter((p) => proposal.proposedDiff.fields_changed.includes(p.field) || p.field === asked);
   return touched.map((p) => {
     const ageDays = Math.max(0, Math.floor((new Date(now).getTime() - new Date(p.fetched_at).getTime()) / MS_PER_DAY));
     return { field: p.field, pinned_at: p.fetched_at, pinned_by: p.pinned_by, note: p.pin_note, age_days: ageDays, stale: ageDays > PIN_STALE_DAYS };

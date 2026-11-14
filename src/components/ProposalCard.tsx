@@ -156,6 +156,11 @@ function formatHoursSummary(hours: WeeklyHours): string {
 
 /** Renders one Venue field's value for the diff view — hours_weekly gets a compact per-day summary, everything else stringifies plainly. Empty/null/undefined renders as an explicit "(empty)" so a real value clearing to nothing reads clearly, not as a blank cell. Exported for the same reuse reason as SOURCE_BADGE above. */
 export function formatFieldValue(field: string, value: unknown): string {
+  // The tri-state columns (NULL unknown, 0 no, 1 yes) arrive in column form
+  // from the SNAP/WIC list cards (scripts/refresh/benefitLists.ts).
+  if (field === "accepts_snap" || field === "accepts_wic") {
+    return value === 1 || value === true ? "Yes" : value === 0 || value === false ? "No" : "Not known";
+  }
   if (value === null || value === undefined || value === "") return "(empty)";
   // The refresh pipeline stores hours in proposed_diff as D1's JSON text
   // (diffEngine's normalizers), hand-loaded proposals as parsed objects —
@@ -329,7 +334,9 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
           ) : (
             <FieldDiff diff={proposal.diff} sourceLabel={sourceBadge.label} />
           )}
-          {!proposal.parseError && <ProposalSourceNotes diff={proposal.diff} showSummary={changeType !== "remove"} />}
+          {!proposal.parseError && (
+            <ProposalSourceNotes diff={proposal.diff} showSummary={changeType !== "remove"} sourceLabel={sourceBadge.label} />
+          )}
         </div>
 
         {!proposal.parseError && source !== "link_health" && (
@@ -654,14 +661,18 @@ function pinsOf(diff: ProposedDiff): PinNote[] {
  * told us that this change would overwrite (meta.pins) — shown beside the
  * change so Kyle weighs the venue's word against the source's.
  */
-function ProposalSourceNotes({ diff, showSummary }: { diff: ProposedDiff; showSummary: boolean }) {
+function ProposalSourceNotes({ diff, showSummary, sourceLabel }: { diff: ProposedDiff; showSummary: boolean; sourceLabel: string }) {
   const summary = showSummary ? metaSummaryOf(diff) : undefined;
   const sourceUrl = typeof diff.meta?.source_url === "string" ? diff.meta.source_url : undefined;
   const pins = pinsOf(diff);
-  const cas = careAndShareNotesOf(diff);
-  if (!summary && !sourceUrl && pins.length === 0 && !cas) return null;
+  // A SNAP/WIC list card has its own sentence; the Care and Share notes
+  // would read its needs_review as "we couldn't read their hours".
+  const list = benefitListNotesOf(diff, sourceLabel);
+  const cas = list ? null : careAndShareNotesOf(diff);
+  if (!summary && !sourceUrl && pins.length === 0 && !cas && !list) return null;
   return (
     <div className="mt-2 space-y-1.5">
+      {list}
       {cas}
       {summary && <p className="text-sm text-[var(--color-ink-700)]">{summary}</p>}
       {sourceUrl && (
@@ -679,10 +690,69 @@ function ProposalSourceNotes({ diff, showSummary }: { diff: ProposedDiff; showSu
           <span className="font-medium">{fieldLabel(p.field)}</span>: the venue told us this itself on{" "}
           {formatLastVerified(p.pinned_at.slice(0, 10))}
           {p.note ? ` (${p.note})` : ""}.
-          {p.stale ? " That was over a year ago, so this change may be right; renew the pin if the venue confirms again." : " Approve only if you trust this source over the venue."}
+          {/* A "not on the list" card changes nothing, so there is no source-over-venue choice to warn about. */}
+          {(diff.meta?.benefit_list as { finding?: unknown } | undefined)?.finding === "not_listed"
+            ? ""
+            : p.stale
+              ? " That was over a year ago, so this change may be right; renew the pin if the venue confirms again."
+              : " Approve only if you trust this source over the venue."}
         </p>
       ))}
     </div>
+  );
+}
+
+/** meta.benefit_list, as scripts/refresh/benefitLists.ts writes it. */
+interface BenefitListNote {
+  field?: string;
+  finding?: string;
+  entry?: { name?: string; address?: string; name_score?: number; same_street?: boolean; distance_m?: number | null };
+}
+
+/**
+ * SNAP/WIC list cards (Venue Data Rebuild step 4): which list said what, and
+ * the date of the download, so Kyle can check the same list himself. Null
+ * for every other card. Defensive reads, like careAndShareNotesOf.
+ */
+function benefitListNotesOf(diff: ProposedDiff, sourceLabel: string): React.ReactNode {
+  const b = (diff.meta?.benefit_list ?? null) as BenefitListNote | null;
+  if (!b || typeof b.finding !== "string" || typeof b.field !== "string") return null;
+  const fetched = typeof diff.meta?.fetched_at === "string" ? diff.meta.fetched_at.slice(0, 10) : null;
+  const list = `${sourceLabel}${fetched ? `, downloaded ${formatLastVerified(fetched)}` : ""}`;
+  const tick = fieldLabel(b.field);
+  const changesTick = diff.fields_changed.includes(b.field);
+  const e = b.entry;
+  const evidence = e
+    ? [
+        typeof e.distance_m === "number" ? `${e.distance_m} m away` : null,
+        typeof e.name_score === "number" ? `name match ${e.name_score}` : null,
+        e.same_street ? "same street number" : null,
+      ].filter(Boolean)
+    : [];
+  const listing = e?.name ? `"${e.name}"${e.address ? `, ${e.address}` : ""}${evidence.length ? ` (${evidence.join(", ")})` : ""}` : "this place";
+  return (
+    <p className="text-sm text-[var(--color-ink-700)]">
+      {b.finding === "listed" && <>The {list}, has this place as {listing}. Approving sets {tick} to Yes.</>}
+      {b.finding === "maybe_listed" && !changesTick && (
+        <>
+          Not sure this is the same place: the {list}, has {listing}, and it also looks like another of our places. The map already says
+          {" "}{tick}: Yes, and approving changes nothing but links this listing to this place. If it isn&apos;t this place, check with the
+          store and reject. Either way this card won&apos;t come back.
+        </>
+      )}
+      {b.finding === "maybe_listed" && changesTick && (
+        <>
+          Not sure this is the same place: the {list}, has {listing}. Approve only if it is, which sets {tick} to Yes. Rejecting means
+          this match isn&apos;t asked again.
+        </>
+      )}
+      {b.finding === "not_listed" && (
+        <>
+          This place isn&apos;t on the {list}, but the map says {tick}: Yes. Nothing has changed. Check with the store, approve if it
+          still does, and if it doesn&apos;t, edit the venue to untick it and reject this. Either way this card won&apos;t come back.
+        </>
+      )}
+    </p>
   );
 }
 

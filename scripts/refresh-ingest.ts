@@ -62,6 +62,7 @@
  *   npx tsx scripts/refresh-ingest.ts --db-mode staging  # pueblo-food-map-admin-staging (dev.pueblofoodmap.com's database)
  *   npx tsx scripts/refresh-ingest.ts --db-mode remote   # PRODUCTION D1 — only ever run by the real workflow
  *   ... --only website   # the venue website reader alone (server timer only, ops/systemd/; see parseFlags)
+ *   ... --only snap_wic  # the monthly SNAP + WIC list check alone (refresh-snap-wic.yml)
  *
  * `local` and `remote` share the database name pueblo-food-map-admin and
  * differ only by wrangler's --local/--remote flag; `staging` is a separate
@@ -120,6 +121,18 @@ import {
   WEBSITE_SOURCE,
 } from "./refresh/website";
 import { makeFetchPage, makeGemini, readAndRemoveSecretsFile } from "./refresh/websiteIo";
+import {
+  BENEFIT_LISTS_ONLY,
+  buildBenefitListProposals,
+  fetchSnapList,
+  fetchWicList,
+  readEachList,
+  SNAP_SOURCE,
+  WIC_SOURCE,
+  type BenefitSource,
+  type BenefitVenueRow,
+  type ListFetchDeps,
+} from "./refresh/benefitLists";
 
 /**
  * The server timer (ops/systemd/) passes the Cloudflare token as a FILE
@@ -184,15 +197,23 @@ type DbMode = keyof typeof DATABASE_NAMES;
  * (ops/systemd/) runs it instead. `--dry-run` reads everything, prints
  * what it found, and writes NOTHING (no proposals, aliases or Jev calls) —
  * the way to watch a source against a local database before trusting it.
+ * `--only snap_wic` runs just the SNAP and WIC list checks
+ * (scripts/refresh/benefitLists.ts) — the monthly refresh-snap-wic.yml job;
+ * the weekly job never reads those lists.
  */
-function parseFlags(argv: string[]): { onlyCareAndShare: boolean; onlyWebsite: boolean; dryRun: boolean } {
+function parseFlags(argv: string[]): { onlyCareAndShare: boolean; onlyWebsite: boolean; onlyBenefitLists: boolean; dryRun: boolean } {
   const idx = argv.indexOf("--only");
   const only = idx >= 0 ? argv[idx + 1] : undefined;
-  if (only !== undefined && only !== CAS_SOURCE && only !== WEBSITE_SOURCE) {
-    console.error(`FATAL: --only accepts "${CAS_SOURCE}" or "${WEBSITE_SOURCE}".`);
+  if (only !== undefined && only !== CAS_SOURCE && only !== WEBSITE_SOURCE && only !== BENEFIT_LISTS_ONLY) {
+    console.error(`FATAL: --only accepts "${CAS_SOURCE}", "${WEBSITE_SOURCE}" or "${BENEFIT_LISTS_ONLY}".`);
     process.exit(1);
   }
-  return { onlyCareAndShare: only === CAS_SOURCE, onlyWebsite: only === WEBSITE_SOURCE, dryRun: argv.includes("--dry-run") };
+  return {
+    onlyCareAndShare: only === CAS_SOURCE,
+    onlyWebsite: only === WEBSITE_SOURCE,
+    onlyBenefitLists: only === BENEFIT_LISTS_ONLY,
+    dryRun: argv.includes("--dry-run"),
+  };
 }
 
 function parseDbMode(argv: string[]): DbMode {
@@ -356,7 +377,7 @@ interface UrlRow {
 }
 
 /** Rejection keys of this source's proposals a person (not the pipeline) approved — dropAlreadyReviewed skips them. */
-function humanApprovedKeys(dbMode: DbMode, source: typeof CAS_SOURCE | typeof WEBSITE_SOURCE): Set<string> {
+function humanApprovedKeys(dbMode: DbMode, source: typeof CAS_SOURCE | typeof WEBSITE_SOURCE | BenefitSource): Set<string> {
   return new Set(
     d1Query<RejectedRow>(
       dbMode,
@@ -370,9 +391,9 @@ function humanApprovedKeys(dbMode: DbMode, source: typeof CAS_SOURCE | typeof WE
 
 async function main(): Promise<void> {
   const dbMode = parseDbMode(process.argv.slice(2));
-  const { onlyCareAndShare, onlyWebsite, dryRun } = parseFlags(process.argv.slice(2));
-  // Either single-source mode skips the Plentiful/OSM scrapes and the link-health pass.
-  const singleSource = onlyCareAndShare || onlyWebsite;
+  const { onlyCareAndShare, onlyWebsite, onlyBenefitLists, dryRun } = parseFlags(process.argv.slice(2));
+  // Every single-source mode skips the Plentiful/OSM scrapes and the link-health pass.
+  const singleSource = onlyCareAndShare || onlyWebsite || onlyBenefitLists;
   const today = new Date().toISOString().slice(0, 10);
   // GitHub keeps run_id stable across a retried Action run (only
   // run_attempt increments) — spec §6.10d's idempotency key. Local runs get
@@ -390,6 +411,7 @@ async function main(): Promise<void> {
   if (dryRun) console.log("DRY RUN — reads only; nothing will be written.");
   if (onlyCareAndShare) console.log("--only care_and_share — skipping the Plentiful/OSM scrapes and the link-health pass.");
   if (onlyWebsite) console.log("--only website — the venue website reader only (no Plentiful/OSM/Care and Share, no link-health pass).");
+  if (onlyBenefitLists) console.log("--only snap_wic — the SNAP and WIC list checks only (no Plentiful/OSM/Care and Share, no link-health pass).");
 
   // Idempotency (§6.10d): a retried Action re-POSTing under the same
   // run_id must not duplicate a whole run's proposals.
@@ -511,8 +533,9 @@ async function main(): Promise<void> {
   // any source_type, matched by alias, id, or the strong/ambiguous check in
   // scripts/refresh/careAndShare.ts. The raw-response cache lives in a temp
   // dir outside the repo and already has contact fields stripped.
-  const casCacheDir = onlyWebsite ? "" : mkdtempSync(join(tmpdir(), "pfm-care-and-share-"));
-  const cas = onlyWebsite
+  const skipCas = onlyWebsite || onlyBenefitLists;
+  const casCacheDir = skipCas ? "" : mkdtempSync(join(tmpdir(), "pfm-care-and-share-"));
+  const cas = skipCas
     ? null
     : await fetchCareAndShare({
         fetch: (url, init) => fetch(url, init),
@@ -523,7 +546,7 @@ async function main(): Promise<void> {
   let casCurrentRows: CurrentVenueRow[] = [];
   const aliasStatements: string[] = [];
   if (!cas) {
-    // --only website: Care and Share isn't read this run.
+    // --only website / snap_wic: Care and Share isn't read this run.
   } else if (!cas.ok) {
     anySourceAborted = true;
     console.error(`\ncare_and_share: ABORTED after ${cas.requests} request(s) (writes nothing for this source): ${cas.reason}`);
@@ -669,6 +692,55 @@ async function main(): Promise<void> {
     }
   }
 
+  // ── 3d: SNAP and WIC lists (Venue Data Rebuild step 4,
+  // scripts/refresh/benefitLists.ts) — only with --only snap_wic, the
+  // monthly refresh-snap-wic.yml job. Each list stands alone: one failing
+  // (download, parse, empty, or a suspiciously short list) writes nothing for
+  // that list and fails the job at the end, while the other's cards still go
+  // in, the same per-source abort as Care and Share above.
+  let benefitCurrentRows: CurrentVenueRow[] = [];
+  if (onlyBenefitLists) {
+    const benefitRows = d1Query<BenefitVenueRow>(
+      dbMode,
+      `SELECT ${CURRENT_ROW_COLUMNS}, accepts_snap, accepts_wic FROM venues WHERE status IN ('draft','published') ` +
+        "AND category IN ('grocery','convenience','farm')",
+    );
+    benefitCurrentRows = benefitRows;
+    const net: ListFetchDeps = { fetch: (url, init) => fetch(url, init), log: (m) => console.log(m) };
+    const lists = await readEachList(
+      [
+        { source: SNAP_SOURCE, read: () => fetchSnapList(net) },
+        { source: WIC_SOURCE, read: () => fetchWicList(net) },
+      ],
+      (source, got) => {
+        // Approved "maybe" matches (venue_id_aliases, written on approve) count as the same place.
+        const aliases = schemaReady
+          ? d1Query<IdAliasRow>(dbMode, `SELECT source, upstream_id, venue_id FROM venue_id_aliases WHERE source = '${source}'`)
+          : [];
+        const approvedKeys = humanApprovedKeys(dbMode, source);
+        const decidedKeys = new Set([...rejectedKeys, ...approvedKeys]);
+        const built = buildBenefitListProposals({ source, entries: got.entries, venues: benefitRows, runId, today, fetchedAt: got.fetchedAt, aliases, decidedKeys });
+        const st = built.stats;
+        console.log(
+          `\n${source}: list_in_county=${got.entries.length} compared=${st.compared} listed=${st.listed} still_listed=${st.stillListed} ` +
+            `maybe=${st.maybe} not_listed=${st.notListed} not_listed_already_decided=${st.notListedDecided}`,
+        );
+        for (const line of built.report) console.log(line);
+        if (built.aborted) return built;
+        // Rejection memory, and approval memory for the review-only "not on the list" cards (dropAlreadyReviewed).
+        const kept = dropAlreadyReviewed(
+          built.proposals.filter((p) => !rejectedKeys.has(rejectionKey(p.source, p.targetVenueId, p.diffHash))),
+          approvedKeys,
+        );
+        console.log(`${source}: proposals=${kept.length} (already-decided=${built.proposals.length - kept.length})`);
+        return { proposals: kept };
+      },
+      { log: (m) => console.log(m), error: (m) => console.error(m) },
+    );
+    if (lists.anyAborted) anySourceAborted = true;
+    allProposals = allProposals.concat(lists.proposals);
+  }
+
   // The automatic switch (src/lib/sourceSwitch.ts, migration 0023). Probed
   // like 0016/0021: without the table every pair stays proposal-only.
   const switchReady = observationsReady && tables.has("source_switch_resets");
@@ -721,12 +793,13 @@ async function main(): Promise<void> {
   if (dryRun) {
     const counts: Record<string, number> = {};
     for (const p of allProposals) {
-      const k = `${p.source}/${p.changeType}/${p.proposedDiff.fields_changed.filter((f) => f !== "last_verified").join("+") || "still-listed"}`;
+      const k = `${p.source}/${p.changeType}/${p.proposedDiff.fields_changed.filter((f) => f !== "last_verified").join("+") || (p.proposedDiff.meta?.needs_review || p.proposedDiff.meta?.match ? "review-only" : "still-listed")}`;
       counts[k] = (counts[k] ?? 0) + 1;
     }
     console.log(`\nDRY RUN — would write ${allProposals.length} proposal(s) + ${aliasStatements.length} alias(es):`);
     for (const [k, n] of Object.entries(counts).sort()) console.log(`  ${n}  ${k}`);
-    for (const p of allProposals.filter((x) => (x.source === CAS_SOURCE || x.source === WEBSITE_SOURCE) && (x.proposedDiff.fields_changed.length > 1 || x.changeType !== "update" || x.proposedDiff.meta?.needs_review))) {
+    const detailed = new Set<string>([CAS_SOURCE, WEBSITE_SOURCE, SNAP_SOURCE, WIC_SOURCE]);
+    for (const p of allProposals.filter((x) => detailed.has(x.source) && (x.proposedDiff.fields_changed.length > 1 || x.changeType !== "update" || x.proposedDiff.meta?.needs_review))) {
       console.log(`  ${p.changeType} ${p.targetVenueId}: ${JSON.stringify({ before: p.proposedDiff.before, after: p.proposedDiff.after, needs_review: p.proposedDiff.meta?.needs_review, summary: p.proposedDiff.meta?.summary })}`);
     }
     console.log("Nothing written.");
@@ -743,7 +816,7 @@ async function main(): Promise<void> {
   const triagePass = await runTriagePass({
     proposals: allProposals,
     // C&S rows overlap the plentiful ones (same venue, any source_type); dedupe by id.
-    currentRows: [...new Map([...currentByType.plentiful, ...currentByType.osm, ...casCurrentRows, ...websiteCurrentRows].map((r) => [r.id, r])).values()],
+    currentRows: [...new Map([...currentByType.plentiful, ...currentByType.osm, ...casCurrentRows, ...websiteCurrentRows, ...benefitCurrentRows].map((r) => [r.id, r])).values()],
     session,
     rejectedKeys,
     today,

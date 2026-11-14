@@ -1,0 +1,63 @@
+# Monthly SNAP and WIC list check (Venue Data Rebuild step 4, issue #938):
+# compares the map's "Accepts SNAP" / "Accepts WIC" ticks on stores and farms
+# against USDA's current SNAP retailer list and the Colorado WIC store map, and
+# writes review cards only (scripts/refresh/benefitLists.ts; mechanism in
+# ARCHITECTURE.md "Automated venue-refresh pipeline"). No tick changes until
+# Kyle approves a card. Both lists are public and no AI model is involved, so
+# this runs here, not on the server.
+#
+# Same credentials and guardrails as refresh-proposals.yml: its own D1-Write-only
+# CLOUDFLARE_D1_TOKEN (#403), never the deploy token; a failed or empty download
+# writes nothing for that list and fails the run, which messages Kyle on Telegram.
+name: SNAP and WIC List Check
+
+on:
+  # The 15th of each month, 07:00 UTC. Monthly because both lists change
+  # slowly (USDA's is refreshed about weekly, store authorizations rarely);
+  # inside refreshAlerts.ts's 40-day staleness window. `schedule` only fires
+  # from the default branch (main).
+  schedule:
+    - cron: "0 7 15 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Shared with refresh-proposals.yml so the two never write change_proposals at
+# the same moment; a run that lands on the weekly one waits for it.
+concurrency:
+  group: refresh-proposals
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Compare SNAP/WIC ticks with the official lists, write change_proposals
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # --db-mode remote is PRODUCTION. --no-install: never fetch tsx from npm
+      # inside a job holding a D1-write token (refresh-proposals.yml's note).
+      - run: npx --no-install tsx scripts/refresh-ingest.ts --db-mode remote --only snap_wic
+        timeout-minutes: 10
+      # Same alert as the weekly refresh (refresh-proposals.yml has the WHY):
+      # the n8n webhook sends one fixed "refresh failed" message with this
+      # run's link, so the link is what says it was the SNAP/WIC check.
+      - name: Tell Kyle on Telegram that the check failed
+        if: failure() || cancelled()
+        env:
+          PFM_ALERT_WEBHOOK_KEY: ${{ secrets.PFM_ALERT_WEBHOOK_KEY }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -sS --fail-with-body --retry 3 --max-time 20 -X POST https://n8n.boyd.fo/webhook/pfm-refresh-failed \
+            -H "X-PFM-Alert-Key: ${PFM_ALERT_WEBHOOK_KEY}" -H "Content-Type: application/json" \
+            -d "{\"run_url\":\"${RUN_URL}\"}" \
+            || echo "::warning::Telegram alert failed to send"

@@ -6,6 +6,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { buildProposalWriteStatements, type PinRow } from "./proposalSql";
 import { rejectionKey } from "./diffEngine";
+import { dropAlreadyReviewed } from "./careAndShare";
 import { sqlText } from "./sql";
 import {
   buildBenefitListProposals,
@@ -235,6 +236,39 @@ describe("buildBenefitListProposals", () => {
     const r = build(SNAP_SOURCE, [entry("usda-far", { name: "Far Away", street: "1 Nowhere Rd", lat: 37, lng: -103 })], venues);
     expect(r.aborted).toBeTruthy();
     expect(r.proposals).toEqual([]);
+  });
+
+  test("stores whose 'not on the list' card Kyle already decided don't trip the bad-download guardrail", () => {
+    // Five ticked stores off the list trip the guardrail (floor 5) — unless each card was decided before.
+    const gone = Array.from({ length: 5 }, (_, i) => venue(`gone-${i}`, { accepts_snap: 1, lat: 37 + i * 0.05, lng: -103 }));
+    const first = withAgreeing([], gone);
+    expect(first.aborted).toBeTruthy();
+    // Each card as an earlier month wrote it (one at a time, so that month's guardrail didn't trip).
+    const decided = new Set(
+      gone.map((g) => {
+        const [p] = withAgreeing([], [g]).proposals.filter((x) => x.targetVenueId === g.id);
+        return rejectionKey(p.source, p.targetVenueId, p.diffHash);
+      }),
+    );
+    expect(decided.size).toBe(5);
+    const next = buildBenefitListProposals({
+      source: SNAP_SOURCE, entries: agreeing.map((a) => a.e), venues: [...agreeing.map((a) => a.v), ...gone],
+      runId: "r1", today: "2026-12-15", fetchedAt: FETCHED, decidedKeys: decided,
+    });
+    expect(next.aborted).toBeUndefined();
+    expect(next.proposals.filter((p) => p.targetVenueId.startsWith("gone-"))).toEqual([]);
+  });
+
+  test("an APPROVED 'not on the list' card stays quiet the next month (existing approval memory)", () => {
+    const [card] = cardFor(withAgreeing([], [venue("v", { accepts_snap: 1 })]), "v");
+    const approved = new Set([rejectionKey(card.source, card.targetVenueId, card.diffHash)]);
+    // Next month, still off the list; the tick is still yes and last_verified moved on approve.
+    const next = buildBenefitListProposals({
+      source: SNAP_SOURCE, entries: agreeing.map((a) => a.e), venues: [...agreeing.map((a) => a.v), venue("v", { accepts_snap: 1, last_verified: TODAY })],
+      runId: "r2", today: "2026-12-15", fetchedAt: "2026-12-15T07:00:00.000Z",
+    });
+    // refresh-ingest.ts drops it through the same call Care and Share uses.
+    expect(dropAlreadyReviewed(cardFor(next, "v"), approved)).toEqual([]);
   });
 
   test("the same finding hashes the same next month, so a rejected card stays rejected", () => {

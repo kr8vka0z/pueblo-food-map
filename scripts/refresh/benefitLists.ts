@@ -45,7 +45,7 @@
  */
 
 import type { Venue } from "@/types/venue";
-import { checkSanityGuardrail, computeDiffHash, type CurrentVenueRow, type ProposalDraft } from "./diffEngine";
+import { checkSanityGuardrail, computeDiffHash, rejectionKey, type CurrentVenueRow, type ProposalDraft } from "./diffEngine";
 import { nameScore, STRONG_DISTANCE_M, STRONG_NAME_SCORE, streetKey } from "./careAndShare";
 import { haversineDistanceKm, type IdAliasRow } from "./renamePairs";
 
@@ -309,13 +309,20 @@ export interface BenefitListBuildParams {
    * would come back as "not on the list" the month after the tick is set.
    */
   aliases?: IdAliasRow[];
+  /**
+   * rejectionKey()s of this source's cards Kyle already approved or rejected.
+   * A "not on the list" card he decided is left out here, and out of the
+   * bad-download guardrail's count: otherwise a few stores permanently off a
+   * small list (WIC trips at 5) would stop that list every month.
+   */
+  decidedKeys?: ReadonlySet<string>;
 }
 
 export interface BenefitListBuildResult {
   proposals: ProposalDraft[];
   /** Set when the list is missing too many of our ticked stores to be a real list: write nothing for this source. */
   aborted?: string;
-  stats: { compared: number; listed: number; stillListed: number; maybe: number; notListed: number };
+  stats: { compared: number; listed: number; stillListed: number; maybe: number; notListed: number; notListedDecided: number };
   report: string[];
 }
 
@@ -341,7 +348,7 @@ export function buildBenefitListProposals(p: BenefitListBuildParams): BenefitLis
 
   const proposals: ProposalDraft[] = [];
   const report: string[] = [];
-  const stats = { compared: pool.length, listed: 0, stillListed: 0, maybe: 0, notListed: 0 };
+  const stats = { compared: pool.length, listed: 0, stillListed: 0, maybe: 0, notListed: 0, notListedDecided: 0 };
   let mapYes = 0;
 
   const card = (v: BenefitVenueRow, meta: Record<string, unknown>, change: boolean, hashExtra?: Record<string, unknown>): ProposalDraft => {
@@ -406,9 +413,15 @@ export function buildBenefitListProposals(p: BenefitListBuildParams): BenefitLis
         report.push(`  probably    ${v.id} "${v.name}" ~ "${best.entry.name}" ${entryAddress(best.entry)} (no card)`);
         continue;
       }
-      stats.notListed++;
       const benefit: BenefitListMeta = { field, finding: "not_listed" };
-      proposals.push(card(v, { benefit_list: benefit, needs_review: [`not on the list`] }, false, { not_listed: field }));
+      const check = card(v, { benefit_list: benefit, needs_review: [`not on the list`] }, false, { not_listed: field });
+      if (p.decidedKeys?.has(rejectionKey(check.source, check.targetVenueId, check.diffHash))) {
+        stats.notListedDecided++;
+        report.push(`  not listed  ${v.id} "${v.name}" (already decided, no card)`);
+        continue;
+      }
+      stats.notListed++;
+      proposals.push(check);
       report.push(`  not listed  ${v.id} "${v.name}" ${v.address} (map says yes)`);
       continue;
     }
@@ -428,7 +441,8 @@ export function buildBenefitListProposals(p: BenefitListBuildParams): BenefitLis
   // The abnormal-drop guardrail the weekly sources use: a valid but partial
   // list would otherwise turn into a pile of "please check" cards that
   // approval and rejection memory then silence for good.
-  const sanity = checkSanityGuardrail(stats.notListed, mapYes);
+  // Decided stores are out of both counts, so they neither trip it nor dilute it.
+  const sanity = checkSanityGuardrail(stats.notListed, mapYes - stats.notListedDecided);
   if (sanity.anomaly) {
     return {
       proposals: [],

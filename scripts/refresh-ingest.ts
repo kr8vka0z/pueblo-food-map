@@ -719,11 +719,13 @@ async function main(): Promise<void> {
       const aliases = schemaReady
         ? d1Query<IdAliasRow>(dbMode, `SELECT source, upstream_id, venue_id FROM venue_id_aliases WHERE source = '${source}'`)
         : [];
-      const built = buildBenefitListProposals({ source, entries: got.entries, venues: benefitRows, runId, today, fetchedAt: got.fetchedAt, aliases });
+      const approvedKeys = humanApprovedKeys(dbMode, source);
+      const decidedKeys = new Set([...rejectedKeys, ...approvedKeys]);
+      const built = buildBenefitListProposals({ source, entries: got.entries, venues: benefitRows, runId, today, fetchedAt: got.fetchedAt, aliases, decidedKeys });
       const st = built.stats;
       console.log(
         `\n${source}: list_in_county=${got.entries.length} compared=${st.compared} listed=${st.listed} still_listed=${st.stillListed} ` +
-          `maybe=${st.maybe} not_listed=${st.notListed}`,
+          `maybe=${st.maybe} not_listed=${st.notListed} not_listed_already_decided=${st.notListedDecided}`,
       );
       for (const line of built.report) console.log(line);
       if (built.aborted) {
@@ -734,7 +736,7 @@ async function main(): Promise<void> {
       // Rejection memory, and approval memory for the review-only "not on the list" cards (dropAlreadyReviewed).
       const kept = dropAlreadyReviewed(
         built.proposals.filter((p) => !rejectedKeys.has(rejectionKey(p.source, p.targetVenueId, p.diffHash))),
-        humanApprovedKeys(dbMode, source),
+        approvedKeys,
       );
       console.log(`${source}: proposals=${kept.length} (already-decided=${built.proposals.length - kept.length})`);
       allProposals = allProposals.concat(kept);

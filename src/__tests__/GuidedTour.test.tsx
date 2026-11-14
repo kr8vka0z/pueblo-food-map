@@ -181,6 +181,40 @@ describe("GuidedTour — puts the UI in each step's state, then restores it", ()
   });
 });
 
+describe("GuidedTour — a box card's lower buttons are scrolled into view", () => {
+  test("scrolls to the target again when the card grows after the first scroll, then comes to rest", () => {
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+    const link = document.createElement("button");
+    link.setAttribute("data-tour", "box-alerts");
+    // A stand-in for the card's scroll area: the link sits at `top`, and
+    // scrolling it into view always brings it to 300.
+    let top = 900;
+    link.getBoundingClientRect = () => ({ top, left: 20, right: 220, bottom: top + 44, width: 200, height: 44 }) as DOMRect;
+    link.scrollIntoView = vi.fn(() => {
+      top = 300;
+    });
+    document.body.appendChild(link);
+    try {
+      renderTour();
+      clickNext(TOUR_STEPS.findIndex((s) => s.id === "boxAlerts"));
+      act(() => vi.advanceTimersByTime(2000));
+      expect(top).toBe(300);
+      const atRest = vi.mocked(link.scrollIntoView).mock.calls.length;
+      act(() => vi.advanceTimersByTime(2000));
+      expect(link.scrollIntoView).toHaveBeenCalledTimes(atRest);
+
+      // The card grows above the link (a late Turnstile fallback, a photo).
+      top = 380;
+      act(() => vi.advanceTimersByTime(2000));
+      expect(top).toBe(300);
+      expect(screen.getByTestId("tour-highlight").style.transform).toBe("translate(14px, 294px)");
+    } finally {
+      link.remove();
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe("GuidedTour — Escape goes through the claim-once overlay stack", () => {
   test("Escape closes only the tour, even when an overlay opened AFTER it (the venue card)", () => {
     const cardEscape = vi.fn();

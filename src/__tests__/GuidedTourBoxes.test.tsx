@@ -131,7 +131,7 @@ describe("Blessing Box steps", () => {
 
     next(); // boxCheckin: the box's card is open on its check-in buttons
     await waitFor(() => expect(checkinButtons().length).toBeGreaterThan(0));
-    next(2); // photo, then the sponsor/alerts step (sheet held open)
+    next(2); // photo, then the sponsor step (sheet held open)
     await waitFor(() => expect(document.querySelector('[data-tour="box-alerts"]')).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: EN.back }));
     expect(screen.getByRole("heading", { level: 2, name: EN.steps.boxPhoto.title })).toBeTruthy();
@@ -146,7 +146,7 @@ describe("Blessing Box steps", () => {
 
   test("leaving the box section mid-tour turns the Boxes view off again", async () => {
     await renderThenTour();
-    next(stepIndex("boxHelp"));
+    next(stepIndex("boxAlerts"));
     next(); // Near me
     await waitFor(() => expect(boxesOn()).toBe("false"));
     expect(writes()).toEqual([]);

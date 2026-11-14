@@ -47,6 +47,17 @@ describe("tourReducer — step state machine", () => {
   });
 });
 
+describe("TOUR_STEPS — one highlight per step", () => {
+  // Every match of a step's target is drawn as ONE box. The sponsor band is
+  // the first row of the desktop box card and the email link the last, so a
+  // step naming both drew a box down the whole card and off a laptop screen.
+  test("the sponsor band and the email link are separate steps", () => {
+    const naming = (hook: string) => TOUR_STEPS.filter((s) => s.target?.includes(hook)).map((s) => s.id);
+    expect(naming("box-adopt")).toEqual(["boxSponsor"]);
+    expect(naming("box-alerts")).toEqual(["boxAlerts"]);
+  });
+});
+
 describe("placeTooltip — never covers its target, never runs off screen", () => {
   test("no target: centered", () => {
     const p = placeTooltip(null, TIP, VP);

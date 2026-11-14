@@ -260,7 +260,8 @@ export default function GuidedTour({
     let frames = 0;
     let stable = 0;
     let last: Rect | null = null;
-    let scrolled = false;
+    // Where the target sat when it was last scrolled into view.
+    let scrolledAt: Rect | null = null;
     const tick = () => {
       // Every match, unioned: the search step highlights the box AND the
       // results list under it, the filters step the whole group of switches.
@@ -296,9 +297,14 @@ export default function GuidedTour({
       // A box's buttons can sit below the card's visible part. Scroll once
       // the card has settled (it slides in, then the phone sheet expands),
       // or the scroll lands on the half-open layout; keep measuring after.
-      if (scrollTarget && !scrolled && selector && rect && stable >= STABLE_FRAMES) {
+      // WHY every time it settles somewhere new, not once: a card the step
+      // has just opened keeps growing after that first scroll (the check-in
+      // panel's Turnstile fallback, a photo), which pushed the card's last
+      // row, the email link, back under the fold with the highlight on it.
+      // The scroll that follows a scroll is a no-op, so this comes to rest.
+      if (scrollTarget && selector && rect && stable >= STABLE_FRAMES && !sameRect(rect, scrolledAt)) {
         document.querySelector(selector)?.scrollIntoView?.({ block: "center" });
-        scrolled = true;
+        scrolledAt = rect;
         stable = 0;
       }
       frames++;

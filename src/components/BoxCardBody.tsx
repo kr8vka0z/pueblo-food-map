@@ -441,6 +441,8 @@ export default function BoxCardBody({
   const sponsorBlock = (
     <>
       <div
+        // The guided tour points at the whole band (#159); it never presses the link.
+        data-tour="box-adopt"
         className={`-mx-4 px-4 py-2.5 text-sm ${
           hasSponsors
             ? "bg-[var(--color-sage-50)] text-[var(--color-sage-700)]"
@@ -461,7 +463,6 @@ export default function BoxCardBody({
           {t("box.sponsor.wantToHelp", locale)}
           <button
             type="button"
-            data-tour="box-adopt"
             aria-expanded={adoptOpen}
             onClick={() => setAdoptOpen((open) => !open)}
             className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] items-center font-medium underline underline-offset-2"

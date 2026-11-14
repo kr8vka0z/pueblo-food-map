@@ -31,7 +31,7 @@
  *       listed       list says yes, map says no/unknown -> propose the tick
  *       maybe_listed only an uncertain match, map says no/unknown -> the
  *                    same change, but marked needs_review (never plain).
- *                    Also used, with meta.shared, when the map already
+ *                    Also used when the map already
  *                    says yes and the record is equally likely to be
  *                    another of our venues: that card changes NO field,
  *                    and approving it only links the record to this venue.

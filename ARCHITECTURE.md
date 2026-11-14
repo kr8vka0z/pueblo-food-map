@@ -425,8 +425,12 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   download writes nothing for that list and fails the job; the other list
   still writes. Matching reuses Care and Share's `nameScore`/`streetKey` and
   distance thresholds (no phone rule): **listed** (list yes, map no/unknown)
-  proposes the tick; **maybe listed** (only an uncertain match) proposes it
-  with `needs_review`; **not listed** (map yes, nothing on the list) is a
+  proposes the tick; **maybe listed** (only an uncertain match, map
+  no/unknown) proposes it with `needs_review`; a **shared** match (a record
+  equally likely to be two of our venues, on a venue the map already ticks)
+  is also a `maybe_listed` `needs_review` card but changes no field:
+  approving it only links the record to that venue (`venue_id_aliases`);
+  **not listed** (map yes, nothing on the list) is a
   review-only card that changes no field, because dropping off a list never
   means "doesn't accept". Only location evidence (same street number, or
   within 50 m, or 150 m with a half-matching name) stops a "not listed"

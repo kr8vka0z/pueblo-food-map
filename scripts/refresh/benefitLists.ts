@@ -30,7 +30,11 @@
  *     convenience and farm venues to the list and writes one of three cards:
  *       listed       list says yes, map says no/unknown -> propose the tick
  *       maybe_listed only an uncertain match, map says no/unknown -> the
- *                    same change, but marked needs_review (never plain)
+ *                    same change, but marked needs_review (never plain).
+ *                    Also used, with meta.shared, when the map already
+ *                    says yes and the record is equally likely to be
+ *                    another of our venues: that card changes NO field,
+ *                    and approving it only links the record to this venue.
  *       not_listed   map says yes, nothing on the list -> a "please check"
  *                    card that changes NO field: dropping off a list is
  *                    never read as "doesn't accept"; Kyle edits the venue

@@ -47,7 +47,8 @@ describe("tourReducer — step state machine", () => {
   });
 });
 
-describe("TOUR_STEPS — one highlight per step", () => {
+// #933: live on v1.5.0, fixed in v1.5.1.
+describe("incident-2026-11-13-tour-box-highlight: TOUR_STEPS — one highlight per step", () => {
   // Every match of a step's target is drawn as ONE box. The sponsor band is
   // the first row of the desktop box card and the email link the last, so a
   // step naming both drew a box down the whole card and off a laptop screen.

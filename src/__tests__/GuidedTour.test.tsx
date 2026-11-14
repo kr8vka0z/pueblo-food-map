@@ -181,7 +181,8 @@ describe("GuidedTour — puts the UI in each step's state, then restores it", ()
   });
 });
 
-describe("GuidedTour — a box card's lower buttons are scrolled into view", () => {
+// #933: live on v1.5.0, fixed in v1.5.1.
+describe("incident-2026-11-13-tour-box-highlight: a box card's lower buttons are scrolled into view", () => {
   test("scrolls to the target again when the card grows after the first scroll, then comes to rest", () => {
     vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
     const link = document.createElement("button");

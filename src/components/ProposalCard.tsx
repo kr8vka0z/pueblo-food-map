@@ -868,6 +868,7 @@ function buildPreviewVenue(venue: VenueLookup | undefined, after: Partial<Venue>
         lng: venue.lng,
         address: venue.address,
         hours_weekly: venue.hours_weekly ?? undefined,
+        hours_irregular: venue.hours_irregular ?? undefined,
         accepts_snap: venue.accepts_snap,
         accepts_wic: venue.accepts_wic,
         phone: venue.phone ?? undefined,

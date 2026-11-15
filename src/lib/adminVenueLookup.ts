@@ -5,7 +5,7 @@
  * SuggestionsBox.tsx import the `VenueLookup` type from here.
  */
 
-import type { WeeklyHours } from "@/types/venue";
+import type { IrregularSchedule, WeeklyHours } from "@/types/venue";
 
 /** The raw `venues` columns toVenueLookup reads; an AdminVenueRow satisfies it. */
 interface VenueLookupRow {
@@ -17,6 +17,7 @@ interface VenueLookupRow {
   phone: string | null;
   url: string | null;
   hours_weekly: string | null;
+  hours_irregular: string | null;
   accepts_snap: number | null;
   accepts_wic: number | null;
   source: string;
@@ -49,6 +50,8 @@ export interface VenueLookup {
   phone: string | null;
   url: string | null;
   hours_weekly: WeeklyHours | null;
+  /** Monthly schedules (#940): without them a monthly-only place previewed as "Hours unknown". */
+  hours_irregular?: IrregularSchedule[] | null;
   accepts_snap?: boolean;
   accepts_wic?: boolean;
   source: string;
@@ -69,14 +72,17 @@ export function toVenueLookup(row: VenueLookupRow): VenueLookup {
   // editing convenience, not what a read-only preview needs). A bad
   // JSON blob degrades to null (no hours row) rather than throwing —
   // same fail-soft posture as parseProposalRow.
-  let hours: WeeklyHours | null = null;
-  if (row.hours_weekly) {
+  // hours_irregular is JSON text too, with the same fail-soft read.
+  const parseOrNull = <T,>(text: string | null): T | null => {
+    if (!text) return null;
     try {
-      hours = JSON.parse(row.hours_weekly) as WeeklyHours;
+      return JSON.parse(text) as T;
     } catch {
-      hours = null;
+      return null;
     }
-  }
+  };
+  const hours = parseOrNull<WeeklyHours>(row.hours_weekly);
+  const irregular = parseOrNull<IrregularSchedule[]>(row.hours_irregular);
   return {
     name: row.name,
     category: row.category,
@@ -86,6 +92,7 @@ export function toVenueLookup(row: VenueLookupRow): VenueLookup {
     phone: row.phone,
     url: row.url,
     hours_weekly: hours,
+    hours_irregular: Array.isArray(irregular) && irregular.length > 0 ? irregular : null,
     // Tri-state INTEGER -> optional boolean, same NULL=unknown mapping
     // publishVenues.ts's serializer already uses for the exact same
     // column (src/lib/publishVenues.ts, "key omitted" comment).

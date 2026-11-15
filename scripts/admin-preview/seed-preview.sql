@@ -197,6 +197,14 @@ INSERT INTO change_proposals (id, source, target_venue_id, change_type, proposed
   (900099, 'osm', 'test-victory-garden-01', 'update',
    '{"before":{"last_verified":"2026-07-18"},"after":{"last_verified":"2026-11-10"},"fields_changed":["last_verified"]}',
    'pv-h99', 'preview-run-1', 0, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days'), NULL, NULL, NULL, NULL);
+-- A monthly-hours-only place with a waiting website card: its preview box must show the monthly hours (#940).
+INSERT INTO venues (id, name, category, lat, lng, address, hours_weekly, hours_irregular, phone, source, last_verified, status, source_type, outside_county, created_by, updated_by) VALUES
+  ('pv-monthly-pantry', 'Preview Monthly Pantry (made up)', 'pantry', 38.2541, -104.6262, '700 Preview Ave, Pueblo, CO 81004', NULL,
+   '[{"recurrence":"monthly_ordinal","ordinal":4,"weekday":"tue","slots":["11:00-12:00"]}]', NULL, 'preview-seed', date('now','-20 days'), 'published', 'plentiful', 0, 'dana@example.org', 'dana@example.org');
+INSERT INTO change_proposals (id, source, target_venue_id, change_type, proposed_diff, diff_hash, run_id, anomaly, status, created_at) VALUES
+  (900023, 'website', 'pv-monthly-pantry', 'update',
+   '{"before":{"phone":null},"after":{"phone":"719-555-0144","last_verified":"2026-11-14"},"fields_changed":["phone","last_verified"],"meta":{"source_url":"https://preview-monthly.example.org/contact","summary":"The contact page lists this phone number; the map had none."}}',
+   'pv-h23', 'preview-run-1', 0, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days'));
 -- The "maybe" SNAP card's store has an unknown tick (most real ones do), so the card shows "Not known".
 UPDATE venues SET accepts_snap = NULL WHERE id = 'test-gas-and-grab-01';
 UPDATE change_proposals SET reviewed_by = 'dana@example.org', reviewed_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-8 days'), applied_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-8 days') WHERE id = 900090;

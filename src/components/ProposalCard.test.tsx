@@ -24,7 +24,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ParsedProposal } from "@/lib/adminProposals";
-import type { VenueLookup } from "@/lib/adminVenueLookup";
+import { toVenueLookup, type VenueLookup } from "@/lib/adminVenueLookup";
 
 const mockPush = vi.fn();
 const mockRefresh = vi.fn();
@@ -490,6 +490,21 @@ describe("ProposalCard — preview panel shows the RESULTING venue, not today's"
     const card = preview.getByText("Old Pantry").closest("ul");
     expect(card).not.toBeNull();
     expect(card?.hasAttribute("inert")).toBe(true);
+  });
+
+  test("a monthly-only venue's preview keeps its monthly hours, not 'Hours unknown' (#940)", () => {
+    // Through toVenueLookup, the edit page's real path from the D1 row.
+    const venue = toVenueLookup({
+      ...makeVenue({ category: "pantry" }),
+      hours_weekly: null,
+      hours_irregular: JSON.stringify([{ recurrence: "monthly_ordinal", ordinal: 4, weekday: "tue", slots: ["11:00-12:00"] }]),
+      accepts_snap: null,
+      accepts_wic: null,
+    });
+    render(<ProposalCard proposal={makeUpdateProposal()} venue={venue} />);
+
+    const preview = within(screen.getByTestId("proposal-preview"));
+    expect(preview.queryByText(/Hours unknown/i)).toBeNull();
   });
 
   test("a link_health card renders no preview panel — there's no proposed field change to preview", () => {

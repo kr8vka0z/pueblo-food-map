@@ -507,6 +507,23 @@ describe("ProposalCard — preview panel shows the RESULTING venue, not today's"
     expect(preview.queryByText(/Hours unknown/i)).toBeNull();
   });
 
+  test("a proposed monthly schedule stored as JSON text previews as that schedule (#940)", () => {
+    // The refresh pipeline writes hours into proposed_diff as D1's JSON text.
+    const scheduleChange = makeUpdateProposal({
+      diff: {
+        before: {},
+        after: {
+          hours_irregular: JSON.stringify([{ recurrence: "monthly_ordinal", ordinal: 2, weekday: "thu", slots: ["11:00-12:00"] }]),
+        },
+        fields_changed: ["hours_irregular"],
+      },
+    } as unknown as Partial<ParsedProposal>);
+    render(<ProposalCard proposal={scheduleChange} venue={makeVenue({ category: "pantry", hours_weekly: null })} />);
+
+    const preview = within(screen.getByTestId("proposal-preview"));
+    expect(preview.getByText(/Next: Thu/)).toBeDefined();
+  });
+
   test("a link_health card renders no preview panel — there's no proposed field change to preview", () => {
     render(<ProposalCard proposal={makeLinkHealthProposal()} />);
     expect(screen.queryByTestId("proposal-preview")).toBeNull();

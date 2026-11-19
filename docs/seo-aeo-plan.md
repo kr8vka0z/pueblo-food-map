@@ -1,7 +1,8 @@
 # SEO / AEO plan
 
-Status (2026-10-19): **Phases 0, 2, 3 and 4 have shipped; Phases 1 and 5 are ongoing
-(Kyle).** Kyle's decisions are in §6. v1 was written from the code alone; v2 (2026-09-28)
+Status (2026-11-19): **Phases 0, 2, 3 and 4 have shipped; Phases 1 and 5 are ongoing
+(Kyle).** The 2026-11-19 review (§8) scores the plan against real Search Console
+data and lists what to do next. Kyle's decisions are in §6. v1 was written from the code alone; v2 (2026-09-28)
 added a live audit of pueblofoodmap.com, the non-prod hosts, search results and
 competing directories. Each phase's own **Status** line below records what shipped
 and where.
@@ -37,7 +38,7 @@ the one fact people search for (hours).
 | 6 | **Non-prod hosts are indexable.** `dev.pueblofoodmap.com` and `pueblo-food-map.kyle-boyd.workers.dev` serve `Allow: /` and no `noindex`. Canonicals do point at prod, which limits the damage, but staging carries unpublished data. | Duplicate or incorrect pages can be indexed. | No |
 | 7 | The Organization JSON-LD has `sameAs: [pueblofoodproject.org, pueblofoodmap.com]`. Listing itself is a no-op, and there's no `logo` or `areaServed`. | Weak entity signal. | Partly |
 | 8 | **No inbound links from the obvious partners.** Pueblo Food Project (the org the map is built for), Pueblo County's food-assistance page and the blessing-box org don't link to pueblofoodmap.com. PFP's own `/foodfinder/` page is currently a **404**. | Authority is the main AEO lever, and it's at zero. | As a to-do only |
-| 9 | Crawler access is **fine**. OAI-SearchBot, ChatGPT-User, PerplexityBot, Claude-SearchBot, ClaudeBot, GPTBot, Googlebot and bingbot all get 200. Prod `robots.txt` is our own (no Cloudflare managed prefix). | v1 Phase 0.4 is done; drop it. | Was an open question |
+| 9 | Crawler access is **fine** (no longer true for PerplexityBot since 2026-10-22; see §8 finding 2). OAI-SearchBot, ChatGPT-User, PerplexityBot, Claude-SearchBot, ClaudeBot, GPTBot, Googlebot and bingbot all get 200. Prod `robots.txt` is our own (no Cloudflare managed prefix). | v1 Phase 0.4 is done; drop it. | Was an open question |
 
 What's already good (unchanged from v1): `buildPageMetadata` on every page, self-canonicals (including `/`), a sitemap with `lastmod`, venue JSON-LD with geo and weekly hours, FAQPage on `/about`, ItemList on `/`, a server-rendered `/venues`, and `www` → apex 301.
 
@@ -340,3 +341,193 @@ doing the outreach.
   prompt-panel run:** not yet done; the questions are in Phase 0 item 8.
 - **`/` was already indexed on 2026-09-29**, but the brand query still ranks the
   GitHub repo first. That's authority, so it's Phase 5 work, not a code fix.
+
+---
+
+## 8. 2026-11-19 review
+
+**Sources:** Google Search Console for 2026-08-01 to 2026-11-18 (Search Analytics
+API through the server's `gsc query`), URL Inspection of all 236 sitemap URLs, a
+curl crawl of every sitemap URL, Lighthouse mobile on three pages, Cloudflare Web
+Analytics referrers, and the published venue data in `src/data/published-venues.ts`.
+**Not measured:** AI citations and Bing rankings. Perplexity, Google, DuckDuckGo,
+Brave and Mojeek all served a CAPTCHA or a 403 to the server, Bing from the server
+returned off-topic results, and there is no Bing Webmaster Tools API key for this
+site. One indirect check: an AI web-search tool (not from the server) returned no
+pueblofoodmap.com page for "Pueblo Food Map", "food pantry Pueblo CO", "blessing
+boxes Pueblo Colorado map" or "stores that take EBT Pueblo Colorado"; it cited
+feedam.org, directory.plentiful.org, foodpantries.org, KOAA and
+mapping.littlefreepantry.org instead. The prompt panel (Phase 0 item 8) must be
+run from a normal browser.
+
+### 8.1 Scorecard against §4
+
+| Signal | Target | 2026-11-19 |
+|---|---|---|
+| Brand query shows the site | #1 | **Unmeasured, probably not met.** Search Console reports no "pueblo food map" searches; Google hides rare queries, and `/` gets 10 clicks from searches it doesn't name. The AI web-search check above didn't find the site for its own name. "pueblo food" and "pueblofood" (445 impressions, around 7th, 0 clicks) show **`/es/about`**, not `/` or `/about`. |
+| Indexed venue pages | ≥ 100 of 107 | **Not met: 94 of 107** (Spanish: 90 of 107). **All 13 missing English pages are pantries**, 13 of 33, among them Bessemer Mobile Food Pantry, Pueblo Cooperative Care Center and the county USDA distribution: 9 "Discovered – currently not indexed", 4 unknown to Google. Every store and garden page is indexed. Hubs: all indexed. |
+| Pantries with hours | ≥ 90% | **Not met: 16 of 33 (48%).** 42 of 63 stores have no hours either. |
+| Impressions / clicks trending up | up | **Met.** 41 impressions and 1 click in the week of 09-14; 863 and 16 in the week of 11-09. |
+| AI-referred visits | tracked | **None visible.** Web Analytics samples about 1 in 10 visits, so a handful could hide. No chatgpt.com, perplexity.ai, copilot or gemini referrer in Web Analytics since launch. Last 30 days (sampled): direct ~310 visits, Google ~90, Gmail app ~50, Facebook ~60, Bing ~10. |
+| Cited in AI answers | most of 16 | **Not measured.** The panel has never run. |
+| Rich-result errors | none | None seen, but venue pages fail Lighthouse's meta-description check (finding 1). |
+
+### 8.2 What people search when Google shows us
+
+4,854 impressions and 79 clicks in total (CTR 1.6%). Google names the query for
+2,133 of those impressions; the rest are hidden for privacy. Mobile is 76% of
+impressions and sits around 8th; desktop sits around 29th.
+
+| Intent | Queries | Impressions | Clicks | Best examples (impressions, typical position) |
+|---|---|---|---|---|
+| Store names and other searches (anything not below) | 256 | 869 | 0 | "valley market" (285, ~10), "save a lot hours pueblo co" (70, ~31, lands on `/venues`), "loaf n jug avondale" (28, ~7) |
+| Free food / pantry / food bank | 203 | 681 | 9 | "food banks near me" (59, ~8, 5 clicks), "food pantry near me" (53, ~10), "free food bank pueblo, co open today" (39, ~10) |
+| "pueblo food" / "pueblofood" | 4 | 450 | 0 | all land on `/es/about` |
+| EBT / SNAP / WIC | 32 | 101 | 0 | "does loaf and jug take ebt" (31, ~8) |
+| Blessing boxes | 9 | 27 | 5 | "blessing boxes near me" (12, ~5) |
+| Spanish | ~10 | ~15 | 0 | "despensas cerca de mi" (~75th) |
+
+Clicks by page: `/food-pantries` 23 (1,258 impressions), `/blessing-boxes` 20
+(130), `/` 10, `/snap-wic-stores` 4, `/venues` 2 (605 impressions). Takeaways:
+
+- **The pantry hub and the blessing-box hub do the work.** "Near me" searches
+  find `/food-pantries` in the top 10 on phones. Blessing boxes have the best
+  click rate on the site (15%).
+- **Store pages bring a third of named impressions and no clicks.** People
+  searching "valley market" want the store, not us. That is fine; the EBT
+  questions on those same pages ("does loaf and jug take ebt") are the
+  on-mission part, and they get no clicks either.
+- **City-named queries rank poorly.** "food pantry pueblo co" (~28th),
+  "pueblo food banks" (~27th), "commodities pueblo co" (~47th), "pueblo soup
+  kitchen" (~52nd). The established directories win these.
+- **Spanish pages barely rank.** `/es/food-pantries` sits around 36th, and
+  Spanish venue pages sometimes show for English searches around 20th to 50th.
+
+### 8.3 Findings, ranked
+
+1. **[Both] Venue and blessing-box pages put their title, description, canonical
+   and hreflang in `<body>`, not `<head>`.** It happens on about half of all
+   responses, at random, whoever asks: ten requests in a row for one venue page
+   gave the tags in the body 6 times as Googlebot, 4 as bingbot and 6 as a
+   browser. The other half are correct. A crawl of all 236 sitemap URLs caught
+   it on every venue page (EN and ES) and on `/blessing-boxes` and
+   `/es/blessing-boxes`: the tags arrive in a streamed `<div hidden id="S:0">`
+   chunk after the body starts. Pages whose metadata is
+   synchronous (`/`, `/about`, the other hubs) are fine. **This arrived with the
+   vinext move (live 2026-10-25), and Google is already losing the canonical:**
+   URL Inspection shows a declared canonical on every indexed venue page Google
+   last crawled up to 2026-10-25, and on none of the 40 it crawled from
+   2026-10-27 on (`/blessing-boxes` too), while hub pages crawled after that date
+   keep theirs. The share grows with every recrawl. Crawlers that don't run
+   JavaScript (Bing, which ChatGPT search and Copilot use, Perplexity, link
+   previews) get no title, description or canonical in the head about half the
+   time. Likely cause: the async `generateMetadata` in
+   `src/app/(site)/venue/[id]/page.tsx` (and its `/es` twin and the force-dynamic
+   blessing-box hub) is streamed by vinext. Fix: render that metadata in the
+   head, and add a check to `scripts/check-pages-serve.sh` that fails when
+   `<title>` or `rel="canonical"` comes after `</head>`. **Fixed 2026-11-19 in
+   v1.5.2 (hotfix #948, PR #949):** `htmlLimitedBots: /.*/` in `next.config.ts`
+   turns streaming metadata off, and the CI check exists. On prod, 150 requests
+   (5 pages × Googlebot, bingbot and a browser × 10) all had the tags in the head.
+2. **[AI] Cloudflare blocks PerplexityBot (403) at the edge.** Tested with the
+   bot's user-agent string from a home connection, so a real Perplexity crawler
+   may be treated differently, but the 403 matches the zone's
+   `ai_training: disallow` bot setting (switched on 2026-10-22), which blocks
+   training crawlers at the edge and is known to catch PerplexityBot, a search
+   crawler. GPTBot, ClaudeBot and
+   CCBot also get 403; they are training crawlers, so that matches the "no
+   training" decision. OAI-SearchBot, ChatGPT-User, Claude-SearchBot,
+   Perplexity-User, Googlebot and bingbot get 200. **Fixed 2026-11-19:** a
+   Cloudflare WAF custom rule lets `PerplexityBot` skip the bot block
+   (PerplexityBot now 200; GPTBot, ClaudeBot and CCBot still 403).
+3. **[Google] 13 of 33 pantry pages are not in Google**, while every store page
+   is (scorecard). Hours don't explain it (6 of the 13 have hours), and they are
+   not newer: they date from the same July and September imports as the indexed
+   pantries. They are linked from `/food-pantries` and in the sitemap, so Google
+   has found them and chosen not to index them yet. Related: two old pantry URLs
+   whose ids changed still get impressions and now 404
+   (`/venue/plentiful-minnequa-vfw-post-3641-9faa99be`, whose new id is one of
+   the 13, and `/venue/plentiful-care-and-share-food-bank-for-southern-colorado-main-location-4a362e63`).
+   Fix: after finding 1 ships, 301 the renamed id to its new page, request
+   indexing for the 13 in Search Console's URL Inspection (Kyle; Google offers
+   no API for this), and recheck in two weeks with the URL Inspection sweep.
+4. **[Google] "pueblo food" shows `/es/about`.** Both About pages are indexed,
+   each under its own canonical, so this is Google's ranking choice, not a merge;
+   it has picked `/es/about` since October (297 impressions in October, 182 so
+   far in November, against 7 and 12 for `/about`). The cause is a hypothesis:
+   `/` has 104 visible words and nothing that reads as a description of Pueblo
+   Food Map, and the two About pages are near-identical twins titled just
+   "About" and "Acerca de"; the Spanish one, which gets no clicks from English
+   searchers, wins the tie. Fix: a short visible intro on `/`
+   ("Pueblo Food Map: free food, SNAP stores and blessing boxes across Pueblo
+   County"), and an `/about` title that leads with the purpose.
+5. **[Both] The venue meta description drops the hours.**
+   `buildVenueMetaDescription` (`src/lib/venueSummary.ts`) skips any sentence that
+   doesn't fit 160 characters, and the hours sentence is usually the long one.
+   Live example, Lynn Gardens: "…is a free food pantry at 3804 W. Pueblo Blvd,
+   Pueblo, CO 81005. Last verified October 2026." Hours are the main thing
+   people search a place for. Fix: a compact hours form ("Thu 9–11am") that
+   comes before "Last verified".
+6. **[Google] Store pages lose "[store] hours" searches to `/venues`.** Save-A-Lot's
+   own page has hours, but its title and description don't say so; `/venues` lists
+   every venue's hours on one 2,259-word page and wins. `/snap-wic-stores` shows
+   no hours at all, although `hubHours()` already exists and the pantry hub uses
+   it. Fix: show hours on the SNAP hub; put "hours" in store titles when known.
+7. **[Google] 25 Loaf 'N Jug pages, 12 with the exact same title** ("Loaf 'N Jug,
+   Pueblo, CO: Accepts SNAP/EBT"); also 7-Eleven ×5 and Alta Convenience ×3. Fix:
+   add the street to the title when the name repeats.
+8. **[Both] Valley Market, the most-shown venue page (319 impressions), is the
+   thinnest.** No address (it shows raw coordinates), no hours, no phone; the
+   whole page is one sentence. It is outside Pueblo city. Data fix in the admin.
+9. **[Google] Structured-data errors.**
+   - 24-hour stores emit `opens: "00:00", closes: "00:00"` (56 slots);
+     schema.org's 24-hour form is `closes: "23:59"` (`slotToIsoTimes`,
+     `src/lib/hours.ts`).
+   - Lynn Gardens has weekly Thursday hours *and* a 2nd/4th-Thursday irregular
+     schedule; the JSON-LD says every Thursday. Fix the data, or skip
+     `openingHoursSpecification` when `hours_irregular` is set.
+   - 30 of 33 pantries put `directory.plentiful.org` in `url`/`sameAs`, a
+     third-party listing, not the operator's site.
+10. **[Google] Small gaps.** `/venues` has a generic title ("All Food Resources")
+   and no ItemList; hubs have no BreadcrumbList; static URLs have no `lastmod`;
+   the sitemap lists the root without its trailing slash while the canonical has
+   it; `/boxes/activity` (a 7-word client shell) is in the sitemap.
+11. **[AI] `public/llms.txt` says pantries are listed "with hours"**; half aren't.
+12. **[Both] Authority is still zero.** None of the nine partner pages in
+    `seo-outreach.md` links to us (the county page blocks bots, so unknown), and
+    there is no Wikidata item (#716). City-named queries won't move without this.
+13. **[Google] Speed is not the problem.** Lighthouse mobile: 0.99–1.00
+    performance, LCP 0.9 s, CLS 0 on `/`, `/food-pantries` and a venue page.
+
+### 8.4 Action plan
+
+**Critical (blocks search engines and AI from reading pages):**
+- ~~Venue and blessing-box metadata in `<head>` (finding 1).~~ Done 2026-11-19
+  (v1.5.2, #949).
+- ~~Let PerplexityBot through the Cloudflare bot block (finding 2).~~ Done
+  2026-11-19.
+
+**High impact (this quarter):**
+- Phase 1 hours pass, now covering stores too: 17 pantries and 42 stores without
+  hours (Kyle, admin).
+- Hours in venue meta descriptions; hours on `/snap-wic-stores`; "hours" in store
+  titles (findings 5, 6). One code PR.
+- Visible intro on `/` and a purpose-led `/about` title (finding 4). Same PR.
+- Request indexing for the 13 missing pantry pages once finding 1 is live
+  (finding 3, Kyle in Search Console).
+- Partner outreach, Pueblo Food Project first (Phase 5, Kyle).
+
+**Quick wins (one small PR plus a few admin edits):**
+- Street in duplicate store titles; JSON-LD 24-hour and irregular-hours fixes;
+  `/venues` title and ItemList; hub breadcrumbs; sitemap tidy-up; `llms.txt`
+  wording (findings 7, 9, 10, 11).
+- Valley Market address, hours and phone (finding 8, admin).
+- First prompt-panel run from a normal browser (Phase 0 item 8), and a Bing
+  Webmaster Tools API key for PFM so Bing can be checked like Google.
+
+**Long term:**
+- Open dataset (the 62 OpenStreetMap-sourced rows carry ODbL attribution and
+  share-alike terms); Wikidata after first outside coverage (#716); by-day pantry
+  pages once hours reach 90%.
+- Phase 2 item 6 (keep or `noindex` the store pages): **keep them.** Google
+  indexes them and they answer EBT questions; fix their titles instead.

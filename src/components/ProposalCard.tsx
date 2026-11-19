@@ -878,6 +878,18 @@ function buildPreviewVenue(venue: VenueLookup | undefined, after: Partial<Venue>
       }
     : {};
   const merged: Partial<Venue> = { ...base, ...(after ?? {}), id };
+  // The refresh pipeline stores proposed hours as D1's JSON text (see
+  // formatValue above); VenueCard needs the parsed shape (#940). Text that
+  // isn't JSON, or empty text, previews as no hours rather than crashing.
+  for (const field of ["hours_weekly", "hours_irregular"] as const) {
+    const value: unknown = merged[field];
+    if (typeof value !== "string") continue;
+    try {
+      merged[field] = value ? JSON.parse(value) : undefined;
+    } catch {
+      merged[field] = undefined;
+    }
+  }
 
   if (!merged.name || !merged.category || !merged.address) return null;
 

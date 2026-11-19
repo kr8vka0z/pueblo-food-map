@@ -204,7 +204,11 @@ INSERT INTO venues (id, name, category, lat, lng, address, hours_weekly, hours_i
 INSERT INTO change_proposals (id, source, target_venue_id, change_type, proposed_diff, diff_hash, run_id, anomaly, status, created_at) VALUES
   (900023, 'website', 'pv-monthly-pantry', 'update',
    '{"before":{"phone":null},"after":{"phone":"719-555-0144","last_verified":"2026-11-14"},"fields_changed":["phone","last_verified"],"meta":{"source_url":"https://preview-monthly.example.org/contact","summary":"The contact page lists this phone number; the map had none."}}',
-   'pv-h23', 'preview-run-1', 0, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days'));
+   'pv-h23', 'preview-run-1', 0, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days')),
+  -- A changed monthly schedule, stored as JSON text like the refresh pipeline writes it: the preview shows 2nd Thursday.
+  (900024, 'plentiful', 'pv-monthly-pantry', 'update',
+   '{"before":{"hours_irregular":"[{\"recurrence\":\"monthly_ordinal\",\"ordinal\":4,\"weekday\":\"tue\",\"slots\":[\"11:00-12:00\"]}]"},"after":{"hours_irregular":"[{\"recurrence\":\"monthly_ordinal\",\"ordinal\":2,\"weekday\":\"thu\",\"slots\":[\"11:00-12:00\"]}]","last_verified":"2026-11-14"},"fields_changed":["hours_irregular","last_verified"]}',
+   'pv-h24', 'preview-run-1', 0, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days'));
 -- The "maybe" SNAP card's store has an unknown tick (most real ones do), so the card shows "Not known".
 UPDATE venues SET accepts_snap = NULL WHERE id = 'test-gas-and-grab-01';
 UPDATE change_proposals SET reviewed_by = 'dana@example.org', reviewed_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-8 days'), applied_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-8 days') WHERE id = 900090;

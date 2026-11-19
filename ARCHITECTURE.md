@@ -720,10 +720,15 @@ English (`buildPageMetadata`/`generateMetadata`, `src/lib/site.ts`).
 `useDocumentTitle` (`src/lib/useDocumentTitle.ts`) corrects it for the
 current locale after hydration and on a live EN↔ES toggle; every localized
 page's "Content" component calls it with a `t()`-composed string. A plain
-`document.title = ...` isn't enough on a hard load: Next's streaming-metadata
-Suspense chunk can arrive after the hook's effect and overwrite `<title>`'s
-DOM node directly (bypassing the setter) — a real timing race, not a fixed
-order. So the hook self-heals with a `MutationObserver` on `document.head`,
+`document.title = ...` wasn't enough on a hard load while metadata was
+streamed: Next's streaming-metadata Suspense chunk could arrive after the
+hook's effect and overwrite `<title>`'s DOM node directly (bypassing the
+setter) — a real timing race, not a fixed order. Since #948,
+`htmlLimitedBots: /.*/` in `next.config.ts` turns streaming metadata off, so
+the server sends `<title>` inside `<head>` before any script runs and that
+race should no longer occur; the observer stays as a cheap guard (nothing
+has verified that no other late `<title>` write exists). So the hook
+self-heals with a `MutationObserver` on `document.head`,
 disconnected on unmount so a page that stays English (`/venue/[id]`) is
 never corrected by a stale observer. The hook's header has the full trace.
 **On a mirrored page** the server `<title>` is already correct for its tree

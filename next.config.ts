@@ -114,6 +114,13 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Matching every user agent turns streaming metadata off (Next's
+  // htmlLimitedBots.md, "Disabling"; vinext honours it). With it on, pages
+  // with generateMetadata (venue, /es venue, blessing boxes) sent <title>,
+  // description, canonical and hreflang inside <body> to browsers and
+  // Googlebot, and Google ignores canonical/hreflang outside <head> (#948).
+  // Blocking costs nothing here: venue metadata is synchronous in-memory data.
+  htmlLimitedBots: /.*/,
   // Dev-only: lets `vite dev` (vinext honours this list) accept hot-reload requests from Kyle's Mac's
   // private tailnet address, so a local change can be checked on his iPhone
   // over https (`tailscale serve --bg 3000`) — https is what lets "find food

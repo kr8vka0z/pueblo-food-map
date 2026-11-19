@@ -18,6 +18,12 @@
  * string changes, covering both an ES-locale first mount and a live EN<->ES
  * toggle.
  *
+ * NOTE (#948): the race below was found while metadata was streamed. Since
+ * #948, `htmlLimitedBots: /.*\/` in next.config.ts turns streaming metadata
+ * off, so the server sends `<title>` in `<head>` and the race should no
+ * longer occur. The observer stays as a cheap guard against any other late
+ * `<title>` write.
+ *
  * WHY the MutationObserver, not just `document.title = title` (#589
  * follow-up — client nav worked, a hard page load didn't): on a real
  * network (reproduced against dev.pueblofoodmap.com; does NOT reproduce on

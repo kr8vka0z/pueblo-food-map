@@ -16,12 +16,8 @@ All work merges to `dev`. A release starts when Kyle says "cut the release", and
 - **Only three things reach `main`:** the `release/*` PR, `hotfix/*` PRs, and `publish-bot` (venue data, no version). The `main-source-guard` check fails any other head branch.
 - **Agents open a `dev` → `main` promotion only when Kyle says "cut the release", never propose one, and never ask Kyle to push to prod midweek.** Finished work "ships in the next Sunday release". Say that, nothing more.
 - **PR titles into `dev` must be Conventional Commits** (`type(scope)!: description`; the `PR title` check enforces it). The squash title is what the release tooling reads.
-- **Versions (semver):** major = something users relied on was removed or changed, set by hand only (`--version` or the workflow's `version` input; a `!` title never bumps major on its own); minor = any `feat`; patch = everything else.
-- **Changelog voice** (the prompt in `release.yml` says the same): Keep a Changelog headings, plain language for food-bank partners and the public. `### New`, `### Improved`, `### Fixed` only. One short sentence per bullet saying what a visitor or admin notices, PR link at the end. Leave out dependency bumps, CI, docs and refactors unless visible; roll security updates into one "Security updates." bullet. No jargon.
+- **Versions, changelog voice, hotfix lane, back-sync, manual cut:** [docs/agents/release-process.md](docs/agents/release-process.md). The hotfix lane is an emergency, only for something broken on the live site, said explicitly. A cut fails (red run) while a `sync/main-*` PR into `dev` is open: merge it, then dispatch `Cut release` again.
 - **Merge methods:** feature PRs into `dev` = squash. `release/*` and `hotfix/*` into `main` = squash (`main` requires linear history). The automatic `main` → `dev` sync PR = **merge commit** (bot only; never squash it). Nobody else merges into `main` or `dev` with a merge commit.
-- **Hotfix lane — an emergency, only for something broken on the live site; say so explicitly.** Branch `hotfix/<slug>` from `main`, fix + test, run `node scripts/release/prepare.mjs --out /tmp/prs.md` (patch bump from the newest `v*` tag), add a `## [X.Y.Z] - date` section to CHANGELOG.md under `## [Unreleased]`, squash-merge the PR into `main`. Same tag/release path on merge; the fix reaches `dev` through the automatic sync below. If a release PR is open, dispatch `release.yml` again after the sync lands so it picks up the hotfix; if the hotfix took that PR's version the run says so: close the PR and dispatch again.
-- **Back-sync (`main` → `dev`):** after ANY push to `main` (release, hotfix, or `publish-bot` venue data), `deploy-prod.yml`'s `sync-dev` job opens a `sync/main-<sha>` PR into `dev` and enables auto-merge with a merge commit, unless `dev` already contains `main`. That is what puts hotfix code and venue data on staging, brings the version bump and changelog to `dev`, and stops the next release PR from conflicting (squash releases leave the two histories diverged). If the sync PR shows conflicts, resolve them on the `sync/*` branch and keep the merge commit. Nobody edits CHANGELOG.md by hand on `dev`. **A cut fails (red run, no release PR change) while a `sync/main-*` PR into `dev` is still open:** it should have auto-merged within minutes, so an open one is stuck on a conflict or a failing check, and a green skip would hide that the release didn't happen. Get the sync PR merged, then dispatch the `Cut release` workflow again.
-- **Manual cut (when the workflow fails):** from a `dev` checkout run `node scripts/release/prepare.mjs --version X.Y.Z`, write the CHANGELOG section per the voice above (`bash scripts/release/section.sh X.Y.Z` proves it parses), push `release/vX.Y.Z`, and open the PR into `main`. Don't tag anything: `deploy-prod.yml` writes `cut/vX.Y.Z` on the dev commit once the release is live. `prepare.mjs` starts the next PR list at the newest `cut/*` tag; without one it falls back to the newest `v*` tag.
 
 ---
 
@@ -45,13 +41,7 @@ All work merges to `dev`. A release starts when Kyle says "cut the release", and
 
 ### Rollback
 
-Undo a bad release. Code and data roll back separately.
-
-1. **Prod, fastest (code only):** Cloudflare Dashboard → Workers & Pages → `pueblo-food-map` → Deployments → pick the previous build → "Rollback to this deployment" (README.md "Rollback"). CLI equivalent: `bunx wrangler deployments list --name pueblo-food-map`, then `bunx wrangler rollback <id> --name pueblo-food-map -y`.
-2. **Staging:** the same with the Worker `pueblo-food-map-staging`, or skip the rollback: a revert PR squash-merged into `dev` redeploys staging, since a push to `dev` runs `deploy-dev.yml`.
-3. **Make it stick:** a rollback does not change git. `main` still holds the bad commit, and the next push to `main` redeploys it. Open a `git revert` PR into `dev`; it ships in the next Sunday release, or as a `hotfix/*` PR into `main` if prod is broken now (hotfix lane, Release schedule above). `deploy-prod.yml` redeploys on that merge.
-4. **Database:** a rollback does not undo D1 migrations. Production migrations are applied by hand after the export in the Promotion checklist, so restore from that export or write a new forward migration; there is no automated down path.
-5. If `main`'s tip differs from the last Deploy Prod run's `headSha`, see "Stranded `main`" above.
+Code and data roll back separately; a rollback does not change git or undo D1 migrations. Steps for prod, staging, making it stick and the database: [docs/agents/rollback.md](docs/agents/rollback.md).
 
 ## Secrets
 
@@ -83,16 +73,7 @@ The 1Password refs are in the gitignored `OPS-SECRETS.local.md`. This repo is pu
 
 `deploy-dev.yml` applies migrations to staging automatically. **Production migrations are a manual step that Kyle approves.** Before merging the release PR (or a hotfix) into `main`:
 
-1. See what's pending: `npx wrangler d1 migrations list pueblo-food-map-admin --remote`.
-2. **Export first:** `wrangler d1 export pueblo-food-map-admin --remote --output <file>`, saved to `~/Backups/pfm-prod-d1/` on the Mac. A rollback can't undo a migration.
-3. Apply: `npx wrangler d1 migrations apply pueblo-food-map-admin --remote`. **Never use `d1 execute --file`**: it routes through the import API, and `0011`, `0012`, `0015`, `0016`, `0017`, `0019`, `0020`, and `0028` are not idempotent (they fail with "duplicate column" on a re-run).
-4. Confirm the Worker has every runtime secret in the table in [docs/agents/secrets.md](docs/agents/secrets.md), then merge the release (the sync back to `dev` is automatic).
-5. If a migration changed published venue fields, the public map only updates at the next admin **Publish**. The Publish bar only shows when `updated_at > published_at`, so data migrations must set `updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')` on the rows they change.
-
-To run wrangler against prod from the Mac (wrangler isn't logged in there):
-- set `CLOUDFLARE_API_TOKEN` from `op://Atlas/Cloudflare - D1 Write Token - pueblo-food-map refresh/credential`;
-- set `CLOUDFLARE_ACCOUNT_ID` from the `username` field of the 1Password item "Cloudflare - Account Token";
-- run from a `dev` checkout.
+Steps (list pending, export first, apply with `migrations apply`, never `d1 execute --file`, confirm runtime secrets, publish-bar `updated_at` rule) and how to run wrangler against prod from the Mac: [docs/agents/d1-promotion.md](docs/agents/d1-promotion.md). Export before every production migration: a rollback can't undo one.
 
 ## Automated venue-refresh pipeline
 
@@ -129,13 +110,7 @@ This is `.github/workflows/refresh-proposals.yml` (weekly). The mechanism is des
   - Photos go to R2 (`pfm-box-photos`, with its own staging bucket). D1 holds metadata only.
   - Box alert sends never block a check-in.
 - **Events (#156, slice 1 #757):**
-  - Live like boxes, never in the Publish snapshot. Mechanism: ARCHITECTURE.md "Events".
-  - **Flyers (#760):** images go to R2 (`EVENT_FLYERS`: `pfm-event-flyers`, staging `pfm-event-flyers-staging`, both created by hand with `wrangler r2 bucket create`, empty). D1 holds only the key, size and alt text (migration `0019_event_flyer`, ADD COLUMN only). Mechanism: ARCHITECTURE.md "Event flyer".
-  - **Migration `0018_events` reaches a database before the code that uses it.** Staging gets it from `deploy-dev.yml`; production is the manual step above. Until then `/api/public/events` returns an empty 200, `/api/public/events/[id]` a 404, and the admin Events tab shows "Couldn't load", by design.
-  - **"Suggest Spanish"** uses the Workers AI binding `AI` (`wrangler.jsonc`, prod and `env.staging`; no secret). A missing binding is a clean 503, never a crash. Suggestions are machine-made and unreviewed; the form fills only empty Spanish boxes.
-  - Times are entered in America/Denver and converted to UTC on the server (`src/lib/eventTime.ts`); never use the browser's timezone for an event.
-  - **Shared events (#883):** the public "Share an event" page queues rows in `event_submissions` (migration `0027`, a manual prod step like the others); nothing reaches the map until an admin converts one to a draft and publishes it. The sender's email is admin-only: never logged, never in an audit row or public response. Pending flyers live under `pending.submissions/` and must stay unreachable by URL. Mechanism: ARCHITECTURE.md "Shared events".
-  - **Event pages (#762):** `/event/[id]` and `/es/event/[id]` are `force-dynamic` and read D1 per request. Keep them dynamic: events are not in the build snapshot, so the venue pages' `generateStaticParams` + `dynamicParams = false` pattern would 404 every event. Draft, archived, unknown and unreadable all end in the same `notFound()`. Their JSON-LD (`src/lib/eventSeo.ts`) must carry the Denver offset for that date, and the share image is the flyer, which lives under `/api/`, so `robots.ts` has a narrow Allow for `/api/public/events/*/flyer/`: keep it. `sitemap.ts` is `force-dynamic` only to list upcoming events; its D1 read must stay fail-soft. The card's Share link is the page URL (`eventShareUrl`); `/?event=<id>` is what the page's "Open on the map" button uses. Mechanism: ARCHITECTURE.md "Event page".
+  - Rules for flyers (R2 `EVENT_FLYERS`), migration `0018_events` ordering, "Suggest Spanish", Denver-time entry, shared events and the event pages (`/event/[id]` stay `force-dynamic`): [docs/agents/events.md](docs/agents/events.md). Events are live like boxes, never in the Publish snapshot.
 
 ---
 

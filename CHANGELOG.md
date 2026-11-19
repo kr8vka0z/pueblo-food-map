@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
-- Search engines and link previews now always see each venue page's title and description. ([#PR](https://github.com/kr8vka0z/pueblo-food-map/pull/PR))
+- Search engines and link previews now always see each venue page's title and description. ([#949](https://github.com/kr8vka0z/pueblo-food-map/pull/949))
 
 ## [1.5.1] - 2026-11-13
 

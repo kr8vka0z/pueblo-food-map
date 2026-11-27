@@ -78,6 +78,7 @@ import {
   tapLinkClass,
 } from "@/lib/adminCardStyles";
 import AdminConfirm, { useAdminConfirm, useAdminStep } from "@/components/AdminConfirm";
+import AdminSuccessTick from "@/components/AdminSuccessTick";
 import AdminSegmented from "@/components/AdminSegmented";
 import EventFlyerField from "@/components/EventFlyerField";
 import type { PublicFlyer } from "@/lib/events";
@@ -165,18 +166,25 @@ interface TextFieldProps {
   hint?: string;
   type?: string;
   placeholder?: string;
+  onBlur?: () => void;
   /** Lets a step put focus in this box when it opens (the cancellation note). */
   fieldRef?: React.Ref<HTMLTextAreaElement>;
 }
 
-function TextField({ id, label, value, onChange, max, error, required, multiline, lang, hint, type = "text", placeholder, fieldRef }: TextFieldProps) {
+function TextField({ id, label, value, onChange, max, error, required, multiline, lang, hint, type = "text", placeholder, onBlur, fieldRef }: TextFieldProps) {
+  const isUrl = type === "url";
   const common = {
     id,
+    name: id,
     value,
     lang,
     placeholder,
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(e.target.value),
+    onBlur,
     maxLength: max || undefined,
+    spellCheck: isUrl ? false : undefined,
+    autoCapitalize: isUrl ? "off" : undefined,
+    autoCorrect: isUrl ? "off" : undefined,
     "aria-required": required ? ("true" as const) : undefined,
     "aria-invalid": error ? ("true" as const) : undefined,
     "aria-describedby": error ? `${id}-error` : undefined,
@@ -226,8 +234,11 @@ export default function EventForm({ venues, eventId, initialValues, status: init
     if (!start.venueName.trim() && start.venueId) start.venueName = venues.find((x) => x.id === start.venueId)?.name ?? "";
     return start;
   });
+  const initialSnapshotRef = useRef<string>(JSON.stringify(values));
+  const leavingAfterSaveRef = useRef(false);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<"save_draft" | "save" | "publish" | "cancel" | "archive" | null>(null);
+  const busy = busyAction !== null;
   const [failure, setFailure] = useState<{ message: string; code: string | null } | null>(null);
   const [saved, setSaved] = useState<{ id: string } | null>(justSaved && eventId ? { id: eventId } : null);
   const [status, setStatus] = useState<EventStatus>(initialStatus ?? "draft");
@@ -278,6 +289,30 @@ export default function EventForm({ venues, eventId, initialValues, status: init
   const set = <K extends keyof EventFormValues>(key: K, value: EventFormValues[K]) => setValues((p) => ({ ...p, [key]: value }));
   const showCancelNote = cancelling || status === "cancelled";
   const pickedVenue = venues.find((x) => x.id === values.venueId);
+
+  useEffect(() => {
+    if (busy) return;
+    if (JSON.stringify(values) === initialSnapshotRef.current) return;
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (leavingAfterSaveRef.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [values, busy]);
+
+  function validateFieldOnBlur(field: keyof FieldErrors) {
+    const all = validateClient(values, cancelling);
+    setErrors((prev) => {
+      const msg = all[field];
+      if (prev[field] === msg) return prev;
+      const next = { ...prev };
+      if (msg) next[field] = msg;
+      else delete next[field];
+      return next;
+    });
+  }
 
   function pickVenue(venue: VenueChoice) {
     setValues((p) => ({
@@ -333,7 +368,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
     }
     setErrors({});
     setFailure(null);
-    setBusy(true);
+    setBusyAction(action);
     const body = {
       action,
       name: values.name, name_es: values.nameEs,
@@ -365,7 +400,9 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         setErrorFocusTick((n) => n + 1);
       } else if (res.status === 200 || res.status === 201) {
         const data = (await res.json()) as { id?: string; status: EventStatus; updated_at: string };
+        initialSnapshotRef.current = JSON.stringify(values);
         if (!isEdit && data.id) {
+          leavingAfterSaveRef.current = true;
           router.replace(`/admin/events/${data.id}/edit?saved=1`);
           return;
         }
@@ -381,7 +418,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
     } catch {
       setFailure({ message: "The event was not saved. Try again.", code: null });
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
@@ -434,7 +471,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
   // Runs only from the on-page confirm's Archive event button: that second press is the gate.
   async function archive() {
     if (busy) return;
-    setBusy(true);
+    setBusyAction("archive");
     setFailure(null);
     setArchiveError(null);
     // Shown once: inside the confirm, where the admin pressed; a conflict
@@ -450,6 +487,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         body: JSON.stringify({ expectedUpdatedAt: version }),
       });
       if (res.status === 200) {
+        leavingAfterSaveRef.current = true;
         router.push("/admin/events");
         router.refresh();
         return;
@@ -459,7 +497,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
     } catch {
       fail("The event was not archived. Try again.", null);
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
@@ -504,7 +542,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
     >
       <legend className={`${labelClass} px-1`}>Cancellation note</legend>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <TextField id="event-cancel-note" multiline required label="Note (English)" value={values.cancelNote} onChange={(v) => set("cancelNote", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note} fieldRef={cancelling ? cancelNoteRef : undefined} />
+        <TextField id="event-cancel-note" multiline required label="Note (English)" value={values.cancelNote} onChange={(v) => set("cancelNote", v)} onBlur={() => validateFieldOnBlur("cancel_note")} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note} fieldRef={cancelling ? cancelNoteRef : undefined} />
         <TextField id="event-cancel-note-es" multiline lang="es" label="Note (Spanish)" value={values.cancelNoteEs} onChange={(v) => set("cancelNoteEs", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.cancel_note_es} />
       </div>
       {/* #926 decision 8: the safe button first, then the red one. "Keep event",
@@ -515,7 +553,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
             Keep event
           </button>
           <button type="button" onClick={() => void send("cancel")} {...busyButtonProps(busy)} className={dangerButtonClass}>
-            {busy ? "Cancelling…" : "Confirm cancel event"}
+            {busyAction === "cancel" ? "Cancelling…" : "Confirm cancel event"}
           </button>
         </div>
       )}
@@ -535,17 +573,20 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       {notice && <p className={`${cardSlimClass} text-sm text-[var(--color-ink-700)]`}>{notice}</p>}
 
       {saved && (
-        <div role="status" className="rounded-[var(--radius-md)] border border-[var(--color-sage-500)] bg-[var(--color-sage-50)] px-4 py-3 text-sm text-[var(--color-sage-700)]">
-          <p className="font-medium">Saved.</p>
-          <p className="flex flex-wrap gap-x-4">
-            {/* ?event=<id> opens this event's card on the map (#758). */}
-            <Link href={`/?event=${saved.id}`} className={tapLinkClass}>
-              View on map
-            </Link>
-            <Link href="/admin/events" className={tapLinkClass}>
-              Back to events
-            </Link>
-          </p>
+        <div role="status" className="flex items-start gap-2.5 rounded-[var(--radius-md)] border border-[var(--color-sage-500)] bg-[var(--color-sage-50)] px-4 py-3 text-sm text-[var(--color-sage-700)]">
+          <AdminSuccessTick size={22} />
+          <div>
+            <p className="font-medium">Saved.</p>
+            <p className="flex flex-wrap gap-x-4">
+              {/* ?event=<id> opens this event's card on the map (#758). */}
+              <Link href={`/?event=${saved.id}`} className={tapLinkClass}>
+                View on map
+              </Link>
+              <Link href="/admin/events" className={tapLinkClass}>
+                Back to events
+              </Link>
+            </p>
+          </div>
         </div>
       )}
 
@@ -564,21 +605,8 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         Spanish is optional. Where it is blank, visitors see the English text.
       </p>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={() => void suggestSpanish()} {...busyButtonProps(suggest === "busy")} className={secondaryButtonClass}>
-          {suggest === "busy" ? "Suggesting…" : "Suggest Spanish"}
-        </button>
-        <p aria-live="polite" className={`text-sm ${suggest === "error" ? "text-[var(--color-danger)]" : "text-[var(--color-ink-500)]"}`}>
-          {suggest === "busy" && "Suggesting Spanish…"}
-          {suggest === "done" && "Spanish suggested by a machine. Read it before publishing."}
-          {suggest === "error" && "The Spanish suggestion could not be made. You can type the Spanish by hand."}
-          {suggest === "none" && "Add some English text first, then ask for a Spanish suggestion."}
-          {suggest === "full" && "The Spanish boxes are already filled, so nothing was changed."}
-        </p>
-      </div>
-
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <TextField id="event-name" label="Name (English)" required value={values.name} onChange={(v) => set("name", v)} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.name} />
+        <TextField id="event-name" label="Name (English)" required value={values.name} onChange={(v) => set("name", v)} onBlur={() => validateFieldOnBlur("name")} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.name} />
         <TextField id="event-name-es" label="Name (Spanish)" lang="es" value={values.nameEs} onChange={(v) => set("nameEs", v)} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.name_es} />
         <TextField id="event-host" label="Host (English)" hint="(optional) who is running it" value={values.host} onChange={(v) => set("host", v)} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.host} />
         <TextField id="event-host-es" label="Host (Spanish)" lang="es" value={values.hostEs} onChange={(v) => set("hostEs", v)} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.host_es} />
@@ -590,8 +618,8 @@ export default function EventForm({ venues, eventId, initialValues, status: init
           When <span className={hintClass}>(Pueblo time, Mountain Time)</span>
         </legend>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <TextField id="event-starts" type="datetime-local" label="Starts" required value={values.startsLocal} onChange={(v) => set("startsLocal", v)} max={0} error={errors.starts_at} />
-          <TextField id="event-ends" type="datetime-local" label="Ends" required value={values.endsLocal} onChange={(v) => set("endsLocal", v)} max={0} error={errors.ends_at} />
+          <TextField id="event-starts" type="datetime-local" label="Starts" required value={values.startsLocal} onChange={(v) => set("startsLocal", v)} onBlur={() => validateFieldOnBlur("starts_at")} max={0} error={errors.starts_at} />
+          <TextField id="event-ends" type="datetime-local" label="Ends" required value={values.endsLocal} onChange={(v) => set("endsLocal", v)} onBlur={() => validateFieldOnBlur("ends_at")} max={0} error={errors.ends_at} />
         </div>
       </fieldset>
 
@@ -647,9 +675,11 @@ export default function EventForm({ venues, eventId, initialValues, status: init
                 <input
                   ref={venueSearchRef}
                   id="event-venue-search"
-                  type="text"
+                  name="event-venue-search"
+                  type="search"
                   value={venueQuery}
                   onChange={(e) => setVenueQuery(e.target.value)}
+                  placeholder="e.g. Pueblo Community Soup Kitchen"
                   aria-invalid={errors.place ? "true" : undefined}
                   aria-describedby={errors.place ? "event-place-error" : undefined}
                   className={`${inputBase} ${inputBorder(!!errors.place)}`}
@@ -772,6 +802,21 @@ export default function EventForm({ venues, eventId, initialValues, status: init
         <TextField id="event-bring-es" multiline lang="es" label="What to bring (Spanish)" value={values.whatToBringEs} onChange={(v) => set("whatToBringEs", v)} max={FIELD_LIMITS.EVENT_SHORT_TEXT} error={errors.what_to_bring_es} />
       </div>
 
+      {/* Positioned after the main English fields so admins can type English
+          first and press Suggest Spanish without scrolling back up. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" onClick={() => void suggestSpanish()} {...busyButtonProps(suggest === "busy")} className={secondaryButtonClass}>
+          {suggest === "busy" ? "Suggesting…" : "Suggest Spanish"}
+        </button>
+        <p aria-live="polite" className={`text-sm ${suggest === "error" ? "text-[var(--color-danger)]" : "text-[var(--color-ink-500)]"}`}>
+          {suggest === "busy" && "Suggesting Spanish…"}
+          {suggest === "done" && "Spanish suggested by a machine. Read it before publishing."}
+          {suggest === "error" && "The Spanish suggestion could not be made. You can type the Spanish by hand."}
+          {suggest === "none" && "Add some English text first, then ask for a Spanish suggestion."}
+          {suggest === "full" && "The Spanish boxes are already filled, so nothing was changed."}
+        </p>
+      </div>
+
       {/* The link becomes the card's green action button (#882); no link, no button. */}
       <fieldset className={fieldGroupClass}>
         <legend className={`${labelClass} px-1`}>Action button</legend>
@@ -799,7 +844,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
           </div>
           {values.linkLabel === "custom" && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <TextField id="event-link-label-custom" label="Button words (English)" required value={values.linkLabelCustom} onChange={(v) => set("linkLabelCustom", v)} max={FIELD_LIMITS.EVENT_LINK_LABEL} error={errors.link_label_custom} />
+              <TextField id="event-link-label-custom" label="Button words (English)" required value={values.linkLabelCustom} onChange={(v) => set("linkLabelCustom", v)} onBlur={() => validateFieldOnBlur("link_label_custom")} max={FIELD_LIMITS.EVENT_LINK_LABEL} error={errors.link_label_custom} />
               <TextField id="event-link-label-custom-es" label="Button words (Spanish)" lang="es" value={values.linkLabelCustomEs} onChange={(v) => set("linkLabelCustomEs", v)} max={FIELD_LIMITS.EVENT_LINK_LABEL} error={errors.link_label_custom_es} />
             </div>
           )}
@@ -832,15 +877,19 @@ export default function EventForm({ venues, eventId, initialValues, status: init
           // 16 px sides "Save draft" broke onto two lines. 87 of room holds it.
           <div className="grid grid-cols-2 gap-2">
             <button type="submit" {...busyButtonProps(busy)} className={`${ADMIN_SECONDARY_BUTTON} w-full whitespace-nowrap px-2!`}>
-              {busy ? "Saving…" : "Save draft"}
+              {busyAction === "save_draft" || busyAction === "save" ? "Saving…" : "Save draft"}
             </button>
             <button type="button" onClick={() => void send("publish")} {...busyButtonProps(busy)} className={`${ADMIN_PRIMARY_BUTTON} w-full whitespace-nowrap px-2!`}>
-              Publish
+              {busyAction === "publish" ? "Publishing…" : "Publish"}
             </button>
           </div>
         ) : (
           <button type="submit" {...busyButtonProps(busy)} className={`${ADMIN_PRIMARY_BUTTON} w-full`}>
-            {busy ? "Saving…" : isEdit && status !== "draft" ? "Save changes" : "Save draft"}
+            {busyAction === "save_draft" || busyAction === "save"
+              ? "Saving…"
+              : isEdit && status !== "draft"
+                ? "Save changes"
+                : "Save draft"}
           </button>
         )}
       </div>

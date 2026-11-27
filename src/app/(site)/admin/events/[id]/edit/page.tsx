@@ -23,7 +23,7 @@ import { publicFlyerOf, type EventRow } from "@/lib/events";
 import AdminNav from "@/components/AdminNav";
 import EventForm, { type EventFormValues } from "@/components/EventForm";
 import EventsList from "@/components/EventsList";
-import { cardClass, formPageBodyClass, pageTitleClass, tapLinkClass } from "@/lib/adminCardStyles";
+import { adminShellWidthClass, cardClass, formPageBodyClass, pageTitleClass, tapLinkClass } from "@/lib/adminCardStyles";
 
 function toFormValues(e: EventRow): Partial<EventFormValues> {
   return {
@@ -71,34 +71,36 @@ export default async function EditEventPage({
   if (event === null) notFound();
 
   return (
-    <main className="min-h-screen bg-[var(--color-bone-50)]">
+    <div className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="events" counts={navCounts} showActivity={identity.isOwner === true} />
-      <div className={formPageBodyClass}>
-        <h2 className={pageTitleClass}>Edit event</h2>
-        {event === undefined ? (
-          // null list = EventsList's shared "couldn't load / Retry" panel (Retry re-runs this page's read).
-          <EventsList events={null} />
-        ) : event.status === "archived" ? (
-          <div className={cardClass}>
-            <p className="text-sm text-[var(--color-ink-700)]">
-              <span className="font-medium text-[var(--color-ink-900)]">{event.name}</span> is archived. Archiving is final, so it can&rsquo;t be edited.
-            </p>
-            <Link href="/admin/events" className={`mt-3 text-sm ${tapLinkClass}`}>
-              Back to events
-            </Link>
-          </div>
-        ) : (
-          <EventForm
-            venues={venues}
-            eventId={event.id}
-            initialValues={toFormValues(event)}
-            status={event.status}
-            expectedUpdatedAt={event.updated_at}
-            initialFlyer={publicFlyerOf(event)}
-            justSaved={saved === "1"}
-          />
-        )}
-      </div>
-    </main>
+      <main id="admin-main" tabIndex={-1} className={adminShellWidthClass}>
+        <div className={formPageBodyClass}>
+          <h2 className={pageTitleClass}>Edit event</h2>
+          {event === undefined ? (
+            // null list = EventsList's shared "couldn't load / Retry" panel (Retry re-runs this page's read).
+            <EventsList events={null} />
+          ) : event.status === "archived" ? (
+            <div className={cardClass}>
+              <p className="text-sm text-[var(--color-ink-700)]">
+                <span className="font-medium text-[var(--color-ink-900)]">{event.name}</span> is archived. Archiving is final, so it can&rsquo;t be edited.
+              </p>
+              <Link href="/admin/events" className={`mt-3 text-sm ${tapLinkClass}`}>
+                Back to events
+              </Link>
+            </div>
+          ) : (
+            <EventForm
+              venues={venues}
+              eventId={event.id}
+              initialValues={toFormValues(event)}
+              status={event.status}
+              expectedUpdatedAt={event.updated_at}
+              initialFlyer={publicFlyerOf(event)}
+              justSaved={saved === "1"}
+            />
+          )}
+        </div>
+      </main>
+    </div>
   );
 }

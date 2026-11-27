@@ -23,6 +23,7 @@
  */
 
 import { buttonClass } from "@/lib/adminCardStyles";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
 // block: a textarea is inline by default and leaves a gap under it for the
@@ -57,8 +58,9 @@ export const fieldGroupClass = "rounded-[var(--radius-lg)] border border-[var(--
 // the tint gets 8 px of room each side while the tick box stays lined up
 // with the fields above it.
 export const checkboxRowClass =
-  "-mx-2 flex min-h-12 cursor-pointer items-center gap-2 rounded-[var(--radius-md)] px-2 text-sm text-[var(--color-ink-700)] " +
-  "transition-colors duration-150 hover:bg-[var(--color-sage-100)]";
+  "-mx-2 flex min-h-12 touch-manipulation cursor-pointer items-center gap-2 rounded-[var(--radius-md)] px-2 text-sm text-[var(--color-ink-700)] " +
+  "transition-colors duration-150 hover:bg-[var(--color-sage-100)] " +
+  PRESS_FEEDBACK;
 // size-[20px], not size-5: this theme remaps --spacing-5 to 24 px.
 // WHY an outline, not a ring: a native tick box does not reliably paint a
 // box-shadow ring in every browser, an outline it always does.

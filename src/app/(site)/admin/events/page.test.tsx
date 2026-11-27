@@ -69,7 +69,7 @@ describe("/admin/events", () => {
     useDb(d);
     render(await AdminEventsPage());
     expect(screen.getByText("Turkey drive")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /edit turkey drive/i })).toHaveAttribute("href", "/admin/events/e1/edit");
+    expect(screen.getByRole("link", { name: "Turkey drive" })).toHaveAttribute("href", "/admin/events/e1/edit");
   });
 
   test("with no events it offers Add event", async () => {

@@ -87,7 +87,7 @@ export default function WaitingToPublishBox({ changes }: WaitingToPublishBoxProp
   return (
     <div className={clayNoticeClass}>
       <p className="font-semibold">Waiting to publish</p>
-      <p className="mt-1">These changes won&apos;t show on the public map until the next Publish.</p>
+      <p className="mt-1">These changes won&rsquo;t show on the public map until the next Publish.</p>
       <dl className="mt-3 flex flex-col gap-3">
         {shown.map((change) => (
           <div key={change.field}>

@@ -8,6 +8,7 @@
  * No "use client": static markup only.
  */
 
+import Link from "next/link";
 import { linkClass } from "@/lib/adminCardStyles";
 
 // The name column: 112 px on a phone; from 640 up 40% of the row (never under
@@ -43,13 +44,23 @@ export default function BarList({ items, emptyMessage }: BarListProps) {
       {items.map((item) => (
         <li key={item.label} className="flex items-center gap-2">
           {item.href ? (
-            <a
-              href={item.href}
-              className={`${linkClass} ${NAME_WIDTH} flex-none break-words text-sm`}
-              title={item.label}
-            >
-              {item.label}
-            </a>
+            item.href.startsWith("/") ? (
+              <Link
+                href={item.href}
+                className={`${linkClass} ${NAME_WIDTH} flex-none break-words text-sm`}
+                title={item.label}
+              >
+                {item.label}
+              </Link>
+            ) : (
+              <a
+                href={item.href}
+                className={`${linkClass} ${NAME_WIDTH} flex-none break-words text-sm`}
+                title={item.label}
+              >
+                {item.label}
+              </a>
+            )
           ) : (
             <span className={`${NAME_WIDTH} flex-none break-words text-sm text-[var(--color-ink-700)]`} title={item.label}>
               {item.label}
@@ -61,7 +72,9 @@ export default function BarList({ items, emptyMessage }: BarListProps) {
               style={{ width: `${Math.max((item.value / max) * 100, item.value > 0 ? 4 : 0)}%` }}
             />
           </span>
-          <span className="w-10 flex-none text-right text-sm text-[var(--color-ink-500)]">{item.displayValue ?? item.value}</span>
+          <span className="min-w-14 shrink-0 whitespace-nowrap text-right text-sm tabular-nums text-[var(--color-ink-500)]">
+            {item.displayValue ?? item.value}
+          </span>
         </li>
       ))}
     </ul>

@@ -28,6 +28,8 @@ import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { parseAdminNeeds, type AdminCheckinRow } from "@/lib/blessingBoxes";
 import { t } from "@/lib/i18n";
+import { TIME_ZONE } from "@/lib/eventTime";
+import { busyButtonProps } from "@/components/formClasses";
 import { emptyStateClass, failureLineClass, secondaryButtonClass, tagClass } from "@/lib/adminCardStyles";
 
 interface BoxCheckinsAdminPanelProps {
@@ -44,7 +46,8 @@ export const KIND_LABEL: Record<AdminCheckinRow["kind"], string> = {
   problem: "Problem report",
 };
 
-const dateFormatter = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
+// Pin Pueblo time so Workers SSR (UTC) and Pueblo browsers never disagree on hydration.
+const dateFormatter = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: TIME_ZONE });
 const HIDE_WORDS = ["Hide", "Saving…", "Unhide"];
 
 export default function BoxCheckinsAdminPanel({ checkins }: BoxCheckinsAdminPanelProps) {
@@ -105,7 +108,7 @@ export default function BoxCheckinsAdminPanel({ checkins }: BoxCheckinsAdminPane
                 {row.visibility === "hidden" && <span className={`ml-2 ${tagClass("quiet")}`}>Hidden</span>}
               </p>
               <p className="text-xs text-[var(--color-ink-400)]">
-                <span id={dateId} className="whitespace-nowrap">{dateFormatter.format(new Date(row.created_at))}</span>
+                <span id={dateId} className="whitespace-nowrap tabular-nums">{dateFormatter.format(new Date(row.created_at))}</span>
                 {row.hidden_by && ` · hidden by ${row.hidden_by}`}
               </p>
               {row.note && <p className="mt-1 text-sm text-[var(--color-ink-700)]">{row.note}</p>}
@@ -124,17 +127,15 @@ export default function BoxCheckinsAdminPanel({ checkins }: BoxCheckinsAdminPane
                 </p>
               )}
             </div>
-            {/* WHY aria-disabled, not disabled: a natively disabled button
-                drops keyboard focus to the top of the page; this one keeps
-                it, and the click is ignored while its request runs. */}
+            {/* WHY busyButtonProps: keeps keyboard focus while ignoring presses during the request. */}
             <button
               id={buttonId}
               type="button"
               aria-labelledby={`${buttonId} ${kindId} ${dateId}`}
               onClick={() => {
-                if (pendingId !== row.id) void toggleVisibility(row);
+                void toggleVisibility(row);
               }}
-              aria-disabled={pendingId === row.id || undefined}
+              {...busyButtonProps(pendingId === row.id)}
               className={`${secondaryButtonClass} shrink-0`}
             >
               {/* All three words in one grid cell, so the button keeps the width

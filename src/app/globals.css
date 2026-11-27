@@ -184,6 +184,13 @@ html {
   }
 }
 
+/* Reserve scrollbar space on admin pages so filtering/expanding lists never
+   jumps horizontally, without adding a right-edge gutter to the full-bleed
+   public map. */
+html:has(#admin-main) {
+  scrollbar-gutter: stable;
+}
+
 body {
   background: var(--color-bone-50);
   color: var(--color-ink-700);
@@ -642,7 +649,24 @@ html:not([data-splash-seen]) [data-map-standin-pending] {
     -0.5px  0.5px 0 #fff, 0.5px  0.5px 0 #fff;
 }
 
-/* ─── Success tick (design feature library, #959) ───────────────────────────
+/* ─── Admin bone-tinted shimmer skeleton (admin/loading.tsx) ──────────────────
+   Bone-tinted placeholder blocks shaped like the loading page so cold admin
+   transitions answer the tap quickly without layout jump. */
+.pfm-skeleton {
+  --sk-base: var(--color-bone-100);
+  --sk-shine: var(--color-bone-50);
+  background: linear-gradient(90deg, var(--sk-base) 25%, var(--sk-shine) 50%, var(--sk-base) 75%);
+  background-size: 200% 100%;
+  animation: pfm-skeleton-sweep 1.4s linear infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes pfm-skeleton-sweep {
+  from { background-position: 200% 0; }
+  to   { background-position: 0 0; }
+}
+
+/* ─── Success tick (design feature library, #959, #962) ─────────────────────
    Once-per-flow confirmation cue (470ms total). Renders already drawn when
    prefers-reduced-motion: reduce is set. */
 .pfm-success-tick {
@@ -671,9 +695,13 @@ html:not([data-splash-seen]) [data-map-standin-pending] {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .pfm-skeleton {
+    animation: none !important;
+    background: var(--sk-base);
+  }
   .pfm-success-tick circle,
   .pfm-success-tick path {
-    animation: none;
+    animation: none !important;
     stroke-dashoffset: 0;
   }
 }

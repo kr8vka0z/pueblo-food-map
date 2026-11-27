@@ -25,7 +25,7 @@
 
 import Link from "next/link";
 import type { AdminNavCounts } from "@/lib/adminNavCounts";
-import { adminNameClass, focusRingClass } from "@/lib/adminCardStyles";
+import { adminNameClass, adminShellWidthClass, focusRingClass } from "@/lib/adminCardStyles";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 export type AdminActiveTab = "dashboard" | "boxes" | "places" | "events" | "activity";
@@ -90,9 +90,11 @@ const ACTIVITY_ITEM: NavItem = { key: "activity", label: "Activity", href: "/adm
 // substring match doesn't know that, so avoid tripping the false positive
 // rather than editing that test.
 const navLinkBase =
-  "inline-flex items-center whitespace-nowrap rounded-[var(--radius-md)] text-sm px-3 py-2 font-medium " +
-  "transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 " +
-  "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 min-h-12";
+  "inline-flex min-h-12 touch-manipulation items-center whitespace-nowrap rounded-[var(--radius-md)] text-sm px-3 py-2 font-medium " +
+  "transition-colors duration-150 " +
+  PRESS_FEEDBACK +
+  " " +
+  focusRingClass;
 
 const navLinkActive = "bg-[var(--color-sage-600)] text-[var(--color-bone-50)]";
 const navLinkInactive = "text-[var(--color-ink-500)] hover:bg-[var(--color-sage-100)]";
@@ -102,7 +104,7 @@ const navLinkSkeleton = "text-[var(--color-ink-500)]";
 
 const pillClass =
   "ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-[var(--color-clay-100)] " +
-  "px-1.5 text-xs font-bold text-[var(--color-clay-700)]";
+  "px-1.5 text-xs font-bold tabular-nums text-[var(--color-clay-700)]";
 
 // Same filled-orange/navy treatment as the approved mockup's "Add place"
 // button — DESIGN.md scopes brand-orange to two PUBLIC map elements, but
@@ -112,7 +114,7 @@ const pillClass =
 // WHY no hover change and a sage ring (#926 decisions 1 and 4): orange buttons
 // get no hover change, and an orange ring is 2.3:1 on white, under the 3:1 floor.
 const addPlaceClass =
-  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] " +
+  "inline-flex min-h-12 touch-manipulation items-center justify-center rounded-[var(--radius-md)] " +
   "bg-[var(--color-brand-orange)] px-4 text-sm font-bold text-[var(--color-brand-navy)] " +
   PRESS_FEEDBACK +
   " " +
@@ -120,13 +122,23 @@ const addPlaceClass =
 
 // WHY no overflow-x-auto: on a 360 px phone a scrolling row hides tabs off
 // screen; the row wraps instead (#926 decision 18).
-const navRowClass = "flex flex-wrap items-center gap-1 px-4 pb-3 sm:px-6";
+const navRowClass = `${adminShellWidthClass} flex flex-wrap items-center gap-1 px-4 pb-3 sm:px-6`;
+
+const skipLinkClass =
+  "sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 " +
+  "focus:inline-flex focus:min-h-12 focus:items-center focus:rounded-[var(--radius-md)] " +
+  "focus:bg-white focus:px-4 focus:text-sm focus:font-semibold focus:text-[var(--color-sage-700)] " +
+  "focus:shadow-md " +
+  focusRingClass;
 
 export default function AdminNav({ email, active, counts, showActivity = false }: AdminNavProps) {
   const items = showActivity ? [...NAV_ITEMS, ACTIVITY_ITEM] : NAV_ITEMS;
   return (
     <header className="border-b border-[var(--color-bone-200)] bg-white">
-      <div className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <a href="#admin-main" className={skipLinkClass}>
+        Skip to main content
+      </a>
+      <div className={`${adminShellWidthClass} flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6`}>
         <h1 className={adminNameClass}>Pueblo Food Map Admin</h1>
         <p className="text-sm text-[var(--color-ink-500)]">
           Signed in as <span className="font-medium text-[var(--color-sage-700)]">{email}</span>
@@ -171,7 +183,7 @@ export default function AdminNav({ email, active, counts, showActivity = false }
 export function AdminNavSkeleton() {
   return (
     <header className="border-b border-[var(--color-bone-200)] bg-white">
-      <div className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div className={`${adminShellWidthClass} flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6`}>
         <p className={adminNameClass}>Pueblo Food Map Admin</p>
         <p className="text-sm text-[var(--color-ink-500)]" aria-hidden>
           &nbsp;

@@ -451,7 +451,7 @@ const MAX_DIFF_FIELDS = 6;
 const MAX_VALUE_CHARS = 60;
 
 function showValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "—";
+  if (value === null || value === undefined || value === "") return "Empty";
   const text = typeof value === "string" ? value : JSON.stringify(value);
   return text.length > MAX_VALUE_CHARS ? `${text.slice(0, MAX_VALUE_CHARS - 1)}…` : text;
 }

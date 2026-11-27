@@ -64,7 +64,9 @@
  */
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { categoryLabels } from "@/lib/categories";
 import CategoryLabel from "@/components/CategoryLabel";
 import { inputClass } from "@/components/formClasses";
@@ -72,6 +74,7 @@ import {
   chipClass,
   controlLabelClass,
   emptyStateClass,
+  focusRingClass,
   linkClass,
   secondaryButtonClass,
   tableCellClass,
@@ -83,6 +86,7 @@ import {
   tagClass,
   type TagTone,
 } from "@/lib/adminCardStyles";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { DISPLAY_STATUS_KEY, DISPLAY_STATUS_LABELS, formatLastVerified, type AdminDisplayStatus } from "@/lib/adminVenues";
 import { SOURCE_BADGE, LANE_BADGE } from "@/components/ProposalCard";
 import { fieldLabel } from "@/lib/fieldLabels";
@@ -101,10 +105,18 @@ interface VenueListViewProps {
   itemsByVenueId?: Record<string, ReviewItem[]>;
   /** Genuinely-new suggestions (an `add` proposal or a "new_venue" submission) with no existing venue row — rendered as their own "Suggested new place" rows. */
   addItems?: ReviewItem[];
-  /** #674: `?show=review` pre-selects the "To review" chip — set server-side from the URL (src/app/(site)/admin/places/page.tsx), never parsed client-side. */
+  /** #674: `?show=review` pre-selects the "To review" chip — set server-side from the URL (src/app/(site)/admin/places/page.tsx). */
   initialShowReview?: boolean;
-  /** #675: `?from=public` pre-selects the "The public" source filter chip — same server-side-only convention as initialShowReview. */
-  initialSourceFilter?: SourceFilter;
+  /** Optional `?status=` value from the URL (reproduces a shared/back-navigated view). */
+  initialStatusFilter?: string;
+  /** #675: `?from=` pre-selects a source filter chip (e.g. "public"). */
+  initialSourceFilter?: string;
+  /** Optional `?category=` value from the URL. */
+  initialCategoryFilter?: string;
+  /** Optional `?lane=` value from the URL. */
+  initialLaneFilter?: string;
+  /** Optional `?q=` search string from the URL. */
+  initialQuery?: string;
 }
 
 // A quick-filter chip is either "all", a real AdminDisplayStatus, or the
@@ -245,7 +257,7 @@ const REVIEW_FIELD_WORD: Record<string, string> = {
 };
 
 export function summarizeProposalForRow(p: Extract<ReviewItem, { kind: "proposal" }>["proposal"]): string {
-  if (p.parseError) return "Suggested change: couldn't read details";
+  if (p.parseError) return "Suggested change: couldn’t read details";
   const { row, diff } = p;
   if (row.source === "link_health") return "Website link broken";
   if (renameMetaOf(diff)) return "Listed under a new name";
@@ -280,7 +292,7 @@ function summarizeItemForRow(item: ReviewItem): string {
 
 function ReviewCell({ items }: { items: ReviewItem[] }) {
   // ink 500, not 400: the row's hover tint (sage 100) needs ink 500 or darker.
-  if (items.length === 0) return <span className="text-[var(--color-ink-500)]">—</span>;
+  if (items.length === 0) return <span className="text-[var(--color-ink-500)]">None</span>;
   return (
     <ul className="flex flex-col gap-1">
       {items.map((item) => {
@@ -297,20 +309,95 @@ function ReviewCell({ items }: { items: ReviewItem[] }) {
   );
 }
 
+const VALID_QUICK_FILTERS = new Set<string>(QUICK_FILTER_ORDER);
+const VALID_CATEGORIES = new Set<string>(ALL_CATEGORIES);
+const VALID_LANES = new Set<string>(Object.keys(LANE_BADGE));
+const VALID_SOURCES = new Set<string>(["all", "public", ...Object.keys(SOURCE_BADGE)]);
+
+function parseQuickFilter(initialShowReview: boolean, rawStatus?: string): QuickFilter {
+  if (initialShowReview) return "to_review";
+  if (rawStatus && VALID_QUICK_FILTERS.has(rawStatus)) return rawStatus as QuickFilter;
+  return "all";
+}
+
+function parseCategoryFilter(raw?: string): CategoryFilter {
+  return raw && VALID_CATEGORIES.has(raw) ? (raw as VenueCategory) : "all";
+}
+
+function parseSourceFilter(raw?: string): SourceFilter {
+  return raw && VALID_SOURCES.has(raw) ? (raw as SourceFilter) : "all";
+}
+
+function parseLaneFilter(raw?: string): LaneFilterValue {
+  return raw && VALID_LANES.has(raw) ? (raw as ReviewLane) : "all";
+}
+
 export default function VenueListView({
   venues,
   statusByVenueId,
   itemsByVenueId = {},
   addItems = [],
   initialShowReview = false,
+  initialStatusFilter,
   initialSourceFilter = "all",
+  initialCategoryFilter,
+  initialLaneFilter,
+  initialQuery = "",
 }: VenueListViewProps) {
-  const [query, setQuery] = useState("");
-  const [quickFilter, setQuickFilter] = useState<QuickFilter>(initialShowReview ? "to_review" : "all");
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(initialSourceFilter);
-  const [laneFilter, setLaneFilter] = useState<LaneFilterValue>("all");
+  const [query, setQuery] = useState(initialQuery);
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>(() =>
+    parseQuickFilter(initialShowReview, initialStatusFilter),
+  );
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>(() =>
+    parseCategoryFilter(initialCategoryFilter),
+  );
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(() => parseSourceFilter(initialSourceFilter));
+  const [laneFilter, setLaneFilter] = useState<LaneFilterValue>(() => parseLaneFilter(initialLaneFilter));
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // Sync when client-side navigation changes the live URL query (e.g. clicking
+  // "Show them" -> /admin/places?show=review or the Places nav tab ->
+  // /admin/places after changing filters locally).
+  const searchParams = useSearchParams();
+  const searchKey = searchParams ? searchParams.toString() : null;
+  const prevSearchKey = useRef(searchKey);
+  const pendingWrittenSearch = useRef<string | null>(null);
+  const didInteract = useRef(false);
+
+  useEffect(() => {
+    if (!searchParams || searchKey === null || prevSearchKey.current === searchKey) return;
+    prevSearchKey.current = searchKey;
+    if (pendingWrittenSearch.current === searchKey) {
+      pendingWrittenSearch.current = null;
+      return;
+    }
+    pendingWrittenSearch.current = null;
+    didInteract.current = false;
+    setQuickFilter(parseQuickFilter(searchParams.get("show") === "review", searchParams.get("status") ?? undefined));
+    setSourceFilter(parseSourceFilter(searchParams.get("from") ?? undefined));
+    setCategoryFilter(parseCategoryFilter(searchParams.get("category") ?? undefined));
+    setLaneFilter(parseLaneFilter(searchParams.get("lane") ?? undefined));
+    setQuery(searchParams.get("q") ?? "");
+  }, [searchKey, searchParams]);
+
+  // Mirror user filter changes into the URL so Back and shared links reproduce
+  // the exact view without triggering a server round-trip on every click/keystroke.
+  useEffect(() => {
+    if (!didInteract.current || typeof window === "undefined") return;
+    const params = new URLSearchParams();
+    if (quickFilter === "to_review") params.set("show", "review");
+    else if (quickFilter !== "all") params.set("status", quickFilter);
+    if (sourceFilter !== "all") params.set("from", sourceFilter);
+    if (categoryFilter !== "all") params.set("category", categoryFilter);
+    if (laneFilter !== "all") params.set("lane", laneFilter);
+    if (query.trim()) params.set("q", query.trim());
+    const qs = params.toString();
+    const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+    if (`${window.location.pathname}${window.location.search}` !== nextUrl) {
+      pendingWrittenSearch.current = qs;
+      window.history.replaceState(null, "", nextUrl);
+    }
+  }, [quickFilter, sourceFilter, categoryFilter, laneFilter, query]);
 
   const hasFilters =
     query.trim() !== "" || quickFilter !== "all" || categoryFilter !== "all" || sourceFilter !== "all" || laneFilter !== "all";
@@ -318,12 +405,43 @@ export default function VenueListView({
   // Clear filters (DESIGN.md Patterns, empty after a filter): resets the
   // search box too, then puts focus on it, since the button itself goes away.
   function clearFilters() {
+    didInteract.current = true;
     setQuery("");
     setQuickFilter("all");
     setCategoryFilter("all");
     setSourceFilter("all");
     setLaneFilter("all");
     searchRef.current?.focus();
+  }
+
+  function handleQuickFilter(value: QuickFilter) {
+    didInteract.current = true;
+    setQuickFilter(value);
+    // Leaving To review clears review-only subfilters so rows aren't hidden by invisible chips.
+    if (value !== "to_review") {
+      setSourceFilter("all");
+      setLaneFilter("all");
+    }
+  }
+
+  function handleSourceFilter(value: SourceFilter) {
+    didInteract.current = true;
+    setSourceFilter(value);
+  }
+
+  function handleLaneFilter(value: LaneFilterValue) {
+    didInteract.current = true;
+    setLaneFilter(value);
+  }
+
+  function handleCategoryFilter(value: CategoryFilter) {
+    didInteract.current = true;
+    setCategoryFilter(value);
+  }
+
+  function handleQueryChange(value: string) {
+    didInteract.current = true;
+    setQuery(value);
   }
 
   const rows: Row[] = useMemo(() => {
@@ -393,6 +511,8 @@ export default function VenueListView({
     [filtered],
   );
 
+  const showReviewSubfilters = quickFilter === "to_review" || sourceFilter !== "all" || laneFilter !== "all";
+
   return (
     <div>
       <StatusKey />
@@ -400,34 +520,33 @@ export default function VenueListView({
       {/* Quick-filter chips (#674, moved the concept of a filter row up from
           the old /admin/flags queue's source/change-type chips). */}
       <div role="group" aria-label="Filter places by status" className="mb-3 flex flex-wrap items-center gap-2">
-        {QUICK_FILTER_ORDER.map((value) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setQuickFilter(value)}
-            aria-pressed={quickFilter === value}
-            className={chipClass(quickFilter === value)}
-          >
-            {QUICK_FILTER_LABELS[value]}
-            {quickFilterCounts[value] > 0 && ` (${quickFilterCounts[value]})`}
-          </button>
-        ))}
+        {QUICK_FILTER_ORDER.map((value) => {
+          const count = quickFilterCounts[value];
+          const isActive = quickFilter === value;
+          const isDisabled = value !== "all" && count === 0 && !isActive;
+          return (
+            <button
+              key={value}
+              type="button"
+              disabled={isDisabled}
+              onClick={() => handleQuickFilter(value)}
+              aria-pressed={isActive}
+              className={`${chipClass(isActive)} tabular-nums`}
+            >
+              {QUICK_FILTER_LABELS[value]} ({count})
+            </button>
+          );
+        })}
       </div>
 
-      {/* Source/AI-lane filters — moved over from the old /admin/flags
-          queue; only shown once there's more than one value present, same
-          "don't clutter an all-noise or all-one-source queue" rule that
-          queue's own filter row followed. #675: "public" (any submission
-          item) is one more value in the source row, not a separate filter
-          group — an admin filtering "where did this come from" shouldn't
-          have to look in two places for the answer. Sources and lanes are
-          two rows that wrap on their own (#926), not one row split by a
-          divider that ended up orphaned or mid-row. */}
-      {presentSources.length > 1 && (
+      {/* Source/AI-lane filters — shown only while reviewing (To review active,
+          or a source/lane filter already picked) so the default Places view
+          stays scannable on phones without 13 extra chips above row 1. */}
+      {showReviewSubfilters && presentSources.length > 1 && (
         <div role="group" aria-label="Filter by source" className="mb-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setSourceFilter("all")}
+            onClick={() => handleSourceFilter("all")}
             aria-pressed={sourceFilter === "all"}
             className={chipClass(sourceFilter === "all")}
           >
@@ -437,7 +556,7 @@ export default function VenueListView({
             <button
               key={source}
               type="button"
-              onClick={() => setSourceFilter(source)}
+              onClick={() => handleSourceFilter(source)}
               aria-pressed={sourceFilter === source}
               className={chipClass(sourceFilter === source)}
             >
@@ -446,11 +565,11 @@ export default function VenueListView({
           ))}
         </div>
       )}
-      {presentLanes.length > 1 && (
+      {showReviewSubfilters && presentLanes.length > 1 && (
         <div role="group" aria-label="Filter by lane" className="mb-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setLaneFilter("all")}
+            onClick={() => handleLaneFilter("all")}
             aria-pressed={laneFilter === "all"}
             className={chipClass(laneFilter === "all")}
           >
@@ -460,7 +579,7 @@ export default function VenueListView({
             <button
               key={lane}
               type="button"
-              onClick={() => setLaneFilter(lane)}
+              onClick={() => handleLaneFilter(lane)}
               aria-pressed={laneFilter === lane}
               className={chipClass(laneFilter === lane)}
             >
@@ -479,9 +598,10 @@ export default function VenueListView({
           <input
             ref={searchRef}
             id="venue-search"
+            name="q"
             type="search"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => handleQueryChange(e.target.value)}
             placeholder="Search by name or address"
             className={inputClass}
           />
@@ -492,8 +612,9 @@ export default function VenueListView({
           </label>
           <select
             id="venue-category-filter"
+            name="category"
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value as CategoryFilter)}
+            onChange={(e) => handleCategoryFilter(e.target.value as CategoryFilter)}
             className={inputClass}
           >
             <option value="all">All</option>
@@ -524,7 +645,7 @@ export default function VenueListView({
           <table className="w-full min-w-[1080px] text-left text-sm">
             <thead>
               <tr className={tableHeadRowClass}>
-                <th scope="col" className={`${tableHeadCellClass} min-w-[240px]`}>
+                <th scope="col" className={`${tableHeadCellClass} sticky left-0 z-10 min-w-[240px] bg-white shadow-[1px_0_0_var(--color-bone-200)] sm:static sm:shadow-none`}>
                   Name
                 </th>
                 <th scope="col" className={tableHeadCellClass}>
@@ -553,7 +674,7 @@ export default function VenueListView({
         </div>
       )}
 
-      <p className="mt-3 text-xs text-[var(--color-ink-400)]">
+      <p className="mt-3 text-xs tabular-nums text-[var(--color-ink-400)]">
         {sorted.length} of {rows.length} {rows.length === 1 ? "place" : "places"}
       </p>
     </div>
@@ -562,7 +683,7 @@ export default function VenueListView({
 
 /** The kind of place in its public colored words (CategoryLabel, R3); SNAP and WIC only when the row says so. */
 function CategoryCell({ category, snap = false, wic = false }: { category: VenueCategory | null; snap?: boolean; wic?: boolean }) {
-  if (!category) return <span className="text-[var(--color-ink-500)]">—</span>;
+  if (!category) return <span className="text-[var(--color-ink-500)]">Not set</span>;
   const benefits = [snap && "SNAP", wic && "WIC"].filter((b): b is string => typeof b === "string");
   return <CategoryLabel category={category} label={categoryLabels[category]} benefits={benefits} className={CATEGORY_ON_ROW_CLASS} />;
 }
@@ -577,12 +698,16 @@ function CategoryCell({ category, snap = false, wic = false }: { category: Venue
 const CATEGORY_ON_ROW_CLASS =
   "text-sm *:transition-colors *:duration-150 group-hover:*:text-[var(--color-ink-700)]!";
 
+const STICKY_NAME_CELL =
+  `${tableCellClass} sticky left-0 z-10 bg-white font-medium shadow-[1px_0_0_var(--color-bone-200)] ` +
+  "transition-colors duration-150 sm:static sm:bg-transparent sm:shadow-none";
+
 function VenueRow({ row, statusByVenueId }: { row: Row; statusByVenueId: Record<string, AdminDisplayStatus> }) {
   if (row.kind === "new") {
     const { item } = row;
     return (
-      <tr className={tableLinkRowClass} onClick={openRowLink}>
-        <td className={`${tableCellClass} font-medium`}>
+      <tr className={`${tableLinkRowClass} [content-visibility:auto] [contain-intrinsic-size:auto_56px]`} onClick={openRowLink}>
+        <td className={`${STICKY_NAME_CELL} group-hover:bg-[var(--color-sage-100)] sm:group-hover:bg-transparent`}>
           <Link href={newItemHref(item)} data-row-link className={linkClass}>
             {rowName(row)}
           </Link>
@@ -599,8 +724,8 @@ function VenueRow({ row, statusByVenueId }: { row: Row; statusByVenueId: Record<
         <td className={tableCellClass}>
           <ReviewCell items={[item]} />
         </td>
-        <td className={`${tableCellClass} text-[var(--color-ink-500)]`}>{rowAddress(row) || "—"}</td>
-        <td className={`${tableCellClass} text-[var(--color-ink-500)]`}>—</td>
+        <td className={`${tableCellClass} text-[var(--color-ink-500)]`}>{rowAddress(row) || "Not set"}</td>
+        <td className={`${tableCellClass} whitespace-nowrap text-[var(--color-ink-500)]`}>Not yet</td>
       </tr>
     );
   }
@@ -620,10 +745,12 @@ function VenueRow({ row, statusByVenueId }: { row: Row; statusByVenueId: Record<
     // The row tint, and a click anywhere on the row, only where the name
     // links somewhere (#926 decision 1; src/lib/rowLinkClick.ts).
     <tr
-      className={isArchivedRowLinkable ? tableLinkRowClass : tableRowClass}
+      className={`${isArchivedRowLinkable ? tableLinkRowClass : tableRowClass} [content-visibility:auto] [contain-intrinsic-size:auto_56px]`}
       onClick={isArchivedRowLinkable ? openRowLink : undefined}
     >
-      <td className={`${tableCellClass} font-medium`}>
+      <td
+        className={`${STICKY_NAME_CELL} ${isArchivedRowLinkable ? "group-hover:bg-[var(--color-sage-100)] sm:group-hover:bg-transparent" : ""}`}
+      >
         {isArchivedRowLinkable ? (
           <Link href={`/admin/venues/${venue.id}/edit`} data-row-link className={linkClass}>
             {venue.name}
@@ -642,24 +769,41 @@ function VenueRow({ row, statusByVenueId }: { row: Row; statusByVenueId: Record<
         <ReviewCell items={items} />
       </td>
       <td className={`${tableCellClass} text-[var(--color-ink-500)]`}>{venue.address}</td>
-      <td className={`${tableCellClass} whitespace-nowrap text-[var(--color-ink-500)]`}>{formatLastVerified(venue.last_verified)}</td>
+      <td className={`${tableCellClass} whitespace-nowrap tabular-nums text-[var(--color-ink-500)]`}>{formatLastVerified(venue.last_verified)}</td>
     </tr>
   );
 }
 
-/** #673 pt.2: one line per status, in plain language, above the table — the Places tab's status key. */
+/** #673 pt.2: one line per status, folded behind a disclosure so the Places table stays close to the top on phones. */
 function StatusKey() {
   return (
-    <dl className="mb-4 flex flex-col gap-1.5 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-3 text-xs text-[var(--color-ink-500)] sm:flex-row sm:flex-wrap sm:gap-x-5 sm:gap-y-1.5">
-      {DISPLAY_STATUS_KEY.map(({ status, description }) => (
-        <div key={status} className="flex items-center gap-1.5">
-          <dt>
-            <StatusBadge status={status} />
-          </dt>
-          <dd>{description}</dd>
-        </div>
-      ))}
-    </dl>
+    <details className="group mb-4 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-1">
+      <summary
+        className={
+          `-mx-2 flex min-h-12 touch-manipulation cursor-pointer list-none items-center justify-between gap-2 ` +
+          `rounded-[var(--radius-sm)] px-2 text-sm font-medium text-[var(--color-ink-700)] ` +
+          `transition-colors duration-150 hover:bg-[var(--color-sage-100)] ${PRESS_FEEDBACK} ${focusRingClass} ` +
+          `[&::-webkit-details-marker]:hidden`
+        }
+      >
+        <span>Status key</span>
+        <ChevronDown
+          size={18}
+          aria-hidden="true"
+          className="shrink-0 text-[var(--color-ink-500)] transition-transform duration-150 group-open:rotate-180"
+        />
+      </summary>
+      <dl className="mt-1 flex flex-col gap-1.5 border-t border-[var(--color-bone-200)] py-3 text-xs text-[var(--color-ink-500)] sm:flex-row sm:flex-wrap sm:gap-x-5 sm:gap-y-1.5">
+        {DISPLAY_STATUS_KEY.map(({ status, description }) => (
+          <div key={status} className="flex items-center gap-1.5">
+            <dt>
+              <StatusBadge status={status} />
+            </dt>
+            <dd>{description}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   );
 }
 

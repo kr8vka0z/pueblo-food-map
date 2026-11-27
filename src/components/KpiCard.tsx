@@ -13,7 +13,7 @@
  * browser state.
  */
 
-import { tileCardClass, tileLabelClass } from "@/lib/adminCardStyles";
+import { kpiTileClass, tileLabelClass } from "@/lib/adminCardStyles";
 
 export interface KpiCardProps {
   label: string;
@@ -61,12 +61,12 @@ function DeltaBadge({ delta }: { delta: KpiDelta }) {
     return <span className="text-xs font-medium text-[var(--color-sage-700)]">new</span>;
   }
   if (delta.pct === null) {
-    return <span className="text-xs text-[var(--color-ink-500)]">—</span>;
+    return <span className="text-xs text-[var(--color-ink-500)]">No change</span>;
   }
   const color = delta.direction === "up" ? "text-[var(--color-sage-700)]" : delta.direction === "down" ? "text-[var(--color-danger)]" : "text-[var(--color-ink-500)]";
   const sign = delta.pct > 0 ? "+" : "";
   return (
-    <span className={`text-xs font-medium ${color}`}>
+    <span className={`text-xs font-medium tabular-nums ${color}`}>
       {sign}
       {delta.pct}%
     </span>
@@ -96,7 +96,7 @@ export default function KpiCard({ label, displayValue, value, previousValue, spa
     // WHY a column with the number pushed down (mt-auto): cards in one grid row
     // are stretched to the same height, so when one label wraps to two lines
     // and its neighbour's does not, both numbers still sit on one line (#926).
-    <div className={`${tileCardClass} flex flex-col`}>
+    <div className={`${kpiTileClass} flex flex-col`}>
       <p className={tileLabelClass}>{label}</p>
       <div className="mt-auto pt-1">
         {/* WHY flex-wrap and a real space after "about": two cards across a
@@ -104,7 +104,7 @@ export default function KpiCard({ label, displayValue, value, previousValue, spa
             number and "about" may sit on its own line, instead of running past
             the card's edge. */}
         <div className="flex flex-wrap items-baseline gap-x-2">
-          <p className="text-2xl font-semibold text-[var(--color-ink-900)]">
+          <p className="text-2xl font-semibold tabular-nums text-[var(--color-ink-900)]">
             {approximate && (
               <>
                 <span className="text-sm font-normal text-[var(--color-ink-500)]">about</span>{" "}

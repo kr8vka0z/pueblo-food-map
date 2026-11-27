@@ -89,7 +89,10 @@ function SubmissionCard({ item }: { item: PendingEventSubmission }) {
           <img
             src={`/api/admin/event-submissions/${encodeURIComponent(item.id)}/flyer`}
             alt={p ? `Flyer for ${p.name}` : "Flyer"}
-            className="h-auto w-full max-w-[160px] self-start rounded-[var(--radius-md)] border border-[var(--color-bone-200)]"
+            width={160}
+            height={208}
+            loading="lazy"
+            className="h-auto w-full max-w-[160px] self-start rounded-[var(--radius-sm)] border border-[var(--color-bone-200)]"
           />
         )}
         <div className="min-w-0 flex-1 space-y-2 text-sm text-[var(--color-ink-700)]">

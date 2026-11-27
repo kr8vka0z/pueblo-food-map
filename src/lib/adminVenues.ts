@@ -13,6 +13,7 @@ import type { AdminVenueRow } from "@/types/venue";
 import type { Venue } from "@/types/venue";
 import { validateAndMapRow, type VenueRow } from "@/lib/publishVenues";
 import { publishedVenues } from "@/data/published-venues";
+import { fieldLabel } from "@/lib/fieldLabels";
 
 // ─── #673: one status per place ─────────────────────────────────────────────
 
@@ -34,7 +35,7 @@ export const DISPLAY_STATUS_LABELS: Record<AdminDisplayStatus, string> = {
 export const DISPLAY_STATUS_KEY: ReadonlyArray<{ status: AdminDisplayStatus; description: string }> = [
   { status: "draft", description: "New, not on the public map yet." },
   { status: "live", description: "On the public map, exactly as shown." },
-  { status: "live_edits_waiting", description: "Approved or saved changes the map doesn't show until Publish." },
+  { status: "live_edits_waiting", description: "Approved or saved changes the map doesn’t show until Publish." },
   { status: "removed", description: "Taken off the map, kept for the record." },
 ];
 
@@ -179,25 +180,6 @@ export function summarizePublishChanges(rows: AdminVenueRow[]): PublishChangeSum
 
 // ─── #673 pt.3: the edit page's "Waiting to publish" box ───────────────────
 
-/** Human labels for the fields diffPublishedFields() below can report — the field-level "on the map now" -> "after you publish" list. */
-const FIELD_LABELS: Record<(typeof COMPARED_VENUE_FIELDS)[number], string> = {
-  name: "Name",
-  category: "Category",
-  lat: "Latitude",
-  lng: "Longitude",
-  address: "Address",
-  hours_weekly: "Hours",
-  hours_irregular: "Special hours",
-  accepts_snap: "SNAP/EBT",
-  accepts_wic: "WIC",
-  phone: "Phone",
-  email: "Email",
-  url: "Website",
-  notes: "Notes",
-  operator: "Operator",
-  source: "Source",
-};
-
 /** Renders one Venue field's value as plain text for a non-technical admin — never a raw JSON blob or `undefined`. */
 function formatFieldValue(field: string, value: unknown): string {
   // Checked BEFORE the generic "not set" fallback below: Venue.accepts_snap/
@@ -235,7 +217,7 @@ export function diffPublishedFields(row: AdminVenueRow, publishedVenue: Venue | 
     if (JSON.stringify(before[field]) === JSON.stringify(current[field])) continue;
     diffs.push({
       field,
-      label: FIELD_LABELS[field],
+      label: fieldLabel(field),
       onMapNow: formatFieldValue(field, before[field]),
       afterPublish: formatFieldValue(field, current[field]),
     });

@@ -8,7 +8,9 @@
  * attention", replacing the old "Needs help now" / "Gone quiet" lists and
  * status map). Filtering/sorting happen entirely in the browser on the
  * page's own already-fetched `entries` — at most a few dozen rows, so no
- * new query or URL state is worth the complexity (task spec).
+ * extra D1 query is needed; active filters are mirrored into the URL via
+ * `history.replaceState` and kept in sync with `useSearchParams()` so links
+ * and Back/Forward reproduce the exact view.
  *
  * "use client" (converted from a server component in #671): the filter bar
  * needs real interactive state. Same "table wrapped in overflow-x-auto, no
@@ -17,8 +19,9 @@
  * convention for this app's other admin table.
  */
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { NEEDS_HELP_STATUSES, type BoxHealthEntry, type BoxHealthStatus } from "@/lib/boxHealth";
 import type { BoxReviewSummary } from "@/lib/adminBoxes";
 import {
@@ -43,8 +46,16 @@ export interface AllBoxesTableProps {
   entries: BoxHealthEntry[];
   /** #677: this venue's pending photo/sponsor-request summary, keyed by venueId — grouped once by adminBoxes.ts's groupBoxReviewItems() from the tab's own already-fetched review queues. Optional/undefined is the same as "nothing to review anywhere" (no venue has an entry). */
   reviewByVenueId?: Record<string, BoxReviewSummary>;
-  /** #677: `?show=review` pre-selects the "To review" chip — set server-side from the URL (src/app/(site)/admin/boxes/page.tsx), never parsed client-side. Same convention as VenueListView's own initialShowReview (#674). */
+  /** #677: `?show=review` pre-selects the "To review" chip — set server-side from the URL (src/app/(site)/admin/boxes/page.tsx). */
   initialShowReview?: boolean;
+  /** Optional `?status=` value from the URL. */
+  initialStatusFilter?: string;
+  /** Optional `?sponsor=` value from the URL. */
+  initialSponsorFilter?: string;
+  /** Optional `?sort=` value from the URL. */
+  initialSort?: string;
+  /** Optional `?q=` search value from the URL. */
+  initialSearch?: string;
 }
 
 // One label/tag per status — a table row has room to spell the status out.
@@ -198,6 +209,9 @@ function ReviewCell({ summary }: { summary: BoxReviewSummary | undefined }) {
           <img
             src={`/api/admin/box-photos/${summary.photo.id}/preview`}
             alt=""
+            width={32}
+            height={32}
+            loading="lazy"
             className="h-8 w-8 flex-none rounded-[var(--radius-sm)] object-cover border border-[var(--color-bone-200)]"
           />
           <span className="text-xs font-medium text-[var(--color-ink-700)]">
@@ -214,22 +228,112 @@ function ReviewCell({ summary }: { summary: BoxReviewSummary | undefined }) {
   );
 }
 
-export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialShowReview = false }: AllBoxesTableProps) {
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialShowReview ? "review" : "all");
-  const [sponsorFilter, setSponsorFilter] = useState<SponsorFilter>("any");
-  const [sort, setSort] = useState<SortKey>("attention");
-  const [search, setSearch] = useState("");
+const VALID_BOX_STATUSES = new Set<string>(STATUS_FILTERS.map((f) => f.key));
+const VALID_BOX_SORTS = new Set<string>(SORT_OPTIONS.map((o) => o.key));
+
+function parseBoxStatus(initialShowReview: boolean, rawStatus?: string): StatusFilter {
+  if (initialShowReview) return "review";
+  if (rawStatus && VALID_BOX_STATUSES.has(rawStatus)) return rawStatus as StatusFilter;
+  return "all";
+}
+
+function parseBoxSponsor(raw?: string): SponsorFilter {
+  return raw === "has" || raw === "needs" ? raw : "any";
+}
+
+function parseBoxSort(raw?: string): SortKey {
+  return raw && VALID_BOX_SORTS.has(raw) ? (raw as SortKey) : "attention";
+}
+
+const EMPTY_REVIEWS: Record<string, BoxReviewSummary> = {};
+
+export default function AllBoxesTable({
+  entries,
+  reviewByVenueId = EMPTY_REVIEWS,
+  initialShowReview = false,
+  initialStatusFilter,
+  initialSponsorFilter,
+  initialSort,
+  initialSearch = "",
+}: AllBoxesTableProps) {
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() =>
+    parseBoxStatus(initialShowReview, initialStatusFilter),
+  );
+  const [sponsorFilter, setSponsorFilter] = useState<SponsorFilter>(() => parseBoxSponsor(initialSponsorFilter));
+  const [sort, setSort] = useState<SortKey>(() => parseBoxSort(initialSort));
+  const [search, setSearch] = useState(initialSearch);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  const searchParams = useSearchParams();
+  const searchKey = searchParams ? searchParams.toString() : null;
+  const prevSearchKey = useRef(searchKey);
+  const pendingWrittenSearch = useRef<string | null>(null);
+  const didInteract = useRef(false);
+
+  // Sync when client-side navigation changes the live URL query (e.g. clicking
+  // "Show them" -> /admin/boxes?show=review or the Blessing Boxes nav tab ->
+  // /admin/boxes after changing filters locally).
+  useEffect(() => {
+    if (!searchParams || searchKey === null || prevSearchKey.current === searchKey) return;
+    prevSearchKey.current = searchKey;
+    if (pendingWrittenSearch.current === searchKey) {
+      pendingWrittenSearch.current = null;
+      return;
+    }
+    pendingWrittenSearch.current = null;
+    didInteract.current = false;
+    setStatusFilter(parseBoxStatus(searchParams.get("show") === "review", searchParams.get("status") ?? undefined));
+    setSponsorFilter(parseBoxSponsor(searchParams.get("sponsor") ?? undefined));
+    setSort(parseBoxSort(searchParams.get("sort") ?? undefined));
+    setSearch(searchParams.get("q") ?? "");
+  }, [searchKey, searchParams]);
+
+  useEffect(() => {
+    if (!didInteract.current || typeof window === "undefined") return;
+    const params = new URLSearchParams();
+    if (statusFilter === "review") params.set("show", "review");
+    else if (statusFilter !== "all") params.set("status", statusFilter);
+    if (sponsorFilter !== "any") params.set("sponsor", sponsorFilter);
+    if (sort !== "attention") params.set("sort", sort);
+    if (search.trim()) params.set("q", search.trim());
+    const qs = params.toString();
+    const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+    if (`${window.location.pathname}${window.location.search}` !== nextUrl) {
+      pendingWrittenSearch.current = qs;
+      window.history.replaceState(null, "", nextUrl);
+    }
+  }, [statusFilter, sponsorFilter, sort, search]);
 
   // DESIGN.md "Empty states" step 3 / "Search and filter" step 6: Clear
   // filters clears the filters and the search words (not the sort). The
   // button unmounts once rows come back, so focus moves to the search box,
   // a control that stays.
   function clearFilters() {
+    didInteract.current = true;
     setStatusFilter("all");
     setSponsorFilter("any");
     setSearch("");
     searchRef.current?.focus();
+  }
+
+  function handleStatusFilter(next: StatusFilter) {
+    didInteract.current = true;
+    setStatusFilter(next);
+  }
+
+  function handleSponsorFilter(next: SponsorFilter) {
+    didInteract.current = true;
+    setSponsorFilter(next);
+  }
+
+  function handleSort(next: SortKey) {
+    didInteract.current = true;
+    setSort(next);
+  }
+
+  function handleSearch(next: string) {
+    didInteract.current = true;
+    setSearch(next);
   }
 
   const statusCounts = useMemo(() => {
@@ -240,14 +344,15 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
     return counts;
   }, [entries, reviewByVenueId]);
 
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    const matched = entries.filter(
+  const query = search.trim().toLowerCase();
+  const filtered = sortEntries(
+    entries.filter(
       (e) =>
         matchesStatus(e, statusFilter, reviewByVenueId) && matchesSponsor(e, sponsorFilter) && matchesSearch(e, query),
-    );
-    return sortEntries(matched, sort, reviewByVenueId);
-  }, [entries, statusFilter, sponsorFilter, search, sort, reviewByVenueId]);
+    ),
+    sort,
+    reviewByVenueId,
+  );
 
   if (entries.length === 0) {
     return (
@@ -268,15 +373,15 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
         {STATUS_FILTERS.map((filter) => {
           const count = statusCounts.get(filter.key) ?? 0;
           const isActive = statusFilter === filter.key;
-          const isDisabled = filter.key !== "all" && count === 0;
+          const isDisabled = filter.key !== "all" && count === 0 && !isActive;
           return (
             <button
               key={filter.key}
               type="button"
               aria-pressed={isActive}
               disabled={isDisabled}
-              onClick={() => setStatusFilter(filter.key)}
-              className={chipClass(isActive)}
+              onClick={() => handleStatusFilter(filter.key)}
+              className={`${chipClass(isActive)} tabular-nums`}
             >
               {filter.label} ({count})
             </button>
@@ -291,10 +396,11 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
           </label>
           <input
             ref={searchRef}
-            type="text"
+            type="search"
             id="boxes-search"
+            name="q"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearch(e.target.value)}
             placeholder="Search by name, address or sponsor"
             className={inputClass}
           />
@@ -306,7 +412,7 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
             legendClass={controlLabelClass}
             options={SPONSOR_OPTIONS}
             value={sponsorFilter}
-            onChange={(v) => setSponsorFilter(v === "has" || v === "needs" ? v : "any")}
+            onChange={(v) => handleSponsorFilter(v === "has" || v === "needs" ? v : "any")}
           />
         </div>
         <div>
@@ -315,8 +421,9 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
           </label>
           <select
             id="boxes-sort"
+            name="sort"
             value={sort}
-            onChange={(e) => setSort(e.target.value as SortKey)}
+            onChange={(e) => handleSort(e.target.value as SortKey)}
             className={inputClass}
           >
             {SORT_OPTIONS.map((option) => (
@@ -328,7 +435,7 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
         </div>
       </div>
 
-      <p aria-live="polite" className="mb-2 text-sm text-[var(--color-ink-500)]">
+      <p aria-live="polite" className="mb-2 text-sm tabular-nums text-[var(--color-ink-500)]">
         Showing {filtered.length} of {entries.length} {entries.length === 1 ? "box" : "boxes"}
       </p>
 
@@ -351,7 +458,7 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
           <table className="w-full min-w-[800px] text-left text-sm">
             <thead>
               <tr className={tableHeadRowClass}>
-                <th scope="col" className={`${tableHeadCellClass} min-w-[240px]`}>
+                <th scope="col" className={`${tableHeadCellClass} sticky left-0 z-10 min-w-[240px] bg-white shadow-[1px_0_0_var(--color-bone-200)] sm:static sm:shadow-none`}>
                   Box
                 </th>
                 <th scope="col" className={tableHeadCellClass}>
@@ -374,7 +481,7 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
                 const review = reviewByVenueId[entry.venueId];
                 return (
                   <tr key={entry.venueId} className={tableLinkRowClass} onClick={openRowLink}>
-                    <td className={tableCellClass}>
+                    <td className={`${tableCellClass} sticky left-0 z-10 bg-white shadow-[1px_0_0_var(--color-bone-200)] transition-colors duration-150 group-hover:bg-[var(--color-sage-100)] sm:static sm:bg-transparent sm:shadow-none sm:group-hover:bg-transparent`}>
                       {/* Box name IS the edit link (#671, same "name = edit link"
                           change #672 made to the Places tab) — the separate
                           trailing Edit column/link is gone. A click anywhere
@@ -390,7 +497,7 @@ export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialSh
                     <td className={tableCellClass}>
                       <span className={tagClass(badge.tone)}>{badge.label}</span>
                     </td>
-                    <td className={`${tableCellClass} whitespace-nowrap text-[var(--color-ink-700)]`}>{formatLastReport(entry)}</td>
+                    <td className={`${tableCellClass} whitespace-nowrap tabular-nums text-[var(--color-ink-700)]`}>{formatLastReport(entry)}</td>
                     {/* "Needs a sponsor" stays on one line; a list of names may wrap. */}
                     <td className={`${tableCellClass} text-[var(--color-ink-700)] ${entry.sponsors.length === 0 ? "whitespace-nowrap" : ""}`}>
                       {formatSponsors(entry.sponsors)}

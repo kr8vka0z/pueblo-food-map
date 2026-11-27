@@ -31,6 +31,7 @@ vi.mock("next/headers", () => ({
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 import PlacesPage from "@/app/(site)/admin/places/page";

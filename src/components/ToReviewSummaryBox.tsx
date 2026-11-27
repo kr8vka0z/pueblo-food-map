@@ -34,7 +34,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BULK_APPROVE_MAX_IDS, isDateOnlyUpdateProposal } from "@/lib/adminProposals";
 import type { ParsedProposal } from "@/lib/adminProposals";
-import { cardSlimClass, primaryButtonClass } from "@/lib/adminCardStyles";
+import { cardSlimClass, primaryButtonClass, secondaryButtonClass } from "@/lib/adminCardStyles";
 import AdminConfirm, { useAdminConfirm } from "@/components/AdminConfirm";
 
 export interface ToReviewSummaryBoxProps {
@@ -44,6 +44,8 @@ export interface ToReviewSummaryBoxProps {
   proposals: ParsedProposal[];
   /** #675: every pending public_submissions row's own count ("from the public"). */
   submissionCount: number;
+  /** Render the bulk-approve button as a quieter outline action when Publish owns the screen's single filled green button. */
+  secondaryAction?: boolean;
 }
 
 /** Bulk-approve's own local result state — mirrors ProposalsReviewView.tsx's original BulkApproveState exactly (same route, same response shape). */
@@ -53,7 +55,12 @@ type BulkApproveState =
   | { status: "done"; approved: number; skipped: number }
   | { status: "error"; message: string };
 
-export default function ToReviewSummaryBox({ reviewRowCount, proposals, submissionCount }: ToReviewSummaryBoxProps) {
+export default function ToReviewSummaryBox({
+  reviewRowCount,
+  proposals,
+  submissionCount,
+  secondaryAction = false,
+}: ToReviewSummaryBoxProps) {
   const router = useRouter();
   const [bulkState, setBulkState] = useState<BulkApproveState>({ status: "idle" });
   // On-page confirm (#926 decision 7): nothing is sent until its own
@@ -125,7 +132,7 @@ export default function ToReviewSummaryBox({ reviewRowCount, proposals, submissi
   return (
     <div className={cardSlimClass}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-[var(--color-ink-700)]">
+        <p className="text-sm font-semibold tabular-nums text-[var(--color-ink-700)]">
           {reviewRowCount} to review · {proposals.length} from the data refresh, {submissionCount} from the public
         </p>
         {dateOnlyIds.length > 0 && (
@@ -135,7 +142,7 @@ export default function ToReviewSummaryBox({ reviewRowCount, proposals, submissi
             hidden={asking}
             onClick={ask}
             disabled={submitting}
-            className={primaryButtonClass}
+            className={secondaryAction ? secondaryButtonClass : primaryButtonClass}
           >
             {`Approve ${allOrCount} date-only ${updatesWord}`}
           </button>

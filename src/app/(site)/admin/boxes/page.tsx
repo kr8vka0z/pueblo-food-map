@@ -28,13 +28,12 @@
  * "To review" column/chip/sort (#677).
  *
  * `?show=review` (same convention #674 established for /admin/places) pre-
- * selects the table's "To review" chip. AllBoxesTable's `initialShowReview`
- * prop only seeds its OWN internal `useState` on first mount — clicking
- * BoxesToReviewBox's "Show them" link navigates to this SAME route with a
- * new query, and React would otherwise keep the already-mounted
- * AllBoxesTable instance (and its stale filter state) rather than re-run
- * that initializer. The `key` below forces a remount exactly when `show`
- * flips, so "Show them" actually shows them.
+ * selects the table's "To review" chip, and filter/sort/search params
+ * (`status`, `sponsor`, `sort`, `q`) hydrate the initial view. AllBoxesTable
+ * mirrors interactive filter changes into the URL and subscribes to live
+ * `useSearchParams()` updates so same-route links (like BoxesToReviewBox's
+ * "Show them" or clicking the Blessing Boxes nav tab) always re-sync the
+ * table without remounting it.
  */
 
 import { headers } from "next/headers";
@@ -59,7 +58,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 export default async function BoxesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ show?: string }>;
+  searchParams?: Promise<{ show?: string; status?: string; sponsor?: string; sort?: string; q?: string }>;
 } = {}) {
   const now = new Date();
   // Window start for the 8-week chart — same boundary bucketCheckinsByWeek's
@@ -90,13 +89,17 @@ export default async function BoxesPage({
   const reviewByVenueId = groupBoxReviewItems(photos, adopters);
   const reviewingBoxCount = Object.keys(reviewByVenueId).length;
   const flaggedPhotosCount = photos.filter((p) => p.status === "flagged").length;
-  const { show } = searchParams ? await searchParams : {};
+  const { show, status, sponsor, sort, q } = searchParams ? await searchParams : {};
   const showReview = show === "review";
+  const boxesCountNote =
+    inServiceCount < boxHealthEntries.length
+      ? `${boxHealthEntries.length} total, ${inServiceCount} in service`
+      : `${inServiceCount} in service`;
 
   return (
-    <main className="min-h-screen bg-[var(--color-bone-50)]">
+    <div className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="boxes" counts={navCounts} showActivity={identity.isOwner === true} />
-      <div className={pageBodyClass}>
+      <main id="admin-main" tabIndex={-1} className={pageBodyClass}>
         <h2 className={pageTitleClass}>Blessing Boxes</h2>
 
         <BoxesToReviewBox
@@ -115,16 +118,18 @@ export default async function BoxesPage({
         </section>
 
         <section>
-          <h3 className={`${sectionTitleClass} mb-3`}>All boxes ({inServiceCount} in service)</h3>
-          {/* key forces a remount on `?show=review` — see this file's own header. */}
+          <h3 className={`${sectionTitleClass} mb-3`}>All boxes ({boxesCountNote})</h3>
           <AllBoxesTable
-            key={showReview ? "review" : "all"}
             entries={boxHealthEntries}
             reviewByVenueId={reviewByVenueId}
             initialShowReview={showReview}
+            initialStatusFilter={status}
+            initialSponsorFilter={sponsor}
+            initialSort={sort}
+            initialSearch={q}
           />
         </section>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

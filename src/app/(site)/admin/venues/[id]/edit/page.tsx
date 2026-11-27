@@ -104,6 +104,7 @@ import BoxCheckinsAdminPanel from "@/components/BoxCheckinsAdminPanel";
 import HostAlertsAdminPanel from "@/components/HostAlertsAdminPanel";
 import WaitingToPublishBox, { type WaitingToPublishChange } from "@/components/WaitingToPublishBox";
 import {
+  adminShellWidthClass,
   clayNoticeClass,
   formPageBodyClass,
   pageTitleClass,
@@ -371,62 +372,66 @@ export default async function EditVenuePage({
   const suggestionsVenue = suggestionItems.length > 0 ? toVenueLookup(venue) : null;
 
   return (
-    <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={identity.email} active="places" counts={navCounts} showActivity={identity.isOwner === true} />
-      <div className={formPageBodyClass}>
-        <h2 className={pageTitleClass}>Edit {venue.name}</h2>
-        {isBox && <BoxReviewBox photos={boxReview.photos} adopters={boxReview.adopters} />}
-        {suggestionItems.length > 0 && suggestionsVenue && (
-          <SuggestionsBox items={suggestionItems} venue={suggestionsVenue} />
-        )}
-        <WaitingToPublishBox changes={waitingToPublish} />
-        {linkHealthContext && (
-          <div className={clayNoticeClass}>
-            <p className="font-semibold">Reviewing a dead link</p>
-            <p className="mt-1">
-              {linkHealthContext.deadUrl
-                ? `The automated refresh couldn't reach ${linkHealthContext.deadUrl}${
-                    linkHealthContext.httpStatus ? ` (HTTP ${linkHealthContext.httpStatus})` : ""
-                  }.`
-                : "The automated refresh flagged this venue's link as unreachable."}{" "}
-              Update or remove the URL below, then save.
-            </p>
-            <Link href="/admin/places?show=review" className={`mt-1 ${tapLinkClass}`}>
-              Back to Places
-            </Link>
-          </div>
-        )}
-        <AddVenueForm
-          venueId={venue.id}
-          initialValues={mapVenueRowToFormValues(venue)}
-          proposalId={linkHealthContext?.proposalId}
-          expectedUpdatedAt={venue.updated_at}
-        />
-
-        {isBox && (
-          <>
-            <section className={sectionDividerClass}>
-              <h3 className={`mb-3 ${sectionTitleClass}`}>Check-ins</h3>
-              <BoxCheckinsAdminPanel checkins={boxCheckins} />
-            </section>
-            <section className={sectionDividerClass}>
-              <h3 className={`mb-3 ${sectionTitleClass}`}>Host alert emails</h3>
-              <HostAlertsAdminPanel venueId={venue.id} initialHosts={hostAlerts} />
-            </section>
-          </>
-        )}
-
-        {/* A removed place has nothing dangerous left to do: just the line, no heading. */}
-        <section className={sectionDividerClass}>
-          {venue.status !== "archived" && <h3 className={`mb-3 ${sectionTitleClass}`}>Danger zone</h3>}
-          <ArchiveVenueButton
+    <div className="min-h-screen bg-[var(--color-bone-50)]">
+      <AdminNav email={identity.email} active={isBox ? "boxes" : "places"} counts={navCounts} showActivity={identity.isOwner === true} />
+      <main id="admin-main" tabIndex={-1} className={adminShellWidthClass}>
+        <div className={formPageBodyClass}>
+          <h2 className={pageTitleClass}>Edit {venue.name}</h2>
+          {isBox && <BoxReviewBox photos={boxReview.photos} adopters={boxReview.adopters} />}
+          {suggestionItems.length > 0 && suggestionsVenue && (
+            <SuggestionsBox items={suggestionItems} venue={suggestionsVenue} />
+          )}
+          <WaitingToPublishBox changes={waitingToPublish} />
+          {linkHealthContext && (
+            <div className={clayNoticeClass}>
+              <p className="font-semibold">Reviewing a dead link</p>
+              <p className="mt-1">
+                {linkHealthContext.deadUrl
+                  ? `The automated refresh couldn’t reach ${linkHealthContext.deadUrl}${
+                      linkHealthContext.httpStatus ? ` (HTTP ${linkHealthContext.httpStatus})` : ""
+                    }.`
+                  : "The automated refresh flagged this venue’s link as unreachable."}{" "}
+                Update or remove the URL below, then save.
+              </p>
+              <Link href="/admin/places?show=review" className={`mt-1 ${tapLinkClass}`}>
+                Back to Places
+              </Link>
+            </div>
+          )}
+          <AddVenueForm
             venueId={venue.id}
-            venueName={venue.name}
-            alreadyArchived={venue.status === "archived"}
-            kind={isBox ? "box" : "place"}
+            initialValues={mapVenueRowToFormValues(venue)}
+            proposalId={linkHealthContext?.proposalId}
+            expectedUpdatedAt={venue.updated_at}
+            defaultReturnHref={isBox ? "/admin/boxes" : "/admin/places"}
           />
-        </section>
-      </div>
-    </main>
+
+          {isBox && (
+            <>
+              <section className={sectionDividerClass}>
+                <h3 className={`mb-3 ${sectionTitleClass}`}>Check-ins</h3>
+                <BoxCheckinsAdminPanel checkins={boxCheckins} />
+              </section>
+              <section className={sectionDividerClass}>
+                <h3 className={`mb-3 ${sectionTitleClass}`}>Host alert emails</h3>
+                <HostAlertsAdminPanel venueId={venue.id} initialHosts={hostAlerts} />
+              </section>
+            </>
+          )}
+
+          {/* A removed place has nothing dangerous left to do: just the line, no heading. */}
+          <section className={sectionDividerClass}>
+            {venue.status !== "archived" && <h3 className={`mb-3 ${sectionTitleClass}`}>Danger zone</h3>}
+            <ArchiveVenueButton
+              venueId={venue.id}
+              venueName={venue.name}
+              alreadyArchived={venue.status === "archived"}
+              kind={isBox ? "box" : "place"}
+              afterArchiveHref={isBox ? "/admin/boxes" : "/admin/places"}
+            />
+          </section>
+        </div>
+      </main>
+    </div>
   );
 }

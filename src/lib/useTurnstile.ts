@@ -168,6 +168,7 @@ export function useTurnstile(
   // waits forever (Kyle's phone, same night). An empty container is the
   // reliable sign; rebuild in whichever mode we're in.
   function reset() {
+    setError(false);
     setToken(null);
     if (!window.turnstile) return;
     if (!rebuildDeadWidget) {
@@ -229,7 +230,7 @@ export function useQueuedTurnstileSubmit<T>(
   token: string | null,
   submit: (values: T) => void,
   onTimeout: () => void,
-): { queued: boolean; queue: (values: T) => void } {
+): { queued: boolean; queue: (values: T) => void; cancel: () => void } {
   const [pending, setPending] = useState<T | null>(null);
 
   useEffect(() => {
@@ -258,5 +259,5 @@ export function useQueuedTurnstileSubmit<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the timer is per queued submit; onTimeout only calls stable setters.
   }, [pending]);
 
-  return { queued: pending !== null, queue: setPending };
+  return { queued: pending !== null, queue: setPending, cancel: () => setPending(null) };
 }

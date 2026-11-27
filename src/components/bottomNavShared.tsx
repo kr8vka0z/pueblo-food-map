@@ -88,6 +88,8 @@ export const ITEM_CLASS =
   // bar's inner edge, so the fill insets 1px more to land 4px in there too.
   "before:absolute before:inset-x-0 before:inset-y-1 2xl:before:inset-y-px before:-z-10 before:rounded-full " +
   "before:transition-colors before:duration-150 " +
+  "aria-[current]:before:bg-[var(--color-sage-50)] " +
+  "after:hidden aria-[current]:after:block after:absolute after:bottom-1.5 2xl:after:bottom-1 after:h-[3px] after:w-4 after:rounded-full after:bg-[var(--color-brand-navy)] " +
   "hover:before:bg-[var(--color-sage-100)] aria-pressed:hover:before:bg-transparent " +
   "disabled:cursor-default " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +

@@ -18,10 +18,10 @@ const es: Record<string, string> = {
 
   "meta.home.title": "Pueblo Food Map · Comida gratis, despensas y tiendas con SNAP en el Condado de Pueblo, CO", // [CHECK]
   "meta.home.description":
-    "Encuentra comida gratis y de bajo costo cerca de ti en el Condado de Pueblo, CO — despensas, huertos comunitarios, supermercados y comedores comunitarios, con información sobre SNAP/WIC y direcciones.", // [CHECK]
+    "Encuentra comida gratis y de bajo costo cerca de ti en el Condado de Pueblo, CO: despensas, huertos comunitarios, supermercados y comedores comunitarios, con información sobre SNAP/WIC y direcciones.", // [CHECK]
 
   // Search
-  "search.placeholder": "Buscar",
+  "search.placeholder": "Buscar lugares, despensas, SNAP…",
   "search.aria": "Buscar lugares",
 
   // Category labels (full)
@@ -57,10 +57,10 @@ const es: Record<string, string> = {
   "detail.close": "Cerrar",
   "detail.getDirections": "Cómo llegar",
   "detail.viewOnMap": "Ver en el mapa",
-  "detail.hours": "HORARIO",
-  "detail.contact": "CONTACTO",
-  "detail.about": "ACERCA DE",
-  "detail.sources": "FUENTES Y DATOS",
+  "detail.hours": "Horario",
+  "detail.contact": "Contacto",
+  "detail.about": "Acerca de",
+  "detail.sources": "Fuentes y datos",
   "detail.acceptsSnap": "Acepta SNAP",
   "detail.acceptsWic": "Acepta WIC",
   "detail.plentifulLink": "Ver horarios, elegibilidad y qué llevar en Plentiful",
@@ -75,7 +75,7 @@ const es: Record<string, string> = {
   "badge.opensAt": "Abre a las {time}",
   "badge.closesAt": "Cierra a las {time}",
   "badge.closedToday": "Cerrado hoy",
-  "badge.hoursUnknown": "Horario desconocido — llama antes",
+  "badge.hoursUnknown": "Horario desconocido, llama antes",
   "badge.snap": "SNAP",
   "badge.wic": "WIC",
 
@@ -208,7 +208,7 @@ const es: Record<string, string> = {
   "suggest.backToMap": "Volver al mapa",
   "suggest.success.title": "¡Gracias!",
   "suggest.success.body": "Tu sugerencia ha sido enviada. Revisamos todas las sugerencias y agregaremos los lugares verificados al mapa.",
-  "suggest.error.title": "Algo salió mal",
+  "suggest.error.title": "No se pudo enviar tu sugerencia",
   "suggest.error.body": "No se pudo enviar tu sugerencia. Por favor intenta de nuevo, o escríbenos directamente a suggestions@pueblofoodmap.com.",
   "suggest.error.retry": "Intentar de nuevo",
   "suggest.validation.nameRequired": "Por favor ingresa el nombre del lugar.",
@@ -224,7 +224,7 @@ const es: Record<string, string> = {
   // Feedback form (#116)
   "feedback.title": "Envíanos tu opinión",
   "feedback.documentTitle": "Enviar comentarios",
-  "feedback.subtitle": "Felicitaciones, reportes de problemas o ideas — queremos escucharte.",
+  "feedback.subtitle": "Felicitaciones, reportes de problemas o ideas. Queremos escucharte.",
   "feedback.type.label": "Tipo de comentario",
   "feedback.type.placeholder": "Selecciona un tipo",
   "feedback.type.positive": "Positivo / felicitación",
@@ -242,7 +242,7 @@ const es: Record<string, string> = {
   "feedback.backToMap": "Volver al mapa",
   "feedback.success.title": "¡Gracias!",
   "feedback.success.body": "Tu comentario ha sido enviado. Leemos cada mensaje y lo usamos para mejorar el mapa.",
-  "feedback.error.title": "Algo salió mal",
+  "feedback.error.title": "No se pudo enviar tu comentario",
   "feedback.error.body": "No se pudo enviar tu comentario. Por favor intenta de nuevo, o escríbenos directamente a feedback@pueblofoodmap.com.",
   "feedback.error.retry": "Intentar de nuevo",
   "feedback.validation.typeRequired": "Por favor selecciona un tipo de comentario.",
@@ -298,7 +298,7 @@ const es: Record<string, string> = {
   "report.backToMap": "Volver al mapa",
   "report.success.title": "¡Gracias!",
   "report.success.body": "Tu reporte ha sido enviado. Revisamos todos los envíos y actualizaremos el mapa cuando verifiquemos los cambios.",
-  "report.error.title": "Algo salió mal",
+  "report.error.title": "No se pudo enviar tu reporte",
   "report.error.body": "No se pudo enviar tu reporte. Por favor intenta de nuevo, o escríbenos directamente a issues@pueblofoodmap.com.",
   "report.error.retry": "Intentar de nuevo",
   "report.validation.issueTypeRequired": "Por favor selecciona un tipo de problema.",
@@ -311,7 +311,7 @@ const es: Record<string, string> = {
   "form.turnstile.error": "No pudimos verificar que eres humano. Por favor intenta de nuevo.",
 
   // Splash dialog (#162)
-  "splash.dialogLabel": "Bienvenido — encuentra comida cerca de ti",
+  "splash.dialogLabel": "Bienvenido: encuentra comida cerca de ti",
 
   // Map marker aria — short conversational labels (#162)
   "marker.category.pantry": "Despensa",
@@ -443,7 +443,7 @@ const es: Record<string, string> = {
   "shareEvent.another": "Compartir otro evento", // [CHECK]
   "shareEvent.success.title": "¡Gracias!", // [CHECK]
   "shareEvent.success.body": "Recibimos tu evento. Lo revisaremos y nos pondremos en contacto antes de que aparezca en el mapa.", // [CHECK]
-  "shareEvent.error.title": "Algo salió mal", // [CHECK]
+  "shareEvent.error.title": "No se pudo enviar tu evento", // [CHECK]
   "shareEvent.error.body": "No se pudo enviar tu evento. Por favor intenta de nuevo, o escríbenos a suggestions@pueblofoodmap.com.", // [CHECK]
   "shareEvent.error.retry": "Intentar de nuevo", // [CHECK]
   "shareEvent.error.rateLimit": "Demasiados eventos enviados desde esta dirección. Por favor intenta de nuevo en una hora.", // [CHECK]
@@ -463,7 +463,7 @@ const es: Record<string, string> = {
   "shareEvent.preview.live": "Se actualiza mientras escribes", // [CHECK]
   "shareEvent.preview.note": "Así se verá en el mapa cuando lo aprobemos.", // [CHECK]
   "shareEvent.preview.open": "Vista previa", // [CHECK]
-  "shareEvent.preview.sheetTag": "Vista previa — aún no está en el mapa", // [CHECK]
+  "shareEvent.preview.sheetTag": "Vista previa (aún no está en el mapa)", // [CHECK]
   "shareEvent.preview.back": "Volver a editar", // [CHECK]
 
   // External links (#162)
@@ -564,6 +564,9 @@ const es: Record<string, string> = {
   "footer.about": "Acerca de",
   "footer.privacy": "Privacidad",
   "footer.suggest": "Sugerir un lugar",
+  "footer.feedback": "Enviar comentarios", // [CHECK]
+  "footer.shareEvent": "Compartir un evento", // [CHECK]
+  "footer.boxActivity": "Actividad de cajas", // [CHECK]
   "footer.roadmap": "Ideas y novedades",
   "footer.venues": "Todos los lugares", // [CHECK]
   "footer.resources": "Programas de ayuda alimentaria",
@@ -574,7 +577,7 @@ const es: Record<string, string> = {
   "nav.venuesList": "Ver todos los lugares",
   "venues.heading": "Todos los recursos alimentarios",
   "venues.documentTitle": "Todos los recursos alimentarios",
-  "venues.intro": "Cada despensa, supermercado, huerto comunitario, granja y comedor del mapa — agrupados por tipo, con direcciones y horarios.",
+  "venues.intro": "Cada despensa, supermercado, huerto comunitario, granja y comedor del mapa, agrupados por tipo, con direcciones y horarios.",
   "venues.noHours": "Horario no disponible",
 
   // Map-wide data freshness (board review finding #2)
@@ -584,7 +587,7 @@ const es: Record<string, string> = {
   "osm.attribution": "Los datos de los lugares incluyen © colaboradores de OpenStreetMap", // [CHECK]
 
   // About page FAQ + stats (#PR4)
-  "about.stat.insecurity": "Según el estudio Map the Meal Gap de Feeding America (datos de 2023), aproximadamente 1 de cada 6 residentes del condado de Pueblo — cerca del 16.5% — vive con inseguridad alimentaria, incluyendo casi 1 de cada 5 niños.",
+  "about.stat.insecurity": "Según el estudio Map the Meal Gap de Feeding America (datos de 2023), aproximadamente 1 de cada 6 residentes del condado de Pueblo (cerca del 16.5%) vive con inseguridad alimentaria, incluyendo casi 1 de cada 5 niños.",
   "about.stat.count": "Pueblo Food Map incluye actualmente {count} de los recursos de alimentos gratuitos y de bajo costo que pueden ayudar.",
   "about.faq.heading": "Preguntas frecuentes",
   "about.faq.q1": "¿Es gratis usar Pueblo Food Map?",
@@ -667,15 +670,15 @@ const es: Record<string, string> = {
   "box.checkin.noteLabel": "Agrega una nota breve (opcional)", // [CHECK]
   "box.checkin.notePlaceholder.filled": "ej. La llené con sopa enlatada", // [CHECK]
   "box.checkin.notePlaceholder.problem": "ej. La puerta está rota", // [CHECK]
-  "box.checkin.submit": "Enviar", // [CHECK]
+  "box.checkin.submit": "Enviar nota", // [CHECK]
   "box.checkin.submitting": "Enviando…", // [CHECK]
   "box.checkin.cancel": "Cancelar", // [CHECK]
   "box.checkin.success.filled": "¡Gracias por surtirla!", // [CHECK]
-  "box.checkin.success.took": "Gracias — ¡disfrútalo!", // [CHECK]
+  "box.checkin.success.took": "¡Gracias, disfrútalo!", // [CHECK]
   "box.checkin.success.low": "Gracias por avisarnos.", // [CHECK]
   "box.checkin.success.empty": "Gracias por avisarnos.", // [CHECK]
-  "box.checkin.success.problem": "Gracias — ya avisamos al administrador.", // [CHECK]
-  "box.checkin.error": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+  "box.checkin.success.problem": "Gracias, ya avisamos al administrador.", // [CHECK]
+  "box.checkin.error": "No se pudo guardar tu registro. Por favor intenta de nuevo.", // [CHECK]
   "box.checkin.error.rateLimitVisitor": "Demasiadas visitas desde este dispositivo por ahora. Por favor intenta más tarde.", // [CHECK]
   "box.checkin.error.rateLimitBox": "Esta caja está recibiendo un número inusual de visitas en este momento. Por favor intenta más tarde.", // [CHECK]
   "box.checkin.turnstileFallbackPrompt": "Toca el recuadro de abajo para confirmar que eres una persona.", // [CHECK]
@@ -683,9 +686,9 @@ const es: Record<string, string> = {
   "box.needs.heading": "¿Qué te ayudaría la próxima vez?", // [CHECK]
   "box.needs.sub": "Toca las que quieras. Esto le dice a quienes donan qué traer.", // [CHECK]
   "box.needs.otherLabel": "¿Algo más? (opcional)", // [CHECK]
-  "box.needs.send": "Enviar", // [CHECK]
+  "box.needs.send": "Enviar artículos", // [CHECK]
   "box.needs.skip": "Omitir", // [CHECK]
-  "box.needs.success": "Recibido — ¡gracias!", // [CHECK]
+  "box.needs.success": "¡Recibido, gracias!", // [CHECK]
   "box.needs.canned_food": "Comida enlatada", // [CHECK]
   "box.needs.fresh_food": "Comida fresca", // [CHECK]
   "box.needs.bread": "Pan", // [CHECK]
@@ -706,10 +709,10 @@ const es: Record<string, string> = {
   "box.photo.unsupportedFormat": "Ese formato de foto no es compatible. Por favor intenta con un JPEG o PNG.", // [CHECK]
   "box.photo.previewAlt": "Vista previa de la foto seleccionada", // [CHECK]
   "box.photo.remove": "Quitar", // [CHECK]
-  "box.photo.send": "Enviar", // [CHECK]
+  "box.photo.send": "Enviar foto", // [CHECK]
   "box.photo.sending": "Enviando…", // [CHECK]
   "box.photo.success": "¡Gracias! Tu foto fue enviada para revisión.", // [CHECK]
-  "box.photo.error": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+  "box.photo.error": "No se pudo subir tu foto. Por favor intenta de nuevo.", // [CHECK]
 
   "box.photo.caption": "Foto · {time}", // [CHECK]
   "box.photo.altText": "Foto de {name}, compartida {time}", // [CHECK]
@@ -718,8 +721,9 @@ const es: Record<string, string> = {
   "box.photo.report": "Reportar esta foto", // [CHECK]
   "box.photo.reporting": "Reportando…", // [CHECK]
   "box.photo.reportConfirm": "¿Ocultar esta foto y enviarla para revisión?", // [CHECK]
-  "box.photo.reportThanks": "Gracias — esta foto se ha ocultado en espera de revisión.", // [CHECK]
-  "box.photo.reportError": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+  "box.photo.reportConfirmAction": "Ocultar foto", // [CHECK]
+  "box.photo.reportThanks": "Gracias. Esta foto se ha ocultado en espera de revisión.", // [CHECK]
+  "box.photo.reportError": "No se pudo ocultar esta foto. Por favor intenta de nuevo.", // [CHECK]
 
   "box.history.link": "Historial", // [CHECK]
 
@@ -746,7 +750,7 @@ const es: Record<string, string> = {
   "box.stats.noData": "—", // [CHECK]
   "box.stats.duration.hours": "{value} horas", // [CHECK]
   "box.stats.duration.days": "{value} días", // [CHECK]
-  "box.stats.honestyNote": "Estos números cuentan las visitas registradas, no cada visita real — por eso “usos” se ve más bajo que el tráfico real, a propósito.", // [CHECK]
+  "box.stats.honestyNote": "Estos números cuentan las visitas registradas, no cada visita real, por eso \"usos\" se ve más bajo que el tráfico real, a propósito.", // [CHECK]
   "box.stats.neverFilled": "Nunca surtida", // [CHECK]
   "box.stats.needLoveHeading": "Cajas que necesitan atención", // [CHECK]
   "box.stats.needLove.longestSinceFill": "Más tiempo sin surtirse", // [CHECK]
@@ -774,7 +778,10 @@ const es: Record<string, string> = {
   "box.alerts.submitting": "Enviando…", // [CHECK]
   "box.alerts.cancel": "Cancelar", // [CHECK]
   "box.alerts.success": "Revisa tu correo para confirmar.", // [CHECK]
-  "box.form.error.generic": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+  "box.form.error.generic": "No se pudo enviar tu solicitud. Por favor intenta de nuevo.", // [CHECK]
+  "box.form.validation.nameRequired": "Por favor ingresa tu nombre.", // [CHECK]
+  "box.form.validation.emailRequired": "Por favor ingresa tu correo electrónico.", // [CHECK]
+  "box.form.validation.emailInvalid": "Por favor ingresa un correo electrónico válido.", // [CHECK]
   "box.form.error.rateLimit": "Demasiados intentos por ahora. Por favor intenta más tarde.", // [CHECK]
 
   "box.sponsor.needsSponsor": "Esta caja necesita un patrocinador.", // [CHECK]
@@ -785,20 +792,21 @@ const es: Record<string, string> = {
 
   "alerts.confirm.heading": "Confirma tu correo", // [CHECK]
   "alerts.confirm.body": "Toca el botón de abajo para confirmar que quieres recibir estos correos.", // [CHECK]
-  "alerts.confirm.button": "Confirmar", // [CHECK]
+  "alerts.confirm.button": "Confirmar correo", // [CHECK]
+  "alerts.confirm.retry": "Intentar de nuevo", // [CHECK]
   "alerts.confirm.confirming": "Confirmando…", // [CHECK]
   "alerts.confirm.success": "¡Confirmado! Recibirás los correos descritos.", // [CHECK]
   "alerts.confirm.invalid": "Este enlace de confirmación ya no es válido.", // [CHECK]
-  "alerts.confirm.error": "Algo salió mal. Por favor intenta de nuevo.", // [CHECK]
+  "alerts.confirm.error": "No se pudo confirmar tu correo. Por favor intenta de nuevo.", // [CHECK]
   "alerts.stop.heading": "Correos detenidos", // [CHECK]
   "alerts.stop.stopping": "Deteniendo…", // [CHECK]
   "alerts.stop.body": "Ya no recibirás más correos sobre esto.", // [CHECK]
   "alerts.stop.invalid": "Este enlace ya no es válido.", // [CHECK]
   "alerts.stop.noscriptButton": "Detener estos correos", // [CHECK]
-  "alerts.stop.undoButton": "Fue un error — vuelve a activar los correos", // [CHECK]
+  "alerts.stop.undoButton": "Fue un error: vuelve a activar los correos", // [CHECK]
   "alerts.stop.undoing": "Reactivando…", // [CHECK]
   "alerts.stop.undone": "Vuelves a estar en la lista.", // [CHECK]
-  "alerts.stop.undoError": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+  "alerts.stop.undoError": "No se pudieron volver a activar los correos. Por favor intenta de nuevo.", // [CHECK]
   "email.adoptConfirm.subject": "Confirma tu solicitud para patrocinar {box}", // [CHECK]
   "email.adoptConfirm.line1": "Gracias por solicitar patrocinar {box}. Confirma tu correo para terminar tu solicitud.", // [CHECK]
   "email.adoptConfirm.line2": "Un administrador revisará tu solicitud una vez que confirmes.", // [CHECK]

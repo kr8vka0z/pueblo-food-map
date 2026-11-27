@@ -47,6 +47,7 @@
 import { useEffect, useRef } from "react";
 import { t, type Locale } from "@/lib/i18n";
 import { useOverlayRegistration } from "@/lib/overlayRegistry";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 export interface PhotoViewerProps {
   /** Image URL, passed straight to the <img src>. */
@@ -150,7 +151,7 @@ export default function PhotoViewer({ src, alt, caption, open, onClose, locale }
             type="button"
             onClick={onClose}
             aria-label={t("detail.close", locale)}
-            className="absolute right-4 top-4 flex h-12 w-12 items-center justify-center rounded-full bg-[rgba(255,255,255,0.12)] text-2xl leading-none text-[var(--color-bone-50)] hover:bg-[rgba(255,255,255,0.2)]"
+            className={`absolute right-4 top-4 flex h-12 w-12 items-center justify-center rounded-full bg-[rgba(255,255,255,0.12)] text-2xl leading-none text-[var(--color-bone-50)] hover:bg-[rgba(255,255,255,0.2)] ${PRESS_FEEDBACK} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-bone-50)] focus-visible:ring-offset-2 focus-visible:ring-offset-black`}
           >
             ×
           </button>
@@ -158,6 +159,7 @@ export default function PhotoViewer({ src, alt, caption, open, onClose, locale }
           <img
             src={src}
             alt={alt}
+            decoding="async"
             onClick={(e) => e.stopPropagation()}
             className="max-h-[calc(100dvh-6rem)] max-w-full object-contain"
           />

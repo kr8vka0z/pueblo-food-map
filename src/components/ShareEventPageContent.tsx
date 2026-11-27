@@ -22,7 +22,7 @@ export default function ShareEventPageContent() {
     <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>
       <PageNav locale={locale} />
       <div className="flex-1 w-full max-w-5xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-normal text-[var(--color-ink-900)] mb-1" style={{ fontFamily: "var(--font-display)" }}>
+        <h1 className="text-2xl font-normal text-balance text-[var(--color-ink-900)] mb-1" style={{ fontFamily: "var(--font-display)" }}>
           {t("shareEvent.title", locale)}
         </h1>
         <p className="text-sm text-[var(--color-ink-500)] mb-6 max-w-lg">{t("shareEvent.subtitle", locale)}</p>

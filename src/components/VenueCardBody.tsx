@@ -211,7 +211,7 @@ export default function VenueCardBody({
             href="https://pueblofoodproject.org/"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
+            className="font-semibold text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
           >
             {venue.operator}
           </a>

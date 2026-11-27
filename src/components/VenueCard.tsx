@@ -36,7 +36,7 @@ export default function VenueCard({
   const Heading = `h${headingLevel}` as "h2" | "h3" | "h4";
 
   return (
-    <li>
+    <li style={{ contentVisibility: "auto", containIntrinsicSize: "auto 96px" }}>
       <button
         type="button"
         onClick={onClick}
@@ -44,8 +44,8 @@ export default function VenueCard({
           "group flex w-full items-start gap-3 px-4 py-3 text-left transition-colors duration-150 " +
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
           (isSelected
-            ? "bg-[var(--color-sage-50)] border-l-[3px] border-[var(--color-sage-500)]"
-            : "border-l-[3px] border-transparent hover:bg-[var(--color-sage-100)]")
+            ? "bg-[var(--color-sage-50)]"
+            : "hover:bg-[var(--color-sage-100)]")
         }
         style={{ minHeight: 96 }}
         aria-current={isSelected ? "true" : undefined}
@@ -59,7 +59,12 @@ export default function VenueCard({
 
         {/* Main content */}
         <span className="flex-1 min-w-0">
-          <Heading className="block text-base font-semibold text-[var(--color-ink-700)] leading-snug mb-0.5">
+          <Heading
+            className={
+              "block text-base leading-snug mb-0.5 " +
+              (isSelected ? "font-bold text-[var(--color-ink-900)]" : "font-semibold text-[var(--color-ink-700)]")
+            }
+          >
             {venue.name}
           </Heading>
           <span className="block text-sm text-[var(--color-ink-400)] group-hover:text-[var(--color-ink-500)] truncate mb-1.5">

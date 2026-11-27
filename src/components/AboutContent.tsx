@@ -27,6 +27,7 @@ import { formatPublishedDate } from "@/lib/dataFreshness";
 import { ABOUT_FAQ_COUNT, faqItemsFor } from "@/lib/faqItems";
 import SiteFooter from "@/components/SiteFooter";
 import FaqList from "@/components/FaqList";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 
 interface AboutContentProps {
@@ -67,7 +68,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
       {/* Page content */}
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8 space-y-8">
         <h1
-          className="text-3xl font-normal text-[var(--color-ink-900)]"
+          className="text-3xl font-normal text-balance text-[var(--color-ink-900)]"
           style={{ fontFamily: "var(--font-display)" }}
         >
           {t("about.heading", locale)}
@@ -87,7 +88,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
         </section>
 
         {/* Context stat — why the map matters + current coverage (approved copy, PR4 S8) */}
-        <div className="border-l-2 border-[var(--color-sage-500)] pl-4 space-y-2">
+        <div className="rounded-[var(--radius-lg)] bg-[var(--color-bone-100)] p-4 space-y-2">
           <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
             {t("about.stat.insecurity", locale)}
           </p>
@@ -154,7 +155,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
           {t("about.contact.body", locale)}{" "}
           <a
             href={`mailto:${SITE_CONTACT_EMAIL}`}
-            className="underline text-[var(--color-sage-700)] hover:text-[var(--color-sage-600)]"
+            className="underline text-[var(--color-sage-700)] hover:text-[var(--color-sage-600)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
           >
             {SITE_CONTACT_EMAIL}
           </a>
@@ -175,9 +176,10 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
           <Link
             href="/suggest"
             className={
-              "inline-block px-4 py-2 text-sm font-medium rounded " +
+              "inline-flex items-center justify-center min-h-12 px-4 text-sm font-medium rounded-[var(--radius-md)] " +
               "bg-[var(--color-sage-600)] text-white " +
               "hover:bg-[var(--color-sage-700)] transition-colors " +
+              PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 " +
               "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
             }

@@ -7,6 +7,7 @@
  */
 
 import type { FaqItem } from "@/lib/faqItems";
+import LinkifyText from "@/components/LinkifyText";
 
 export default function FaqList({
   id,
@@ -28,7 +29,9 @@ export default function FaqList({
             <h3 className="text-base font-semibold text-[var(--color-ink-700)] mb-1">
               {item.question}
             </h3>
-            <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">{item.answer}</p>
+            <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
+              <LinkifyText text={item.answer} />
+            </p>
           </div>
         ))}
       </div>

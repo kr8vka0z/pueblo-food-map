@@ -170,9 +170,8 @@ function DesktopSidePanelShell({
         "bg-[var(--color-bone-50)] " +
         "rounded-[var(--radius-lg)] " +
         "border border-[var(--color-bone-200)] " +
-        // Same heavy hand-written shadow DesktopVenueWindow used to lift a
-        // floating card off the map surface (DESIGN.md).
-        "shadow-[0_8px_32px_rgba(0,0,0,0.18)] " +
+        // Elevation-2 token lifts the floating panel off the map surface (#957).
+        "elevation-2 " +
         "overflow-hidden"
       }
       style={{

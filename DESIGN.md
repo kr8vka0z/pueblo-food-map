@@ -335,7 +335,7 @@ Every hex here is copied from `@theme`. Ratios are measured against the real bac
 - `bone-50` `#FBFAF6`: the paper every page sits on.
 - `bone-100` `#F4F1EA`: resting chips, the loading block, the location help card, the status pill without a photo, the admin's quiet tags. It is no longer a hover fill anywhere (that is sage 100, R1).
 - `bone-200` `#E8E3D6`: card borders, dividers, the ended event badge.
-- `bone-300` `#D4CDB8`: edges of the search bar, bottom bar and outline buttons at rest (1.5 to 1, decoration only: the words carry the control). It is also the public text-box edge, which fails (see Known drift); admin text boxes use ink 400.
+- `bone-300` `#D4CDB8`: edges of the search bar, bottom bar and outline buttons at rest (1.5 to 1, decoration only: the words carry the control). Both public and admin text boxes use `ink-400` (#926, #959).
 
 **Ink is the words.** Warm charcoal.
 
@@ -989,7 +989,7 @@ A pattern is a job that comes up on many pages and uses several components. Word
 |---|---|---|
 | Back to map | Volver al mapa | Top bar of every inside page |
 | Know a food resource we're missing? Tell us about it. | ¿Conoces un recurso alimentario que nos falta? Cuéntanos. | Under Suggest a place |
-| `Compliments, bug reports, or feature ideas — we want to hear it.` | `Felicitaciones, reportes de problemas o ideas — queremos escucharte.` | Under Send us feedback (breaks the no-long-dash rule) |
+| Compliments, bug reports, or feature ideas. We want to hear from you. | Felicitaciones, reportes de problemas o ideas. Queremos escucharte. | Under Send us feedback |
 | Help us keep this information accurate. | Ayúdanos a mantener esta información actualizada. | Under Report an issue |
 
 - **Don't:** a hero picture and two columns. Pictures cost slow phones data, and a second column fights the map for room.
@@ -1025,9 +1025,9 @@ A pattern is a job that comes up on many pages and uses several components. Word
 - **Screens:** public Suggest a place, Send us feedback, Report an issue, Share an event; admin Add a venue, a place's edit page, Add event, Edit event.
 - **Steps:**
   1. One box per thing, label above it; "(optional)" in the label, a red star on required ones.
-  2. Public forms check on send; each problem shows under its box and focus moves to the first.
-  3. The send button says what it sends, reads Verifying… while the human check runs and Sending… while it sends, and can't be pressed twice.
-  4. Sent: the form is replaced by Thank you! and what happens next, with Back to map.
+  2. Public forms check on blur and on send; each problem shows with an alert icon under its box and focus moves to the first on send.
+  3. The send button says what it sends, queues taps if the human check is still loading, reads Sending… while it sends, and can't be pressed twice.
+  4. Sent: the form is replaced by an animated success tick (static with reduced motion), Thank you! and what happens next, with Back to map.
   5. Failed: a red box at the top, everything typed stays, Try again under the send button.
   6. Admin: Cancel beside Save, a third of the row, on every form. It saves nothing and goes where Save would land: Places (or the To review list when a place's form was opened from a review), or Events from the event form. While a save runs Cancel is off, so nobody leaves while the save still lands.
   7. Admin, someone else saved first: the red box says so and offers Reload; nothing typed is cleared until Reload.
@@ -1064,10 +1064,10 @@ A pattern is a job that comes up on many pages and uses several components. Word
 |---|---|---|
 | Please enter a place name. | Por favor ingresa el nombre del lugar. | Under an empty Place name |
 | Please enter a valid email address. | Por favor ingresa un correo electrónico válido. | Under an email box |
-| Something went wrong | Algo salió mal | Title of the red box on public forms (vague: breaks a rule) |
+| Couldn't send your suggestion | No se pudo enviar tu sugerencia | Title of the red box on Suggest a place (each form names what failed) |
 | Your suggestion couldn't be sent. Please try again, or email us directly at suggestions@pueblofoodmap.com. | No se pudo enviar tu sugerencia. Por favor intenta de nuevo, o escríbenos directamente a suggestions@pueblofoodmap.com. | Under it |
 | Too many submissions from this address. Please try again in an hour. | Demasiados envíos desde esta dirección. Por favor intenta de nuevo en una hora. | Too many sends |
-| `Couldn't verify you're human — please retry.` | No pudimos verificar que eres humano. Por favor intenta de nuevo. | Under the human check (long dash in English) |
+| Couldn't verify you're human. Please try again. | No pudimos verificar que eres humano. Por favor intenta de nuevo. | Under the human check |
 | Map unavailable | Mapa no disponible | Over the list when the map can't load |
 | The interactive map can't load on this device, so we're showing the list instead. | El mapa interactivo no se puede cargar en este dispositivo, así que mostramos la lista. | Under it |
 | Map needs a connection | El mapa necesita conexión | Offline, with "The list still works." |
@@ -1137,8 +1137,8 @@ A pattern is a job that comes up on many pages and uses several components. Word
 
 ### Confirming a risky action
 
-- **When:** the action changes what the public sees or can't easily be undone (taking a place off the map, publishing, hiding a photo). Live as is on the admin (#926, the On-page confirm entry).
-- **Screens:** every admin site asks on the page: Remove from map, Archive this venue on a change card, Publish, Approve all date-only updates, Archive event, Remove this flyer. The one browser pop-up left is on the public site, a box photo's report (Known drift).
+- **When:** the action changes what the public sees or can't easily be undone (taking a place off the map, publishing, hiding a photo). Live as is on both admin (#926) and public (#959).
+- **Screens:** every admin site and public box-photo report asks on the page: Remove from map, Archive this venue on a change card, Publish, Approve all date-only updates, Archive event, Remove this flyer, and Report this photo (`src/components/ReportPhotoButton.tsx`).
 - **Steps:**
   1. The first tap opens the confirm right where the button was, on the page. Never the browser's pop-up.
   2. It names the thing and says exactly what happens and what doesn't.
@@ -1164,7 +1164,7 @@ A pattern is a job that comes up on many pages and uses several components. Word
 | Remove this flyer? | Remove, under an event's flyer (`src/components/EventFlyerField.tsx`) |
 | The event stays. Only the picture is removed. | Under it; then Cancel and Remove flyer (Removing…) |
 | Cancel | The safe button, always first |
-| Hide this photo and send it for review? (¿Ocultar esta foto y enviarla para revisión?) | Public, reporting a box photo; still a browser pop-up (`src/components/ReportPhotoButton.tsx`) |
+| Hide this photo and send it for review? (¿Ocultar esta foto y enviarla para revisión?) | Public, reporting a box photo; on-page confirm with Cancel first and red Hide photo second (`src/components/ReportPhotoButton.tsx`, #959) |
 
 - **Don't:** "Are you sure? Yes / No." Nobody knows what Yes does, and the risky button comes first.
 
@@ -1205,7 +1205,7 @@ A pattern is a job that comes up on many pages and uses several components. Word
 
 | English | Spanish | Where |
 |---|---|---|
-| Search | Buscar | Grey words in the empty box |
+| Search places, pantries, SNAP… | Buscar lugares, despensas, SNAP… | Grey words in the empty box |
 | Search places | Buscar lugares | The box's name for screen readers |
 | 3 places match | 3 lugares coinciden | Over the matches as you type |
 | See all 3 matches as a list | Ver los 3 resultados en una lista | Under the matches |
@@ -1293,7 +1293,7 @@ A pattern is a job that comes up on many pages and uses several components. Word
 |---|---|---|
 | Near me · Saved · Boxes · Help · Menu | Cercanos · Guardados · Cajas · Ayuda · Menú | The bottom bar |
 | Open now | Abierto ahora | A place card's hours line |
-| `Hours unknown — call ahead` | `Horario desconocido — llama antes` | A place with no known hours (long dash: breaks a rule) |
+| Hours unknown, call ahead | Horario desconocido, llama antes | A place with no known hours |
 | Link copied | Enlace copiado | After Share |
 | Language / Idioma | Language / Idioma | The Menu row, the same in both on purpose |
 | Ver en español → | Ver en español → | The Menu, for an English-page visitor who picked Spanish |
@@ -1402,9 +1402,8 @@ One ladder for everything that floats over the map, lowest first. A new floating
 | 1100 / 1101 | The location help card; the Share an event preview sheet's backdrop and sheet | `src/components/LocationHelpCard.tsx`, `src/components/ShareEventForm.tsx` |
 | 9000 | The welcome screen | `src/components/SplashScreen.tsx`, `src/app/(site)/HomePageClient.tsx` |
 | 9500 | The guided tour, over everything once the welcome screen is gone | `src/components/GuidedTour.tsx` |
+| 9600 | Home page skip links when focused (#957) | `src/components/HomeShell.tsx` |
 | top layer | The photo viewer: a native `<dialog>` with `showModal()`, above every number by design | `src/components/PhotoViewer.tsx` |
-
-Not checked: the home page's skip links take `z-50` when focused (`src/components/HomeShell.tsx:84`), under the search bar's 1000; whether the bar ever covers them hasn't been looked at in a browser.
 
 ## Live surfaces not on shared parts
 
@@ -1433,51 +1432,40 @@ Where the live code differs from the rules above. Fix an item when you're in its
 
 - Map pins do not use CSS `filter: drop-shadow()`: the shadow is drawn in the SVG (`src/components/PinShadow.tsx`, #722).
 - Submit buttons are not `h-11`: public send buttons are 48 tall, and so is every admin button (#926; the admin's short set is gone).
-- There is not one field style: there are four copies of the same look: `INPUT_BASE` in `src/components/PublicForm.tsx:33-42`, the admin's `inputBase` in `src/components/formClasses.ts` (48 tall with an `ink-400` edge since #926, so it no longer matches the public copies), `SELECT_CLASS` in `src/components/BoxNumbersPanel.tsx:37`, and the inline field classes in `src/components/AdoptBoxForm.tsx:177` and `src/components/BoxAlertSignupForm.tsx:162`.
+- There is not one shared field class across admin and public, though all four now share the 48-pixel height and `ink-400` border (#926, #959): `INPUT_BASE` in `src/components/PublicForm.tsx`, the admin's `inputBase` in `src/components/formClasses.ts`, `SELECT_CLASS` in `src/components/BoxNumbersPanel.tsx`, and the inline field classes in `src/components/AdoptBoxForm.tsx` and `src/components/BoxAlertSignupForm.tsx`.
 - The bottom bar's icons are not 24 and 20: `ICON_CLASS = "shrink-0 size-6 2xl:size-5"` (`src/components/bottomNavShared.tsx:86`) measures 32 on phones and 24 on large screens (the spacing trap; its own comment says 24), and the large-screen bar sits 32 up (`2xl:bottom-6`) where the spec says 24.
 - Two colored edge stripes break the no-stripes rule: today's line in the hours (`src/components/HoursList.tsx`) and the location help card's top band (`src/components/LocationHelpCard.tsx`). The Hours list entry shows them as live; whether to keep them is not decided. The monospace times in the hours list stay.
 - Code comments that point to parts of this file that are gone: "DESIGN.md Forms > Submit" (now Public form fields and buttons) in `scripts/check-banned.mjs:27`; the `filtersButton` component token (now `buttonPrimary` and `switchOn`) in `src/components/RouteStrip.tsx:50`. Also `src/components/EventCardBody.tsx:39` says the action button shows on ended or cancelled cards; the code at `:412` hides it there.
 
-**The spacing trap, live:** `size-6` 32 (`src/components/bottomNavShared.tsx:86`); `h-5 w-5` 24 for route step icons and arrows (`src/components/DirectionButtons.tsx:227`, `:357`); `w-8 h-8` 48 for the Donate heart's circle (`src/components/HamburgerMenuContent.tsx:238`); `h-10` 64 for the thank-you's Back to map (`src/components/PublicForm.tsx:233`); `px-5 pt-5` 24 for the place card's padding (`src/components/VenueCardBody.tsx`).
+**The spacing trap, live:** `size-6` 32 (`src/components/bottomNavShared.tsx:86`); `h-5 w-5` 24 for route step icons and arrows (`src/components/DirectionButtons.tsx:227`, `:357`); `w-8 h-8` 48 for the Donate heart's circle (`src/components/HamburgerMenuContent.tsx:238`); `px-5 pt-5` 24 for the place card's padding (`src/components/VenueCardBody.tsx`).
 
 **Under the 48-pixel floor:**
 
 - Place pins tap at 44: `MIN_HIT_SIZE = 44` (`src/components/VenueMarker.tsx:42`).
-- See all matches row 46 (`src/components/SearchResultsPopover.tsx:242`).
 - Route strip: Clear walking route and Show card about 32 (`src/components/RouteStrip.tsx:112`), Steps 36 (`:122`), the steps sheet's × 36 by 36 (`:306-308`).
 - The event strip's "+2" is `min-w-9`, 36 wide, under 360 (`src/components/EventStrip.tsx:100`).
-- Public fields about 42 tall on a phone, 38 on a computer (`src/components/PublicForm.tsx:33`); the box period select about 42 (`src/components/BoxNumbersPanel.tsx:34-38`). Admin fields are 48 (#926).
-- Checkboxes: the phone's own 16-pixel box with a row about 20 tall (`src/components/SuggestForm.tsx:36`). Admin tick boxes are 20 pixels in 48-tall rows (#926).
-- All places name links about 24 tall, no `min-h-12` (`src/components/VenuesDirectoryContent.tsx:127-133`).
-- Not found button 40 tall (`src/components/NotFoundContent.tsx:47`); on a 360 phone its padding (`p-8` 48 and `p-6` 32, `:33-34`) leaves the words about 200 wide.
 
 **Contrast fails:**
 
-- The public text-box edge, `bone-300` on white, 1.6 to 1 where an edge needs 3 to 1: `src/components/PublicForm.tsx:81`, `src/components/BoxNumbersPanel.tsx`, the box card forms. The admin's text boxes moved to `ink-400` (5.9 to 1) in #926; the public forms were outside that work, so the two now differ.
 - A Filters switch that's off, `bone-300` on bone 50, 1.5 to 1 (`src/components/FilterPanel.tsx:139`).
-- Orange keyboard rings, 2.2 to 1 on bone 50 (`src/components/FilterPanel.tsx:453`, `src/components/SplashScreen.tsx:218`, `:243`). The admin's Add place now takes the green ring.
 - Box status words on `bone-100` (the pill without a photo): Stocked 4.4 to 1, Running low just under 4.5 (`src/components/BoxCardBody.tsx:184`, `src/lib/blessingBoxes.ts:430-436`).
 
 **Off the scales:**
 
 - Type: 13, 15 and 18 pixels written by hand on the location help card (`src/components/LocationHelpCard.tsx:154-193`); two title sizes for one job (`text-3xl` in `src/components/AboutContent.tsx:70`, `text-2xl` in `src/components/SuggestPageContent.tsx:33` and `src/components/VenueContent.tsx:121`); the box card forms' 12-pixel labels (`src/components/AdoptBoxForm.tsx:166`) and the period box's 12-pixel label.
 - Corners: plain `rounded` (4 pixels) on small things on the public pages (none left in the admin since #926); `rounded-[14px]` by hand; `rounded-t-[20px]` on the share preview sheet (`src/components/ShareEventForm.tsx:552`).
-- Shadows: black-based shadows by hand on the side panel (`0 8px 32px rgba(0,0,0,0.18)`, `src/components/DesktopSidePanel.tsx:175`), the Menu (22% and 18%, `src/components/HamburgerMenu.tsx:290`, `:315`) and Filters (22%, `src/components/FilterPanel.tsx:304`); the share preview backdrop at 45% (`src/components/ShareEventForm.tsx:548`). The Menu panel is also `white` and, as a dropdown, an 8-pixel radius.
+- Shadows: black-based shadows by hand on the Menu (22% and 18%, `src/components/HamburgerMenu.tsx:290`, `:315`) and Filters (22%, `src/components/FilterPanel.tsx:304`); the share preview backdrop at 45% (`src/components/ShareEventForm.tsx:548`). The Menu panel is also `white` and, as a dropdown, an 8-pixel radius.
 - Motion: the phone sheet's open, close and grab-bar moves are the browser's smooth scroll, whose speed and curve no token sets (`src/components/ScrollSheet.tsx`, #923).
 - Two sheet systems: the phone card is the native scroll sheet, but while a walking route is on it is still the vaul drawer, with vaul's own drag and 0.5 s slide (`src/components/BottomSheet.tsx`), until the route strip moves too (#923).
 - Motion: of the four motion tokens only `--ease-out-circ` is used by name, by the switches, side panels and sliders (`src/app/globals.css:96-99`); live color changes are `duration-150` (some 100, the side-panel shift 300) on Tailwind's default curve `cubic-bezier(0.4, 0, 0.2, 1)`.
 
 **Other:**
 
-- The keyboard sees only the browser's outline on box activity's Previous and Next.
 - The event page draws its own copy of the flyer (`src/components/EventPage.tsx:124-145`) instead of `src/components/EventFlyer.tsx`.
-- The browser's own `window.confirm` still asks on the public site, when someone reports a box photo (`src/components/ReportPhotoButton.tsx:29`). The admin has none left (#926); the public pop-up was outside that work.
 - The admin's list filters are not in the address: the Blessing Boxes status chips, Sponsor slider and search, and the Places chips once pressed, are lost on a refresh and can't be shared (only the Dashboard period and the Activity filters are kept). Left out of #926 on purpose; the same open question as the public view (Search and filter).
 - Two different things on the event form say Cancel: the Cancel link beside Save (leave the form, save nothing) and the red Cancel event in Danger zone (mark the event cancelled). They sit apart, but the words are the same.
 - Admin words that don't yet say what to do: "Visitor numbers are unavailable right now." and "Usage numbers are unavailable right now." on the Dashboard have no Try again.
-- Admin pages still carry the public browser-tab title, `Pueblo Food Map — Food Resources in Pueblo County, CO` (`ROOT_METADATA`, `src/lib/site.ts`), long dash included, on every admin page. `buildPageMetadata` in the same file always adds a canonical link and share-image tags, which an admin page must not get, so the admin can't use it as it is; a fix needs a change to that public file.
+- Admin pages still carry the public browser-tab title (`ROOT_METADATA`, `src/lib/site.ts`) on every admin page. `buildPageMetadata` in the same file always adds a canonical link and share-image tags, which an admin page must not get, so the admin can't use it as it is; a fix needs a change to that public file.
 - The date box's built-in calendar button (the admin's `type="date"` boxes, such as Activity's From and To) shows the browser's own outline when reached by keyboard, not the green ring.
 - Two lists of field names: Waiting to publish takes its own from `src/lib/adminVenues.ts` ("SNAP/EBT", "Special hours", "WIC"), while every other admin place that names a field uses `src/lib/fieldLabels.ts` ("Accepts SNAP", "Monthly hours", "Accepts WIC").
 - The link preview image (`public/og-image.png`) runs the word Map past the cream half onto the green map under a pin, and has a gradient stripe along its top: it breaks two logo rules.
-- The About page's mission sentence has a long dash; the brand note uses a comma there.
-- Live words that break the wording rules (vague or a long dash), not rewritten: `Something went wrong` (`src/lib/i18n.ts`, the public forms' red box title and the box alert pages); long dashes in the Send us feedback line, `Couldn't verify you're human — please retry.` and `Hours unknown — call ahead` (both languages). The admin's messages were rewritten in #926: none says "Something went wrong" or uses a long dash.

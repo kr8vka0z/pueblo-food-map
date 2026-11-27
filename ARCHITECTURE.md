@@ -1761,7 +1761,7 @@ it a draft and publishes it.
   action button and Get directions are faded non-links until there is a link /
   an address, and Share / Add to calendar are left out. Desktop: beside the form
   (sticky). Phone: a Preview button beside "Send for review" opens it in a vaul
-  sheet ("Preview — not on the map yet", "Back to editing"). The card, the
+  sheet ("Preview (not on the map yet)", "Back to editing"). The card, the
   sheet and the address-check results carry `NO_CAPTURE_CLASS`
   (`ph-no-capture`, `src/lib/analytics.ts`): they show unsent personal text,
   which `maskAllInputs` doesn't cover, so autocapture skips them and replay

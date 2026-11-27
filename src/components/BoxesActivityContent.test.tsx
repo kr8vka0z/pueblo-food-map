@@ -302,8 +302,8 @@ describe("BoxesActivityContent — Network numbers (slice 7)", () => {
     expect(screen.getByText("5")).toBeDefined(); // sponsorCount
     expect(screen.getByText("0.7")).toBeDefined(); // avgSponsorsPerBox (5/7 -> one decimal)
 
-    const periodSelect = screen.getByLabelText(t("box.stats.period", "en"));
-    await userEvent.selectOptions(periodSelect, "7d");
+    const periodRadio = screen.getByRole("radio", { name: t("box.stats.period.7d", "en") });
+    await userEvent.click(periodRadio);
 
     expect(screen.getByText("7")).toBeDefined();
     expect(screen.getByText("5")).toBeDefined();

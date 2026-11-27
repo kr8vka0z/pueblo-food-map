@@ -131,7 +131,7 @@ describe("BoxAlertSignupForm", () => {
     await user.type(screen.getByLabelText(/your email/i), "a@example.com");
     await user.click(screen.getByRole("button", { name: "Sign me up" }));
 
-    await waitFor(() => expect(screen.getByText("That didn't go through. Please try again.")).toBeDefined());
+    await waitFor(() => expect(screen.getByText("Couldn't send your request. Please try again.")).toBeDefined());
   });
 
   test("Cancel collapses the form back to the plain link", async () => {

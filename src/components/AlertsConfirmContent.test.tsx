@@ -66,12 +66,20 @@ describe("AlertsConfirmContent", () => {
     await waitFor(() => expect(screen.getByText(t("alerts.confirm.invalid", "en"))).toBeDefined());
   });
 
-  test("a network failure shows the generic error message", async () => {
+  test("a network failure shows the error message and keeps a Retry button that recovers (#958)", async () => {
     const user = userEvent.setup();
-    mockFetch.mockRejectedValue(new Error("network down"));
+    mockFetch
+      .mockRejectedValueOnce(new Error("network down"))
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
     render(<AlertsConfirmContent />);
 
     await user.click(screen.getByRole("button", { name: t("alerts.confirm.button", "en") }));
     await waitFor(() => expect(screen.getByText(t("alerts.confirm.error", "en"))).toBeDefined());
+
+    const retryBtn = screen.getByRole("button", { name: t("alerts.confirm.retry", "en") });
+    await user.click(retryBtn);
+
+    await waitFor(() => expect(screen.getByText(t("alerts.confirm.success", "en"))).toBeDefined());
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });

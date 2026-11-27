@@ -35,7 +35,7 @@ export const FIELD_LABEL = "block text-xs font-medium text-[var(--color-ink-700)
 // text-base md:text-sm, not a bare text-sm: iOS Safari auto-zooms the page
 // on focusing any field under 16px (see mobile-viewport-and-form-zoom.test.ts).
 export const SELECT_CLASS =
-  "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm " +
+  "w-full min-h-12 rounded-[var(--radius-md)] border border-[var(--color-ink-400)] px-3 py-2 text-base md:text-sm " +
   "text-[var(--color-ink-900)] bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
 
 interface RowProps {
@@ -48,7 +48,7 @@ function Row({ label, value }: RowProps) {
   return (
     <div className="flex items-center justify-between gap-3 py-2 border-b border-[var(--color-bone-200)] last:border-b-0">
       <dt className="text-sm text-[var(--color-ink-700)]">{label}</dt>
-      <dd className="text-sm font-medium text-[var(--color-ink-900)]">{value}</dd>
+      <dd className="text-sm font-medium tabular-nums text-[var(--color-ink-900)]">{value}</dd>
     </div>
   );
 }
@@ -94,23 +94,37 @@ export default function BoxNumbersPanel({
         </dl>
       )}
 
-      <div className="max-w-xs">
-        <label htmlFor={periodSelectId} className={FIELD_LABEL}>
-          {t("box.stats.period", locale)}
-        </label>
-        <select
-          id={periodSelectId}
-          value={period}
-          onChange={(e) => onPeriodChange(e.target.value as PeriodKey)}
-          className={SELECT_CLASS}
-        >
-          {PERIOD_KEYS.map((k) => (
-            <option key={k} value={k}>
-              {t(`box.stats.period.${k}`, locale)}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* 4 short periods shown directly as a segmented radio group rather than hidden in a select (#959). */}
+      <fieldset>
+        <legend className={FIELD_LABEL}>{t("box.stats.period", locale)}</legend>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+          {PERIOD_KEYS.map((k) => {
+            const selected = period === k;
+            return (
+              <label
+                key={k}
+                className={
+                  "relative flex min-h-12 items-center justify-center rounded-[var(--radius-md)] border px-2 text-center text-sm cursor-pointer transition-colors duration-150 " +
+                  "focus-within:ring-2 focus-within:ring-[var(--color-sage-500)] focus-within:ring-offset-1 " +
+                  (selected
+                    ? "border-[var(--color-sage-600)] bg-[var(--color-sage-600)] font-semibold text-[var(--color-bone-50)]"
+                    : "border-[var(--color-ink-400)] bg-white font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-sage-100)]")
+                }
+              >
+                <input
+                  type="radio"
+                  name={periodSelectId}
+                  value={k}
+                  checked={selected}
+                  onChange={() => onPeriodChange(k)}
+                  className="sr-only"
+                />
+                <span>{t(`box.stats.period.${k}`, locale)}</span>
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
 
       <dl>
         <Row label={t("box.stats.fills", locale)} value={String(counts.fills)} />

@@ -20,7 +20,7 @@ describe("/report/[venueId] page", () => {
     const metadata = await generateMetadata({
       params: Promise.resolve({ venueId: venue.id }),
     });
-    expect(metadata.title).toBe(`Report an issue — ${venue.name}`);
+    expect(metadata.title).toBe(`Report an issue: ${venue.name}`);
     expect(metadata.title).not.toContain("Pueblo Food Map");
   });
 

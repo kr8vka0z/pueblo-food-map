@@ -39,6 +39,7 @@ import type { Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { formatRelativeTime } from "@/lib/relativeTime";
 import PhotoViewer from "@/components/PhotoViewer";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import type { ActivityItem } from "@/lib/boxActivity";
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -112,12 +113,16 @@ export default function BoxActivityList({
                   type="button"
                   onClick={() => setOpenPhotoIndex(i)}
                   aria-label={t("box.photo.viewFullSizeAt", locale, { time: when })}
-                  className="mt-1.5 block"
+                  className="mt-1.5 block rounded-[var(--radius-md)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- a runtime, R2-backed image via our own serve route, not a build-time/static asset next/image can optimize */}
                   <img
                     src={`/api/public/box-photos/${item.photoId}`}
                     alt={t("box.photo.altText", locale, { name: item.venueName, time: when })}
+                    width={64}
+                    height={64}
+                    loading="lazy"
+                    decoding="async"
                     className="h-16 w-16 rounded-[var(--radius-md)] border border-[var(--color-bone-200)] object-cover"
                   />
                 </button>
@@ -189,7 +194,7 @@ export function PagedBoxActivityList({
             type="button"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
-            className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] transition-colors duration-150 hover:bg-[var(--color-sage-100)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] transition-colors duration-150 hover:bg-[var(--color-sage-100)] ${PRESS_FEEDBACK} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {t("activity.prevPage", locale)}
           </button>
@@ -197,7 +202,7 @@ export function PagedBoxActivityList({
             type="button"
             onClick={() => setPage((p) => p + 1)}
             disabled={!hasMore}
-            className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] transition-colors duration-150 hover:bg-[var(--color-sage-100)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] transition-colors duration-150 hover:bg-[var(--color-sage-100)] ${PRESS_FEEDBACK} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {t("activity.nextPage", locale)}
           </button>

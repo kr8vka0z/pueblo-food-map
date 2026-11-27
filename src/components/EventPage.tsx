@@ -154,7 +154,7 @@ export default function EventPage({
               {badgeText}
             </p>
             <h1
-              className="text-2xl font-normal leading-tight text-[var(--color-ink-900)]"
+              className="text-2xl font-normal leading-tight text-balance text-[var(--color-ink-900)]"
               style={{ fontFamily: "var(--font-display)" }}
             >
               {text.name}
@@ -228,8 +228,11 @@ export default function EventPage({
             <a
               href={mapHref}
               className={
-                "flex min-h-12 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
-                "px-4 text-base font-semibold text-[var(--color-bone-50)] transition-colors hover:bg-[var(--color-sage-700)] " +
+                (active
+                  ? "flex min-h-12 w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-sage-600)] " +
+                    "bg-[var(--color-bone-50)] px-4 text-base font-semibold text-[var(--color-sage-700)] transition-colors hover:bg-[var(--color-sage-100)] "
+                  : "flex min-h-12 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
+                    "px-4 text-base font-semibold text-[var(--color-bone-50)] transition-colors hover:bg-[var(--color-sage-700)] ") +
                 "touch-manipulation " + PRESS_FEEDBACK + " " + FOCUS + " focus-visible:ring-offset-2"
               }
             >

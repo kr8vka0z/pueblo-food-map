@@ -34,9 +34,10 @@ const FIELD_IDS: Record<SuggestField, string> = {
   submitterEmail: "suggest-email",
 };
 
+// size-[20px], not w-5/h-5: globals.css remaps --spacing-5 to 24px (see formClasses.ts).
 const CHECKBOX_CLASS =
-  "w-4 h-4 rounded border-[var(--color-bone-300)] " +
-  "text-[var(--color-sage-500)] " +
+  "size-[20px] shrink-0 rounded border-[var(--color-ink-400)] " +
+  "accent-[var(--color-sage-600)] " +
   "focus-visible:outline-none focus-visible:ring-2 " +
   "focus-visible:ring-[var(--color-sage-500)]";
 
@@ -90,15 +91,18 @@ export default function SuggestForm() {
         submitterEmail: submitterEmail.trim(),
       })}
     >
-      {(errors, locale) => (
+      {(errors, locale, onBlurField) => (
         <>
           <Field id="suggest-name" label={t("suggest.venueName.label", locale)} required error={errors.venueName}>
             {(control) => (
               <input
                 {...control}
+                name="venueName"
                 type="text"
+                enterKeyHint="next"
                 value={venueName}
                 onChange={(e) => setVenueName(e.target.value)}
+                onBlur={() => onBlurField("venueName")}
                 placeholder={t("suggest.venueName.placeholder", locale)}
                 maxLength={SUGGEST_VENUE_NAME}
               />
@@ -109,9 +113,13 @@ export default function SuggestForm() {
             {(control) => (
               <input
                 {...control}
+                name="address"
                 type="text"
+                autoComplete="street-address"
+                enterKeyHint="next"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
+                onBlur={() => onBlurField("address")}
                 placeholder={t("suggest.address.placeholder", locale)}
                 maxLength={SUGGEST_ADDRESS}
               />
@@ -120,7 +128,13 @@ export default function SuggestForm() {
 
           <Field id="suggest-category" label={t("suggest.category.label", locale)} required error={errors.category}>
             {(control) => (
-              <select {...control} value={category} onChange={(e) => setCategory(e.target.value)}>
+              <select
+                {...control}
+                name="category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                onBlur={() => onBlurField("category")}
+              >
                 <option value="">{t("suggest.category.placeholder", locale)}</option>
                 {(Object.keys(categoryLabels) as VenueCategory[]).map((key) => (
                   <option key={key} value={key}>
@@ -135,7 +149,9 @@ export default function SuggestForm() {
             {(control) => (
               <input
                 {...control}
+                name="hours"
                 type="text"
+                enterKeyHint="next"
                 value={hours}
                 onChange={(e) => setHours(e.target.value)}
                 placeholder={t("suggest.hours.placeholder", locale)}
@@ -148,7 +164,9 @@ export default function SuggestForm() {
             {(control) => (
               <input
                 {...control}
+                name="contact"
                 type="text"
+                enterKeyHint="next"
                 value={contact}
                 onChange={(e) => setContact(e.target.value)}
                 placeholder={t("suggest.contact.placeholder", locale)}
@@ -159,22 +177,24 @@ export default function SuggestForm() {
 
           {/* SNAP / WIC checkboxes */}
           {/* legend is required for WCAG 1.3.1 (fieldset must have accessible name) */}
-          <fieldset className="space-y-2">
+          <fieldset className="space-y-1">
             <legend className={LABEL_CLASS.replace("mb-1", "mb-2")}>{t("suggest.benefits.legend", locale)}</legend>
-            <label className="flex items-center gap-2 text-sm text-[var(--color-ink-700)] cursor-pointer">
+            <label className="flex min-h-12 items-center gap-3 text-sm text-[var(--color-ink-700)] cursor-pointer">
               <input
                 type="checkbox"
                 id="suggest-snap"
+                name="acceptsSnap"
                 checked={acceptsSnap}
                 onChange={(e) => setAcceptsSnap(e.target.checked)}
                 className={CHECKBOX_CLASS}
               />
               {t("suggest.snap.label", locale)}
             </label>
-            <label className="flex items-center gap-2 text-sm text-[var(--color-ink-700)] cursor-pointer">
+            <label className="flex min-h-12 items-center gap-3 text-sm text-[var(--color-ink-700)] cursor-pointer">
               <input
                 type="checkbox"
                 id="suggest-wic"
+                name="acceptsWic"
                 checked={acceptsWic}
                 onChange={(e) => setAcceptsWic(e.target.checked)}
                 className={CHECKBOX_CLASS}
@@ -187,6 +207,7 @@ export default function SuggestForm() {
             {(control) => (
               <textarea
                 {...control}
+                name="notes"
                 rows={3}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -201,19 +222,21 @@ export default function SuggestForm() {
             label={t("suggest.submitterEmail.label", locale)}
             required
             error={errors.submitterEmail}
-            hint={t("suggest.submitterEmail.hint", locale)}
             after={<PrivacyNote locale={locale} />}
           >
             {(control) => (
               <input
                 {...control}
+                name="submitterEmail"
                 type="email"
                 value={submitterEmail}
                 onChange={(e) => setSubmitterEmail(e.target.value)}
+                onBlur={() => onBlurField("submitterEmail")}
                 placeholder={t("suggest.submitterEmail.placeholder", locale)}
                 autoComplete="email"
                 autoCapitalize="off"
                 autoCorrect="off"
+                spellCheck={false}
                 // Last field before submit — Enter implicitly submits, so "send".
                 enterKeyHint="send"
                 required

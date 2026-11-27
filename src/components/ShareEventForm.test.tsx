@@ -16,7 +16,7 @@ vi.mock("@/lib/imageResize", async (importOriginal) => ({
   shrinkFlyerToJpeg: async () => new Blob([new Uint8Array([0xff, 0xd8])], { type: "image/jpeg" }),
 }));
 
-import ShareEventForm from "@/components/ShareEventForm";
+import ShareEventForm, { normalizeEventLinkUrl } from "@/components/ShareEventForm";
 
 const SEND = t("shareEvent.submit", "en");
 
@@ -166,5 +166,25 @@ describe("ShareEventForm", () => {
     await act(async () => answer.resolve(json({ ok: true, matches: [{ lat: 38.3, lng: -104.5, matchedAddress: "1 Old St, Pueblo, CO" }] })));
     expect(field(/Street address/).value).toBe("1 Old St, Apt 2");
     expect(screen.getByTestId("share-address-check")).toBeEmptyDOMElement();
+  });
+
+  test("normalizeEventLinkUrl prepends https:// to schemeless domains and submits the normalized URL (#959)", async () => {
+    expect(normalizeEventLinkUrl("pueblofoodproject.org/event")).toBe("https://pueblofoodproject.org/event");
+    expect(normalizeEventLinkUrl("https://example.org/a")).toBe("https://example.org/a");
+    expect(normalizeEventLinkUrl("http://example.org/a")).toBe("http://example.org/a");
+    expect(normalizeEventLinkUrl("not a url")).toBe("not a url");
+
+    routes["/events/share/geocode"] = async () => json({ ok: true, matches: [{ lat: 38.2, lng: -104.6, matchedAddress: "1 Main St, Pueblo, CO" }] });
+    routes["/events/share/submit"] = async () => json({ ok: true });
+    renderForm();
+    fillRequired();
+    change(/Link/i, "pueblofoodproject.org/turkey");
+    await waitFor(() => expect(sendButton()).toBeEnabled());
+    fireEvent.click(sendButton());
+
+    await waitFor(() => expect(submitCalls()).toHaveLength(1));
+    expect(JSON.parse(submitCalls()[0].init!.body as string)).toMatchObject({
+      link_url: "https://pueblofoodproject.org/turkey",
+    });
   });
 });

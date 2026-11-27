@@ -37,10 +37,12 @@ describe("mobile review #8 (superseded by #666) — BottomSheet grab bar meets t
   });
 });
 
-describe("mobile review #9 — DirectionButtons walk-steps toggle (~20px -> >=24px)", () => {
-  test("steps toggle gains vertical padding", () => {
+// #957 raised the walk-steps toggle from mobile review #9's ~32px (py-1.5)
+// to the 48px floor (min-h-12 -my-2), matching Clear route and Open in Google Maps.
+describe("mobile review #9 (superseded by #957) — DirectionButtons walk-steps toggle meets 48px floor", () => {
+  test("steps toggle is a 48px-tall box", () => {
     const src = readSource("src/components/DirectionButtons.tsx");
-    expect(src).toMatch(/py-1\.5 text-sm font-medium text-\[var\(--color-sage-600\)\]/);
+    expect(src).toMatch(/inline-flex items-center min-h-12 -my-2 gap-1 text-sm font-medium text-\[var\(--color-sage-600\)\]/);
   });
 });
 

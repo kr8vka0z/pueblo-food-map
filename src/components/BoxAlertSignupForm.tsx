@@ -14,12 +14,15 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import { AlertCircle } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { EMAIL_RE } from "@/lib/email";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { getCheckinClientToken } from "@/lib/checkinClientToken";
 import { useQueuedTurnstileSubmit, useTurnstile } from "@/lib/useTurnstile";
 import CardFormTurnstile from "@/components/CardFormTurnstile";
+import SuccessTick from "@/components/SuccessTick";
 import { PRIMARY_BTN, SECONDARY_BTN } from "@/components/BoxCheckinPanel";
 
 type SubmitState = "idle" | "submitting" | "success" | "error" | "rateLimited";
@@ -36,6 +39,14 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
   const [email, setEmail] = useState("");
   const [honeypot, setHoneypot] = useState("");
   const [state, setState] = useState<SubmitState>("idle");
+  const [emailError, setEmailError] = useState<string | undefined>(undefined);
+
+  function validateEmail(val: string): string | undefined {
+    const trimmed = val.trim();
+    if (!trimmed) return t("box.form.validation.emailRequired", locale);
+    if (!EMAIL_RE.test(trimmed)) return t("box.form.validation.emailInvalid", locale);
+    return undefined;
+  }
 
   // The container ref stays LOCAL to this component (not returned by the
   // hook) — see useTurnstile.ts's own header for why (the React
@@ -86,6 +97,13 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (state === "submitting" || queued) return;
+    const err = validateEmail(email);
+    if (err) {
+      setEmailError(err);
+      document.getElementById("box-alert-email-error")?.focus();
+      return;
+    }
+    setEmailError(undefined);
     const value = email.trim();
     if (turnstile.token) {
       void submit(value);
@@ -118,7 +136,7 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
           // The guided tour points at this (#159); it never presses it.
           data-tour="box-alerts"
           onClick={() => setOpen(true)}
-          className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] w-fit items-center text-left text-sm font-medium text-[var(--color-sage-600)] underline hover:text-[var(--color-sage-700)]"
+          className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] w-fit items-center text-left text-sm font-medium text-[var(--color-sage-600)] underline hover:text-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
         >
           {t("box.alerts.linkLabel", locale)}
         </button>
@@ -130,8 +148,9 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
   if (state === "success") {
     return (
       <>
-        <p role="status" className="text-sm font-medium text-[var(--color-success)]">
-          {t("box.alerts.success", locale)}
+        <p role="status" className="flex items-center gap-2 text-sm font-medium text-[var(--color-success)]">
+          <SuccessTick size={20} />
+          <span>{t("box.alerts.success", locale)}</span>
         </p>
         {turnstileNodes}
       </>
@@ -142,9 +161,10 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
     <>
     <form
       onSubmit={handleSubmit}
+      noValidate
       className="space-y-2 rounded-[var(--radius-md)] border border-[var(--color-bone-200)] p-3"
     >
-      <h3 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)]">
+      <h3 className="text-sm font-semibold text-[var(--color-ink-900)]">
         {t("box.alerts.linkLabel", locale)}
       </h3>
 
@@ -154,34 +174,56 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
         </label>
         <input
           id="box-alert-email"
+          name="email"
           type="email"
           required
+          aria-required="true"
+          aria-invalid={emailError ? "true" : undefined}
+          aria-describedby={emailError ? "box-alert-email-error" : undefined}
+          autoComplete="email"
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="send"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          onBlur={() => setEmailError(validateEmail(email))}
           maxLength={FIELD_LIMITS.EMAIL}
-          className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+          className={
+            "mt-1 w-full min-h-12 rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
+            (emailError ? "border-[var(--color-danger)]" : "border-[var(--color-ink-400)]")
+          }
         />
+        {emailError && (
+          <p id="box-alert-email-error" role="alert" tabIndex={-1} className="mt-1 flex items-start gap-1 text-xs text-[var(--color-danger)]">
+            <AlertCircle size={14} aria-hidden className="mt-0.5 shrink-0" />
+            <span>{emailError}</span>
+          </p>
+        )}
         <p className="mt-1 text-xs text-[var(--color-ink-400)]">
           {t("box.alerts.emailDisclosure", locale)}{" "}
-          <Link href="/privacy" className="underline hover:text-[var(--color-sage-600)] transition-colors">
+          <Link href="/privacy" className="underline hover:text-[var(--color-sage-600)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded">
             {t("privacy.linkLabel", locale)}
           </Link>
         </p>
       </div>
 
       {state === "error" && (
-        <p role="alert" className="text-sm font-medium text-[var(--color-danger)]">
-          {t("box.form.error.generic", locale)}
+        <p role="alert" className="flex items-start gap-1.5 text-sm font-medium text-[var(--color-danger)]">
+          <AlertCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{t("box.form.error.generic", locale)}</span>
         </p>
       )}
       {state === "rateLimited" && (
-        <p role="alert" className="text-sm font-medium text-[var(--color-danger)]">
-          {t("box.form.error.rateLimit", locale)}
+        <p role="alert" className="flex items-start gap-1.5 text-sm font-medium text-[var(--color-danger)]">
+          <AlertCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{t("box.form.error.rateLimit", locale)}</span>
         </p>
       )}
       {turnstile.error && (
-        <p role="alert" className="text-xs text-[var(--color-danger)]">
-          {t("form.turnstile.error", locale)}
+        <p role="alert" className="flex items-start gap-1 text-xs text-[var(--color-danger)]">
+          <AlertCircle size={14} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{t("form.turnstile.error", locale)}</span>
         </p>
       )}
 

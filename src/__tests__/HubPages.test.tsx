@@ -95,7 +95,8 @@ describe("FoodPantriesHub", () => {
     expect(faq.mainEntity).toHaveLength(4);
     for (const q of faq.mainEntity) {
       expect(screen.getByRole("heading", { level: 3, name: q.name })).toBeDefined();
-      expect(screen.getByText(q.acceptedAnswer.text)).toBeDefined();
+      const paragraphs = [...container.querySelectorAll("p")];
+      expect(paragraphs.some((p) => p.textContent === q.acceptedAnswer.text)).toBe(true);
     }
   });
 
@@ -208,7 +209,8 @@ describe("/resources FAQ (ResourcesContent + resourcesFaqJsonLd)", () => {
     expect(faq.mainEntity).toHaveLength(4);
     for (const q of faq.mainEntity) {
       expect(screen.getByRole("heading", { level: 3, name: q.name })).toBeDefined();
-      expect(screen.getByText(q.acceptedAnswer.text)).toBeDefined();
+      const paragraphs = [...container.querySelectorAll("p")];
+      expect(paragraphs.some((p) => p.textContent === q.acceptedAnswer.text)).toBe(true);
     }
     // No raw i18n key leaked through (a missing key renders the key itself).
     expect(container.textContent).not.toMatch(/resources\.faq\./);

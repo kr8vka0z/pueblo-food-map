@@ -62,7 +62,7 @@ describe("VenueCard — hours-unknown badge", () => {
         <VenueCard venue={makeVenue()} isSelected={false} onClick={vi.fn()} />
       </ul>,
     );
-    expect(screen.getByText(/Hours unknown — call ahead/i)).toBeDefined();
+    expect(screen.getByText(/Hours unknown, call ahead/i)).toBeDefined();
   });
 
   test("does NOT show the badge for a venue with known hours", () => {
@@ -79,7 +79,7 @@ describe("VenueCard — hours-unknown badge", () => {
 describe("BottomSheet — hours-unknown label", () => {
   test("shows 'Hours unknown — call ahead' when hours_weekly is absent", () => {
     render(<BottomSheet venue={makeVenue()} onClose={vi.fn()} />);
-    expect(screen.getByText(/Hours unknown — call ahead/i)).toBeDefined();
+    expect(screen.getByText(/Hours unknown, call ahead/i)).toBeDefined();
   });
 
   test("does NOT show the label for a venue with known hours", () => {
@@ -97,7 +97,7 @@ describe("DesktopVenueWindow — hours-unknown label", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByText(/Hours unknown — call ahead/i)).toBeDefined();
+    expect(screen.getByText(/Hours unknown, call ahead/i)).toBeDefined();
   });
 
   test("does NOT show the label for a venue with known hours", () => {

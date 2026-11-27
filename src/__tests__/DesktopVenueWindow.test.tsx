@@ -92,7 +92,7 @@ describe("DesktopVenueWindow — full details on open, no toggle (#732)", () => 
     expect(screen.queryByRole("button", { name: /show details|hide details/i })).toBeNull();
     expect(screen.getByRole("button", { name: /walk/i })).toBeDefined();
     expect(screen.getByText("123 Test St, Pueblo, CO")).toBeDefined();
-    expect(screen.getByRole("region", { name: "HOURS" })).toBeDefined();
+    expect(screen.getByRole("region", { name: "Hours" })).toBeDefined();
     expect(screen.getByRole("link", { name: /555-0164/ })).toBeDefined();
     expect(screen.getByText("Bring a photo ID.")).toBeDefined();
   });

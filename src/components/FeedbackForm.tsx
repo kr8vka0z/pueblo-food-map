@@ -13,11 +13,12 @@
  */
 
 import { useState } from "react";
+import { AlertCircle } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
 import { EMAIL_RE } from "@/lib/email";
 import { FEEDBACK_TYPES, type FeedbackTypeKey } from "@/lib/feedbackTypes";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
-import PublicForm, { Field, PrivacyNote, type FieldErrors } from "@/components/PublicForm";
+import PublicForm, { ERROR_CLASS, Field, LABEL_CLASS, PrivacyNote, type FieldErrors } from "@/components/PublicForm";
 
 const { FEEDBACK_MESSAGE, EMAIL } = FIELD_LIMITS;
 
@@ -59,20 +60,51 @@ export default function FeedbackForm() {
       validate={validate}
       body={() => ({ feedbackType, message: message.trim(), contactEmail: contactEmail.trim() })}
     >
-      {(errors, locale) => (
+      {(errors, locale, onBlurField) => (
         <>
-          <Field id="feedback-type" label={t("feedback.type.label", locale)} required error={errors.feedbackType}>
-            {(control) => (
-              <select {...control} value={feedbackType} onChange={(e) => setFeedbackType(e.target.value)}>
-                <option value="">{t("feedback.type.placeholder", locale)}</option>
-                {(Object.keys(FEEDBACK_TYPES) as FeedbackTypeKey[]).map((key) => (
-                  <option key={key} value={key}>
-                    {t(`feedback.type.${key}`, locale)}
-                  </option>
-                ))}
-              </select>
+          {/* 4 short options shown directly as radios rather than hidden in a select (#959). */}
+          <fieldset
+            aria-describedby={errors.feedbackType ? "feedback-type-error" : undefined}
+            aria-invalid={errors.feedbackType ? "true" : undefined}
+          >
+            <legend className={LABEL_CLASS.replace("mb-1", "mb-2")}>
+              {t("feedback.type.label", locale)}{" "}
+              <span aria-hidden className="text-[var(--color-danger)]">*</span>
+            </legend>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {(Object.keys(FEEDBACK_TYPES) as FeedbackTypeKey[]).map((key, index) => {
+                const selected = feedbackType === key;
+                return (
+                  <label
+                    key={key}
+                    className={
+                      "flex min-h-12 items-center gap-3 rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm cursor-pointer transition-colors duration-150 " +
+                      (selected
+                        ? "border-[var(--color-sage-600)] bg-[var(--color-sage-50)] font-semibold text-[var(--color-sage-700)]"
+                        : "border-[var(--color-ink-400)] bg-white font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-sage-100)]")
+                    }
+                  >
+                    <input
+                      id={index === 0 ? "feedback-type" : undefined}
+                      type="radio"
+                      name="feedbackType"
+                      value={key}
+                      checked={selected}
+                      onChange={() => setFeedbackType(key)}
+                      className="h-5 w-5 shrink-0 accent-[var(--color-sage-600)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                    />
+                    <span>{t(`feedback.type.${key}`, locale)}</span>
+                  </label>
+                );
+              })}
+            </div>
+            {errors.feedbackType && (
+              <p id="feedback-type-error" role="alert" tabIndex={-1} className={ERROR_CLASS}>
+                <AlertCircle size={14} aria-hidden className="mt-0.5 shrink-0" />
+                <span>{errors.feedbackType}</span>
+              </p>
             )}
-          </Field>
+          </fieldset>
 
           <Field
             id="feedback-message"
@@ -84,9 +116,11 @@ export default function FeedbackForm() {
             {(control) => (
               <textarea
                 {...control}
+                name="message"
                 rows={4}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
+                onBlur={() => onBlurField("message")}
                 placeholder={t("feedback.message.placeholder", locale)}
                 maxLength={FEEDBACK_MESSAGE}
               />
@@ -98,19 +132,21 @@ export default function FeedbackForm() {
             label={t("feedback.email.label", locale)}
             required
             error={errors.contactEmail}
-            hint={t("feedback.email.hint", locale)}
             after={<PrivacyNote locale={locale} />}
           >
             {(control) => (
               <input
                 {...control}
+                name="contactEmail"
                 type="email"
                 value={contactEmail}
                 onChange={(e) => setContactEmail(e.target.value)}
+                onBlur={() => onBlurField("contactEmail")}
                 placeholder={t("feedback.email.placeholder", locale)}
                 autoComplete="email"
                 autoCapitalize="off"
                 autoCorrect="off"
+                spellCheck={false}
                 // Last field before submit — Enter implicitly submits, so "send".
                 enterKeyHint="send"
                 required

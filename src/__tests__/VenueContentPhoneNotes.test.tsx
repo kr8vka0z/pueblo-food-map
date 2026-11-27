@@ -57,7 +57,7 @@ describe("VenueContent — notes suppression", () => {
         }}
       />,
     );
-    expect(screen.queryByText(t("detail.about", "en"))).toBeNull();
+    expect(screen.queryByRole("heading", { name: t("detail.about", "en") })).toBeNull();
   });
 
   test("still renders a real, informative note", () => {

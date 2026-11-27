@@ -230,7 +230,7 @@ const EXPECTED_ES = {
   activity: "Actividad de las cajas de bendiciones · Pueblo Food Map",
   alertsConfirm: "Confirma tu correo · Pueblo Food Map",
   alertsStop: "Correos detenidos · Pueblo Food Map",
-  report: "Reportar un problema — RMSER Community Garden · Pueblo Food Map",
+  report: "Reportar un problema: RMSER Community Garden · Pueblo Food Map",
   boxHistory: "Test Blessing Box — Historial · Pueblo Food Map",
   notFound: "Página no encontrada · Pueblo Food Map",
 } as const;

@@ -343,7 +343,7 @@ describe("SuggestForm — submit flow", () => {
     await waitForSubmitEnabled("suggest");
     await user.click(screen.getByRole("button", { name: /Submit suggestion/i }));
     await waitFor(() => {
-      expect(screen.getByText(/Something went wrong/i)).toBeDefined();
+      expect(screen.getByText(/Couldn't send your suggestion/i)).toBeDefined();
     });
   });
 
@@ -355,12 +355,12 @@ describe("SuggestForm — submit flow", () => {
     await waitForSubmitEnabled("suggest");
     await user.click(screen.getByRole("button", { name: /Submit suggestion/i }));
     await waitFor(() => {
-      expect(screen.getByText(/Something went wrong/i)).toBeDefined();
+      expect(screen.getByText(/Couldn't send your suggestion/i)).toBeDefined();
     });
 
     await user.click(screen.getByRole("button", { name: /Try again/i }));
     await waitFor(() => {
-      expect(screen.queryByText(/Something went wrong/i)).toBeNull();
+      expect(screen.queryByText(/Couldn't send your suggestion/i)).toBeNull();
     });
     expect(screen.getByRole("button", { name: /Submit suggestion/i })).toBeDefined();
   });

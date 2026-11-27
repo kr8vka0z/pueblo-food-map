@@ -52,7 +52,7 @@ describe("BoxNumbersPanel", () => {
     expect(screen.getByText(t("box.stats.noData", "en"))).toBeDefined(); // fillToFillMs (null)
   });
 
-  test("the period select has a real label (accessibility) and calls onPeriodChange", async () => {
+  test("the period picker has a real label (accessibility) and calls onPeriodChange", async () => {
     const onPeriodChange = vi.fn();
     render(
       <BoxNumbersPanel
@@ -65,8 +65,8 @@ describe("BoxNumbersPanel", () => {
         locale="en"
       />,
     );
-    const select = screen.getByLabelText(t("box.stats.period", "en"));
-    await userEvent.selectOptions(select, "30d");
+    expect(screen.getByRole("group", { name: t("box.stats.period", "en") })).toBeDefined();
+    await userEvent.click(screen.getByRole("radio", { name: t("box.stats.period.30d", "en") }));
     expect(onPeriodChange).toHaveBeenCalledWith("30d");
   });
 
@@ -98,6 +98,6 @@ describe("BoxNumbersPanel", () => {
       />,
     );
     expect(screen.getByText(t("box.stats.honestyNote", "es"))).toBeDefined();
-    expect(screen.getByLabelText(t("box.stats.period", "es"))).toBeDefined();
+    expect(screen.getByRole("group", { name: t("box.stats.period", "es") })).toBeDefined();
   });
 });

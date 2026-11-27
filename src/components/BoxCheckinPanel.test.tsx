@@ -37,7 +37,7 @@ const mockTurnstile = {
 const mockFetch = vi.fn();
 
 beforeEach(() => {
-  mockFetch.mockClear();
+  mockFetch.mockReset();
   vi.stubGlobal("fetch", mockFetch);
   mockTurnstile.render.mockClear();
   mockTurnstile.reset.mockClear();
@@ -250,7 +250,7 @@ describe("BoxCheckinPanel — a tap before the token exists is queued, not dropp
 
     await user.click(await screen.findByRole("button", { name: "I filled it" }));
     await user.type(screen.getByLabelText(/Add a short note/i), "Topped it off");
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Send note" }));
 
     expect(mockFetch).not.toHaveBeenCalled();
     deliver("test-turnstile-token");
@@ -329,7 +329,7 @@ describe("BoxCheckinPanel — a queued tap that never resolves is not stuck fore
       // The tap is still queued (not failed) and the calm prompt replaces
       // the old dead-end error text.
       expect(screen.getByRole("button", { name: "Sending…" })).toBeDefined();
-      expect(screen.queryByText("That didn't go through. Please try again.")).toBeNull();
+      expect(screen.queryByText("Couldn't save your check-in. Please try again.")).toBeNull();
       expect(screen.getByText(/tap the box below/i)).toBeDefined();
       expect(mockFetch).not.toHaveBeenCalled();
 
@@ -384,7 +384,7 @@ describe("BoxCheckinPanel — a queued tap that never resolves is not stuck fore
 
     expect(renderMock).toHaveBeenCalledTimes(2);
     expect(screen.getByRole("button", { name: "Sending…" })).toBeDefined();
-    expect(screen.queryByText("That didn't go through. Please try again.")).toBeNull();
+    expect(screen.queryByText("Couldn't save your check-in. Please try again.")).toBeNull();
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -400,7 +400,7 @@ describe("BoxCheckinPanel — a queued tap that never resolves is not stuck fore
       vi.advanceTimersByTime(15_000);
     });
 
-    expect(screen.getByText("That didn't go through. Please try again.")).toBeDefined();
+    expect(screen.getByText("Couldn't save your check-in. Please try again.")).toBeDefined();
     expect(screen.getByRole("button", { name: "I used this box" })).not.toBeDisabled();
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -411,7 +411,7 @@ describe("BoxCheckinPanel — a queued tap that never resolves is not stuck fore
 
     await user.click(await screen.findByRole("button", { name: "I filled it" }));
     await user.type(screen.getByLabelText(/Add a short note/i), "Topped it off");
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Send note" }));
 
     // Queued (no token yet) — the form closes at queue time, same as the
     // happy path in "a tap before the token exists is queued" above.
@@ -514,7 +514,7 @@ describe("BoxCheckinPanel — note kinds (filled/problem)", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "I filled it" })).not.toBeDisabled());
     await user.click(screen.getByRole("button", { name: "I filled it" }));
 
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Send note" }));
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledOnce());
     const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
@@ -530,7 +530,7 @@ describe("BoxCheckinPanel — note kinds (filled/problem)", () => {
     await user.click(screen.getByRole("button", { name: "Report a problem" }));
 
     await user.type(screen.getByLabelText(/Add a short note/i), "Door is broken");
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Send note" }));
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledOnce());
     const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
@@ -556,7 +556,7 @@ describe("BoxCheckinPanel — note kinds (filled/problem)", () => {
     renderPanel();
     await waitFor(() => expect(screen.getByRole("button", { name: "I filled it" })).not.toBeDisabled());
     await user.click(screen.getByRole("button", { name: "I filled it" }));
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Send note" }));
 
     await waitFor(() => {
       expect(screen.getByText("Thanks for filling it!")).toBeDefined();
@@ -576,7 +576,7 @@ describe("BoxCheckinPanel — error states", () => {
     await waitFor(() => {
       expect(screen.getByText(/Too many check-ins/i)).toBeDefined();
     });
-    expect(screen.queryByText("That didn't go through. Please try again.")).toBeNull();
+    expect(screen.queryByText("Couldn't save your check-in. Please try again.")).toBeNull();
   });
 
   test("rate_limit_box error shows the box-scoped inline message, not the visitor one", async () => {
@@ -602,7 +602,7 @@ describe("BoxCheckinPanel — error states", () => {
     await user.click(screen.getByRole("button", { name: "I used this box" }));
 
     await waitFor(() => {
-      expect(screen.getByText("That didn't go through. Please try again.")).toBeDefined();
+      expect(screen.getByText("Couldn't save your check-in. Please try again.")).toBeDefined();
     });
   });
 
@@ -643,7 +643,7 @@ describe("BoxCheckinPanel — Add a photo (standalone)", () => {
 
     await waitFor(() => expect(mockShrinkImageToJpeg).toHaveBeenCalledWith(file));
     await waitFor(() => expect(screen.getByAltText("Preview of the photo you selected")).toBeDefined());
-    expect(screen.getByRole("button", { name: "Send" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Send photo" })).not.toBeDisabled();
   });
 
   test("an unsupported format shows a friendly error, never a raw exception, and no preview", async () => {
@@ -658,7 +658,7 @@ describe("BoxCheckinPanel — Add a photo (standalone)", () => {
 
     await waitFor(() => expect(screen.getByText(/isn't supported/i)).toBeDefined());
     expect(screen.queryByAltText("Preview of the photo you selected")).toBeNull();
-    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Send photo" })).toBeDisabled();
   });
 
   test("Remove clears the selection and disables Send again", async () => {
@@ -672,7 +672,7 @@ describe("BoxCheckinPanel — Add a photo (standalone)", () => {
     await user.click(screen.getByRole("button", { name: "Remove" }));
 
     expect(screen.queryByAltText("Preview of the photo you selected")).toBeNull();
-    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Send photo" })).toBeDisabled();
   });
 
   test("Send POSTs multipart form data with no checkinId, shows success, and resets the form", async () => {
@@ -682,9 +682,9 @@ describe("BoxCheckinPanel — Add a photo (standalone)", () => {
     await user.click(await screen.findByRole("button", { name: "Add a photo" }));
     const input = document.getElementById("box-photo-standalone-input") as HTMLInputElement;
     await user.upload(input, new File(["fake-bytes"], "photo.jpg", { type: "image/jpeg" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).not.toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send photo" })).not.toBeDisabled());
 
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Send photo" }));
 
     await waitFor(() => expect(screen.getByText(/submitted for review/i)).toBeDefined());
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
@@ -747,7 +747,7 @@ describe("BoxCheckinPanel — photo attach on the 'filled' note form", () => {
     await user.upload(fileInput, new File(["fake-bytes"], "photo.jpg", { type: "image/jpeg" }));
     await waitFor(() => expect(mockShrinkImageToJpeg).toHaveBeenCalled());
 
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Send note" }));
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
     const [checkinUrl] = mockFetch.mock.calls[0] as [string, RequestInit];
@@ -774,7 +774,7 @@ describe("BoxCheckinPanel — needs ask after 'took'", () => {
     expect(screen.queryByRole("button", { name: "I filled it" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Report a problem" })).toBeNull();
     // The thanks line still shows alongside the ask — success state is unconditional.
-    expect(screen.getByText("Thanks — enjoy!")).toBeDefined();
+    expect(screen.getByText("Thanks, enjoy!")).toBeDefined();
   });
 
   test("renders all nine need chips as toggle buttons", async () => {
@@ -835,7 +835,7 @@ describe("BoxCheckinPanel — needs ask after 'took'", () => {
     await user.click(await screen.findByRole("button", { name: "I used this box" }));
     await screen.findByText("What would help you next time?");
 
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Send items" }));
 
     expect(screen.queryByText("What would help you next time?")).toBeNull();
     expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -853,7 +853,7 @@ describe("BoxCheckinPanel — needs ask after 'took'", () => {
     await user.click(screen.getByRole("button", { name: "Diapers" }));
     await user.click(screen.getByRole("button", { name: "Canned food" }));
     await user.type(screen.getByLabelText(/Something else/i), "Extra formula too");
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Send items" }));
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
     const [url, init] = mockFetch.mock.calls[1] as [string, RequestInit];
@@ -868,7 +868,7 @@ describe("BoxCheckinPanel — needs ask after 'took'", () => {
     // mirrors Turnstile's real auto-re-challenge with a fresh value.
     expect(body.turnstileToken).toBe("test-turnstile-token-2");
 
-    expect(await screen.findByText("Got it — thank you.")).toBeDefined();
+    expect(await screen.findByText("Got it, thank you.")).toBeDefined();
     expect(await screen.findByRole("button", { name: "I filled it" })).toBeDefined();
   });
 
@@ -882,7 +882,7 @@ describe("BoxCheckinPanel — needs ask after 'took'", () => {
     await screen.findByText("What would help you next time?");
 
     await user.type(screen.getByLabelText(/Something else/i), "Just diapers please");
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Send items" }));
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
     const body = JSON.parse((mockFetch.mock.calls[1][1] as RequestInit).body as string);
@@ -899,7 +899,7 @@ describe("BoxCheckinPanel — needs ask after 'took'", () => {
     renderPanel();
     await user.click(await screen.findByRole("button", { name: "I used this box" }));
 
-    await waitFor(() => expect(screen.getByText("Thanks — enjoy!")).toBeDefined());
+    await waitFor(() => expect(screen.getByText("Thanks, enjoy!")).toBeDefined());
     expect(screen.queryByText("What would help you next time?")).toBeNull();
   });
 
@@ -911,7 +911,7 @@ describe("BoxCheckinPanel — needs ask after 'took'", () => {
     const user = userEvent.setup();
     renderPanel();
     await user.click(await screen.findByRole("button", { name: "I filled it" }));
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Send note" }));
 
     await waitFor(() => expect(screen.getByText("Thanks for filling it!")).toBeDefined());
     expect(screen.queryByText("What would help you next time?")).toBeNull();
@@ -937,9 +937,9 @@ describe("BoxCheckinPanel — needs ask after 'took'", () => {
     await screen.findByText("What would help you next time?");
 
     await user.click(screen.getByRole("button", { name: "Diapers" }));
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Send items" }));
 
-    await waitFor(() => expect(screen.getByText("That didn't go through. Please try again.")).toBeDefined());
+    await waitFor(() => expect(screen.getByText("Couldn't save your check-in. Please try again.")).toBeDefined());
     expect(await screen.findByRole("button", { name: "I filled it" })).toBeDefined();
   });
 
@@ -994,7 +994,7 @@ describe("BoxCheckinPanel — a throwing Turnstile reset() never strands the out
 
     await user.click(await screen.findByRole("button", { name: "I used this box" }));
 
-    expect(await screen.findByText("Thanks — enjoy!")).toBeDefined();
+    expect(await screen.findByText("Thanks, enjoy!")).toBeDefined();
   });
 
   test("submitPhoto: reset() throws right after a successful standalone photo send — the success message still shows", async () => {
@@ -1005,9 +1005,9 @@ describe("BoxCheckinPanel — a throwing Turnstile reset() never strands the out
     await user.click(await screen.findByRole("button", { name: "Add a photo" }));
     const input = document.getElementById("box-photo-standalone-input") as HTMLInputElement;
     await user.upload(input, new File(["fake-bytes"], "photo.jpg", { type: "image/jpeg" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).not.toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send photo" })).not.toBeDisabled());
 
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Send photo" }));
 
     expect(await screen.findByText(/submitted for review/i)).toBeDefined();
   });
@@ -1025,8 +1025,8 @@ describe("BoxCheckinPanel — a throwing Turnstile reset() never strands the out
     await screen.findByText("What would help you next time?");
 
     await user.click(screen.getByRole("button", { name: "Diapers" }));
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Send items" }));
 
-    expect(await screen.findByText("Got it — thank you.")).toBeDefined();
+    expect(await screen.findByText("Got it, thank you.")).toBeDefined();
   });
 });

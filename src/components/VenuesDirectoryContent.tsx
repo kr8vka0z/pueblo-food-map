@@ -51,7 +51,7 @@ export default function VenuesDirectoryContent({ groups }: VenuesDirectoryConten
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8 space-y-8">
         <div>
           <h1
-            className="text-3xl font-normal text-[var(--color-ink-900)]"
+            className="text-3xl font-normal text-balance text-[var(--color-ink-900)]"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {t("venues.heading", locale)}
@@ -123,11 +123,11 @@ export default function VenuesDirectoryContent({ groups }: VenuesDirectoryConten
                         : t("venues.noHours", locale);
 
                   return (
-                    <li key={v.id}>
+                    <li key={v.id} style={{ contentVisibility: "auto", containIntrinsicSize: "auto 88px" }}>
                       <Link
                         href={localizedHref(`/venue/${v.id}`, tree)}
                         className={
-                          "text-base font-semibold text-[var(--color-sage-600)] " +
+                          "inline-flex items-center min-h-12 text-base font-semibold text-[var(--color-sage-600)] " +
                           "hover:text-[var(--color-sage-700)] transition-colors " +
                           "focus-visible:outline-none focus-visible:ring-2 " +
                           "focus-visible:ring-[var(--color-sage-500)] rounded"

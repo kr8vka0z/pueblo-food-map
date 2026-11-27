@@ -20,25 +20,33 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test("cancelling the confirm dialog never calls the flag route", async () => {
-  vi.spyOn(window, "confirm").mockReturnValue(false);
+test("cancelling the inline confirmation never calls the flag route or window.confirm", async () => {
+  const confirmSpy = vi.spyOn(window, "confirm");
   const user = userEvent.setup();
   render(<ReportPhotoButton photoId={42} locale="en" />);
 
   await user.click(screen.getByRole("button", { name: "Report this photo" }));
+  expect(confirmSpy).not.toHaveBeenCalled();
+
+  const cancelBtn = screen.getByRole("button", { name: "Cancel" });
+  expect(document.activeElement).toBe(cancelBtn);
+  await user.click(cancelBtn);
 
   expect(mockFetch).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Report this photo" })).toBeDefined();
 });
 
-test("confirming POSTs the flag route with a clientToken and shows a thank-you", async () => {
-  vi.spyOn(window, "confirm").mockReturnValue(true);
+test("confirming inline POSTs the flag route with a clientToken and shows a thank-you", async () => {
+  const confirmSpy = vi.spyOn(window, "confirm");
   mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
   const user = userEvent.setup();
   render(<ReportPhotoButton photoId={42} locale="en" />);
 
   await user.click(screen.getByRole("button", { name: "Report this photo" }));
+  await user.click(screen.getByRole("button", { name: "Hide photo" }));
 
   await waitFor(() => expect(screen.getByText(/Thanks/i)).toBeDefined());
+  expect(confirmSpy).not.toHaveBeenCalled();
   const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
   expect(url).toBe("/api/public/box-photos/42/flag");
   const body = JSON.parse(init.body as string);
@@ -47,12 +55,12 @@ test("confirming POSTs the flag route with a clientToken and shows a thank-you",
 });
 
 test("a failed report shows an inline error, and the button stays available", async () => {
-  vi.spyOn(window, "confirm").mockReturnValue(true);
   mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ ok: false }), { status: 500 }));
   const user = userEvent.setup();
   render(<ReportPhotoButton photoId={42} locale="en" />);
 
   await user.click(screen.getByRole("button", { name: "Report this photo" }));
+  await user.click(screen.getByRole("button", { name: "Hide photo" }));
 
   await waitFor(() => expect(screen.getByRole("alert")).toBeDefined());
   expect(screen.getByRole("button", { name: "Report this photo" })).not.toBeDisabled();

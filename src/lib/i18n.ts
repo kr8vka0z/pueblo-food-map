@@ -38,10 +38,10 @@ const enClient: Record<string, string> = {
   // native-speaker [CHECK] review as every other locale-facing string.
   "meta.home.title": "Pueblo Food Map · Free Food, Pantries and SNAP Stores in Pueblo County, CO",
   "meta.home.description":
-    "Find free and low-cost food near you in Pueblo County, CO — pantries, community gardens, grocery stores, and meal sites, with SNAP/WIC info and directions.",
+    "Find free and low-cost food near you in Pueblo County, CO: pantries, community gardens, grocery stores, and meal sites, with SNAP/WIC info and directions.",
 
   // Search
-  "search.placeholder": "Search",
+  "search.placeholder": "Search places, pantries, SNAP…",
   "search.aria": "Search places",
 
   // Category labels (full)
@@ -81,10 +81,10 @@ const enClient: Record<string, string> = {
   // "View on the map" CTA on /venue/[id] — was a hardcoded English string
   // (pueblo-food-map#bilingual-static-pages) since that page never read locale.
   "detail.viewOnMap": "View on the map",
-  "detail.hours": "HOURS",
-  "detail.contact": "CONTACT",
-  "detail.about": "ABOUT",
-  "detail.sources": "SOURCES & DATA",
+  "detail.hours": "Hours",
+  "detail.contact": "Contact",
+  "detail.about": "About",
+  "detail.sources": "Sources & data",
   "detail.acceptsSnap": "Accepts SNAP",
   "detail.acceptsWic": "Accepts WIC",
   "detail.plentifulLink": "See hours, eligibility & what to bring on Plentiful",
@@ -99,7 +99,7 @@ const enClient: Record<string, string> = {
   "badge.opensAt": "Opens at {time}",
   "badge.closesAt": "Closes {time}",
   "badge.closedToday": "Closed today",
-  "badge.hoursUnknown": "Hours unknown — call ahead",
+  "badge.hoursUnknown": "Hours unknown, call ahead",
   "badge.snap": "SNAP",
   "badge.wic": "WIC",
 
@@ -264,7 +264,7 @@ const enClient: Record<string, string> = {
   "suggest.backToMap": "Back to map",
   "suggest.success.title": "Thank you!",
   "suggest.success.body": "Your suggestion has been submitted. We review all suggestions and will add verified places to the map.",
-  "suggest.error.title": "Something went wrong",
+  "suggest.error.title": "Couldn't send your suggestion",
   "suggest.error.body": "Your suggestion couldn't be sent. Please try again, or email us directly at suggestions@pueblofoodmap.com.",
   "suggest.error.retry": "Try again",
   "suggest.validation.nameRequired": "Please enter a place name.",
@@ -282,7 +282,7 @@ const enClient: Record<string, string> = {
   // <title> for /feedback (#589) — matches page.tsx's metadata title
   // exactly ("Send Feedback"); distinct from feedback.title, the on-page h1.
   "feedback.documentTitle": "Send Feedback",
-  "feedback.subtitle": "Compliments, bug reports, or feature ideas — we want to hear it.",
+  "feedback.subtitle": "Compliments, bug reports, or feature ideas. We want to hear from you.",
   "feedback.type.label": "Feedback type",
   "feedback.type.placeholder": "Select a type",
   "feedback.type.positive": "Positive / compliment",
@@ -300,7 +300,7 @@ const enClient: Record<string, string> = {
   "feedback.backToMap": "Back to map",
   "feedback.success.title": "Thank you!",
   "feedback.success.body": "Your feedback has been sent. We read every message and use it to improve the map.",
-  "feedback.error.title": "Something went wrong",
+  "feedback.error.title": "Couldn't send your feedback",
   "feedback.error.body": "Your feedback couldn't be sent. Please try again, or email us directly at feedback@pueblofoodmap.com.",
   "feedback.error.retry": "Try again",
   "feedback.validation.typeRequired": "Please select a feedback type.",
@@ -360,7 +360,7 @@ const enClient: Record<string, string> = {
   "report.backToMap": "Back to map",
   "report.success.title": "Thank you!",
   "report.success.body": "Your report has been sent. We review all submissions and will update the map as we verify changes.",
-  "report.error.title": "Something went wrong",
+  "report.error.title": "Couldn't send your report",
   "report.error.body": "Your report couldn't be sent. Please try again, or email us directly at issues@pueblofoodmap.com.",
   "report.error.retry": "Try again",
   "report.validation.issueTypeRequired": "Please select an issue type.",
@@ -370,10 +370,10 @@ const enClient: Record<string, string> = {
 
   // Turnstile (#162)
   "form.turnstile.verifying": "Verifying…",
-  "form.turnstile.error": "Couldn't verify you're human — please retry.",
+  "form.turnstile.error": "Couldn't verify you're human. Please try again.",
 
   // Splash dialog (#162)
-  "splash.dialogLabel": "Welcome — find food near you",
+  "splash.dialogLabel": "Welcome: find food near you",
 
   // Short pin aria labels. category.full.* stays longer for chips and detail panels.
   // Screen readers hear each pin in a cluster, so ES copy stays conversational per #162.
@@ -507,7 +507,7 @@ const enClient: Record<string, string> = {
   "shareEvent.another": "Share another event",
   "shareEvent.success.title": "Thank you!",
   "shareEvent.success.body": "We got your event. We'll look it over and be in touch before it goes on the map.",
-  "shareEvent.error.title": "Something went wrong",
+  "shareEvent.error.title": "Couldn't send your event",
   "shareEvent.error.body": "Your event couldn't be sent. Please try again, or email us at suggestions@pueblofoodmap.com.",
   "shareEvent.error.retry": "Try again",
   "shareEvent.error.rateLimit": "Too many events sent from this address. Please try again in an hour.",
@@ -527,7 +527,7 @@ const enClient: Record<string, string> = {
   "shareEvent.preview.live": "Updates as you type",
   "shareEvent.preview.note": "This is how it will look on the map once we approve it.",
   "shareEvent.preview.open": "Preview",
-  "shareEvent.preview.sheetTag": "Preview — not on the map yet",
+  "shareEvent.preview.sheetTag": "Preview (not on the map yet)",
   "shareEvent.preview.back": "Back to editing",
 
   // External links (#162)
@@ -646,11 +646,11 @@ const enClient: Record<string, string> = {
   // ("About"); distinct from about.heading, the longer on-page h1.
   "about.documentTitle": "About",
   "about.mission.heading": "Our mission",
-  "about.mission.body": "Pueblo Food Map puts every free and low-cost food resource in Pueblo County on one mobile-friendly map — so anyone, in any neighborhood, can find what they need in minutes.",
+  "about.mission.body": "Pueblo Food Map puts every free and low-cost food resource in Pueblo County on one mobile-friendly map so anyone, in any neighborhood, can find what they need in minutes.",
   "about.vision.heading": "Our vision",
   "about.vision.body": "A Pueblo County where no one goes hungry because they couldn't find the resources already available in their community.",
   "about.origin.heading": "How it started",
-  "about.origin.body": "Finding food assistance in Pueblo meant juggling separate tools — the Pueblo Food Project site, Plentiful, FoodFinder, Pueblo Transit, and 211. Pueblo Food Map consolidates those sources into a single, bilingual map that works on any smartphone, no app install required.",
+  "about.origin.body": "Finding food assistance in Pueblo meant juggling separate tools: the Pueblo Food Project site, Plentiful, FoodFinder, Pueblo Transit, and 211. Pueblo Food Map consolidates those sources into a single, bilingual map that works on any smartphone, no app install required.",
   "about.howWeSource.heading": "How places are added",
   "about.howWeSource.body": "Place data comes from Pueblo Food Project, OpenStreetMap, Plentiful's public directory, and USDA benefit data. All listings are reviewed before going live. If you know of a resource we're missing, please suggest it.",
   "about.contact.body": "Questions or partnership ideas? Email",
@@ -664,6 +664,9 @@ const enClient: Record<string, string> = {
   "footer.about": "About",
   "footer.privacy": "Privacy",
   "footer.suggest": "Suggest a place",
+  "footer.feedback": "Send feedback",
+  "footer.shareEvent": "Share an event",
+  "footer.boxActivity": "Box activity",
   "footer.roadmap": "Roadmap",
   // SEO/AEO plan Phase 0: the footer is how crawlers reach /venues (and from
   // there every venue page) — before this, no page's server HTML linked it.
@@ -679,7 +682,7 @@ const enClient: Record<string, string> = {
   // <title> for /venues (#589) — matches page.tsx's metadata title exactly
   // ("All Food Resources"); distinct from venues.heading, the on-page h1.
   "venues.documentTitle": "All Food Resources",
-  "venues.intro": "Every pantry, grocery store, community garden, farm, and meal site on the map — grouped by type, with addresses and hours.",
+  "venues.intro": "Every pantry, grocery store, community garden, farm, and meal site on the map, grouped by type, with addresses and hours.",
   "venues.noHours": "Hours not listed",
 
   // Map-wide data freshness (board review finding #2) — surfaced in ListView
@@ -692,19 +695,19 @@ const enClient: Record<string, string> = {
   "osm.attribution": "Place data includes © OpenStreetMap contributors",
 
   // About page FAQ + stats (#PR4)
-  "about.stat.insecurity": "According to Feeding America's Map the Meal Gap (2023 data), about 1 in 6 Pueblo County residents — roughly 16.5% — faces food insecurity, including nearly 1 in 5 children.",
+  "about.stat.insecurity": "According to Feeding America's Map the Meal Gap (2023 data), about 1 in 6 Pueblo County residents (roughly 16.5%) faces food insecurity, including nearly 1 in 5 children.",
   "about.stat.count": "Pueblo Food Map currently maps {count} of the free and low-cost food resources that can help.",
   "about.faq.heading": "Frequently asked questions",
   "about.faq.q1": "Is Pueblo Food Map free to use?",
-  "about.faq.a1": "Yes — completely free, with no account or sign-in. It's a community project, not a business.",
+  "about.faq.a1": "Yes, completely free, with no account or sign-in. It's a community project, not a business.",
   "about.faq.q2": "Do I need ID, proof of income, or to share my immigration status to get food?",
-  "about.faq.a2": "It depends on the location. Many pantries and meal sites serve anyone who comes — no ID or proof of income required; some ask only for basic details like household size. When a listing links to Plentiful, you can check what to bring before you go — and it's always okay to call ahead and ask.",
+  "about.faq.a2": "It depends on the location. Many pantries and meal sites serve anyone who comes, with no ID or proof of income required; some ask only for basic details like household size. When a listing links to Plentiful, you can check what to bring before you go, and it's always okay to call ahead and ask.",
   "about.faq.q3": "Does the map show which places accept SNAP or WIC?",
   "about.faq.a3": "Yes. Places that accept SNAP or WIC show a badge, and you can filter the map to show only those. We mark SNAP/WIC where we've confirmed it, mainly for grocery stores and markets.",
   "about.faq.q4": "What if a listing is wrong, out of date, or a place has closed?",
   "about.faq.a4": "Please tell us. Every place has a 'Report an issue' option, and you can suggest one we're missing. We review every report and update the map as we confirm changes.",
   "about.faq.q5": "How current is the information?",
-  "about.faq.a5": "Each place shows a 'last verified' date so you can judge how recent it is. Hours can still change — especially around holidays — so for anything time-sensitive, call ahead when a phone number is listed.",
+  "about.faq.a5": "Each place shows a 'last verified' date so you can judge how recent it is. Hours can still change, especially around holidays, so for anything time-sensitive, call ahead when a phone number is listed.",
   "about.faq.q6": "How do I get directions?",
   "about.faq.a6": "Open any place and choose Walk, Bus, or Drive. Walking directions show right on the map; bus and driving directions open in Google Maps.",
 
@@ -720,10 +723,10 @@ const enClient: Record<string, string> = {
   // Resources page (/resources) — Kyle, 2026-09-16
   "nav.resourcesPage": "Food help programs",
   "resources.heading": "Food help programs",
-  "resources.intro": "These programs can help you pay for groceries or get free food. Asking costs nothing. Not sure where to start? Call the Food Resource Hotline — they can tell you what you may qualify for.",
+  "resources.intro": "These programs can help you pay for groceries or get free food. Asking costs nothing. Not sure where to start? Call the Food Resource Hotline; they can tell you what you may qualify for.",
   "resources.goodFor": "What it's good for",
   "resources.how": "How to get it",
-  "resources.checked": "Details checked with each program in September 2026. Hours and rules can change — call ahead if you can.",
+  "resources.checked": "Details checked with each program in September 2026. Hours and rules can change; call ahead if you can.",
   "resources.action.website": "Website",
   "resources.action.call": "Call {number}",
   "resources.action.text": "Text {number}",
@@ -739,19 +742,19 @@ const enClient: Record<string, string> = {
   "resources.wic.name": "WIC",
   "resources.wic.what": "Healthy food, nutrition advice, and breastfeeding support (including pumps) for pregnant women, new moms, babies, and children under 5.",
   "resources.wic.goodFor": "Families with young children. Dads, grandparents, foster parents and other caregivers can get WIC for a child under 5. You don't need to be a U.S. citizen.",
-  "resources.wic.how": "If you get Medicaid, SNAP or TANF, you already meet the income rule. Call the Pueblo WIC clinic (101 W. 9th St.; Monday–Thursday 8 a.m.–5 p.m., Friday 8 a.m.–4:30 p.m.), or fill out the online sign-up form and they'll contact you within 10 days.",
+  "resources.wic.how": "If you get Medicaid, SNAP or TANF, you already meet the income rule. Call the Pueblo WIC clinic (101 W. 9th St.; Monday to Thursday 8 a.m.–5 p.m., Friday 8 a.m.–4:30 p.m.), or fill out the online sign-up form and they'll contact you within 10 days.",
   "resources.wic.signup": "Sign up online",
   "resources.doubleup.name": "Double Up Food Bucks",
   "resources.doubleup.what": "A match on fresh fruits and vegetables for people who use SNAP.",
   "resources.doubleup.goodFor": "Getting twice the produce. When you use your EBT card at a participating store or farmers market, Double Up matches what you spend, dollar for dollar, up to $20 a day.",
-  "resources.doubleup.how": "If you have a Colorado EBT card, you're already in — there's nothing to apply for. Just use your card at a participating location.",
+  "resources.doubleup.how": "If you have a Colorado EBT card, you're already in. There's nothing to apply for; just use your card at a participating location.",
   "resources.doubleup.find": "Find a location",
   "resources.hotline.name": "Food Resource Hotline",
   "resources.hotline.what": "A free, confidential phone line run by Hunger Free Colorado.",
   "resources.hotline.goodFor": "Getting pointed in the right direction. They check which programs you may qualify for, help you apply for SNAP over the phone, and connect you with food pantries, free meals and WIC. They help everyone, no matter their immigration status.",
-  "resources.hotline.how": "Call 855-855-4626, Monday–Thursday 8:30 a.m.–4:30 p.m. or Friday 8 a.m.–noon. Help is available in more than 150 languages, including Spanish.",
+  "resources.hotline.how": "Call 855-855-4626, Monday to Thursday 8:30 a.m.–4:30 p.m. or Friday 8 a.m.–noon. Help is available in more than 150 languages, including Spanish.",
   "resources.everydayeats.name": "Everyday Eats (60 and older)",
-  "resources.everydayeats.what": "A free box of 22–25 basic foods every month from Pueblo County — things like milk, cheese, cereal, rice or pasta, and canned fruits, vegetables and protein.",
+  "resources.everydayeats.what": "A free box of 22 to 25 basic foods every month from Pueblo County, including milk, cheese, cereal, rice or pasta, and canned fruits, vegetables and protein.",
   "resources.everydayeats.goodFor": "Adults 60 and older with limited income. Households of any age on SNAP, Medicaid, SSI and some other programs can also get emergency food (called TEFAP) the same way.",
   "resources.everydayeats.how": "Text FOOD to 1-877-644-3663. You'll get a link to a short sign-up form. You'll renew every 6 months, and if you miss your box 3 months in a row you lose your spot.",
 
@@ -797,15 +800,15 @@ const enClient: Record<string, string> = {
   "box.checkin.noteLabel": "Add a short note (optional)",
   "box.checkin.notePlaceholder.filled": "e.g. Topped it off with canned soup",
   "box.checkin.notePlaceholder.problem": "e.g. Door is broken",
-  "box.checkin.submit": "Send",
+  "box.checkin.submit": "Send note",
   "box.checkin.submitting": "Sending…",
   "box.checkin.cancel": "Cancel",
   "box.checkin.success.filled": "Thanks for filling it!",
-  "box.checkin.success.took": "Thanks — enjoy!",
+  "box.checkin.success.took": "Thanks, enjoy!",
   "box.checkin.success.low": "Thanks for the heads up.",
   "box.checkin.success.empty": "Thanks for letting us know.",
-  "box.checkin.success.problem": "Thanks — we've let the admin know.",
-  "box.checkin.error": "That didn't go through. Please try again.",
+  "box.checkin.success.problem": "Thanks, we've let the admin know.",
+  "box.checkin.error": "Couldn't save your check-in. Please try again.",
   // Split 2026-09-17 (review correction) from one shared "rateLimit" key —
   // a single message misdirected blame between "this device is over its
   // own cap" and "this box is busy right now." See the checkins route's
@@ -826,9 +829,9 @@ const enClient: Record<string, string> = {
   "box.needs.heading": "What would help you next time?",
   "box.needs.sub": "Tap any. This tells givers what to bring.",
   "box.needs.otherLabel": "Something else? (optional)",
-  "box.needs.send": "Send",
+  "box.needs.send": "Send items",
   "box.needs.skip": "Skip",
-  "box.needs.success": "Got it — thank you.",
+  "box.needs.success": "Got it, thank you.",
   "box.needs.canned_food": "Canned food",
   "box.needs.fresh_food": "Fresh food",
   "box.needs.bread": "Bread",
@@ -856,10 +859,10 @@ const enClient: Record<string, string> = {
   "box.photo.unsupportedFormat": "That photo format isn't supported. Please try a JPEG or PNG.",
   "box.photo.previewAlt": "Preview of the photo you selected",
   "box.photo.remove": "Remove",
-  "box.photo.send": "Send",
+  "box.photo.send": "Send photo",
   "box.photo.sending": "Sending…",
   "box.photo.success": "Thanks! Your photo has been submitted for review.",
-  "box.photo.error": "That didn't go through. Please try again.",
+  "box.photo.error": "Couldn't upload your photo. Please try again.",
 
   // Photo DISPLAY (card slot + history grid) and "Report this photo"
   // (ReportPhotoButton.tsx) — separate from the upload-picker keys above.
@@ -879,8 +882,9 @@ const enClient: Record<string, string> = {
   "box.photo.report": "Report this photo",
   "box.photo.reporting": "Reporting…",
   "box.photo.reportConfirm": "Hide this photo and send it for review?",
-  "box.photo.reportThanks": "Thanks — this photo has been hidden pending review.",
-  "box.photo.reportError": "That didn't go through. Please try again.",
+  "box.photo.reportConfirmAction": "Hide photo",
+  "box.photo.reportThanks": "Thanks. This photo has been hidden pending review.",
+  "box.photo.reportError": "Couldn't hide this photo. Please try again.",
 
   // "box.recentCheckin.heading"/"box.recentCheckin.none" deleted (card
   // redesign, 2026-09-19) — the standalone "Most recent check-in" line is
@@ -929,7 +933,7 @@ const enClient: Record<string, string> = {
   "box.stats.noData": "—",
   "box.stats.duration.hours": "{value} hours",
   "box.stats.duration.days": "{value} days",
-  "box.stats.honestyNote": "These numbers count check-ins, not every visit — so “uses” reads lower than real foot traffic, on purpose.",
+  "box.stats.honestyNote": "These numbers count check-ins, not every visit, so \"uses\" reads lower than real foot traffic, on purpose.",
   "box.stats.neverFilled": "Never filled",
   "box.stats.needLoveHeading": "Boxes that need love",
   "box.stats.needLove.longestSinceFill": "Longest since last fill",
@@ -972,7 +976,10 @@ const enClient: Record<string, string> = {
   // of failure" convention as box.checkin.error, but not scope-split like
   // that one: the adopt/alert forms don't need per-scope wording, only "try
   // again" vs. "try again later."
-  "box.form.error.generic": "That didn't go through. Please try again.",
+  "box.form.error.generic": "Couldn't send your request. Please try again.",
+  "box.form.validation.nameRequired": "Please enter your name.",
+  "box.form.validation.emailRequired": "Please enter your email address.",
+  "box.form.validation.emailInvalid": "Please enter a valid email address.",
   "box.form.error.rateLimit": "Too many attempts right now. Please try again later.",
 
   // Sponsor band (card redesign, 2026-09-19) — replaces the old flat
@@ -992,20 +999,21 @@ const enClient: Record<string, string> = {
   // next.config.ts and each page's own metadata export.
   "alerts.confirm.heading": "Confirm your email",
   "alerts.confirm.body": "Click the button below to confirm you'd like these emails.",
-  "alerts.confirm.button": "Confirm",
+  "alerts.confirm.button": "Confirm email",
+  "alerts.confirm.retry": "Try again",
   "alerts.confirm.confirming": "Confirming…",
   "alerts.confirm.success": "You're confirmed! You'll get emails as described.",
   "alerts.confirm.invalid": "This confirmation link is no longer valid.",
-  "alerts.confirm.error": "Something went wrong. Please try again.",
+  "alerts.confirm.error": "Couldn't confirm your email. Please try again.",
   "alerts.stop.heading": "Emails stopped",
   "alerts.stop.stopping": "Stopping…",
   "alerts.stop.body": "You won't get any more emails about this.",
   "alerts.stop.invalid": "This link is no longer valid.",
   "alerts.stop.noscriptButton": "Stop these emails",
-  "alerts.stop.undoButton": "That was a mistake — turn emails back on",
+  "alerts.stop.undoButton": "That was a mistake: turn emails back on",
   "alerts.stop.undoing": "Turning back on…",
   "alerts.stop.undone": "You're back on the list.",
-  "alerts.stop.undoError": "That didn't go through. Please try again.",
+  "alerts.stop.undoError": "Couldn't turn emails back on. Please try again.",
   "email.adoptConfirm.subject": "Confirm your application to sponsor {box}",
   "email.adoptConfirm.line1": "Thanks for applying to sponsor {box}. Please confirm your email to finish your application.",
   "email.adoptConfirm.line2": "An admin will review your application once you've confirmed.",

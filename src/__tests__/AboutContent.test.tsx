@@ -73,8 +73,11 @@ describe("AboutContent — locale", () => {
           <AboutContent faqJsonLd={FIXTURE_JSON_LD} venueCount={42} publishedAt="2026-01-01T00:00:00.000Z" />
         </LocaleProvider>,
       );
-      const link = screen.getByRole("link", { name: "hello@pueblofoodmap.com" });
-      expect(link.getAttribute("href")).toBe("mailto:hello@pueblofoodmap.com");
+      const links = screen.getAllByRole("link", { name: "hello@pueblofoodmap.com" });
+      expect(links.length).toBeGreaterThanOrEqual(1);
+      for (const link of links) {
+        expect(link.getAttribute("href")).toBe("mailto:hello@pueblofoodmap.com");
+      }
       expect(screen.getByText(t("about.contact.body", locale), { exact: false })).toBeDefined();
       unmount();
     }

@@ -28,6 +28,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { AlertCircle } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
@@ -91,7 +92,7 @@ export default function AlertsStopContent({ token }: { token: string }) {
 
       <div className="flex-1 w-full max-w-md mx-auto px-4 py-10 text-center">
         <h1
-          className="text-2xl font-normal text-[var(--color-ink-900)]"
+          className="text-2xl font-normal text-balance text-[var(--color-ink-900)]"
           style={{ fontFamily: "var(--font-display)" }}
         >
           {t("alerts.stop.heading", locale)}
@@ -122,14 +123,16 @@ export default function AlertsStopContent({ token }: { token: string }) {
                   className={
                     "mt-6 relative before:absolute before:inset-x-0 before:-inset-y-0.5 min-h-[44px] px-4 text-sm font-medium text-[var(--color-sage-600)] underline " +
                     "underline-offset-2 hover:text-[var(--color-sage-700)] " +
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded " +
                     "disabled:opacity-50 disabled:cursor-not-allowed"
                   }
                 >
                   {undoState === "undoing" ? t("alerts.stop.undoing", locale) : t("alerts.stop.undoButton", locale)}
                 </button>
                 {undoState === "error" && (
-                  <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
-                    {t("alerts.stop.undoError", locale)}
+                  <p role="alert" className="mt-2 inline-flex items-start justify-center gap-1.5 text-sm text-[var(--color-danger)]">
+                    <AlertCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+                    <span>{t("alerts.stop.undoError", locale)}</span>
                   </p>
                 )}
               </>
@@ -138,13 +141,15 @@ export default function AlertsStopContent({ token }: { token: string }) {
         )}
 
         {result === "invalid" && (
-          <p role="alert" className="mt-4 text-sm text-[var(--color-danger)]">
-            {t("alerts.stop.invalid", locale)}
+          <p role="alert" className="mt-4 inline-flex items-start justify-center gap-1.5 text-sm text-[var(--color-danger)]">
+            <AlertCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+            <span>{t("alerts.stop.invalid", locale)}</span>
           </p>
         )}
         {result === "unavailable" && (
-          <p role="alert" className="mt-4 text-sm text-[var(--color-danger)]">
-            {t("alerts.confirm.error", locale)}
+          <p role="alert" className="mt-4 inline-flex items-start justify-center gap-1.5 text-sm text-[var(--color-danger)]">
+            <AlertCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+            <span>{t("alerts.confirm.error", locale)}</span>
           </p>
         )}
 
@@ -153,7 +158,7 @@ export default function AlertsStopContent({ token }: { token: string }) {
             <form action={`/api/public/alerts/stop?t=${encodeURIComponent(token)}`} method="post" className="mt-6">
               <button
                 type="submit"
-                className="min-h-12 px-4 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] text-sm font-semibold"
+                className="min-h-12 px-4 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
               >
                 {t("alerts.stop.noscriptButton", locale)}
               </button>

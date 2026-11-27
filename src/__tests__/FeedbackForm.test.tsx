@@ -24,6 +24,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import FeedbackForm from "@/components/FeedbackForm";
 import { LocaleProvider } from "@/lib/LocaleContext";
+import { t } from "@/lib/i18n";
 import {
   expectTurnstileError,
   getSubmitButtonName,
@@ -49,7 +50,7 @@ const mockTurnstile = {
 const mockFetch = vi.fn();
 
 beforeEach(() => {
-  mockFetch.mockClear();
+  mockFetch.mockReset();
   vi.stubGlobal("fetch", mockFetch);
   mockTurnstile.render.mockClear();
   mockTurnstile.reset.mockClear();
@@ -88,12 +89,21 @@ function mockError(error = "send_failed") {
   });
 }
 
+async function selectFeedbackType(
+  user: ReturnType<typeof userEvent.setup>,
+  key: "problem" | "feature" | "positive" | "other",
+  locale: "en" | "es" = "en",
+) {
+  await user.click(screen.getByRole("radio", { name: t(`feedback.type.${key}`, locale) }));
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("FeedbackForm — rendering", () => {
-  test("renders feedback type select", () => {
+  test("renders feedback type radio group with all 4 options", () => {
     renderForm();
-    expect(screen.getByLabelText(/Feedback type/i)).toBeDefined();
+    expect(screen.getByRole("group", { name: /Feedback type/i })).toBeDefined();
+    expect(screen.getAllByRole("radio")).toHaveLength(4);
   });
 
   test("renders message textarea", () => {
@@ -152,9 +162,7 @@ describe("FeedbackForm — client validation", () => {
     const user = userEvent.setup();
     renderForm();
 
-    // Select type
-    const select = screen.getByLabelText(/Feedback type/i) as HTMLSelectElement;
-    await user.selectOptions(select, "feature");
+    await selectFeedbackType(user, "feature");
 
     await waitForSubmitEnabled("feedback");
     await user.click(screen.getByRole("button", { name: /Send feedback/i }));
@@ -168,8 +176,7 @@ describe("FeedbackForm — client validation", () => {
     const user = userEvent.setup();
     renderForm();
 
-    const select = screen.getByLabelText(/Feedback type/i) as HTMLSelectElement;
-    await user.selectOptions(select, "problem");
+    await selectFeedbackType(user, "problem");
 
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "The search bar is broken.");
@@ -190,8 +197,7 @@ describe("FeedbackForm — client validation", () => {
     const user = userEvent.setup();
     renderForm();
 
-    const select = screen.getByLabelText(/Feedback type/i) as HTMLSelectElement;
-    await user.selectOptions(select, "positive");
+    await selectFeedbackType(user, "positive");
 
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "Love the map!");
@@ -211,8 +217,7 @@ describe("FeedbackForm — client validation", () => {
     const user = userEvent.setup();
     renderForm();
 
-    const select = screen.getByLabelText(/Feedback type/i) as HTMLSelectElement;
-    await user.selectOptions(select, "other");
+    await selectFeedbackType(user, "other");
 
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "Just a general note.");
@@ -233,8 +238,7 @@ describe("FeedbackForm — submit flow", () => {
     const user = userEvent.setup();
     renderForm();
 
-    const select = screen.getByLabelText(/Feedback type/i) as HTMLSelectElement;
-    await user.selectOptions(select, "feature");
+    await selectFeedbackType(user, "feature");
 
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "Please add a printer-friendly view.");
@@ -265,8 +269,7 @@ describe("FeedbackForm — submit flow", () => {
     const user = userEvent.setup();
     renderForm();
 
-    const select = screen.getByLabelText(/Feedback type/i) as HTMLSelectElement;
-    await user.selectOptions(select, "positive");
+    await selectFeedbackType(user, "positive");
 
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "Love the map!");
@@ -287,8 +290,7 @@ describe("FeedbackForm — submit flow", () => {
     const user = userEvent.setup();
     renderForm();
 
-    const select = screen.getByLabelText(/Feedback type/i) as HTMLSelectElement;
-    await user.selectOptions(select, "problem");
+    await selectFeedbackType(user, "problem");
 
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "Something is broken.");
@@ -299,7 +301,7 @@ describe("FeedbackForm — submit flow", () => {
     await waitForSubmitEnabled("feedback");
     await user.click(screen.getByRole("button", { name: /Send feedback/i }));
     await waitFor(() => {
-      expect(screen.getByText(/Something went wrong/i)).toBeDefined();
+      expect(screen.getByText(/Couldn't send your feedback/i)).toBeDefined();
     });
   });
 
@@ -308,8 +310,7 @@ describe("FeedbackForm — submit flow", () => {
     const user = userEvent.setup();
     renderForm();
 
-    const select = screen.getByLabelText(/Feedback type/i) as HTMLSelectElement;
-    await user.selectOptions(select, "problem");
+    await selectFeedbackType(user, "problem");
 
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "Something is broken.");
@@ -320,12 +321,12 @@ describe("FeedbackForm — submit flow", () => {
     await waitForSubmitEnabled("feedback");
     await user.click(screen.getByRole("button", { name: /Send feedback/i }));
     await waitFor(() => {
-      expect(screen.getByText(/Something went wrong/i)).toBeDefined();
+      expect(screen.getByText(/Couldn't send your feedback/i)).toBeDefined();
     });
 
     await user.click(screen.getByRole("button", { name: /Try again/i }));
     await waitFor(() => {
-      expect(screen.queryByText(/Something went wrong/i)).toBeNull();
+      expect(screen.queryByText(/Couldn't send your feedback/i)).toBeNull();
     });
     expect(screen.getByRole("button", { name: /Send feedback/i })).toBeDefined();
   });
@@ -335,8 +336,7 @@ describe("FeedbackForm — submit flow", () => {
     const user = userEvent.setup();
     renderForm();
 
-    const select = screen.getByLabelText(/Feedback type/i) as HTMLSelectElement;
-    await user.selectOptions(select, "other");
+    await selectFeedbackType(user, "other");
 
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "A message.");
@@ -350,7 +350,7 @@ describe("FeedbackForm — submit flow", () => {
       expect(screen.getByText(/Too many submissions/i)).toBeDefined();
     });
     // Should NOT show global error banner
-    expect(screen.queryByText(/Something went wrong/i)).toBeNull();
+    expect(screen.queryByText(/Couldn't send your feedback/i)).toBeNull();
   });
 
   test("turnstile_failed error from server shows Turnstile error message + resets widget", async () => {
@@ -358,8 +358,7 @@ describe("FeedbackForm — submit flow", () => {
     const user = userEvent.setup();
     renderForm();
 
-    const select = screen.getByLabelText(/Feedback type/i) as HTMLSelectElement;
-    await user.selectOptions(select, "feature");
+    await selectFeedbackType(user, "feature");
 
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "Would love dark mode.");
@@ -371,7 +370,7 @@ describe("FeedbackForm — submit flow", () => {
     await user.click(screen.getByRole("button", { name: /Send feedback/i }));
     await expectTurnstileError("en");
     // Should NOT show global error banner
-    expect(screen.queryByText(/Something went wrong/i)).toBeNull();
+    expect(screen.queryByText(/Couldn't send your feedback/i)).toBeNull();
     // Widget reset should have been called
     expect(mockTurnstile.reset).toHaveBeenCalled();
   });
@@ -381,8 +380,7 @@ describe("FeedbackForm — submit flow", () => {
     const user = userEvent.setup();
     renderForm("es");
 
-    const select = screen.getByLabelText(/Tipo de comentario/i) as HTMLSelectElement;
-    await user.selectOptions(select, "feature");
+    await selectFeedbackType(user, "feature", "es");
 
     const textarea = screen.getByLabelText(/Mensaje/i);
     await user.type(textarea, "Would love dark mode.");
@@ -395,5 +393,49 @@ describe("FeedbackForm — submit flow", () => {
       screen.getByRole("button", { name: getSubmitButtonName("feedback", "es") }),
     );
     await expectTurnstileError("es");
+  });
+
+  test("early onBlur validation flags an invalid email before submit (#959)", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    const emailInput = screen.getByLabelText(/Your email/i);
+    await user.type(emailInput, "not-an-email");
+    await user.tab();
+
+    expect(screen.getByText(/valid email address/i)).toBeDefined();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  test("submitting before Turnstile resolves queues the submit instead of disabling the button (#959)", async () => {
+    let deliverToken: ((tok: string) => void) | undefined;
+    vi.stubGlobal("turnstile", {
+      render: vi.fn((_c: HTMLElement, opts: { callback?: (tok: string) => void }) => {
+        deliverToken = opts.callback;
+        return "widget-delayed";
+      }),
+      reset: vi.fn(),
+      remove: vi.fn(),
+    });
+    mockSuccess();
+    const user = userEvent.setup();
+    renderForm();
+
+    // Button is immediately enabled with its real action label, not disabled with "Verifying…"
+    const submitBtn = screen.getByRole("button", { name: /Send feedback/i });
+    expect(submitBtn).not.toBeDisabled();
+
+    await selectFeedbackType(user, "positive");
+    await user.type(screen.getByLabelText(/Message/i), "Great map!");
+    await user.type(screen.getByLabelText(/Your email/i), "test@example.com");
+    await user.click(submitBtn);
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    deliverToken?.("late-token");
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledOnce());
+    const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.turnstileToken).toBe("late-token");
+    expect(await screen.findByText(/Thank you!/i)).toBeDefined();
   });
 });

@@ -17,6 +17,7 @@ import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { localizedHref } from "@/lib/localizedHref";
 import { OSM_COPYRIGHT_URL } from "@/lib/osmAttribution";
+import { SITE_CONTACT_EMAIL } from "@/lib/site";
 import StyxCredit from "./StyxCredit";
 
 // #711: every link is at least 48×48 (DESIGN.md touch-target floor; short
@@ -99,10 +100,31 @@ export default function SiteFooter() {
         >
           {t("footer.suggest", locale)}
         </Link>
+        <Link
+          href="/feedback"
+          className={LINK_CLASS}
+        >
+          {t("footer.feedback", locale)}
+        </Link>
+        <Link
+          href={localizedHref("/events/share", tree)}
+          className={LINK_CLASS}
+        >
+          {t("footer.shareEvent", locale)}
+        </Link>
+        <Link
+          href="/boxes/activity"
+          className={LINK_CLASS}
+        >
+          {t("footer.boxActivity", locale)}
+        </Link>
         {/* Roadmap (#846): served by a separate Worker, so a plain <a> (no
             client routing) and the same /roadmap path in both languages. */}
         <a href="/roadmap" className={LINK_CLASS}>
           {t("footer.roadmap", locale)}
+        </a>
+        <a href={`mailto:${SITE_CONTACT_EMAIL}`} className={LINK_CLASS}>
+          {SITE_CONTACT_EMAIL}
         </a>
         {/* ODbL attribution (#133 4.5) — this footer covers /venues, /about
             and every other SiteFooter page that lists venue data without

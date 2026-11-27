@@ -75,7 +75,7 @@ function HubShell({
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8 space-y-8">
         <div>
           <h1
-            className="text-3xl font-normal text-[var(--color-ink-900)]"
+            className="text-3xl font-normal text-balance text-[var(--color-ink-900)]"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {heading}
@@ -153,7 +153,7 @@ export function SnapWicHub({ locale, venues }: { locale: Locale; venues: Venue[]
         {t("hubs.snapWic.note", locale)} {t("hubs.snapWic.apply", locale)}{" "}
         <Link
           href={localizedHref("/resources", locale)}
-          className="inline-flex items-center min-h-12 font-semibold text-[var(--color-sage-600)] underline"
+          className="inline-flex items-center min-h-12 font-semibold text-[var(--color-sage-600)] underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
         >
           {t("resources.heading", locale)}
         </Link>

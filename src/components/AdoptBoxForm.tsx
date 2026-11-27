@@ -23,12 +23,15 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import { AlertCircle } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { EMAIL_RE } from "@/lib/email";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { getCheckinClientToken } from "@/lib/checkinClientToken";
 import { useQueuedTurnstileSubmit, useTurnstile } from "@/lib/useTurnstile";
 import CardFormTurnstile from "@/components/CardFormTurnstile";
+import SuccessTick from "@/components/SuccessTick";
 import { track, EVENTS } from "@/lib/analytics";
 import { PRIMARY_BTN, SECONDARY_BTN } from "@/components/BoxCheckinPanel";
 
@@ -56,6 +59,15 @@ export default function AdoptBoxForm({ boxId, open, onOpenChange }: AdoptBoxForm
   const [note, setNote] = useState("");
   const [honeypot, setHoneypot] = useState("");
   const [state, setState] = useState<SubmitState>("idle");
+  const [fieldErrors, setFieldErrors] = useState<{ displayName?: string; email?: string }>({});
+
+  function validateFields(nameVal: string, emailVal: string) {
+    const errs: { displayName?: string; email?: string } = {};
+    if (!nameVal.trim()) errs.displayName = t("box.form.validation.nameRequired", locale);
+    if (!emailVal.trim()) errs.email = t("box.form.validation.emailRequired", locale);
+    else if (!EMAIL_RE.test(emailVal.trim())) errs.email = t("box.form.validation.emailInvalid", locale);
+    return errs;
+  }
 
   // The container ref stays LOCAL to this component (not returned by the
   // hook) — see useTurnstile.ts's own header for why (the React
@@ -111,6 +123,13 @@ export default function AdoptBoxForm({ boxId, open, onOpenChange }: AdoptBoxForm
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (state === "submitting" || queued) return;
+    const errs = validateFields(displayName, email);
+    if (errs.displayName || errs.email) {
+      setFieldErrors(errs);
+      document.getElementById(errs.displayName ? "adopt-display-name-error" : "adopt-email-error")?.focus();
+      return;
+    }
+    setFieldErrors({});
     const values: PendingSubmit = { displayName: displayName.trim(), email: email.trim(), note: note.trim() };
     if (turnstile.token) {
       void submit(values);
@@ -146,8 +165,9 @@ export default function AdoptBoxForm({ boxId, open, onOpenChange }: AdoptBoxForm
   if (state === "success") {
     return (
       <>
-        <p role="status" className="text-sm font-medium text-[var(--color-success)]">
-          {t("box.adopt.success", locale)}
+        <p role="status" className="flex items-center gap-2 text-sm font-medium text-[var(--color-success)]">
+          <SuccessTick size={20} />
+          <span>{t("box.adopt.success", locale)}</span>
         </p>
         {turnstileNodes}
       </>
@@ -158,9 +178,10 @@ export default function AdoptBoxForm({ boxId, open, onOpenChange }: AdoptBoxForm
     <>
     <form
       onSubmit={handleSubmit}
+      noValidate
       className="space-y-2 rounded-[var(--radius-md)] border border-[var(--color-bone-200)] p-3"
     >
-      <h3 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)]">
+      <h3 className="text-sm font-semibold text-[var(--color-ink-900)]">
         {t("box.adopt.linkLabel", locale)}
       </h3>
 
@@ -170,14 +191,33 @@ export default function AdoptBoxForm({ boxId, open, onOpenChange }: AdoptBoxForm
         </label>
         <input
           id="adopt-display-name"
+          name="displayName"
           type="text"
           required
+          aria-required="true"
+          aria-invalid={fieldErrors.displayName ? "true" : undefined}
+          aria-describedby={fieldErrors.displayName ? "adopt-display-name-error" : undefined}
+          autoComplete="name"
+          spellCheck={false}
+          enterKeyHint="next"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
+          onBlur={() =>
+            setFieldErrors((prev) => ({ ...prev, displayName: validateFields(displayName, email).displayName }))
+          }
           maxLength={FIELD_LIMITS.BOX_ADOPTER_DISPLAY_NAME}
           placeholder={t("box.adopt.displayNamePlaceholder", locale)}
-          className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+          className={
+            "mt-1 w-full min-h-12 rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
+            (fieldErrors.displayName ? "border-[var(--color-danger)]" : "border-[var(--color-ink-400)]")
+          }
         />
+        {fieldErrors.displayName && (
+          <p id="adopt-display-name-error" role="alert" tabIndex={-1} className="mt-1 flex items-start gap-1 text-xs text-[var(--color-danger)]">
+            <AlertCircle size={14} aria-hidden className="mt-0.5 shrink-0" />
+            <span>{fieldErrors.displayName}</span>
+          </p>
+        )}
       </div>
 
       <div>
@@ -186,16 +226,37 @@ export default function AdoptBoxForm({ boxId, open, onOpenChange }: AdoptBoxForm
         </label>
         <input
           id="adopt-email"
+          name="email"
           type="email"
           required
+          aria-required="true"
+          aria-invalid={fieldErrors.email ? "true" : undefined}
+          aria-describedby={fieldErrors.email ? "adopt-email-error" : undefined}
+          autoComplete="email"
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="next"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          onBlur={() =>
+            setFieldErrors((prev) => ({ ...prev, email: validateFields(displayName, email).email }))
+          }
           maxLength={FIELD_LIMITS.EMAIL}
-          className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+          className={
+            "mt-1 w-full min-h-12 rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
+            (fieldErrors.email ? "border-[var(--color-danger)]" : "border-[var(--color-ink-400)]")
+          }
         />
+        {fieldErrors.email && (
+          <p id="adopt-email-error" role="alert" tabIndex={-1} className="mt-1 flex items-start gap-1 text-xs text-[var(--color-danger)]">
+            <AlertCircle size={14} aria-hidden className="mt-0.5 shrink-0" />
+            <span>{fieldErrors.email}</span>
+          </p>
+        )}
         <p className="mt-1 text-xs text-[var(--color-ink-400)]">
           {t("box.alerts.emailDisclosure", locale)}{" "}
-          <Link href="/privacy" className="underline hover:text-[var(--color-sage-600)] transition-colors">
+          <Link href="/privacy" className="underline hover:text-[var(--color-sage-600)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded">
             {t("privacy.linkLabel", locale)}
           </Link>
         </p>
@@ -207,27 +268,31 @@ export default function AdoptBoxForm({ boxId, open, onOpenChange }: AdoptBoxForm
         </label>
         <textarea
           id="adopt-note"
+          name="note"
           rows={2}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           maxLength={FIELD_LIMITS.BOX_ADOPTER_NOTE}
-          className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] bg-white resize-y focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+          className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-ink-400)] px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] bg-white resize-y focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
         />
       </div>
 
       {state === "error" && (
-        <p role="alert" className="text-sm font-medium text-[var(--color-danger)]">
-          {t("box.form.error.generic", locale)}
+        <p role="alert" className="flex items-start gap-1.5 text-sm font-medium text-[var(--color-danger)]">
+          <AlertCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{t("box.form.error.generic", locale)}</span>
         </p>
       )}
       {state === "rateLimited" && (
-        <p role="alert" className="text-sm font-medium text-[var(--color-danger)]">
-          {t("box.form.error.rateLimit", locale)}
+        <p role="alert" className="flex items-start gap-1.5 text-sm font-medium text-[var(--color-danger)]">
+          <AlertCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{t("box.form.error.rateLimit", locale)}</span>
         </p>
       )}
       {turnstile.error && (
-        <p role="alert" className="text-xs text-[var(--color-danger)]">
-          {t("form.turnstile.error", locale)}
+        <p role="alert" className="flex items-start gap-1 text-xs text-[var(--color-danger)]">
+          <AlertCircle size={14} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{t("form.turnstile.error", locale)}</span>
         </p>
       )}
 

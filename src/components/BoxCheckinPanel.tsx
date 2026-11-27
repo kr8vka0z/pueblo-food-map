@@ -143,6 +143,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
+import { AlertCircle } from "lucide-react";
 import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
@@ -150,8 +151,10 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { getCheckinClientToken } from "@/lib/checkinClientToken";
 import { shrinkImageToJpeg, UnsupportedImageError } from "@/lib/imageResize";
 import ReportPhotoButton from "@/components/ReportPhotoButton";
+import SuccessTick from "@/components/SuccessTick";
 import { PENDING_SUBMIT_TIMEOUT_MS, useTurnstile } from "@/lib/useTurnstile";
 import { NEED_KEYS, type BoxStatus, type CheckinKind, type NeedKey } from "@/lib/blessingBoxes";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { track, EVENTS } from "@/lib/analytics";
 
 const { BOX_CHECKIN_NOTE } = FIELD_LIMITS;
@@ -178,9 +181,13 @@ const KIND_WITH_PHOTO_ATTACH: CheckinKind = "filled";
 export const PRIMARY_BTN =
   "min-h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
   "text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
+  PRESS_FEEDBACK + " " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2";
 export const SECONDARY_BTN =
-  "min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] transition-colors duration-150 hover:bg-[var(--color-sage-100)]";
+  "min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] " +
+  "transition-colors duration-150 hover:bg-[var(--color-sage-100)] " +
+  PRESS_FEEDBACK + " " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
 
 interface BoxCheckinPanelProps {
   boxId: string;
@@ -634,7 +641,9 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
   const buttonBase =
     "min-h-12 px-3 py-2 rounded-[var(--radius-md)] text-sm font-medium text-center " +
     "transition-colors duration-150 border border-[var(--color-bone-300)] text-[var(--color-ink-700)] bg-white " +
-    "hover:bg-[var(--color-sage-100)] focus-visible:outline-none focus-visible:ring-2 " +
+    "hover:bg-[var(--color-sage-100)] " +
+    PRESS_FEEDBACK + " " +
+    "focus-visible:outline-none focus-visible:ring-2 " +
     "focus-visible:ring-[var(--color-sage-500)] disabled:opacity-60 disabled:cursor-not-allowed";
 
   // One action at a time: busy while an actual submit is in flight OR one is
@@ -675,29 +684,34 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
 
       <div role="status" aria-live="polite">
         {submitState === "success" && lastKind && (
-          <p className="text-sm font-medium text-[var(--color-success)]">
-            {t(`box.checkin.success.${lastKind}`, locale)}
+          <p className="flex items-center gap-2 text-sm font-medium text-[var(--color-success)]">
+            <SuccessTick size={20} />
+            <span>{t(`box.checkin.success.${lastKind}`, locale)}</span>
           </p>
         )}
       </div>
       {submitState === "error" && (
-        <p role="alert" className="text-sm font-medium text-[var(--color-danger)]">
-          {t("box.checkin.error", locale)}
+        <p role="alert" className="flex items-start gap-1.5 text-sm font-medium text-[var(--color-danger)]">
+          <AlertCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{t("box.checkin.error", locale)}</span>
         </p>
       )}
       {submitState === "rate_limited_visitor" && (
-        <p role="alert" className="text-sm font-medium text-[var(--color-danger)]">
-          {t("box.checkin.error.rateLimitVisitor", locale)}
+        <p role="alert" className="flex items-start gap-1.5 text-sm font-medium text-[var(--color-danger)]">
+          <AlertCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{t("box.checkin.error.rateLimitVisitor", locale)}</span>
         </p>
       )}
       {submitState === "rate_limited_box" && (
-        <p role="alert" className="text-sm font-medium text-[var(--color-danger)]">
-          {t("box.checkin.error.rateLimitBox", locale)}
+        <p role="alert" className="flex items-start gap-1.5 text-sm font-medium text-[var(--color-danger)]">
+          <AlertCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{t("box.checkin.error.rateLimitBox", locale)}</span>
         </p>
       )}
       {turnstile.error && (
-        <p role="alert" className="text-xs text-[var(--color-danger)]">
-          {t("form.turnstile.error", locale)}
+        <p role="alert" className="flex items-start gap-1 text-xs text-[var(--color-danger)]">
+          <AlertCircle size={14} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{t("form.turnstile.error", locale)}</span>
         </p>
       )}
 
@@ -708,12 +722,16 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
           message above lives outside `openKind &&`. */}
       <div role="status" aria-live="polite">
         {photoSubmitState === "success" && (
-          <p className="text-sm font-medium text-[var(--color-success)]">{t("box.photo.success", locale)}</p>
+          <p className="flex items-center gap-2 text-sm font-medium text-[var(--color-success)]">
+            <SuccessTick size={20} />
+            <span>{t("box.photo.success", locale)}</span>
+          </p>
         )}
       </div>
       {photoSubmitState === "error" && (
-        <p role="alert" className="text-sm font-medium text-[var(--color-danger)]">
-          {t("box.photo.error", locale)}
+        <p role="alert" className="flex items-start gap-1.5 text-sm font-medium text-[var(--color-danger)]">
+          <AlertCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{t("box.photo.error", locale)}</span>
         </p>
       )}
 
@@ -799,7 +817,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
             disabled={busy}
             aria-disabled={busy}
             onClick={() => handleTap("problem")}
-            className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] items-center text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:opacity-60"
+            className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] items-center text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
           >
             {busyKind === "problem" ? t("box.checkin.submitting", locale) : t("box.checkin.problem", locale)}
           </button>
@@ -858,7 +876,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
               maxLength={BOX_CHECKIN_NOTE}
               disabled={needsBusy}
               className={
-                "mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 " +
+                "mt-1 w-full min-h-12 rounded-[var(--radius-md)] border border-[var(--color-ink-400)] px-3 py-2 " +
                 "text-base md:text-sm text-[var(--color-ink-900)] bg-white " +
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
               }
@@ -895,12 +913,16 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
           conditionals. */}
       <div role="status" aria-live="polite">
         {needsSubmitState === "success" && (
-          <p className="text-sm font-medium text-[var(--color-success)]">{t("box.needs.success", locale)}</p>
+          <p className="flex items-center gap-2 text-sm font-medium text-[var(--color-success)]">
+            <SuccessTick size={20} />
+            <span>{t("box.needs.success", locale)}</span>
+          </p>
         )}
       </div>
       {needsSubmitState === "error" && (
-        <p role="alert" className="text-sm font-medium text-[var(--color-danger)]">
-          {t("box.checkin.error", locale)}
+        <p role="alert" className="flex items-start gap-1.5 text-sm font-medium text-[var(--color-danger)]">
+          <AlertCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{t("box.checkin.error", locale)}</span>
         </p>
       )}
 
@@ -917,7 +939,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
             maxLength={BOX_CHECKIN_NOTE}
             placeholder={t(`box.checkin.notePlaceholder.${openKind}`, locale)}
             className={
-              "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 " +
+              "w-full rounded-[var(--radius-md)] border border-[var(--color-ink-400)] px-3 py-2 " +
               "text-base md:text-sm text-[var(--color-ink-900)] bg-white resize-y " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
             }
@@ -1045,8 +1067,9 @@ function PhotoPickerField({
       />
       {attach.processing && <p className="text-xs text-[var(--color-ink-500)]">{t("box.photo.processing", locale)}</p>}
       {attach.error && (
-        <p role="alert" className="text-xs text-[var(--color-danger)]">
-          {attach.error}
+        <p role="alert" className="flex items-start gap-1 text-xs text-[var(--color-danger)]">
+          <AlertCircle size={14} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{attach.error}</span>
         </p>
       )}
       {attach.previewUrl && (
@@ -1060,7 +1083,7 @@ function PhotoPickerField({
           <button
             type="button"
             onClick={attach.clear}
-            className="text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+            className="inline-flex min-h-12 items-center px-2 text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
           >
             {t("box.photo.remove", locale)}
           </button>

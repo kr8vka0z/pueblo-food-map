@@ -168,7 +168,12 @@
    for every scroller inside the sheet. */
 html {
   overscroll-behavior-y: none;
-  /* Reserve scrollbar space so filtering/expanding lists never jumps horizontally. */
+}
+
+/* Reserve scrollbar space on admin pages so filtering/expanding lists never
+   jumps horizontally, without adding a right-edge gutter to the full-bleed
+   public map. */
+html:has(#admin-main) {
   scrollbar-gutter: stable;
 }
 
@@ -655,11 +660,6 @@ html:not([data-splash-seen]) [data-map-standin-pending] {
   to { stroke-dashoffset: 0; }
 }
 
-/* In-page View Transitions (used by admin list sort/filter via startViewTransition). */
-::view-transition-group(*) {
-  animation-duration: 0.25s;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .pfm-skeleton {
     animation: none !important;
@@ -669,10 +669,5 @@ html:not([data-splash-seen]) [data-map-standin-pending] {
   .pfm-success-tick path {
     animation: none !important;
     stroke-dashoffset: 0;
-  }
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none !important;
   }
 }

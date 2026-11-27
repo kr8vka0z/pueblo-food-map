@@ -76,7 +76,7 @@ function Ip({ ip }: { ip: string | null }) {
 function DeviceLine({ row }: { row: AuthEventRow }) {
   const parts = [describeDevice(row.user_agent), describeLocation(row)].filter(Boolean);
   return (
-    <p className="mt-0.5 text-sm text-[var(--color-ink-500)]">
+    <div className="mt-0.5 text-sm text-[var(--color-ink-500)]">
       {parts.join(" · ")}
       {row.ip && (
         <>
@@ -84,7 +84,7 @@ function DeviceLine({ row }: { row: AuthEventRow }) {
           <Ip ip={row.ip} />
         </>
       )}
-    </p>
+    </div>
   );
 }
 

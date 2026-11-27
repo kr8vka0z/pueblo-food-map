@@ -104,6 +104,7 @@ import BoxCheckinsAdminPanel from "@/components/BoxCheckinsAdminPanel";
 import HostAlertsAdminPanel from "@/components/HostAlertsAdminPanel";
 import WaitingToPublishBox, { type WaitingToPublishChange } from "@/components/WaitingToPublishBox";
 import {
+  adminShellWidthClass,
   clayNoticeClass,
   formPageBodyClass,
   pageTitleClass,
@@ -373,7 +374,7 @@ export default async function EditVenuePage({
   return (
     <div className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active={isBox ? "boxes" : "places"} counts={navCounts} showActivity={identity.isOwner === true} />
-      <main id="admin-main" tabIndex={-1} className="mx-auto w-full max-w-[1440px]">
+      <main id="admin-main" tabIndex={-1} className={adminShellWidthClass}>
         <div className={formPageBodyClass}>
           <h2 className={pageTitleClass}>Edit {venue.name}</h2>
           {isBox && <BoxReviewBox photos={boxReview.photos} adopters={boxReview.adopters} />}

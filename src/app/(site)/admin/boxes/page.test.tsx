@@ -34,6 +34,7 @@ vi.mock("next/navigation", () => ({
   forbidden: vi.fn(() => {
     throw new Error("FORBIDDEN_CALLED");
   }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock("@/lib/logger", () => ({

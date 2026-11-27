@@ -537,7 +537,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <KpiCard label="Reported empty" displayValue={formatInt(counts.emptyReports)} value={counts.emptyReports} previousValue={previousCounts.emptyReports} />
             <KpiCard
               label="Avg. empty → refilled"
-              displayValue={formatDurationLabel(networkAverages.emptyToFillMs, "en")}
+              displayValue={
+                networkAverages.emptyToFillMs === null
+                  ? "No data"
+                  : formatDurationLabel(networkAverages.emptyToFillMs, "en")
+              }
               value={networkAverages.emptyToFillMs ?? 0}
             />
           </div>

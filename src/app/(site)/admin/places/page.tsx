@@ -51,8 +51,8 @@
  * goes into `proposalsByVenueId`; everything else — a genuinely-new `add`
  * with no matching venue row at all — goes into `addProposals`, rendered by
  * VenueListView as its own "Suggested new place" row. `?show=review`
- * pre-selects the "To review" chip (passed down as a plain boolean prop,
- * never parsed client-side — see VenueListView's own header).
+ * pre-selects the "To review" chip via server `searchParams` on first load,
+ * while VenueListView keeps interactive filters synced with `useSearchParams()`.
  *
  * #675 ("fold the Review queue into Places"): this page ALSO loads every
  * pending `public_submissions` row (the same query the now-retired
@@ -67,8 +67,8 @@
  * no target_venue_id at all and becomes its own "Suggested new place" row,
  * same shape as a genuinely-new `add` proposal. `?from=public` mirrors
  * `?show=review`'s own pre-select convention, pointed at the source filter
- * this time (VenueListView's own header covers why it's a plain prop, never
- * parsed client-side).
+ * this time, and VenueListView stays in sync on client navigations via
+ * `useSearchParams()`.
  *
 
  * On AccessDeniedError this delegates to handlePageAuthError()

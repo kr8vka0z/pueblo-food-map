@@ -8,7 +8,9 @@
  * attention", replacing the old "Needs help now" / "Gone quiet" lists and
  * status map). Filtering/sorting happen entirely in the browser on the
  * page's own already-fetched `entries` — at most a few dozen rows, so no
- * new query or URL state is worth the complexity (task spec).
+ * extra D1 query is needed; active filters are mirrored into the URL via
+ * `history.replaceState` and kept in sync with `useSearchParams()` so links
+ * and Back/Forward reproduce the exact view.
  *
  * "use client" (converted from a server component in #671): the filter bar
  * needs real interactive state. Same "table wrapped in overflow-x-auto, no
@@ -19,6 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { NEEDS_HELP_STATUSES, type BoxHealthEntry, type BoxHealthStatus } from "@/lib/boxHealth";
 import type { BoxReviewSummary } from "@/lib/adminBoxes";
 import {
@@ -38,7 +41,6 @@ import {
 import { inputClass } from "@/components/formClasses";
 import AdminSegmented from "@/components/AdminSegmented";
 import { openRowLink } from "@/lib/rowLinkClick";
-import { runViewTransition } from "@/lib/viewTransition";
 
 export interface AllBoxesTableProps {
   entries: BoxHealthEntry[];
@@ -262,18 +264,30 @@ export default function AllBoxesTable({
   const [search, setSearch] = useState(initialSearch);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const propKey = `${initialShowReview}|${initialStatusFilter ?? ""}|${initialSponsorFilter ?? ""}|${initialSort ?? ""}|${initialSearch}`;
-  const lastPropKey = useRef(propKey);
-  useEffect(() => {
-    if (lastPropKey.current === propKey) return;
-    lastPropKey.current = propKey;
-    setStatusFilter(parseBoxStatus(initialShowReview, initialStatusFilter));
-    setSponsorFilter(parseBoxSponsor(initialSponsorFilter));
-    setSort(parseBoxSort(initialSort));
-    setSearch(initialSearch);
-  }, [propKey, initialShowReview, initialStatusFilter, initialSponsorFilter, initialSort, initialSearch]);
-
+  const searchParams = useSearchParams();
+  const searchKey = searchParams ? searchParams.toString() : null;
+  const prevSearchKey = useRef(searchKey);
+  const pendingWrittenSearch = useRef<string | null>(null);
   const didInteract = useRef(false);
+
+  // Sync when client-side navigation changes the live URL query (e.g. clicking
+  // "Show them" -> /admin/boxes?show=review or the Blessing Boxes nav tab ->
+  // /admin/boxes after changing filters locally).
+  useEffect(() => {
+    if (!searchParams || searchKey === null || prevSearchKey.current === searchKey) return;
+    prevSearchKey.current = searchKey;
+    if (pendingWrittenSearch.current === searchKey) {
+      pendingWrittenSearch.current = null;
+      return;
+    }
+    pendingWrittenSearch.current = null;
+    didInteract.current = false;
+    setStatusFilter(parseBoxStatus(searchParams.get("show") === "review", searchParams.get("status") ?? undefined));
+    setSponsorFilter(parseBoxSponsor(searchParams.get("sponsor") ?? undefined));
+    setSort(parseBoxSort(searchParams.get("sort") ?? undefined));
+    setSearch(searchParams.get("q") ?? "");
+  }, [searchKey, searchParams]);
+
   useEffect(() => {
     if (!didInteract.current || typeof window === "undefined") return;
     const params = new URLSearchParams();
@@ -285,6 +299,7 @@ export default function AllBoxesTable({
     const qs = params.toString();
     const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
     if (`${window.location.pathname}${window.location.search}` !== nextUrl) {
+      pendingWrittenSearch.current = qs;
       window.history.replaceState(null, "", nextUrl);
     }
   }, [statusFilter, sponsorFilter, sort, search]);
@@ -295,27 +310,25 @@ export default function AllBoxesTable({
   // a control that stays.
   function clearFilters() {
     didInteract.current = true;
-    runViewTransition(() => {
-      setStatusFilter("all");
-      setSponsorFilter("any");
-      setSearch("");
-    });
+    setStatusFilter("all");
+    setSponsorFilter("any");
+    setSearch("");
     searchRef.current?.focus();
   }
 
   function handleStatusFilter(next: StatusFilter) {
     didInteract.current = true;
-    runViewTransition(() => setStatusFilter(next));
+    setStatusFilter(next);
   }
 
   function handleSponsorFilter(next: SponsorFilter) {
     didInteract.current = true;
-    runViewTransition(() => setSponsorFilter(next));
+    setSponsorFilter(next);
   }
 
   function handleSort(next: SortKey) {
     didInteract.current = true;
-    runViewTransition(() => setSort(next));
+    setSort(next);
   }
 
   function handleSearch(next: string) {

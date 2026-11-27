@@ -1905,7 +1905,9 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   one `await` after another (the venue edit page's only real dependencies are
   the venue row and the suggestion lookup). The Dashboard's Cloudflare and
   PostHog calls start in that same `Promise.all`. `admin/loading.tsx` shows the
-  header (`AdminNavSkeleton`) plus "Loading…" during client navigation (it also wraps `/admin/login`).
+  header (`AdminNavSkeleton`) plus bone-tinted shimmer skeleton blocks (with an
+  `sr-only` "Loading…" status region) during client navigation (it also wraps
+  `/admin/login`).
   Because that shell streams before the page's session check, a first
   full-page request to a guarded admin URL answers 200 (noindex) and redirects
   or renders forbidden/not-found on the client instead of a 307/403/404 (this

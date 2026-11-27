@@ -64,6 +64,7 @@
  */
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { categoryLabels } from "@/lib/categories";
@@ -86,7 +87,6 @@ import {
   type TagTone,
 } from "@/lib/adminCardStyles";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
-import { runViewTransition } from "@/lib/viewTransition";
 import { DISPLAY_STATUS_KEY, DISPLAY_STATUS_LABELS, formatLastVerified, type AdminDisplayStatus } from "@/lib/adminVenues";
 import { SOURCE_BADGE, LANE_BADGE } from "@/components/ProposalCard";
 import { fieldLabel } from "@/lib/fieldLabels";
@@ -355,23 +355,33 @@ export default function VenueListView({
   const [laneFilter, setLaneFilter] = useState<LaneFilterValue>(() => parseLaneFilter(initialLaneFilter));
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Sync when client-side navigation changes URL-derived props (e.g. clicking
-  // a link to /admin/places?show=review while already on /admin/places).
-  const propKey = `${initialShowReview}|${initialStatusFilter ?? ""}|${initialSourceFilter ?? ""}|${initialCategoryFilter ?? ""}|${initialLaneFilter ?? ""}|${initialQuery}`;
-  const lastPropKey = useRef(propKey);
+  // Sync when client-side navigation changes the live URL query (e.g. clicking
+  // "Show them" -> /admin/places?show=review or the Places nav tab ->
+  // /admin/places after changing filters locally).
+  const searchParams = useSearchParams();
+  const searchKey = searchParams ? searchParams.toString() : null;
+  const prevSearchKey = useRef(searchKey);
+  const pendingWrittenSearch = useRef<string | null>(null);
+  const didInteract = useRef(false);
+
   useEffect(() => {
-    if (lastPropKey.current === propKey) return;
-    lastPropKey.current = propKey;
-    setQuickFilter(parseQuickFilter(initialShowReview, initialStatusFilter));
-    setSourceFilter(parseSourceFilter(initialSourceFilter));
-    setCategoryFilter(parseCategoryFilter(initialCategoryFilter));
-    setLaneFilter(parseLaneFilter(initialLaneFilter));
-    setQuery(initialQuery);
-  }, [propKey, initialShowReview, initialStatusFilter, initialSourceFilter, initialCategoryFilter, initialLaneFilter, initialQuery]);
+    if (!searchParams || searchKey === null || prevSearchKey.current === searchKey) return;
+    prevSearchKey.current = searchKey;
+    if (pendingWrittenSearch.current === searchKey) {
+      pendingWrittenSearch.current = null;
+      return;
+    }
+    pendingWrittenSearch.current = null;
+    didInteract.current = false;
+    setQuickFilter(parseQuickFilter(searchParams.get("show") === "review", searchParams.get("status") ?? undefined));
+    setSourceFilter(parseSourceFilter(searchParams.get("from") ?? undefined));
+    setCategoryFilter(parseCategoryFilter(searchParams.get("category") ?? undefined));
+    setLaneFilter(parseLaneFilter(searchParams.get("lane") ?? undefined));
+    setQuery(searchParams.get("q") ?? "");
+  }, [searchKey, searchParams]);
 
   // Mirror user filter changes into the URL so Back and shared links reproduce
   // the exact view without triggering a server round-trip on every click/keystroke.
-  const didInteract = useRef(false);
   useEffect(() => {
     if (!didInteract.current || typeof window === "undefined") return;
     const params = new URLSearchParams();
@@ -384,6 +394,7 @@ export default function VenueListView({
     const qs = params.toString();
     const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
     if (`${window.location.pathname}${window.location.search}` !== nextUrl) {
+      pendingWrittenSearch.current = qs;
       window.history.replaceState(null, "", nextUrl);
     }
   }, [quickFilter, sourceFilter, categoryFilter, laneFilter, query]);
@@ -395,41 +406,37 @@ export default function VenueListView({
   // search box too, then puts focus on it, since the button itself goes away.
   function clearFilters() {
     didInteract.current = true;
-    runViewTransition(() => {
-      setQuery("");
-      setQuickFilter("all");
-      setCategoryFilter("all");
-      setSourceFilter("all");
-      setLaneFilter("all");
-    });
+    setQuery("");
+    setQuickFilter("all");
+    setCategoryFilter("all");
+    setSourceFilter("all");
+    setLaneFilter("all");
     searchRef.current?.focus();
   }
 
   function handleQuickFilter(value: QuickFilter) {
     didInteract.current = true;
-    runViewTransition(() => {
-      setQuickFilter(value);
-      // Leaving To review clears review-only subfilters so rows aren't hidden by invisible chips.
-      if (value !== "to_review") {
-        setSourceFilter("all");
-        setLaneFilter("all");
-      }
-    });
+    setQuickFilter(value);
+    // Leaving To review clears review-only subfilters so rows aren't hidden by invisible chips.
+    if (value !== "to_review") {
+      setSourceFilter("all");
+      setLaneFilter("all");
+    }
   }
 
   function handleSourceFilter(value: SourceFilter) {
     didInteract.current = true;
-    runViewTransition(() => setSourceFilter(value));
+    setSourceFilter(value);
   }
 
   function handleLaneFilter(value: LaneFilterValue) {
     didInteract.current = true;
-    runViewTransition(() => setLaneFilter(value));
+    setLaneFilter(value);
   }
 
   function handleCategoryFilter(value: CategoryFilter) {
     didInteract.current = true;
-    runViewTransition(() => setCategoryFilter(value));
+    setCategoryFilter(value);
   }
 
   function handleQueryChange(value: string) {

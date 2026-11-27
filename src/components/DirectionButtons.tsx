@@ -191,7 +191,7 @@ function WalkStepsList({ steps, locale, id, hidden, className, onSelectStep, act
                 type="button"
                 onClick={() => onSelectStep(i)}
                 className={
-                  "flex flex-1 items-start gap-2 text-left rounded " +
+                  "flex flex-1 min-h-12 items-center gap-2 py-1 text-left rounded " +
                   (i === activeIndex ? "text-[var(--color-sage-700)] font-medium" : "") +
                   " focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
                 }
@@ -376,10 +376,10 @@ export function WalkStepper({
           aria-controls={allTurnsId}
           onClick={() => setAllTurnsOpen((v) => !v)}
           className={
-            "flex items-center gap-1 py-1.5 text-sm font-medium text-[var(--color-sage-600)] " +
+            "inline-flex items-center min-h-12 -my-2 gap-1 text-sm font-medium text-[var(--color-sage-600)] " +
             "hover:text-[var(--color-sage-700)] " +
             PRESS_FEEDBACK + " " +
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
           }
         >
           {allTurnsOpen ? (

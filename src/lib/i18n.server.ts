@@ -12,22 +12,22 @@ export const serverEn: Record<string, string> = {
   // real text search/AI answer engines can quote, so it goes through t()
   // like every other locale-facing string.
   "jsonld.website.description":
-    "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores.",
+    "A community-built map of food resources in Pueblo County, Colorado: community gardens, edible landscapes, food pantries, and grocery stores.",
   // The homepage's sr-only <h1> (HomeShell). It was the meta.home.title string;
   // #921 changed only the <title>, so the heading keeps its own copy.
-  "home.h1": "Pueblo Food Map — Food Resources in Pueblo County, CO",
+  "home.h1": "Pueblo Food Map: Food Resources in Pueblo County, CO",
   "meta.shareEvent.title": "Share an Event",
   "meta.shareEvent.description":
     "Holding a food event in Pueblo County? Send us the details and see how it will look on Pueblo Food Map.",
   "meta.about.title": "About",
   "meta.about.description":
-    "About Pueblo Food Map — our mission to connect Pueblo County residents with free and low-cost food resources, and how venue data is sourced.",
+    "About Pueblo Food Map: our mission to connect Pueblo County residents with free and low-cost food resources, and how venue data is sourced.",
   "meta.resources.title": "Food help programs",
   "meta.resources.description":
-    "How to get SNAP, WIC, Double Up Food Bucks, 2-1-1 Colorado, the Food Resource Hotline and senior food boxes in Pueblo County, CO — what each is for and how to sign up.",
+    "How to get SNAP, WIC, Double Up Food Bucks, 2-1-1 Colorado, the Food Resource Hotline and senior food boxes in Pueblo County, CO: what each is for and how to sign up.",
   "meta.venues.title": "All Food Resources",
   "meta.venues.description":
-    "Browse every food resource on the Pueblo Food Map — food pantries, grocery stores, community gardens, farms, and meal sites across Pueblo County, CO, with addresses and hours.",
+    "Browse every food resource on the Pueblo Food Map: food pantries, grocery stores, community gardens, farms, and meal sites across Pueblo County, CO, with addresses and hours.",
 
   // Event page (#762, /event/<id>). {abbr} is the Pueblo zone abbreviation (MST/MDT).
   "events.page.statusUpcoming": "Coming up",
@@ -61,7 +61,7 @@ export const serverEn: Record<string, string> = {
   "email.alert.line2": "See the box's page for details: {url}",
   "email.stopLine": "Don't want these emails anymore? Stop them any time, no login needed: {stopUrl}",
   "email.adoptApproved.subject": "You're approved to sponsor {box}",
-  "email.adoptApproved.line1": "Good news — your application to sponsor {box} as \"{displayName}\" has been approved.",
+  "email.adoptApproved.line1": "Good news: your application to sponsor {box} as \"{displayName}\" has been approved.",
   "email.adoptApproved.line2": "Your name will now show on the box's card, and you'll get an email if it's reported empty or has a problem.",
   "email.alertConfirm.subject": "Confirm your alerts for {box}",
   "email.alertConfirm.line1": "Please confirm you'd like email alerts for {box}.",
@@ -122,20 +122,20 @@ export const serverEn: Record<string, string> = {
 
 export const serverEs: Record<string, string> = {
   "jsonld.website.description":
-    "Un mapa comunitario de recursos alimentarios en el condado de Pueblo, Colorado — huertos comunitarios, paisajes comestibles, despensas de alimentos y supermercados.", // [CHECK]
-  "home.h1": "Pueblo Food Map — Recursos de alimentos en el Condado de Pueblo, CO",
+    "Un mapa comunitario de recursos alimentarios en el condado de Pueblo, Colorado: huertos comunitarios, paisajes comestibles, despensas de alimentos y supermercados.", // [CHECK]
+  "home.h1": "Pueblo Food Map: Recursos de alimentos en el Condado de Pueblo, CO",
   "meta.shareEvent.title": "Compartir un evento", // [CHECK]
   "meta.shareEvent.description":
     "¿Vas a tener un evento de comida en el Condado de Pueblo? Mándanos los detalles y mira cómo se verá en Pueblo Food Map.", // [CHECK]
   "meta.about.title": "Acerca de",
   "meta.about.description":
-    "Acerca de Pueblo Food Map — nuestra misión de conectar a los residentes del Condado de Pueblo con recursos de alimentos gratuitos y de bajo costo, y cómo se obtienen los datos de los lugares.", // [CHECK]
+    "Acerca de Pueblo Food Map: nuestra misión de conectar a los residentes del Condado de Pueblo con recursos de alimentos gratuitos y de bajo costo, y cómo se obtienen los datos de los lugares.", // [CHECK]
   "meta.resources.title": "Programas de ayuda alimentaria",
   "meta.resources.description":
-    "Cómo obtener SNAP, WIC, Double Up Food Bucks, 2-1-1 Colorado, la Línea de Ayuda Alimentaria y cajas de alimentos para personas mayores en el Condado de Pueblo, CO — para qué sirve cada uno y cómo inscribirse.", // [CHECK]
+    "Cómo obtener SNAP, WIC, Double Up Food Bucks, 2-1-1 Colorado, la Línea de Ayuda Alimentaria y cajas de alimentos para personas mayores en el Condado de Pueblo, CO: para qué sirve cada uno y cómo inscribirse.", // [CHECK]
   "meta.venues.title": "Todos los recursos alimentarios",
   "meta.venues.description":
-    "Explora todos los recursos alimentarios en Pueblo Food Map — despensas de alimentos, supermercados, huertos comunitarios, granjas y comedores comunitarios en todo el Condado de Pueblo, CO, con direcciones y horarios.", // [CHECK]
+    "Explora todos los recursos alimentarios en Pueblo Food Map: despensas de alimentos, supermercados, huertos comunitarios, granjas y comedores comunitarios en todo el Condado de Pueblo, CO, con direcciones y horarios.", // [CHECK]
 
   // Event page (#762)
   "events.page.statusUpcoming": "Próximamente", // [CHECK]
@@ -161,7 +161,7 @@ export const serverEs: Record<string, string> = {
   "email.alert.line2": "Consulta la página de la caja para más detalles: {url}", // [CHECK]
   "email.stopLine": "¿Ya no quieres estos correos? Detenlos cuando quieras, sin iniciar sesión: {stopUrl}", // [CHECK]
   "email.adoptApproved.subject": "Fuiste aprobado para patrocinar {box}", // [CHECK]
-  "email.adoptApproved.line1": "Buenas noticias — tu solicitud para patrocinar {box} como \"{displayName}\" fue aprobada.", // [CHECK]
+  "email.adoptApproved.line1": "Buenas noticias: tu solicitud para patrocinar {box} como \"{displayName}\" fue aprobada.", // [CHECK]
   "email.adoptApproved.line2": "Tu nombre ahora aparecerá en la tarjeta de la caja, y recibirás un correo si se reporta vacía o con un problema.", // [CHECK]
   "email.alertConfirm.subject": "Confirma tus alertas para {box}", // [CHECK]
   "email.alertConfirm.line1": "Confirma que quieres recibir alertas por correo de {box}.", // [CHECK]

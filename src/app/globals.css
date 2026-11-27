@@ -168,6 +168,20 @@
    for every scroller inside the sheet. */
 html {
   overscroll-behavior-y: none;
+  scroll-padding-bottom: calc(var(--bottom-nav-clearance) + env(safe-area-inset-bottom) + 16px);
+}
+
+@layer base {
+  a,
+  button {
+    text-underline-offset: 0.2em;
+  }
+
+  button,
+  a,
+  summary {
+    touch-action: manipulation;
+  }
 }
 
 body {
@@ -440,6 +454,26 @@ body {
   animation: pfm-pulse 2s ease-in-out infinite;
 }
 
+/* ─── Venue pin marker (#957) ───────────────────────────────────────────────
+   Hover scale is CSS-only and media-gated to fine pointers so touch phones
+   don't leave a tapped pin stuck enlarged (mirrors .pfm-event-pin below). */
+.pfm-venue-pin:focus-visible {
+  outline: 2px solid var(--color-sage-500);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.pfm-venue-pin__body {
+  display: block;
+  transform: scale(1);
+  transition: transform 0.1s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pfm-venue-pin:hover .pfm-venue-pin__body { transform: scale(1.15); }
+}
+.pfm-venue-pin:active .pfm-venue-pin__body { transform: scale(0.96); }
+
 /* ─── Special-event star pin (#758) ─────────────────────────────────────────
    EventMarker.tsx sets --pin (the pin height in px) on .pfm-event-pin__body;
    everything is sized from it so the 44px and 52px pins share one set of rules.
@@ -606,4 +640,40 @@ html:not([data-splash-seen]) [data-map-standin-pending] {
   text-shadow:
     -0.5px -0.5px 0 #fff, 0.5px -0.5px 0 #fff,
     -0.5px  0.5px 0 #fff, 0.5px  0.5px 0 #fff;
+}
+
+/* ─── Success tick (design feature library, #959) ───────────────────────────
+   Once-per-flow confirmation cue (470ms total). Renders already drawn when
+   prefers-reduced-motion: reduce is set. */
+.pfm-success-tick {
+  --tick-color: var(--color-success);
+  --tick-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  fill: none;
+  stroke: var(--tick-color);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pfm-success-tick circle,
+.pfm-success-tick path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: pfm-tick-draw 260ms var(--tick-ease) forwards;
+}
+
+.pfm-success-tick path {
+  animation-delay: 210ms;
+}
+
+@keyframes pfm-tick-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pfm-success-tick circle,
+  .pfm-success-tick path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
 }

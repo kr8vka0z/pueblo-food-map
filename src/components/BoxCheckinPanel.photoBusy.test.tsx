@@ -56,8 +56,8 @@ async function startUpload(user: ReturnType<typeof userEvent.setup>) {
     document.getElementById("box-photo-standalone-input") as HTMLInputElement,
     new File(["bytes"], "photo.jpg", { type: "image/jpeg" }),
   );
-  await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).toBeEnabled());
-  await user.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Send photo" })).toBeEnabled());
+  await user.click(screen.getByRole("button", { name: "Send photo" }));
 }
 
 test("Cancel during an upload does not free the status buttons before it finishes", async () => {

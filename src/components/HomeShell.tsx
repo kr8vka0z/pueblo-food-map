@@ -81,7 +81,7 @@ const HOME_CRAWL_LINKS: { href: string; label: Record<Locale, string> }[] = [
 const HOME_CRAWL_NAV_LABEL: Record<Locale, string> = { en: "Site", es: "Sitio" };
 
 const HOME_CRAWL_LINK_CLASS =
-  "sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 " +
+  "sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9600] " +
   "focus:px-3 focus:py-2 focus:rounded focus:bg-[var(--color-bone-50)] " +
   "focus:text-[var(--color-ink-900)] focus:outline-none focus:ring-2 " +
   "focus:ring-[var(--color-sage-500)]";

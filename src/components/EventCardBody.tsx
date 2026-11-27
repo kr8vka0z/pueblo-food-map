@@ -232,7 +232,7 @@ export default function EventCardBody({
   async function handleShare() {
     void track(EVENTS.EVENT_SHARED, { eventId: event.id });
     const url = eventShareUrl(event.id, locale);
-    const result = await shareLink({ url, title: text.name, text: `${text.name} — Pueblo Food Map` });
+    const result = await shareLink({ url, title: text.name, text: `${text.name}: Pueblo Food Map` });
     // Neither a share sheet nor a clipboard: show the link to copy by hand
     // instead of a button that silently does nothing.
     if (result === "unsupported") setManualLink(url);

@@ -175,7 +175,9 @@ export default function SplashScreen({ onPrimary, pending, onTour }: SplashScree
             // Full-width, capped at 820px, centered with side padding.
             // Wider cap lets "Pueblo Food Map" sit on one line at desktop sizes.
             'relative z-10 flex flex-col w-full max-w-[820px] text-center',
-            'px-6 py-10 pt-16',
+            // px-4 (16px) on phones so "Pueblo Food Map" stays single-line at 360-390px
+            // (px-6 is 32px in @theme, which forced "Map" onto a second line, #957).
+            'px-4 py-10 pt-16',
             // Roomier spacing between blocks so the text isn't bunched together
             'gap-7 md:gap-8',
             // Desktop: a touch more padding, same single-column layout
@@ -193,7 +195,7 @@ export default function SplashScreen({ onPrimary, pending, onTour }: SplashScree
           <div className="flex flex-col gap-3">
             <p
               id="splash-purpose"
-              className="text-2xl md:text-3xl font-semibold leading-normal text-[var(--color-brand-navy)] max-w-md mx-auto splash-text-outline"
+              className="text-2xl md:text-3xl font-semibold leading-normal text-balance text-[var(--color-brand-navy)] max-w-md mx-auto splash-text-outline"
               data-testid="splash-purpose"
             >
               {t('splash.purpose', locale)}
@@ -215,7 +217,7 @@ export default function SplashScreen({ onPrimary, pending, onTour }: SplashScree
                 'active:brightness-95',
                 'transition-[filter] duration-150',
                 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
-                'focus-visible:outline-[var(--color-brand-orange)]',
+                'focus-visible:outline-[var(--color-brand-navy)]',
               ].join(' ')}
             >
               {t('splash.cta.primary', 'en')}
@@ -240,7 +242,7 @@ export default function SplashScreen({ onPrimary, pending, onTour }: SplashScree
                 'active:brightness-95',
                 'transition-[filter] duration-150',
                 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
-                'focus-visible:outline-[var(--color-brand-orange)]',
+                'focus-visible:outline-[var(--color-brand-navy)]',
               ].join(' ')}
             >
               {t('splash.cta.primary', 'es')}

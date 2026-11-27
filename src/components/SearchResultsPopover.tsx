@@ -154,7 +154,7 @@ export default function SearchResultsPopover({
         id={listboxId}
         role="listbox"
         aria-label={matchCountText}
-        className="max-h-[calc(7*52px)] overflow-y-auto py-1 rounded-[var(--radius-lg)]"
+        className="max-h-[min(364px,calc(100dvh-160px))] overflow-y-auto py-1 rounded-[var(--radius-lg)]"
       >
         {visibleVenues.map((venue, i) => {
           const isActive = i === activeIndex;
@@ -239,7 +239,7 @@ export default function SearchResultsPopover({
           onFocus={onSeeAllAsListFocus}
           onBlur={onSeeAllAsListBlur}
           className={
-            "flex items-center gap-2.5 w-full px-4 h-[46px] text-left text-xs " +
+            "flex items-center gap-2.5 w-full px-4 h-12 text-left text-xs " +
             "text-[var(--color-sage-700)] font-semibold " +
             "border-t border-[var(--color-bone-200)] " +
             "hover:bg-[var(--color-sage-100)] transition-colors duration-150 " +

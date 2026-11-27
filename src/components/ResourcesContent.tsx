@@ -112,7 +112,7 @@ export default function ResourcesContent({ faqJsonLd }: { faqJsonLd?: string }) 
 
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-6 space-y-3">
         <h1
-          className="text-3xl font-normal text-[var(--color-ink-900)]"
+          className="text-3xl font-normal text-balance text-[var(--color-ink-900)]"
           style={{ fontFamily: "var(--font-display)" }}
         >
           {t("resources.heading", locale)}

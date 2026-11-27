@@ -72,11 +72,17 @@ export default function ReportForm({ venueId }: ReportFormProps) {
         contactEmail: contactEmail.trim() || undefined,
       })}
     >
-      {(errors, locale) => (
+      {(errors, locale, onBlurField) => (
         <>
           <Field id="report-issue-type" label={t("report.issueType.label", locale)} required error={errors.issueType}>
             {(control) => (
-              <select {...control} value={issueType} onChange={(e) => setIssueType(e.target.value)}>
+              <select
+                {...control}
+                name="issueType"
+                value={issueType}
+                onChange={(e) => setIssueType(e.target.value)}
+                onBlur={() => onBlurField("issueType")}
+              >
                 <option value="">{t("report.issueType.placeholder", locale)}</option>
                 {(Object.keys(ISSUE_TYPES) as IssueTypeKey[]).map((key) => (
                   <option key={key} value={key}>
@@ -97,9 +103,11 @@ export default function ReportForm({ venueId }: ReportFormProps) {
             {(control) => (
               <textarea
                 {...control}
+                name="description"
                 rows={4}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                onBlur={() => onBlurField("description")}
                 placeholder={t("report.description.placeholder", locale)}
                 maxLength={REPORT_DESCRIPTION}
               />
@@ -110,19 +118,21 @@ export default function ReportForm({ venueId }: ReportFormProps) {
             id="report-email"
             label={t("report.email.label", locale)}
             error={errors.contactEmail}
-            hint={t("report.email.hint", locale)}
             after={<PrivacyNote locale={locale} />}
           >
             {(control) => (
               <input
                 {...control}
+                name="contactEmail"
                 type="email"
                 value={contactEmail}
                 onChange={(e) => setContactEmail(e.target.value)}
+                onBlur={() => onBlurField("contactEmail")}
                 placeholder={t("report.email.placeholder", locale)}
                 autoComplete="email"
                 autoCapitalize="off"
                 autoCorrect="off"
+                spellCheck={false}
                 // Last field before submit — Enter implicitly submits, so "send".
                 enterKeyHint="send"
                 maxLength={EMAIL}

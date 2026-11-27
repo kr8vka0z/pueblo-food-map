@@ -307,7 +307,7 @@ describe("ReportForm — submit flow", () => {
     await waitForSubmitEnabled("report");
     await user.click(screen.getByRole("button", { name: /Submit report/i }));
     await waitFor(() => {
-      expect(screen.getByText(/Something went wrong/i)).toBeDefined();
+      expect(screen.getByText(/Couldn't send your report/i)).toBeDefined();
     });
   });
 
@@ -325,7 +325,7 @@ describe("ReportForm — submit flow", () => {
     await waitForSubmitEnabled("report");
     await user.click(screen.getByRole("button", { name: /Submit report/i }));
     await waitFor(() => {
-      expect(screen.getByText(/Something went wrong/i)).toBeDefined();
+      expect(screen.getByText(/Couldn't send your report/i)).toBeDefined();
     });
 
     // Click "Try again"
@@ -333,7 +333,7 @@ describe("ReportForm — submit flow", () => {
 
     // Error banner should be gone; submit button should be visible again
     await waitFor(() => {
-      expect(screen.queryByText(/Something went wrong/i)).toBeNull();
+      expect(screen.queryByText(/Couldn't send your report/i)).toBeNull();
     });
     // Token is still set (widget not destroyed), so Submit label shows
     expect(screen.getByRole("button", { name: /Submit report/i })).toBeDefined();

@@ -14,6 +14,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { pageDocumentTitle } from "@/lib/site";
 import SuggestForm from "@/components/SuggestForm";
+import LinkifyText from "@/components/LinkifyText";
 import SiteFooter from "@/components/SiteFooter";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 
@@ -30,7 +31,7 @@ export default function SuggestPageContent() {
       {/* Content */}
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8">
         <h1
-          className="text-2xl font-normal text-[var(--color-ink-900)] mb-1"
+          className="text-2xl font-normal text-balance text-[var(--color-ink-900)] mb-1"
           style={{ fontFamily: "var(--font-display)" }}
         >
           {t("suggest.title", locale)}
@@ -44,7 +45,7 @@ export default function SuggestPageContent() {
 
         {/* Fallback email link */}
         <p className="mt-6 text-xs text-center text-[var(--color-ink-400)]">
-          {t("suggest.fallback", locale)}
+          <LinkifyText text={t("suggest.fallback", locale)} />
         </p>
       </div>
 

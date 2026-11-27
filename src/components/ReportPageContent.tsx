@@ -17,6 +17,8 @@ import { useLocale } from "@/lib/LocaleContext";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { pageDocumentTitle } from "@/lib/site";
 import ReportForm from "@/components/ReportForm";
+import LinkifyText from "@/components/LinkifyText";
+import SiteFooter from "@/components/SiteFooter";
 import type { Venue } from "@/types/venue";
 
 interface ReportPageContentProps {
@@ -28,16 +30,16 @@ export default function ReportPageContent({ venue }: ReportPageContentProps) {
   // <title> follows locale client-side (#589) — report.title's EN value
   // ("Report an issue") matches page.tsx generateMetadata's prefix exactly;
   // venue.name is a proper noun, not translated, same as the metadata itself.
-  useDocumentTitle(pageDocumentTitle(`${t("report.title", locale)} — ${venue.name}`));
+  useDocumentTitle(pageDocumentTitle(`${t("report.title", locale)}: ${venue.name}`));
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">
       {/* Top nav bar */}
-      <nav className="h-12 flex items-center px-4 border-b border-[var(--color-bone-200)] shrink-0">
+      <nav aria-label={t("report.backToMap", locale)} className="h-12 flex items-center px-4 border-b border-[var(--color-bone-200)] shrink-0">
         <Link
           href="/"
           className={
-            "text-sm font-medium text-[var(--color-sage-600)] " +
+            "inline-flex items-center min-h-12 text-sm font-medium text-[var(--color-sage-600)] " +
             "hover:text-[var(--color-sage-700)] transition-colors " +
             "focus-visible:outline-none focus-visible:ring-2 " +
             "focus-visible:ring-[var(--color-sage-500)] rounded"
@@ -50,7 +52,7 @@ export default function ReportPageContent({ venue }: ReportPageContentProps) {
       {/* Content */}
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8">
         <h1
-          className="text-2xl font-normal text-[var(--color-ink-900)] mb-1"
+          className="text-2xl font-normal text-balance text-[var(--color-ink-900)] mb-1"
           style={{ fontFamily: "var(--font-display)" }}
         >
           {t("report.title", locale)}
@@ -75,9 +77,11 @@ export default function ReportPageContent({ venue }: ReportPageContentProps) {
 
         {/* Fallback email link */}
         <p className="mt-6 text-xs text-center text-[var(--color-ink-400)]">
-          {t("report.fallback", locale)}
+          <LinkifyText text={t("report.fallback", locale)} />
         </p>
       </div>
+
+      <SiteFooter />
     </main>
   );
 }

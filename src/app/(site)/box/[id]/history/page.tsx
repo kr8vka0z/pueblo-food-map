@@ -75,7 +75,7 @@ export async function generateMetadata({
   const box = await loadBox(id);
   if (!box) return {};
   return buildPageMetadata({
-    title: `${box.name} — History`,
+    title: `${box.name}: History`,
     description: `Full check-in and activity history for ${box.name}, a community blessing box in Pueblo, CO.`,
     path: `/box/${box.id}/history`,
   });

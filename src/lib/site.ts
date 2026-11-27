@@ -22,7 +22,7 @@ export const OG_IMAGE = {
   width: 1200,
   height: 630,
   type: "image/png",
-  alt: "Pueblo Food Map — find food pantries, gardens, grocery & meal sites in Pueblo County, Colorado",
+  alt: "Pueblo Food Map: find food pantries, gardens, grocery & meal sites in Pueblo County, Colorado",
 } as const;
 
 const OG_LOCALE: Record<Locale, string> = { en: "en_US", es: "es_US" };

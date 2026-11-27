@@ -18,7 +18,7 @@
  *   - The <button> element provides native role="button" — no ARIA role needed.
  */
 
-import { memo, useRef, type KeyboardEvent } from "react";
+import { memo, type KeyboardEvent } from "react";
 import { Marker } from "react-map-gl/mapbox";
 import { MapPin } from "lucide-react";
 import type { Venue } from "@/types/venue";
@@ -77,7 +77,6 @@ function VenueMarker({
   // grows the transparent button around it (bottom-anchored, see below) — the
   // visible pin never changes size or position.
   const hitSize = Math.max(totalSize, MIN_HIT_SIZE);
-  const pinWrapperRef = useRef<HTMLSpanElement>(null);
 
   // Build aria-label: "<name>, <category>[, <distance>]"
   const distLabel = distanceMiles !== undefined ? formatMiles(distanceMiles) : "";
@@ -168,6 +167,7 @@ function VenueMarker({
     >
       <button
         type="button"
+        className="pfm-venue-pin"
         aria-label={ariaLabel}
         // Guided tour (#159) finds the sample venue's pin by this.
         data-venue-id={venue.id}
@@ -190,26 +190,17 @@ function VenueMarker({
           height: `${hitSize}px`,
           lineHeight: 0,
         }}
-        onMouseEnter={() => {
-          if (pinWrapperRef.current) pinWrapperRef.current.style.transform = "scale(1.15)";
-          onHover?.(venue.id);
-        }}
-        onMouseLeave={() => {
-          if (pinWrapperRef.current) pinWrapperRef.current.style.transform = "scale(1)";
-          onLeave?.();
-        }}
+        onMouseEnter={() => onHover?.(venue.id)}
+        onMouseLeave={() => onLeave?.()}
         onFocus={() => onHover?.(venue.id)}
         onBlur={() => onLeave?.()}
       >
         {/* This wrapper is exactly totalSize — the pin's real visual box.
-            Hover-scale now targets it directly (not the enlarged button)
-            so the zoom still happens around the pin itself. */}
+            Hover-scale targets it via CSS (@media hover: hover) so touch
+            phones never leave a tapped pin stuck enlarged (#957). */}
         <span
-          ref={pinWrapperRef}
+          className="pfm-venue-pin__body"
           style={{
-            display: "block",
-            transform: "scale(1)",
-            transition: "transform 0.1s ease",
             width: `${totalSize}px`,
             height: `${totalSize}px`,
             lineHeight: 0,

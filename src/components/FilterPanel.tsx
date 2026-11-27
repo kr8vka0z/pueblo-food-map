@@ -479,7 +479,8 @@ function FilterPanelView({
               // orange exception is --color-brand-orange/--color-brand-navy.
               "bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)] " +
               "active:brightness-95 " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-brand-orange)]"
+              PRESS_FEEDBACK + " " +
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-brand-navy)]"
             }
           >
             {filterEvents

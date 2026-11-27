@@ -15,6 +15,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { localizedHref } from "@/lib/localizedHref";
 import { pageDocumentTitle } from "@/lib/site";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 export default function NotFoundContent() {
   const { locale, tree } = useLocale();
@@ -30,10 +31,10 @@ export default function NotFoundContent() {
   });
 
   return (
-    <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)] items-center justify-center p-6 text-center">
-      <div className="max-w-md w-full rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-8 shadow-sm">
+    <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)] items-center justify-center p-4 text-center">
+      <div className="max-w-md w-full rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-5 shadow-sm">
         <h1
-          className="text-3xl font-normal text-[var(--color-ink-900)] mb-3"
+          className="text-3xl font-normal text-balance text-[var(--color-ink-900)] mb-3"
           style={{ fontFamily: "var(--font-display)" }}
         >
           {t("notfound.title", locale)}
@@ -44,10 +45,11 @@ export default function NotFoundContent() {
         <Link
           href={localizedHref("/", tree)}
           className={
-            "inline-flex items-center justify-center px-5 py-2.5 rounded-[var(--radius-md)] " +
+            "inline-flex items-center justify-center min-h-12 px-5 rounded-[var(--radius-md)] " +
             "bg-[var(--color-sage-600)] text-white text-sm font-medium " +
             "hover:bg-[var(--color-sage-700)] transition-colors " +
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+            PRESS_FEEDBACK + " " +
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
           }
         >
           ← {t("notfound.backToMap", locale)}

@@ -41,6 +41,8 @@ import type { Venue } from "@/types/venue";
 import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
 import SiteFooter from "@/components/SiteFooter";
+import CategoryLabel from "@/components/CategoryLabel";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { track, EVENTS } from "@/lib/analytics";
 
 interface VenueContentProps {
@@ -113,17 +115,19 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
 
       {/* Content */}
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8 space-y-6">
-        {/* Header */}
+        {/* Header — R3: colored category words under the name, no uppercase eyebrow (#958). */}
         <header>
-          <p className="text-xs font-medium uppercase tracking-widest text-[var(--color-sage-600)] mb-1">
-            {t(`category.full.${v.category}`, locale)}
-          </p>
           <h1
-            className="text-2xl font-normal text-[var(--color-ink-900)]"
+            className="text-2xl font-normal text-balance text-[var(--color-ink-900)]"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {v.name}
           </h1>
+          <CategoryLabel
+            category={v.category}
+            label={t(`category.full.${v.category}`, locale)}
+            className="mt-1 text-sm"
+          />
           <p className="mt-1 text-sm text-[var(--color-ink-500)]">{displayAddress(v)}</p>
           {/* Answer-first summary (#704) — the fact people actually search
               for ("[name] hours", "does [store] take EBT"), assembled from
@@ -168,7 +172,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
             map card, where a fresh `new Date()` read is safe. */}
         {(v.hours_weekly || v.hours_irregular) && (
           <section aria-label={t("detail.hours", locale)}>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)] mb-2">
+            <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">
               {t("detail.hours", locale)}
             </h2>
             {v.hours_weekly && (
@@ -210,13 +214,13 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
         {/* Phone / Contact — same tel: link pattern as VenueCardBody.tsx */}
         {v.phone && (
           <section aria-label={t("detail.contact", locale)}>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)] mb-2">
+            <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">
               {t("detail.contact", locale)}
             </h2>
             <a
               href={`tel:${v.phone}`}
               onClick={() => void track(EVENTS.CALL_CLICKED, { venueId: v.id, surface: "venue_page" })}
-              className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
+              className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
             >
               <Phone size={15} className="text-[var(--color-sage-600)]" aria-hidden />
               {v.phone}
@@ -230,7 +234,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
             even where the map card already hid it. */}
         {displayNotes && (
           <section>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)] mb-2">
+            <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">
               {t("detail.about", locale)}
             </h2>
             <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">{displayNotes}</p>
@@ -242,7 +246,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
             render this heading over nothing. */}
         {v.operator && (
           <section>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)] mb-2">
+            <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">
               {t("detail.sources", locale)}
             </h2>
             <p className="text-sm text-[var(--color-ink-500)]">
@@ -257,7 +261,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
             below 3 (decision 5). */}
         {nearby.length > 0 && (
           <section aria-label={t("detail.nearby", locale)}>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)] mb-2">
+            <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">
               {t("detail.nearby", locale)}
             </h2>
             <ul className="space-y-2">
@@ -292,10 +296,11 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
             target="_blank"
             rel="noopener noreferrer"
             className={
-              "inline-flex items-center justify-center px-4 py-2 rounded " +
+              "inline-flex items-center justify-center min-h-12 px-4 rounded-[var(--radius-md)] " +
               "bg-[var(--color-sage-600)] text-white text-sm font-medium " +
               "hover:bg-[var(--color-sage-700)] transition-colors " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+              PRESS_FEEDBACK + " " +
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
             }
           >
             {t("detail.getDirections", locale)}
@@ -303,9 +308,10 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
           <Link
             href={viewOnMapHref}
             className={
-              "inline-flex items-center justify-center px-4 py-2 rounded " +
+              "inline-flex items-center justify-center min-h-12 px-4 rounded-[var(--radius-md)] " +
               "border border-[var(--color-sage-500)] text-[var(--color-sage-700)] text-sm font-medium " +
               "hover:bg-[var(--color-sage-100)] transition-colors duration-150 " +
+              PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
             }
           >

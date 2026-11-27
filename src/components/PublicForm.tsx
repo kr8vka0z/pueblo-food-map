@@ -18,27 +18,28 @@
  * `report.*`, `suggest.*`, `shareEvent.*`), so each keeps its own wording.
  */
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Script from "next/script";
 import Link from "next/link";
+import { AlertCircle } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { localizedHref } from "@/lib/localizedHref";
-import { useTurnstile } from "@/lib/useTurnstile";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { useQueuedTurnstileSubmit, useTurnstile } from "@/lib/useTurnstile";
+import SuccessTick from "@/components/SuccessTick";
 
 type FormName = "feedback" | "report" | "suggest" | "shareEvent";
 export type FieldErrors<K extends string> = Partial<Record<K, string>>;
 
 // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
+// min-h-12 + border ink-400 (5.9:1 on white) align public forms with admin (#959).
 const INPUT_BASE =
-  "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
-  // #534: --color-ink-300 undefined in globals.css @theme — DESIGN.md
-  // names ink-400 explicitly as "placeholder text, icon fills, and
-  // section headers," so that's the documented replacement, not a guess.
+  "w-full min-h-12 rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
   "bg-white placeholder:text-[var(--color-ink-400)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
   "focus-visible:border-[var(--color-sage-500)]";
-const ERROR_CLASS = "mt-1 text-xs text-[var(--color-danger)]";
+export const ERROR_CLASS = "mt-1 flex items-start gap-1.5 text-xs text-[var(--color-danger)]";
 export const LABEL_CLASS = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
 
 interface FieldControlProps {
@@ -78,7 +79,7 @@ export function Field({
 }) {
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
-  const border = error ? "border-[var(--color-danger)]" : "border-[var(--color-bone-300)]";
+  const border = error ? "border-[var(--color-danger)]" : "border-[var(--color-ink-400)]";
   return (
     <div>
       <label htmlFor={id} className={LABEL_CLASS}>
@@ -99,7 +100,8 @@ export function Field({
       })}
       {error ? (
         <p id={errorId} role="alert" tabIndex={-1} className={ERROR_CLASS}>
-          {error}
+          <AlertCircle size={14} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{error}</span>
         </p>
       ) : (
         hint && (
@@ -118,7 +120,7 @@ export function PrivacyNote({ locale }: { locale: Locale }) {
   return (
     <p className="mt-1 text-xs text-[var(--color-ink-400)]">
       {t("privacy.emailDisclosure", locale)}{" "}
-      <Link href="/privacy" className="underline hover:text-[var(--color-sage-600)] transition-colors">
+      <Link href="/privacy" className="underline hover:text-[var(--color-sage-600)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded">
         {t("privacy.linkLabel", locale)}
       </Link>
     </p>
@@ -148,7 +150,11 @@ export default function PublicForm<K extends string>({
   validate: (locale: Locale) => FieldErrors<NoInfer<K>>;
   /** The form's own JSON fields; `website` and `turnstileToken` are appended. */
   body: () => Record<string, unknown>;
-  children: (errors: FieldErrors<NoInfer<K>>, locale: Locale) => ReactNode;
+  children: (
+    errors: FieldErrors<NoInfer<K>>,
+    locale: Locale,
+    onBlurField: (field: NoInfer<K>, opts?: { clear?: boolean }) => void,
+  ) => ReactNode;
   onSuccess?: () => void;
   /** Wraps the submit button (default: the button alone). */
   submitRow?: (submit: ReactNode) => ReactNode;
@@ -163,20 +169,27 @@ export default function PublicForm<K extends string>({
   const turnstile = useTurnstile(turnstileContainerRef, { rebuildDeadWidget: false });
   const [errors, setErrors] = useState<FieldErrors<K>>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  // Synchronous guard against rapid double-submit clicks before React re-renders (#959).
+  const submittingRef = useRef(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
-    const validationErrors = validate(locale);
-    const firstError = (Object.keys(fieldIds) as K[]).find((k) => validationErrors[k]);
-    if (firstError) {
-      setErrors(validationErrors);
-      // Move focus to first error for screen-reader users
-      document.getElementById(`${fieldIds[firstError]}-error`)?.focus();
+  function onBlurField(field: K, opts?: { clear?: boolean }) {
+    if (opts?.clear) {
+      setErrors((prev) => {
+        if (prev[field] === undefined) return prev;
+        return { ...prev, [field]: undefined };
+      });
       return;
     }
+    const next = validate(locale);
+    setErrors((prev) => {
+      if (prev[field] === next[field]) return prev;
+      return { ...prev, [field]: next[field] };
+    });
+  }
 
-    setErrors({});
+  async function runSubmit() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setStatus("submitting");
 
     try {
@@ -211,12 +224,63 @@ export default function PublicForm<K extends string>({
       }
     } catch {
       setStatus("error");
+    } finally {
+      submittingRef.current = false;
+    }
+  }
+
+  const { queued, queue, cancel } = useQueuedTurnstileSubmit<boolean>(
+    turnstile.token,
+    () => void runSubmit(),
+    () => {
+      submittingRef.current = false;
+      turnstile.fail();
+      setStatus("idle");
+    },
+  );
+
+  // If Turnstile reports an error while a submit is queued, cancel the queue and unblock immediately.
+  useEffect(() => {
+    if (!turnstile.error || !queued) return;
+    queueMicrotask(() => {
+      cancel();
+      submittingRef.current = false;
+      setStatus("idle");
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cancel only wraps stable setPending; run only on error/queued transitions.
+  }, [turnstile.error, queued]);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (submittingRef.current || status === "submitting" || queued) return;
+
+    const validationErrors = validate(locale);
+    const firstError = (Object.keys(fieldIds) as K[]).find((k) => validationErrors[k]);
+    if (firstError) {
+      setErrors(validationErrors);
+      // Focus the already-mounted invalid control (which carries aria-invalid + aria-describedby)
+      // rather than the error <p> which hasn't committed yet on first invalid submit.
+      document.getElementById(fieldIds[firstError])?.focus();
+      return;
+    }
+
+    setErrors({});
+    if (turnstile.token) {
+      void runSubmit();
+    } else {
+      setStatus("submitting");
+      queue(true);
+      // Only reset when recovering from an earlier widget error — never abort an in-flight initial check.
+      if (turnstile.error) {
+        turnstile.reset();
+      }
     }
   }
 
   if (status === "success") {
     return (
       <div role="status" aria-live="polite" className="text-center py-8">
+        <SuccessTick size={48} className="mx-auto mb-3" />
         <h2
           className="text-xl font-semibold text-[var(--color-ink-900)] mb-2"
           style={{ fontFamily: "var(--font-display)" }}
@@ -230,10 +294,12 @@ export default function PublicForm<K extends string>({
         <Link
           href={localizedHref("/", tree)}
           className={
-            "inline-flex items-center justify-center px-5 h-10 rounded-[var(--radius-md)] " +
+            "inline-flex items-center justify-center px-5 h-12 rounded-[var(--radius-md)] " +
             "bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
             "text-sm font-semibold transition-colors duration-150 " +
-            "hover:bg-[var(--color-sage-700)] focus-visible:outline-none " +
+            "hover:bg-[var(--color-sage-700)] " +
+            PRESS_FEEDBACK + " " +
+            "focus-visible:outline-none " +
             "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
           }
         >
@@ -243,7 +309,7 @@ export default function PublicForm<K extends string>({
     );
   }
 
-  const waiting = status === "submitting" || !turnstile.token;
+  const waiting = status === "submitting" || queued;
 
   return (
     <>
@@ -255,13 +321,16 @@ export default function PublicForm<K extends string>({
       />
       <form onSubmit={handleSubmit} noValidate className="space-y-5">
         {status === "error" && (
-          <div role="alert" className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 py-3">
-            <p className="text-sm font-medium text-[var(--color-danger)]">{t(`${form}.error.title`, locale)}</p>
-            <p className="text-sm text-[var(--color-danger)] mt-0.5">{t(`${form}.error.body`, locale)}</p>
+          <div role="alert" className="flex items-start gap-2.5 rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 py-3">
+            <AlertCircle size={16} aria-hidden className="mt-0.5 shrink-0 text-[var(--color-danger)]" />
+            <div>
+              <p className="text-sm font-medium text-[var(--color-danger)]">{t(`${form}.error.title`, locale)}</p>
+              <p className="text-sm text-[var(--color-danger)] mt-0.5">{t(`${form}.error.body`, locale)}</p>
+            </div>
           </div>
         )}
 
-        {children(errors, locale)}
+        {children(errors, locale, onBlurField)}
 
         {/* Honeypot — visually hidden from real users */}
         <div aria-hidden="true" className="hidden">
@@ -281,7 +350,8 @@ export default function PublicForm<K extends string>({
           <div ref={turnstileContainerRef} data-testid="turnstile-widget" />
           {turnstile.error && (
             <p role="alert" className={ERROR_CLASS}>
-              {t("form.turnstile.error", locale)}
+              <AlertCircle size={14} aria-hidden className="mt-0.5 shrink-0" />
+              <span>{t("form.turnstile.error", locale)}</span>
             </p>
           )}
         </div>
@@ -295,17 +365,14 @@ export default function PublicForm<K extends string>({
             "bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
             "text-base font-semibold transition-colors duration-150 " +
             "hover:bg-[var(--color-sage-700)] " +
+            PRESS_FEEDBACK + " " +
             "focus-visible:outline-none focus-visible:ring-2 " +
             "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
             "disabled:opacity-60 disabled:cursor-not-allowed"
           }
           aria-disabled={waiting}
         >
-          {status === "submitting"
-            ? t(`${form}.submitting`, locale)
-            : !turnstile.token
-              ? t("form.turnstile.verifying", locale)
-              : t(`${form}.submit`, locale)}
+          {waiting ? t(`${form}.submitting`, locale) : t(`${form}.submit`, locale)}
         </button>,
         )}
 
@@ -321,6 +388,7 @@ export default function PublicForm<K extends string>({
               "border border-[var(--color-bone-300)] text-[var(--color-ink-700)] " +
               "text-base font-medium transition-colors duration-150 " +
               "hover:bg-[var(--color-sage-100)] " +
+              PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 " +
               "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
             }

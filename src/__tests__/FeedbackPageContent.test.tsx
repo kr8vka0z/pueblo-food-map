@@ -34,7 +34,7 @@ describe("FeedbackPageContent — locale", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: t("feedback.title", "en") }),
     ).toBeDefined();
-    expect(screen.getByLabelText(new RegExp(t("feedback.type.label", "en")))).toBeDefined();
+    expect(screen.getByRole("group", { name: new RegExp(t("feedback.type.label", "en")) })).toBeDefined();
   });
 
   test("renders Spanish heading and form labels when locale='es'", () => {
@@ -46,6 +46,6 @@ describe("FeedbackPageContent — locale", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: t("feedback.title", "es") }),
     ).toBeDefined();
-    expect(screen.getByLabelText(new RegExp(t("feedback.type.label", "es")))).toBeDefined();
+    expect(screen.getByRole("group", { name: new RegExp(t("feedback.type.label", "es")) })).toBeDefined();
   });
 });

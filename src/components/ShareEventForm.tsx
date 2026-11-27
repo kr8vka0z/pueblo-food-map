@@ -89,6 +89,16 @@ type AddressCheck = "found" | "multiple" | "none" | "error" | "stale";
 
 const SECTION = "pt-4 border-t border-[var(--color-bone-200)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]";
 
+/** Postel's law (#959): accept bare domain URLs like "example.org/event" by prepending https://. */
+export function normalizeEventLinkUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) return trimmed;
+  // Require a dot in the host segment so gibberish like "not a url" still fails safeUrl.
+  if (/^[^\s/]+\.[^\s/]+/.test(trimmed)) return `https://${trimmed}`;
+  return trimmed;
+}
+
 export default function ShareEventForm() {
   const pathname = usePathname();
   const { locale } = useLocale();
@@ -226,7 +236,8 @@ export default function ShareEventForm() {
     else if (v.start && v.end <= v.start) e.end = t("shareEvent.validation.endBeforeStart", locale);
     if (!v.description.trim()) e.description = t("shareEvent.validation.descriptionRequired", locale);
     if (!v.address.trim()) e.address = t("shareEvent.validation.addressRequired", locale);
-    if (v.linkUrl.trim() && !safeUrl(v.linkUrl.trim())) e.linkUrl = t("shareEvent.validation.linkInvalid", locale);
+    const normalizedLink = normalizeEventLinkUrl(v.linkUrl);
+    if (normalizedLink && !safeUrl(normalizedLink)) e.linkUrl = t("shareEvent.validation.linkInvalid", locale);
     if (!submitterName.trim()) e.submitterName = t("shareEvent.validation.submitterNameRequired", locale);
     if (!submitterEmail.trim()) e.submitterEmail = t("shareEvent.validation.emailRequired", locale);
     else if (!EMAIL_RE.test(submitterEmail)) e.submitterEmail = t("shareEvent.validation.emailInvalid", locale);
@@ -239,7 +250,13 @@ export default function ShareEventForm() {
       return <input {...control} type="text" value={values[key]} onChange={(e) => set(key, e.target.value)} maxLength={max} {...extra} />;
     };
 
-  const card = <ShareEventPreview values={values} flyer={flyer} locale={locale} />;
+  const card = (
+    <ShareEventPreview
+      values={{ ...values, linkUrl: normalizeEventLinkUrl(values.linkUrl) }}
+      flyer={flyer}
+      locale={locale}
+    />
+  );
 
   // Phone only: Preview beside Send, pinned to the screen's bottom edge while the form is on screen.
   const submitRow = (submit: ReactNode) => (
@@ -297,31 +314,68 @@ export default function ShareEventForm() {
         address: pinRef.current?.matchedAddress ?? values.address.trim(),
         lat: pinRef.current?.lat,
         lng: pinRef.current?.lng,
-        link_url: values.linkUrl.trim() || undefined,
+        link_url: normalizeEventLinkUrl(values.linkUrl) || undefined,
         link_label: values.linkLabel,
         flyer_key: flyerRef.current?.key,
         submitter_name: submitterName.trim(),
         submitter_email: submitterEmail.trim(),
       })}
     >
-      {(errors, locale) => (
+      {(errors, locale, onBlurField) => (
         <>
           <p className={SECTION + " pt-0 border-t-0"}>{t("shareEvent.section.event", locale)}</p>
           <Field id={FIELD_IDS.name} label={t("shareEvent.name.label", locale)} required error={errors.name}>
-            {text("name", SUGGEST_VENUE_NAME, { placeholder: t("shareEvent.name.placeholder", locale) })}
+            {text("name", SUGGEST_VENUE_NAME, {
+              name: "name",
+              enterKeyHint: "next",
+              onBlur: () => onBlurField("name"),
+              placeholder: t("shareEvent.name.placeholder", locale),
+            })}
           </Field>
           <Field id={FIELD_IDS.host} label={t("shareEvent.host.label", locale)} required error={errors.host}>
-            {text("host", SUGGEST_VENUE_NAME, { placeholder: t("shareEvent.host.placeholder", locale) })}
+            {text("host", SUGGEST_VENUE_NAME, {
+              name: "host",
+              enterKeyHint: "next",
+              onBlur: () => onBlurField("host"),
+              placeholder: t("shareEvent.host.placeholder", locale),
+            })}
           </Field>
           <Field id={FIELD_IDS.date} label={t("shareEvent.date.label", locale)} required error={errors.date}>
-            {(control) => <input {...control} type="date" value={values.date} onChange={(e) => set("date", e.target.value)} />}
+            {(control) => (
+              <input
+                {...control}
+                name="date"
+                type="date"
+                value={values.date}
+                onChange={(e) => set("date", e.target.value)}
+                onBlur={() => onBlurField("date")}
+              />
+            )}
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field id={FIELD_IDS.start} label={t("shareEvent.start.label", locale)} required error={errors.start}>
-              {(control) => <input {...control} type="time" value={values.start} onChange={(e) => set("start", e.target.value)} />}
+              {(control) => (
+                <input
+                  {...control}
+                  name="start"
+                  type="time"
+                  value={values.start}
+                  onChange={(e) => set("start", e.target.value)}
+                  onBlur={() => onBlurField("start")}
+                />
+              )}
             </Field>
             <Field id={FIELD_IDS.end} label={t("shareEvent.end.label", locale)} required error={errors.end}>
-              {(control) => <input {...control} type="time" value={values.end} onChange={(e) => set("end", e.target.value)} />}
+              {(control) => (
+                <input
+                  {...control}
+                  name="end"
+                  type="time"
+                  value={values.end}
+                  onChange={(e) => set("end", e.target.value)}
+                  onBlur={() => onBlurField("end")}
+                />
+              )}
             </Field>
           </div>
           <p className="-mt-3 text-xs text-[var(--color-ink-400)]">{t("shareEvent.timeHint", locale)}</p>
@@ -335,30 +389,37 @@ export default function ShareEventForm() {
             {(control) => (
               <textarea
                 {...control}
+                name="description"
                 rows={3}
                 value={values.description}
                 onChange={(e) => set("description", e.target.value)}
+                onBlur={() => onBlurField("description")}
                 placeholder={t("shareEvent.description.placeholder", locale)}
                 maxLength={SUGGEST_NOTES}
               />
             )}
           </Field>
           <Field id="share-bring" label={t("shareEvent.bring.label", locale)}>
-            {text("whatToBring", EVENT_SHORT_TEXT, { placeholder: t("shareEvent.bring.placeholder", locale) })}
+            {text("whatToBring", EVENT_SHORT_TEXT, { name: "whatToBring", enterKeyHint: "next", placeholder: t("shareEvent.bring.placeholder", locale) })}
           </Field>
 
           <p className={SECTION}>{t("shareEvent.section.where", locale)}</p>
           <Field id="share-venue-name" label={t("shareEvent.venueName.label", locale)}>
-            {text("venueName", SUGGEST_VENUE_NAME, { placeholder: t("shareEvent.venueName.placeholder", locale) })}
+            {text("venueName", SUGGEST_VENUE_NAME, { name: "venueName", enterKeyHint: "next", placeholder: t("shareEvent.venueName.placeholder", locale) })}
           </Field>
           <Field id={FIELD_IDS.address} label={t("shareEvent.address.label", locale)} required error={errors.address}>
             {(control) => (
               <input
                 {...control}
+                name="address"
                 type="text"
+                enterKeyHint="next"
                 value={values.address}
                 onChange={(e) => editAddress(e.target.value)}
-                onBlur={() => void checkAddress()}
+                onBlur={() => {
+                  onBlurField("address");
+                  void checkAddress();
+                }}
                 placeholder={t("shareEvent.address.placeholder", locale)}
                 autoComplete="street-address"
                 maxLength={SUGGEST_ADDRESS}
@@ -411,12 +472,16 @@ export default function ShareEventForm() {
             {(control) => (
               <input
                 {...control}
+                name="linkUrl"
                 type="url"
                 inputMode="url"
                 autoCapitalize="off"
                 autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="next"
                 value={values.linkUrl}
                 onChange={(e) => set("linkUrl", e.target.value)}
+                onBlur={() => onBlurField("linkUrl")}
                 placeholder={t("shareEvent.link.placeholder", locale)}
                 maxLength={SUGGEST_CONTACT}
               />
@@ -465,7 +530,7 @@ export default function ShareEventForm() {
               <button
                 type="button"
                 onClick={() => setFlyerBoth(null)}
-                className="mt-2 inline-flex min-h-12 items-center text-sm font-medium text-[var(--color-danger)] underline underline-offset-2"
+                className="mt-2 inline-flex min-h-12 items-center text-sm font-medium text-[var(--color-danger)] underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
               >
                 {t("shareEvent.flyer.remove", locale)}
               </button>
@@ -477,10 +542,14 @@ export default function ShareEventForm() {
             {(control) => (
               <input
                 {...control}
+                name="submitterName"
                 type="text"
                 autoComplete="name"
+                spellCheck={false}
+                enterKeyHint="next"
                 value={submitterName}
                 onChange={(e) => setSubmitterName(e.target.value)}
+                onBlur={() => onBlurField("submitterName")}
                 maxLength={SUGGEST_VENUE_NAME}
               />
             )}
@@ -490,19 +559,21 @@ export default function ShareEventForm() {
             label={t("shareEvent.submitterEmail.label", locale)}
             required
             error={errors.submitterEmail}
-            hint={t("shareEvent.submitterEmail.hint", locale)}
             after={<PrivacyNote locale={locale} />}
           >
             {(control) => (
               <input
                 {...control}
+                name="submitterEmail"
                 type="email"
                 value={submitterEmail}
                 onChange={(e) => setSubmitterEmail(e.target.value)}
+                onBlur={() => onBlurField("submitterEmail")}
                 placeholder={t("shareEvent.submitterEmail.placeholder", locale)}
                 autoComplete="email"
                 autoCapitalize="off"
                 autoCorrect="off"
+                spellCheck={false}
                 enterKeyHint="send"
                 maxLength={EMAIL}
               />
@@ -524,7 +595,7 @@ export default function ShareEventForm() {
           // A full page load on purpose: it gives the next event a fresh Turnstile token and an empty form.
           <a
             href={pathname}
-            className="inline-flex min-h-12 items-center text-sm font-semibold text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
+            className="inline-flex min-h-12 items-center text-sm font-semibold text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
           >
             {t("shareEvent.another", locale)}
           </a>

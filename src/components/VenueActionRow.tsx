@@ -51,7 +51,7 @@ function Tip({ children }: { children: ReactNode }) {
     <span
       aria-hidden
       className={
-        "pointer-events-none absolute left-0 top-[calc(100%+4px)] z-20 hidden whitespace-nowrap " +
+        "pointer-events-none absolute left-0 top-[calc(100%+4px)] z-20 hidden max-w-[220px] truncate " +
         "rounded-[var(--radius-sm)] bg-[var(--color-ink-900)] px-2 py-1 text-xs font-medium text-[var(--color-bone-50)] " +
         "group-hover:block group-focus-visible:block"
       }

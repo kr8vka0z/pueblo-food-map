@@ -41,11 +41,11 @@ export default function PrivacyContent() {
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">
       {/* Top nav bar */}
-      <nav className="h-12 flex items-center px-4 border-b border-[var(--color-bone-200)] shrink-0">
+      <nav aria-label={t("report.backToMap", locale)} className="h-12 flex items-center px-4 border-b border-[var(--color-bone-200)] shrink-0">
         <Link
           href="/"
           className={
-            "text-sm font-medium text-[var(--color-sage-600)] " +
+            "inline-flex items-center min-h-12 text-sm font-medium text-[var(--color-sage-600)] " +
             "hover:text-[var(--color-sage-700)] transition-colors " +
             "focus-visible:outline-none focus-visible:ring-2 " +
             "focus-visible:ring-[var(--color-sage-500)] rounded"
@@ -58,7 +58,7 @@ export default function PrivacyContent() {
       {/* Content */}
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8">
         <h1
-          className="text-2xl font-normal text-[var(--color-ink-900)] mb-6"
+          className="text-2xl font-normal text-balance text-[var(--color-ink-900)] mb-6"
           style={{ fontFamily: "var(--font-display)" }}
         >
           {t("privacy.heading", locale)}

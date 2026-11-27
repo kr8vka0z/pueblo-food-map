@@ -83,10 +83,10 @@ function yesNo(value: boolean): string {
  * detail rendering.
  */
 export function summarizeSubmissionForRow(submission: ReviewSubmission): string {
-  if (submission.parseError) return "Public report: couldn't read details";
+  if (submission.parseError) return "Public report: couldn’t read details";
   if (submission.kind === "new_venue") return "Suggested new place";
   const issueLabel = ISSUE_TYPES[submission.payload.issueType as IssueTypeKey] ?? submission.payload.issueType;
-  return `"${issueLabel}"`;
+  return `“${issueLabel}”`;
 }
 
 type ActionState = { status: "idle" } | { status: "submitting" } | { status: "error"; message: string };

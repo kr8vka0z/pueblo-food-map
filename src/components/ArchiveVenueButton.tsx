@@ -40,6 +40,8 @@ export interface ArchiveVenueButtonProps {
    *  the live box reads skip archived rows); a place waits for the next
    *  publish. Defaults to "place". */
   kind?: "place" | "box";
+  /** Where to navigate after archiving succeeds (defaults to /admin/places; blessing boxes return to /admin/boxes). */
+  afterArchiveHref?: string;
 }
 
 export default function ArchiveVenueButton({
@@ -47,6 +49,7 @@ export default function ArchiveVenueButton({
   venueName,
   alreadyArchived,
   kind = "place",
+  afterArchiveHref = "/admin/places",
 }: ArchiveVenueButtonProps) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
@@ -58,10 +61,9 @@ export default function ArchiveVenueButton({
     try {
       const res = await fetch(`/api/admin/venues/${venueId}/archive`, { method: "POST" });
       if (res.status === 200) {
-        // Back to the venue list (/admin/places, moved from /admin in the
-        // admin dashboard build), not the Dashboard. The box stays busy
-        // until the page changes, so it can't be pressed twice.
-        router.push("/admin/places");
+        // Back to the venue list (/admin/places, or /admin/boxes for a blessing box).
+        // The box stays busy until the page changes, so it can't be pressed twice.
+        router.push(afterArchiveHref);
         router.refresh();
         return;
       }

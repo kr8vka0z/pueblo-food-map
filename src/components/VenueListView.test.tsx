@@ -155,7 +155,7 @@ describe("VenueListView — status key", () => {
     render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
     expect(screen.getByText("New, not on the public map yet.")).toBeDefined();
     expect(screen.getByText("On the public map, exactly as shown.")).toBeDefined();
-    expect(screen.getByText("Approved or saved changes the map doesn't show until Publish.")).toBeDefined();
+    expect(screen.getByText("Approved or saved changes the map doesn’t show until Publish.")).toBeDefined();
     expect(screen.getByText("Taken off the map, kept for the record.")).toBeDefined();
   });
 });
@@ -425,10 +425,11 @@ describe("VenueListView — To review column", () => {
     expect(screen.getByText(/phone number/i)).toBeDefined();
   });
 
-  test("a venue with nothing pending shows a dash", () => {
+  test("a venue with nothing pending shows plain 'None' instead of a dash", () => {
     const venues = [makeVenue({ id: "manual-abc" })];
     render(<VenueListView venues={venues} statusByVenueId={makeStatusMap(venues)} />);
-    expect(screen.getByText("—")).toBeDefined();
+    expect(screen.getByText("None")).toBeDefined();
+    expect(screen.queryByText("—")).toBeNull();
   });
 });
 
@@ -518,7 +519,7 @@ describe("VenueListView — source/lane filters (moved from /admin/flags)", () =
     expect(screen.queryByRole("button", { name: "All sources" })).toBeNull();
   });
 
-  test("filters rows by proposal source when more than one source is present", async () => {
+  test("filters rows by proposal source when To review is active and more than one source is present", async () => {
     const venues = [
       makeVenue({ id: "manual-abc", name: "Eastside Pantry" }),
       makeVenue({ id: "manual-xyz", name: "Westside Grocery" }),
@@ -535,6 +536,10 @@ describe("VenueListView — source/lane filters (moved from /admin/flags)", () =
       />,
     );
 
+    // Source chips stay hidden on the default All places view to reduce clutter.
+    expect(screen.queryByRole("button", { name: "OpenStreetMap" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /To review/ }));
     await user.click(screen.getByRole("button", { name: "OpenStreetMap" }));
 
     expect(screen.getByRole("link", { name: "Eastside Pantry" })).toBeDefined();
@@ -600,7 +605,7 @@ describe("VenueListView — public submissions in the To review column (#675)", 
       />,
     );
 
-    expect(screen.getByText(/Public: "Hours are wrong or out of date"/)).toBeDefined();
+    expect(screen.getByText(/Public: “Hours are wrong or out of date”/)).toBeDefined();
     expect(screen.getByText("Public")).toBeDefined();
   });
 
@@ -615,7 +620,7 @@ describe("VenueListView — public submissions in the To review column (#675)", 
     );
 
     expect(screen.getByRole("link", { name: "Eastside Pantry" })).toBeDefined();
-    expect(screen.getByText(/Public: "Hours are wrong or out of date"/)).toBeDefined();
+    expect(screen.getByText(/Public: “Hours are wrong or out of date”/)).toBeDefined();
   });
 });
 
@@ -663,6 +668,7 @@ describe("VenueListView — source filter gains 'The public' (#675)", () => {
       />,
     );
 
+    await user.click(screen.getByRole("button", { name: /To review/ }));
     await user.click(screen.getByRole("button", { name: "The public" }));
 
     expect(screen.getByRole("link", { name: "Westside Grocery" })).toBeDefined();

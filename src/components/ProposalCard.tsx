@@ -297,53 +297,54 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
         </p>
       </div>
 
-      {/* Detail column stacks under the preview on narrow screens (mobile-
-          first base rule) and sits side-by-side with it from lg: up — a
-          side-by-side layout needs real width for both to stay readable, so
-          this doesn't flip at md: (design/references/mobile.md). */}
-      <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start">
-        {/* data-testid: the preview column intentionally re-renders the
-            venue's name/address/category via the real VenueCard — tests
-            need to scope queries to one column or the other rather than
-            asserting on now-legitimately-duplicated text. */}
-        <div data-testid="proposal-detail" className="min-w-0 flex-1">
-          <p className={cardNameClass}>{venueName}</p>
-          {/* Address alongside the name — recognising the actual place, not just
-              matching an id, is what lets an admin judge the change at all. */}
-          {venue?.address && <p className="text-sm text-[var(--color-ink-500)]">{venue.address}</p>}
-          <p className="text-xs text-[var(--color-ink-400)]">{row.target_venue_id}</p>
-          {rename && (
-            <p className="mt-2 text-sm text-[var(--color-ink-700)]">
-              {sourceBadge.label} stopped listing this place and started listing <span className="[overflow-wrap:anywhere]">{rename.to_id}</span> at
-              the same spot or phone. Approving updates this venue in place, on the same page and link, with the new details below.
-            </p>
-          )}
-          {summary && <p className="mt-2 text-xs text-[var(--color-ink-500)]">{summary}</p>}
+      {/* Container-aware layout: inside formPageBodyClass (672px) the preview
+          stacks below details with full width; inside wider containers (>=768px)
+          the two columns sit side-by-side without squeezing details. */}
+      <div className="@container mt-3">
+        <div className="flex flex-col gap-4 @3xl:flex-row @3xl:items-start">
+          {/* data-testid: the preview column intentionally re-renders the
+              venue's name/address/category via the real VenueCard — tests
+              need to scope queries to one column or the other rather than
+              asserting on now-legitimately-duplicated text. */}
+          <div data-testid="proposal-detail" className="min-w-0 flex-1">
+            <p className={cardNameClass}>{venueName}</p>
+            {/* Address alongside the name — recognising the actual place, not just
+                matching an id, is what lets an admin judge the change at all. */}
+            {venue?.address && <p className="text-sm text-[var(--color-ink-500)]">{venue.address}</p>}
+            <p className="text-xs text-[var(--color-ink-400)]">{row.target_venue_id}</p>
+            {rename && (
+              <p className="mt-2 text-sm text-[var(--color-ink-700)]">
+                {sourceBadge.label} stopped listing this place and started listing <span className="[overflow-wrap:anywhere]">{rename.to_id}</span> at
+                the same spot or phone. Approving updates this venue in place, on the same page and link, with the new details below.
+              </p>
+            )}
+            {summary && <p className="mt-2 text-xs text-[var(--color-ink-500)]">{summary}</p>}
 
-          {proposal.parseError ? (
-            <p className="mt-2 text-sm text-[var(--color-clay-700)]">
-              Couldn&apos;t read details for this proposal. The stored data may be malformed. You can still
-              reject it below.
-            </p>
-          ) : source === "link_health" ? (
-            <LinkHealthDetails diff={proposal.diff} />
-          ) : changeType === "remove" ? (
-            <RemoveDetails name={venueName} venue={venue} sourceLabel={sourceBadge.label} reason={metaSummaryOf(proposal.diff)} />
-          ) : changeType === "add" ? (
-            <AddDetails diff={proposal.diff} sourceLabel={sourceBadge.label} isRestore={isRestore} />
-          ) : (
-            <FieldDiff diff={proposal.diff} sourceLabel={sourceBadge.label} />
-          )}
-          {!proposal.parseError && (
-            <ProposalSourceNotes diff={proposal.diff} showSummary={changeType !== "remove"} sourceLabel={sourceBadge.label} />
+            {proposal.parseError ? (
+              <p className="mt-2 text-sm text-[var(--color-clay-700)]">
+                Couldn&rsquo;t read details for this proposal. The stored data may be malformed. You can still
+                reject it below.
+              </p>
+            ) : source === "link_health" ? (
+              <LinkHealthDetails diff={proposal.diff} />
+            ) : changeType === "remove" ? (
+              <RemoveDetails name={venueName} venue={venue} sourceLabel={sourceBadge.label} reason={metaSummaryOf(proposal.diff)} />
+            ) : changeType === "add" ? (
+              <AddDetails diff={proposal.diff} sourceLabel={sourceBadge.label} isRestore={isRestore} />
+            ) : (
+              <FieldDiff diff={proposal.diff} sourceLabel={sourceBadge.label} />
+            )}
+            {!proposal.parseError && (
+              <ProposalSourceNotes diff={proposal.diff} showSummary={changeType !== "remove"} sourceLabel={sourceBadge.label} />
+            )}
+          </div>
+
+          {!proposal.parseError && source !== "link_health" && (
+            <div data-testid="proposal-preview" className="min-w-0 @3xl:w-[320px] @3xl:shrink-0">
+              <ProposalPreview changeType={changeType} diff={proposal.diff} venue={venue} venueId={row.target_venue_id} />
+            </div>
           )}
         </div>
-
-        {!proposal.parseError && source !== "link_health" && (
-          <div data-testid="proposal-preview" className="min-w-0 lg:w-[320px] lg:shrink-0">
-            <ProposalPreview changeType={changeType} diff={proposal.diff} venue={venue} venueId={row.target_venue_id} />
-          </div>
-        )}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -936,7 +937,7 @@ function ProposalPreview({
             (isRemove ? "opacity-50 grayscale" : "")
           }
         >
-          <VenueCard venue={previewVenue} isSelected={false} onClick={() => {}} headingLevel={3} />
+          <VenueCard venue={previewVenue} isSelected={false} onClick={() => {}} headingLevel={4} />
         </ul>
       ) : (
         <p className="text-sm text-[var(--color-ink-500)]">Not enough data to preview this change.</p>

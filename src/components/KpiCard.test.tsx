@@ -50,9 +50,10 @@ describe("KpiCard render", () => {
     expect(screen.getByText("new")).toBeDefined();
   });
 
-  test("both periods zero -> a dash, not '+0%' or 'new'", () => {
+  test("both periods zero -> plain 'No change', not '+0%', 'new', or an em dash", () => {
     render(<KpiCard label="Reported empty" displayValue="0" value={0} previousValue={0} />);
-    expect(screen.getByText("—")).toBeDefined();
+    expect(screen.getByText("No change")).toBeDefined();
+    expect(screen.queryByText("—")).toBeNull();
   });
 
   test("'about' prefix renders for sampled RUM numbers", () => {

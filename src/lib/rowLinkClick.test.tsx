@@ -19,12 +19,13 @@ function renderTable() {
       events={[{ id: "evt-1", name: "Turkey drive", starts_at: "2026-11-20T17:00:00.000Z", ends_at: "2026-11-20T19:00:00.000Z", status: "published" }]}
     />,
   );
-  const link = screen.getByRole("link", { name: "Edit Turkey drive" });
+  const link = screen.getByRole("link", { name: "Turkey drive" });
   // Count the clicks that reach the real link; stop them there, since jsdom
   // cannot navigate.
   const opened = vi.fn((e: Event) => e.preventDefault());
   link.addEventListener("click", opened);
-  return { link, opened, cell: screen.getByText("Turkey drive") };
+  // Click a non-link cell in the same row to verify openRowLink delegates to the name link.
+  return { link, opened, cell: screen.getByText("Published") };
 }
 
 describe("openRowLink", () => {

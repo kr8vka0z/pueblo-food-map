@@ -119,14 +119,21 @@ function filterLabel(key: string): string {
   return FILTER_ACRONYM_LABELS[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/** `null` when the denominator is 0 or unavailable — rendered as "—", never a divide-by-zero NaN. Rounded to a whole percent; these are share-of-an-event-count numbers, not precise measurements. */
+const NUMBER_FORMAT = new Intl.NumberFormat("en-US");
+const REFRESH_DATE_FORMAT = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: TIME_ZONE });
+
+function formatInt(n: number): string {
+  return NUMBER_FORMAT.format(n);
+}
+
+/** `null` when the denominator is 0 or unavailable — rendered as "No data", never a divide-by-zero NaN. Rounded to a whole percent; these are share-of-an-event-count numbers, not precise measurements. */
 function pctOf(count: number, total: number | null | undefined): number | null {
   if (!total) return null;
   return Math.round((count / total) * 100);
 }
 
 function formatPct(pct: number | null): string {
-  return pct === null ? "—" : `${pct}%`;
+  return pct === null ? "No data" : `${pct}%`;
 }
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
@@ -295,6 +302,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const networkOverview = computeNetworkOverview(networkStats.boxes.length, networkStats.approvedSponsorCount ?? 0);
   const boxesForRanking = networkStats.boxes.map((b) => ({ id: b.id, name: b.name, archived: b.archived, checkins: checkinsByVenue.get(b.id) ?? [] }));
   const longestSinceFill = rankLongestSinceLastFill(boxesForRanking, 4);
+  const longestRealFillMs = Math.max(
+    0,
+    ...longestSinceFill.map((b) => (b.lastFilledAt ? now.getTime() - new Date(b.lastFilledAt).getTime() : 0)),
+  );
+  // Keep "never" boxes at the top (100% bar) without compressing real durations
+  // (like 30 days) into tiny slivers against epoch-time (~56 years).
+  const neverFilledBarValue = longestRealFillMs > 0 ? Math.round(longestRealFillMs * 1.25) : 1;
   const periodPhotos = filterByPeriod(networkStats.photos, period, now);
   const milestones = computeMilestones({ fills: counts.fills, uses: counts.uses });
   const mostNeeded = rankNetworkMostNeeded(needRows, 4);
@@ -306,9 +320,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const problemCounts = computeProblemReportCounts(problemReportRows, period, now);
 
   return (
-    <main className="min-h-screen bg-[var(--color-bone-50)]">
+    <div className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="dashboard" counts={navCounts} showActivity={identity.isOwner === true} />
-      <div className={pageBodyClass}>
+      <main id="admin-main" tabIndex={-1} className={pageBodyClass}>
         {publishBotStatus && (
           <PublishBotStatusBanner
             prNumber={publishBotStatus.number}
@@ -344,25 +358,25 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           {visitors ? (
             <div className="mt-3 flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <KpiCard label="Visitors" displayValue={String(visitors.visits)} value={visitors.visits} previousValue={visitors.previousVisits} approximate />
-                <KpiCard label="Page views" displayValue={String(visitors.pageviews)} value={visitors.pageviews} previousValue={visitors.previousPageviews} approximate />
+                <KpiCard label="Visitors" displayValue={formatInt(visitors.visits)} value={visitors.visits} previousValue={visitors.previousVisits} approximate />
+                <KpiCard label="Page views" displayValue={formatInt(visitors.pageviews)} value={visitors.pageviews} previousValue={visitors.previousPageviews} approximate />
                 <KpiCard
                   label="On a phone"
-                  displayValue={visitors.phoneSharePct === null ? "—" : `${visitors.phoneSharePct}%`}
+                  displayValue={visitors.phoneSharePct === null ? "No data" : `${visitors.phoneSharePct}%`}
                   value={visitors.phoneSharePct ?? 0}
                   approximate
                 />
                 <KpiCard
                   label="Phone page load"
-                  displayValue={visitors.phoneLcpMs === null ? "—" : `${(visitors.phoneLcpMs / 1000).toFixed(1)}s`}
+                  displayValue={visitors.phoneLcpMs === null ? "No data" : `${(visitors.phoneLcpMs / 1000).toFixed(1)}s`}
                   value={visitors.phoneLcpMs ?? 0}
                   approximate
                 />
               </div>
               {visitors.phoneLcpMs !== null && (
                 <p className="text-xs text-[var(--color-ink-500)]">
-                  Google calls anything under {(LCP_GOOD_MS / 1000).toFixed(1)}s &quot;good&quot;, and{" "}
-                  {visitors.phoneLcpMs <= LCP_GOOD_MS ? "we're in that range." : "we're slower than that right now."}
+                  Google calls anything under {(LCP_GOOD_MS / 1000).toFixed(1)}s &ldquo;good&rdquo;, and{" "}
+                  {visitors.phoneLcpMs <= LCP_GOOD_MS ? "we’re in that range." : "we’re slower than that right now."}
                 </p>
               )}
               <div>
@@ -401,12 +415,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           {mapUsage ? (
             <div className="mt-3 flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <KpiCard label="Near me taps" displayValue={String(mapUsage.headline.nearMeTaps)} value={mapUsage.headline.nearMeTaps} previousValue={mapUsage.headline.previousNearMeTaps} />
-                <KpiCard label="Searches" displayValue={String(mapUsage.headline.searches)} value={mapUsage.headline.searches} previousValue={mapUsage.headline.previousSearches} />
-                <KpiCard label="Place cards opened" displayValue={String(mapUsage.headline.cardsOpened)} value={mapUsage.headline.cardsOpened} previousValue={mapUsage.headline.previousCardsOpened} />
+                <KpiCard label="Near me taps" displayValue={formatInt(mapUsage.headline.nearMeTaps)} value={mapUsage.headline.nearMeTaps} previousValue={mapUsage.headline.previousNearMeTaps} />
+                <KpiCard label="Searches" displayValue={formatInt(mapUsage.headline.searches)} value={mapUsage.headline.searches} previousValue={mapUsage.headline.previousSearches} />
+                <KpiCard label="Place cards opened" displayValue={formatInt(mapUsage.headline.cardsOpened)} value={mapUsage.headline.cardsOpened} previousValue={mapUsage.headline.previousCardsOpened} />
                 <KpiCard
                   label="Switched to Spanish"
-                  displayValue={cfVisits === null ? `${mapUsage.headline.localeSwitchedToEs} ${mapUsage.headline.localeSwitchedToEs === 1 ? "switch" : "switches"}` : formatPct(localeEsPct)}
+                  displayValue={cfVisits === null ? `${formatInt(mapUsage.headline.localeSwitchedToEs)} ${mapUsage.headline.localeSwitchedToEs === 1 ? "switch" : "switches"}` : formatPct(localeEsPct)}
                   value={cfVisits === null ? mapUsage.headline.localeSwitchedToEs : (localeEsPct ?? 0)}
                   previousValue={cfVisits === null ? mapUsage.headline.previousLocaleSwitchedToEs : (previousLocaleEsPct ?? undefined)}
                 />
@@ -431,12 +445,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     items={mapUsage.topSearches.map((s) => ({
                       label: s.term,
                       value: s.count,
-                      displayValue: s.zeroResults ? `${s.count} · 0 results` : String(s.count),
+                      displayValue: s.zeroResults ? `${formatInt(s.count)} · 0 results` : formatInt(s.count),
                     }))}
                     emptyMessage="Not enough repeated searches yet to say."
                   />
                   <p className="mt-1 text-xs text-[var(--color-ink-500)]">
-                    Terms searched 3+ times only. A &quot;0 results&quot; tag means every one of those searches found nothing, a hint the map may be missing that place.
+                    Terms searched 3+ times only. A &ldquo;0 results&rdquo; tag means every one of those searches found nothing, a hint the map may be missing that place.
                   </p>
                 </div>
               </div>
@@ -459,11 +473,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   />
                   <p className="mt-1 text-xs text-[var(--color-ink-500)]">Share of cards opened this period.</p>
                   {/* #919: taps on a place's own page, as plain counts: that page isn't a card, so a share of cards opened would mislead. */}
-                  <h4 className={`${groupTitleClass} mb-1 mt-4`}>On a place&apos;s own page, people…</h4>
+                  <h4 className={`${groupTitleClass} mb-1 mt-4`}>On a place&rsquo;s own page, people…</h4>
                   <BarList
                     items={[
-                      { label: "Directions", value: mapUsage.cardActions.venuePageDirections },
-                      { label: "Call", value: mapUsage.cardActions.venuePageCall },
+                      { label: "Directions", value: mapUsage.cardActions.venuePageDirections, displayValue: formatInt(mapUsage.cardActions.venuePageDirections) },
+                      { label: "Call", value: mapUsage.cardActions.venuePageCall, displayValue: formatInt(mapUsage.cardActions.venuePageCall) },
                     ]}
                     emptyMessage="No taps on place pages yet this period."
                   />
@@ -486,11 +500,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   <h4 className={`${groupTitleClass} mb-1`}>Location shared?</h4>
                   <BarList
                     items={[
-                      { label: "Granted", value: mapUsage.location.granted, displayValue: `${mapUsage.location.granted}` },
-                      { label: "Said no", value: mapUsage.location.denied, displayValue: `${mapUsage.location.denied}` },
-                      { label: "Timed out, no location found", value: mapUsage.location.timeout, displayValue: `${mapUsage.location.timeout}` },
-                      { label: "Phone couldn't find its location", value: mapUsage.location.unavailable, displayValue: `${mapUsage.location.unavailable}` },
-                      { label: "Never asked", value: neverAskedLocation, displayValue: `${neverAskedLocation}` },
+                      { label: "Granted", value: mapUsage.location.granted, displayValue: formatInt(mapUsage.location.granted) },
+                      { label: "Said no", value: mapUsage.location.denied, displayValue: formatInt(mapUsage.location.denied) },
+                      { label: "Timed out, no location found", value: mapUsage.location.timeout, displayValue: formatInt(mapUsage.location.timeout) },
+                      { label: "Phone couldn’t find its location", value: mapUsage.location.unavailable, displayValue: formatInt(mapUsage.location.unavailable) },
+                      { label: "Never asked", value: neverAskedLocation, displayValue: formatInt(neverAskedLocation) },
                     ]}
                     emptyMessage="No location prompts yet this period."
                   />
@@ -518,9 +532,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             Blessing boxes
           </h3>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <KpiCard label="Times filled" displayValue={String(counts.fills)} value={counts.fills} previousValue={previousCounts.fills} />
-            <KpiCard label="Times used" displayValue={String(counts.uses)} value={counts.uses} previousValue={previousCounts.uses} />
-            <KpiCard label="Reported empty" displayValue={String(counts.emptyReports)} value={counts.emptyReports} previousValue={previousCounts.emptyReports} />
+            <KpiCard label="Times filled" displayValue={formatInt(counts.fills)} value={counts.fills} previousValue={previousCounts.fills} />
+            <KpiCard label="Times used" displayValue={formatInt(counts.uses)} value={counts.uses} previousValue={previousCounts.uses} />
+            <KpiCard label="Reported empty" displayValue={formatInt(counts.emptyReports)} value={counts.emptyReports} previousValue={previousCounts.emptyReports} />
             <KpiCard
               label="Avg. empty → refilled"
               displayValue={formatDurationLabel(networkAverages.emptyToFillMs, "en")}
@@ -528,10 +542,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             />
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <KpiCard label="Boxes in service" displayValue={String(networkOverview.boxCount)} value={networkOverview.boxCount} />
+            <KpiCard label="Boxes in service" displayValue={formatInt(networkOverview.boxCount)} value={networkOverview.boxCount} />
             <KpiCard label="With a sponsor" displayValue={`${networkOverview.avgSponsorsPerBox} avg`} value={networkStats.approvedSponsorCount ?? 0} />
-            <KpiCard label="Photos shared" displayValue={String(periodPhotos.length)} value={periodPhotos.length} />
-            <KpiCard label="Getting empty-box emails" displayValue={String(adopters.length)} value={adopters.length} />
+            <KpiCard label="Photos shared" displayValue={formatInt(periodPhotos.length)} value={periodPhotos.length} />
+            <KpiCard label="Getting empty-box emails" displayValue={formatInt(adopters.length)} value={adopters.length} />
           </div>
           {milestones.length > 0 && (
             <p className="mt-3 text-sm text-[var(--color-ink-700)]">
@@ -544,7 +558,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               <BarList
                 items={longestSinceFill.map((b) => ({
                   label: b.name,
-                  value: b.lastFilledAt ? now.getTime() - new Date(b.lastFilledAt).getTime() : now.getTime(),
+                  value: b.lastFilledAt ? now.getTime() - new Date(b.lastFilledAt).getTime() : neverFilledBarValue,
                   displayValue: b.lastFilledAt ? formatDurationLabel(now.getTime() - new Date(b.lastFilledAt).getTime(), "en") : "never",
                 }))}
                 emptyMessage="No boxes yet."
@@ -565,15 +579,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             Map data health
           </h3>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <KpiCard label="Places on the map" displayValue={String(publishedVenues.length)} value={publishedVenues.length} previousValue={publishedVenues.length - newPlacesThisPeriod} />
-            <KpiCard label="New this period" displayValue={String(newPlacesThisPeriod)} value={newPlacesThisPeriod} />
-            <KpiCard label="Not checked in 90+ days" displayValue={String(staleThreeMonths)} value={staleThreeMonths} />
-            <KpiCard label="Problem reports (open / fixed)" displayValue={`${problemCounts.open} / ${problemCounts.fixed}`} value={problemCounts.open} />
+            <KpiCard label="Places on the map" displayValue={formatInt(publishedVenues.length)} value={publishedVenues.length} previousValue={publishedVenues.length - newPlacesThisPeriod} />
+            <KpiCard label="New this period" displayValue={formatInt(newPlacesThisPeriod)} value={newPlacesThisPeriod} />
+            <KpiCard label="Not checked in 90+ days" displayValue={formatInt(staleThreeMonths)} value={staleThreeMonths} />
+            <KpiCard label="Problem reports (open / fixed)" displayValue={`${formatInt(problemCounts.open)} / ${formatInt(problemCounts.fixed)}`} value={problemCounts.open} />
           </div>
           <p className="mt-3 text-sm text-[var(--color-ink-500)]">
             {latestRefresh ? (
               <>
-                Last data refresh {new Date(latestRefresh.createdAt).toLocaleDateString("en-US", { timeZone: TIME_ZONE })}:{" "}
+                Last data refresh {REFRESH_DATE_FORMAT.format(new Date(latestRefresh.createdAt))}:{" "}
                 {pluralize(latestRefresh.suggestedCount, "suggested change")}.{" "}
                 <Link href="/admin/places?show=review" className={linkClass}>
                   Review →
@@ -589,7 +603,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </Link>
           )}
         </section>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

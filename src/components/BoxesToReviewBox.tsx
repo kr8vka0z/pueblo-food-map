@@ -18,7 +18,7 @@
 
 import Link from "next/link";
 import { pluralize } from "@/lib/pluralize";
-import { cardSlimClass, primaryButtonClass } from "@/lib/adminCardStyles";
+import { cardSlimClass, secondaryButtonClass } from "@/lib/adminCardStyles";
 
 export interface BoxesToReviewBoxProps {
   /** Boxes with at least one photo or sponsor request pending — the "N" in the summary line, and what the "To review" chip/column count matches. */
@@ -42,12 +42,12 @@ export default function BoxesToReviewBox({
   return (
     <div className={cardSlimClass}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-[var(--color-ink-700)]">
+        <p className="text-sm font-semibold tabular-nums text-[var(--color-ink-700)]">
           {reviewingBoxCount} to review: {pluralize(photosCount, "photo")}
           {flaggedPhotosCount > 0 && ` (${flaggedPhotosCount} reported by a visitor)`} and{" "}
           {pluralize(sponsorRequestsCount, "sponsor request")}
         </p>
-        <Link href="/admin/boxes?show=review" className={primaryButtonClass}>
+        <Link href="/admin/boxes?show=review" className={secondaryButtonClass}>
           Show them
         </Link>
       </div>

@@ -37,7 +37,7 @@ export default function AdminError() {
     <main className="min-h-screen bg-[var(--color-bone-50)] px-4 py-6 sm:px-6">
       {/* An h1 here: this page replaces the whole admin page, menu included,
           so it carries the page's one h1 itself. */}
-      <h1 className={pageTitleClass}>This page didn&apos;t load</h1>
+      <h1 className={pageTitleClass}>This page didn&rsquo;t load</h1>
       <p className="mt-2 text-sm text-[var(--color-ink-700)]">Nothing was changed. Try again, or go back to the Dashboard.</p>
       <div className="mt-4 flex flex-wrap items-center gap-4">
         <button type="button" onClick={() => window.location.reload()} className={primaryButtonClass}>

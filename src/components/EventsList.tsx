@@ -116,35 +116,26 @@ export default function EventsList({ events }: EventsListProps) {
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead>
             <tr className={tableHeadRowClass}>
-              <th scope="col" className={`${tableHeadCellClass} min-w-[240px]`}>Event</th>
+              <th scope="col" className={`${tableHeadCellClass} sticky left-0 z-10 min-w-[240px] bg-white shadow-[1px_0_0_var(--color-bone-200)] sm:static sm:shadow-none`}>
+                Event
+              </th>
               <th scope="col" className={tableHeadCellClass}>Starts (Pueblo time)</th>
               <th scope="col" className={tableHeadCellClass}>Status</th>
-              <th scope="col" className={tableHeadCellClass}><span className="sr-only">Edit</span></th>
             </tr>
           </thead>
           <tbody>
-            {events.map((e, i) => (
-              // A click anywhere on the row opens its Edit link (src/lib/rowLinkClick.ts).
+            {events.map((e) => (
+              // Name IS the edit link (matching Places and Blessing Boxes); a
+              // click anywhere on the row opens it too (src/lib/rowLinkClick.ts).
               <tr key={e.id} className={tableLinkRowClass} onClick={openRowLink}>
-                <td id={`${rowId}-${i}-name`} className={`${tableCellClass} font-medium text-[var(--color-ink-900)]`}>
-                  {e.name}
+                <td className={`${tableCellClass} sticky left-0 z-10 bg-white font-medium shadow-[1px_0_0_var(--color-bone-200)] transition-colors duration-150 group-hover:bg-[var(--color-sage-100)] sm:static sm:bg-transparent sm:shadow-none sm:group-hover:bg-transparent`}>
+                  <Link href={`/admin/events/${e.id}/edit`} data-row-link className={linkClass}>
+                    {e.name}
+                  </Link>
                 </td>
-                <td className={`${tableCellClass} whitespace-nowrap text-[var(--color-ink-700)]`}>{formatEventWhen(e.starts_at)}</td>
+                <td className={`${tableCellClass} whitespace-nowrap tabular-nums text-[var(--color-ink-700)]`}>{formatEventWhen(e.starts_at)}</td>
                 <td className={tableCellClass}>
                   <span className={tagClass(STATUS_TONE[e.status])}>{STATUS_LABEL[e.status]}</span>
-                </td>
-                <td className={`${tableCellClass} text-right`}>
-                  {/* WHY aria-labelledby, not aria-label: the name ("Edit <event>") is built from visible text,
-                      so no stored text goes into an attribute. */}
-                  <Link
-                    id={`${rowId}-${i}-edit`}
-                    href={`/admin/events/${e.id}/edit`}
-                    data-row-link
-                    className={linkClass}
-                    aria-labelledby={`${rowId}-${i}-edit ${rowId}-${i}-name`}
-                  >
-                    Edit
-                  </Link>
                 </td>
               </tr>
             ))}

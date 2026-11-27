@@ -68,6 +68,6 @@ describe("AddVenueForm — PATCH 409 (archived venue, #568 item 1)", () => {
 
     await user.click(screen.getByRole("button", { name: /Save changes/i }));
 
-    expect(await screen.findByText(/can't be edited right now/i)).toBeDefined();
+    expect(await screen.findByText(/can’t be edited right now/i)).toBeDefined();
   });
 });

@@ -53,5 +53,5 @@ afterAll(() => {
 test("an evening refresh shows that day's Pueblo date", async () => {
   delete process.env.GITHUB_PUBLISH_TOKEN;
   render(await DashboardPage({ searchParams: Promise.resolve({}) }));
-  expect(screen.getByText(/Last data refresh/).textContent).toContain("11/5/2026");
+  expect(screen.getByText(/Last data refresh/).textContent).toContain("Nov 5, 2026");
 });

@@ -101,7 +101,7 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
         return;
       }
       if (method === "POST" && res.status === 409) {
-        setState({ status: "error", message: "That address previously stopped these emails and can't be re-added here." });
+        setState({ status: "error", message: "That address previously stopped these emails and can’t be re-added here." });
         return;
       }
       setState({ status: "error", message: failedMessage[method] });
@@ -110,17 +110,19 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
     }
   }
 
+  function validateEmail(raw: string): string | null {
+    const trimmed = raw.trim();
+    if (!trimmed) return "Type the host’s email address.";
+    if (!EMAIL_RE.test(trimmed)) return "Type a full email address, like host@example.com.";
+    return null;
+  }
+
   // The browser's own bubble is off (noValidate): the box says what to put
   // in, the settled way (red edge, a line under it, focus in the box).
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (state.status === "submitting") return;
-    const trimmed = email.trim();
-    const problem = !trimmed
-      ? "Type the host's email address."
-      : !EMAIL_RE.test(trimmed)
-        ? "Type a full email address, like host@example.com."
-        : null;
+    const problem = validateEmail(email);
     setEmailError(problem);
     if (problem) {
       emailRef.current?.focus();
@@ -196,12 +198,21 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
             <input
               ref={emailRef}
               id="host-alert-email"
+              name="email"
               type="email"
               required
+              autoComplete="email"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="done"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
                 setEmailError(null);
+              }}
+              onBlur={() => {
+                if (email.trim()) setEmailError(validateEmail(email));
               }}
               placeholder="host@example.com"
               aria-invalid={emailError ? "true" : undefined}
@@ -224,12 +235,10 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
               onChange={(v) => setLang(v === "es" ? "es" : "en")}
             />
           </div>
-          {/* WHY aria-disabled, not disabled: a natively disabled button
-              drops keyboard focus to the top of the page while it adds;
-              handleAdd ignores presses while a request runs. */}
+          {/* WHY busyButtonProps: keeps keyboard focus while ignoring presses during the request. */}
           <button
             type="submit"
-            aria-disabled={state.status === "submitting" || undefined}
+            {...busyButtonProps(state.status === "submitting")}
             className={`${primaryButtonClass} sm:mt-[24px]`}
           >
             {state.status === "submitting" && state.removing === null ? "Adding…" : "Add host"}

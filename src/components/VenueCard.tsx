@@ -13,7 +13,7 @@ interface VenueCardProps {
   isSelected: boolean;
   onClick: () => void;
   locale?: Locale;
-  headingLevel?: 2 | 3;
+  headingLevel?: 2 | 3 | 4;
 }
 
 export default function VenueCard({
@@ -33,7 +33,7 @@ export default function VenueCard({
     ? nextIrregularOccurrence(venue.hours_irregular)
     : null;
 
-  const Heading = `h${headingLevel}` as "h2" | "h3";
+  const Heading = `h${headingLevel}` as "h2" | "h3" | "h4";
 
   return (
     <li>

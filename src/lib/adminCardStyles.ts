@@ -59,29 +59,34 @@
  */
 
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { TIME_ZONE } from "@/lib/eventTime";
 
 export const focusRingClass =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2";
+
+// Caps the admin content width on wide desktop monitors (ui-tips.md: 1440px ceiling)
+// while keeping the full width below 1440px.
+export const adminShellWidthClass = "mx-auto w-full max-w-[1440px]";
 
 // One page body for every admin page (sm:px-6 is 32 px in this theme, the
 // menu's own side padding). Parts sit 24 apart through the gap (gap-5 is
 // 24 px here), so a part never carries its own outer margin, and a part that
 // hides (an empty summary box) leaves no gap behind.
-export const pageBodyClass = "flex flex-col gap-5 px-4 py-6 sm:px-6";
+export const pageBodyClass = `${adminShellWidthClass} flex flex-col gap-5 px-4 py-6 sm:px-6`;
 // WHY box-content: the 672 limit is on the content, so the side padding
 // stays the same as on a list page instead of eating into the form.
-export const formPageBodyClass = pageBodyClass + " box-content max-w-2xl";
+export const formPageBodyClass = "flex flex-col gap-5 px-4 py-6 sm:px-6 box-content max-w-2xl";
 
 // A section set off by a hairline above it, on a form page (Check-ins,
 // Host alert emails, Danger zone). Its h3 sits 12 above what follows (mb-3).
 export const sectionDividerClass = "border-t border-[var(--color-bone-200)] pt-5";
 
-export const pageTitleClass = "wordmark text-xl text-[var(--color-ink-900)]";
-export const sectionTitleClass = "wordmark text-lg text-[var(--color-ink-900)]";
+export const pageTitleClass = "wordmark text-balance text-xl text-[var(--color-ink-900)]";
+export const sectionTitleClass = "wordmark text-balance text-lg text-[var(--color-ink-900)]";
 export const groupTitleClass = "text-sm font-semibold text-[var(--color-ink-700)]";
-export const adminNameClass = "wordmark text-2xl text-[var(--color-ink-900)]";
+export const adminNameClass = "wordmark text-balance text-2xl text-[var(--color-ink-900)]";
 // Never Fraunces at 16 (#926 decision 5); the design page's .pa-name.
-export const cardNameClass = "text-base font-semibold text-[var(--color-ink-700)]";
+export const cardNameClass = "text-balance text-base font-semibold text-[var(--color-ink-700)]";
 
 export const cardClass =
   "elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5";
@@ -93,6 +98,9 @@ export const cardSlimClass =
 // tiles across inside a section card (the design page's .pa-kpi and .pa-need).
 export const tileCardClass =
   "elevation-1 min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4";
+// Flat metric tile used INSIDE a white cardClass section (KpiCard) so static
+// numbers never nest a bordered/elevated card inside a card (DESIGN.md Do's/Don'ts).
+export const kpiTileClass = "min-w-0 rounded-[var(--radius-lg)] bg-[var(--color-bone-50)] p-4";
 export const tileLabelClass = "text-xs font-medium uppercase tracking-wide text-[var(--color-ink-500)]";
 
 // The design page pictures the sign-in box lifted (#926 decision 14).
@@ -142,7 +150,7 @@ export const tableHeadCellClass = tableCellClass + " whitespace-nowrap font-medi
 // aria-disabled (a working button keeps keyboard focus: busyButtonProps in
 // src/components/formClasses.ts).
 const buttonBase =
-  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] px-4 py-2 text-center " +
+  "inline-flex min-h-12 touch-manipulation items-center justify-center rounded-[var(--radius-md)] px-4 py-2 text-center " +
   "transition-colors duration-150 " +
   PRESS_FEEDBACK +
   " disabled:opacity-50 disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:cursor-not-allowed ";
@@ -174,7 +182,7 @@ export const dangerButtonClass = buttonClass("danger");
 // Full width and left-aligned on purpose: secondaryButtonClass centres its
 // words, and appending text-left to it would fight it in stylesheet order.
 export const pickerOptionClass =
-  "block w-full min-h-12 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-4 py-2 text-left text-sm " +
+  "block w-full min-h-12 touch-manipulation rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-4 py-2 text-left text-sm " +
   "text-[var(--color-ink-700)] transition-colors duration-150 hover:bg-[var(--color-sage-100)] " +
   PRESS_FEEDBACK +
   " " +
@@ -185,7 +193,7 @@ export const pickerOptionClass =
 // pointer (#926 decision 1) is here, so the banner's links get it too: its
 // two word colours both read on the tint (ink 700 10.2 to 1, danger red 4.6).
 export const bannerLinkClass =
-  "rounded-[var(--radius-sm)] font-medium underline underline-offset-2 box-decoration-clone " +
+  "rounded-[var(--radius-sm)] font-medium underline underline-offset-[0.2em] box-decoration-clone " +
   "transition-colors duration-150 hover:bg-[var(--color-sage-100)] " +
   focusRingClass;
 
@@ -200,7 +208,7 @@ export const linkClass = bannerLinkClass + " text-[var(--color-sage-700)]";
 // and nowrap pushed them past a 320 px screen.
 export const keepTogetherClass = "inline-block max-w-full [overflow-wrap:anywhere]";
 
-export const tapLinkClass = "inline-flex min-h-12 items-center " + linkClass;
+export const tapLinkClass = "inline-flex min-h-12 touch-manipulation items-center " + linkClass;
 
 export type TagTone = "calm" | "attention" | "quiet" | "neutral" | "caution" | "danger";
 
@@ -215,11 +223,15 @@ const TAG_TONES: Record<TagTone, string> = {
 };
 
 export function tagClass(tone: TagTone): string {
-  return "inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium " + TAG_TONES[tone];
+  return (
+    "inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium " +
+    "[text-box:trim-both_cap_alphabetic] " +
+    TAG_TONES[tone]
+  );
 }
 
 const chipBase =
-  "inline-flex min-h-12 items-center rounded-full border px-3.5 text-sm font-medium transition-colors duration-150 " +
+  "inline-flex min-h-12 touch-manipulation items-center rounded-full border px-3.5 text-sm font-medium transition-colors duration-150 " +
   PRESS_FEEDBACK +
   " " +
   focusRingClass +
@@ -234,16 +246,19 @@ export function chipClass(on: boolean): string {
   );
 }
 
+const SUBMITTED_AT_FORMAT = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: TIME_ZONE,
+});
+
 /**
- * Full date + time, in the viewer's LOCAL timezone (deliberately NOT pinned
- * to UTC like adminVenues.ts's formatLastVerified) — `created_at` is a
- * genuine timestamp an admin reads as "when did this arrive," not a
- * date-only field with an established display convention to match
- * elsewhere, so showing it in the browser's own local time is the more
- * useful reading here.
+ * Full date + time pinned to Pueblo time (`America/Denver`), matching
+ * `eventTime.ts` and `activityLog.ts` so Cloudflare Workers SSR (UTC) and
+ * Pueblo browsers never disagree on hydration.
  */
 export function formatSubmittedAt(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso; // defensive: never crash a card on a malformed timestamp
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(date);
+  return SUBMITTED_AT_FORMAT.format(date);
 }

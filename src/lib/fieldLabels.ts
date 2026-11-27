@@ -10,8 +10,9 @@
  * here.
  *
  * A field with no entry falls back to a readable form (underscores to
- * spaces, first letter capital), never the raw key. src/lib/adminVenues.ts
- * keeps its own map for the edit page's "Waiting to publish" box.
+ * spaces, first letter capital), never the raw key. Also shared by
+ * src/lib/adminVenues.ts for the edit page's "Waiting to publish" box so field
+ * labels match AddVenueForm everywhere.
  */
 
 const FIELD_LABELS: Record<string, string> = {

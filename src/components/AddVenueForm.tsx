@@ -73,10 +73,12 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ChevronDown } from "lucide-react";
 import { categoryLabels } from "@/lib/categories";
 import StaticLocationMap from "@/components/StaticLocationMap";
 import AdminSegmented from "@/components/AdminSegmented";
 import { DISPLAY_DAY_KEYS, type DayKey } from "@/lib/hours";
+import { puebloDateKey } from "@/lib/eventTime";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import {
   ADMIN_PRIMARY_BUTTON,
@@ -99,9 +101,11 @@ import {
   dangerButtonClass,
   failureBoxClass,
   failureLineClass,
+  focusRingClass,
   pickerOptionClass,
   secondaryButtonClass,
 } from "@/lib/adminCardStyles";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { EMAIL_RE } from "@/lib/email";
 import { focusFirstProblem } from "@/lib/focusFirstProblem";
 import type { IrregularSchedule, VenueCategory, WeeklyHours } from "@/types/venue";
@@ -224,6 +228,10 @@ export interface AddVenueFormProps {
    * from the same `venue` row mapVenueRowToFormValues() already reads.
    */
   expectedUpdatedAt?: string;
+  /** Default return URL for Cancel and plain Save (defaults to /admin/places; blessing boxes return to /admin/boxes). */
+  defaultReturnHref?: string;
+  /** Server-supplied Pueblo calendar day ("YYYY-MM-DD") for new venues so SSR and browser never disagree near midnight. */
+  todayYmd?: string;
 }
 
 type FieldErrorKey =
@@ -279,22 +287,18 @@ function emptyHoursDraft(): HoursDraft {
   return draft;
 }
 
-// UTC, not local time: last_verified is stored and displayed elsewhere
-// (src/lib/adminVenues.ts's formatLastVerified) as a UTC-interpreted
-// date-only string — defaulting "today" to the host's local date would
-// disagree with how that same string renders everywhere else in the admin
-// on a negative-UTC-offset host (e.g. Kyle's Mountain-time laptop near
-// midnight).
-function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
+// Pueblo calendar day (America/Denver): avoids defaulting "today" to tomorrow
+// in UTC during Pueblo evenings.
+function todayPuebloDate(): string {
+  return puebloDateKey(Date.now());
 }
 
-function defaultValues(initialValues?: Partial<AddVenueFormValues>): AddVenueFormValues {
+function defaultValues(initialValues?: Partial<AddVenueFormValues>, todayYmd?: string): AddVenueFormValues {
   return {
     name: "",
     category: "",
     address: "",
-    lastVerified: todayIsoDate(),
+    lastVerified: todayYmd ?? todayPuebloDate(),
     lat: "",
     lng: "",
     hours: emptyHoursDraft(),
@@ -407,10 +411,14 @@ export default function AddVenueForm({
   submissionId,
   proposalId,
   expectedUpdatedAt,
+  defaultReturnHref = "/admin/places",
+  todayYmd,
 }: AddVenueFormProps) {
   const router = useRouter();
   const isEditMode = venueId !== undefined;
-  const [values, setValues] = useState<AddVenueFormValues>(() => defaultValues(initialValues));
+  const [values, setValues] = useState<AddVenueFormValues>(() => defaultValues(initialValues, todayYmd));
+  const initialSnapshotRef = useRef<string>(JSON.stringify(values));
+  const leavingAfterSaveRef = useRef(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
   // #568 item 1: a 409 (edit refused — the venue is archived,
@@ -480,6 +488,33 @@ export default function AddVenueForm({
     focusAfterScheduleRemove.current = null;
     (scheduleRemoveRefs.current[index] ?? addScheduleRef.current)?.focus();
   }, [values.hoursIrregular.length]);
+
+  // Warn before unloading the tab when the admin has unsaved edits (Vercel WIG).
+  useEffect(() => {
+    if (status === "submitting") return;
+    const isDirty =
+      JSON.stringify(values) !== initialSnapshotRef.current || venueToldUs || venueToldUsNote.trim() !== "";
+    if (!isDirty) return;
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (leavingAfterSaveRef.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [values, status, venueToldUs, venueToldUsNote]);
+
+  function validateFieldOnBlur(field: FieldErrorKey) {
+    const all = validateClient(values);
+    setErrors((prev) => {
+      const msg = all[field];
+      if (prev[field] === msg) return prev;
+      const next = { ...prev };
+      if (msg) next[field] = msg;
+      else delete next[field];
+      return next;
+    });
+  }
 
   function setField<K extends keyof AddVenueFormValues>(key: K, value: AddVenueFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -577,7 +612,7 @@ export default function AddVenueForm({
       ? "/admin/places?show=review&from=public"
       : proposalId != null
         ? "/admin/places?show=review"
-        : "/admin/places";
+        : defaultReturnHref;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -662,6 +697,7 @@ export default function AddVenueForm({
       });
 
       if (res.status === successStatus) {
+        leavingAfterSaveRef.current = true;
         router.push(afterSaveHref);
         router.refresh();
         return;
@@ -677,7 +713,7 @@ export default function AddVenueForm({
 
       if (res.status === 409) {
         const data = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
-        setErrorMessage(data?.message ?? "This venue can't be edited right now.");
+        setErrorMessage(data?.message ?? "This venue can’t be edited right now.");
         setErrorCode(data?.error ?? null);
         setStatus("error");
         return;
@@ -738,8 +774,10 @@ export default function AddVenueForm({
         <input
           type="text"
           id="venue-name"
+          name="name"
           value={values.name}
           onChange={(e) => setField("name", e.target.value)}
+          onBlur={() => validateFieldOnBlur("name")}
           maxLength={FIELD_LIMITS.SUGGEST_VENUE_NAME}
           aria-required="true"
           aria-invalid={errors.name ? "true" : undefined}
@@ -760,8 +798,10 @@ export default function AddVenueForm({
         </label>
         <select
           id="venue-category"
+          name="category"
           value={values.category}
           onChange={(e) => setField("category", e.target.value as VenueCategory | "")}
+          onBlur={() => validateFieldOnBlur("category")}
           aria-required="true"
           aria-invalid={errors.category ? "true" : undefined}
           aria-describedby={errors.category ? "venue-category-error" : undefined}
@@ -796,6 +836,7 @@ export default function AddVenueForm({
             <input
               type="text"
               id="box-host-name"
+              name="host_name"
               value={values.hostName}
               onChange={(e) => setField("hostName", e.target.value)}
               placeholder="e.g. First Baptist Church"
@@ -810,10 +851,11 @@ export default function AddVenueForm({
             </label>
             <textarea
               id="box-host-note"
+              name="host_note"
               rows={2}
               value={values.hostNote}
               onChange={(e) => setField("hostNote", e.target.value)}
-              placeholder="Shown on the box's public page"
+              placeholder="Shown on the box’s public page"
               maxLength={FIELD_LIMITS.BOX_ADOPTER_NOTE}
               className={`${inputClass} resize-y min-h-[56px]`}
             />
@@ -827,6 +869,7 @@ export default function AddVenueForm({
             <input
               type="text"
               id="box-host-contact"
+              name="host_contact"
               value={values.hostContact}
               onChange={(e) => setField("hostContact", e.target.value)}
               placeholder="Phone or email, for admin use only"
@@ -842,6 +885,7 @@ export default function AddVenueForm({
             <input
               type="text"
               id="box-most-needed"
+              name="most_needed"
               value={values.mostNeeded}
               onChange={(e) => setField("mostNeeded", e.target.value)}
               placeholder="e.g. canned protein, diapers, no glass"
@@ -858,6 +902,7 @@ export default function AddVenueForm({
               <input
                 type="date"
                 id="box-installed-on"
+                name="installed_on"
                 value={values.installedOn}
                 onChange={(e) => setField("installedOn", e.target.value)}
                 className={inputClass}
@@ -870,6 +915,7 @@ export default function AddVenueForm({
               <input
                 type="date"
                 id="box-removed-on"
+                name="removed_on"
                 value={values.removedOn}
                 onChange={(e) => setField("removedOn", e.target.value)}
                 className={inputClass}
@@ -899,8 +945,11 @@ export default function AddVenueForm({
               <input
                 type="text"
                 id="venue-address"
+                name="address"
+                autoComplete="street-address"
                 value={values.address}
                 onChange={(e) => setField("address", e.target.value)}
+                onBlur={() => validateFieldOnBlur("address")}
                 maxLength={FIELD_LIMITS.SUGGEST_ADDRESS}
                 aria-required="true"
                 aria-invalid={errors.address ? "true" : undefined}
@@ -1008,9 +1057,11 @@ export default function AddVenueForm({
                 <input
                   type="number"
                   id="venue-lat"
+                  name="lat"
                   step="any"
                   value={values.lat}
                   onChange={(e) => setField("lat", e.target.value)}
+                  onBlur={() => validateFieldOnBlur("lat")}
                   onWheel={(e) => e.currentTarget.blur()}
                   aria-required="true"
                   aria-invalid={errors.lat ? "true" : undefined}
@@ -1030,9 +1081,11 @@ export default function AddVenueForm({
                 <input
                   type="number"
                   id="venue-lng"
+                  name="lng"
                   step="any"
                   value={values.lng}
                   onChange={(e) => setField("lng", e.target.value)}
+                  onBlur={() => validateFieldOnBlur("lng")}
                   onWheel={(e) => e.currentTarget.blur()}
                   aria-required="true"
                   aria-invalid={errors.lng ? "true" : undefined}
@@ -1066,8 +1119,10 @@ export default function AddVenueForm({
         <input
           type="date"
           id="venue-last-verified"
+          name="last_verified"
           value={values.lastVerified}
           onChange={(e) => setField("lastVerified", e.target.value)}
+          onBlur={() => validateFieldOnBlur("last_verified")}
           aria-required="true"
           aria-invalid={errors.last_verified ? "true" : undefined}
           aria-describedby={errors.last_verified ? "venue-last-verified-error" : undefined}
@@ -1080,191 +1135,229 @@ export default function AddVenueForm({
         )}
       </div>
 
-      {/* Hours — basic per-day text, not a scheduler (kept lean per #254) */}
-      <fieldset className="space-y-2">
-        <legend className={labelClass.replace("mb-1", "mb-2")}>
-          Hours <span className={hintClass}>(optional)</span>
-        </legend>
-        <p className="text-xs text-[var(--color-ink-400)] mb-2">
-          Comma-separated time ranges per day, e.g. &quot;9:00-17:00&quot;. Leave a day blank if closed or unknown.
-        </p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {DISPLAY_DAY_KEYS.map((day) => (
-            <div key={day}>
-              <label htmlFor={`venue-hours-${day}`} className={labelClass}>
-                {DAY_LABELS[day]}
-              </label>
-              <input
-                type="text"
-                id={`venue-hours-${day}`}
-                value={values.hours[day]}
-                onChange={(e) => setHourDay(day, e.target.value)}
-                placeholder="9:00-17:00"
-                className={inputClass}
-              />
-            </div>
-          ))}
-        </div>
-        {errors.hours_weekly && (
-          <p role="alert" className={errorClass}>
-            {errors.hours_weekly}
-          </p>
-        )}
-      </fieldset>
-
-      {/* Monthly / irregular schedule (#400) — kept lean per the weekly
-          fieldset's own precedent above: a repeatable row of plain
-          selects/inputs, not a calendar picker. Stored ALONGSIDE hours_weekly,
-          never replacing it — a venue (e.g. Lynn Gardens Baptist Church) can
-          have both. */}
-      <fieldset className="space-y-3">
-        <legend className={labelClass.replace("mb-1", "mb-2")}>
-          Monthly schedule <span className={hintClass}>(optional)</span>
-        </legend>
-        <p className="text-xs text-[var(--color-ink-400)] mb-2">
-          For a schedule the weekly hours above can&apos;t show, e.g. &quot;4th Tuesday of each month.&quot;
-        </p>
-        {values.hoursIrregular.map((row, i) => (
-          <div key={i} className={`space-y-2 ${fieldGroupClass}`}>
-            <div className="flex items-center justify-between gap-2">
-              <label
-                id={`irregular-label-${i}`}
-                htmlFor={`irregular-recurrence-${i}`}
-                className="text-xs text-[var(--color-ink-500)]"
-              >
-                Schedule {i + 1}
-              </label>
-              {/* Named "Remove Schedule 2" from the visible label, so two
-                  schedules' buttons can be told apart. */}
-              <button
-                ref={(el) => {
-                  scheduleRemoveRefs.current[i] = el;
-                }}
-                id={`irregular-remove-${i}`}
-                type="button"
-                aria-labelledby={`irregular-remove-${i} irregular-label-${i}`}
-                onClick={() => removeIrregularRow(i)}
-                className={secondaryButtonClass}
-              >
-                Remove
-              </button>
-            </div>
-            <select
-              id={`irregular-recurrence-${i}`}
-              value={row.recurrence}
-              onChange={(e) => setIrregularField(i, "recurrence", e.target.value as IrregularEntryDraft["recurrence"])}
-              className={inputClass}
-            >
-              <option value="">Select a kind…</option>
-              <option value="monthly_ordinal">A specific weekday each month (e.g. 4th Tuesday)</option>
-              <option value="monthly_date">A fixed day of the month (e.g. the 15th)</option>
-              <option value="other">Other (describe in the note)</option>
-            </select>
-
-            {row.recurrence === "monthly_ordinal" && (
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  aria-label={`Schedule ${i + 1} ordinal`}
-                  value={row.ordinal}
-                  onChange={(e) => setIrregularField(i, "ordinal", e.target.value as IrregularEntryDraft["ordinal"])}
-                  className={inputClass}
-                >
-                  <option value="">1st, 2nd…</option>
-                  <option value="1">1st</option>
-                  <option value="2">2nd</option>
-                  <option value="3">3rd</option>
-                  <option value="4">4th</option>
-                  <option value="5">5th</option>
-                  <option value="last">Last</option>
-                </select>
-                <select
-                  aria-label={`Schedule ${i + 1} weekday`}
-                  value={row.weekday}
-                  onChange={(e) => setIrregularField(i, "weekday", e.target.value as IrregularEntryDraft["weekday"])}
-                  className={inputClass}
-                >
-                  <option value="">Weekday…</option>
-                  {DISPLAY_DAY_KEYS.map((day) => (
-                    <option key={day} value={day}>
+      {/* Hours, Monthly schedule, and SNAP/WIC: rendered directly for ordinary
+          places, folded behind a closed disclosure for Blessing Boxes so box
+          edit pages aren't bloated with ~650px of irrelevant fields. */}
+      {(() => {
+        const hoursAndBenefits = (
+          <>
+            {/* Hours — basic per-day text, not a scheduler (kept lean per #254) */}
+            <fieldset className="space-y-2">
+              <legend className={labelClass.replace("mb-1", "mb-2")}>
+                Hours <span className={hintClass}>(optional)</span>
+              </legend>
+              <p className="text-xs text-[var(--color-ink-400)] mb-2">
+                Comma-separated time ranges per day, e.g. &ldquo;9:00 AM - 5:00 PM&rdquo; or &ldquo;9:00-17:00&rdquo;. Leave a day blank if closed or unknown.
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {DISPLAY_DAY_KEYS.map((day) => (
+                  <div key={day}>
+                    <label htmlFor={`venue-hours-${day}`} className={labelClass}>
                       {DAY_LABELS[day]}
-                    </option>
-                  ))}
-                </select>
+                    </label>
+                    <input
+                      type="text"
+                      id={`venue-hours-${day}`}
+                      name={`hours_${day}`}
+                      value={values.hours[day]}
+                      onChange={(e) => setHourDay(day, e.target.value)}
+                      placeholder="9:00 AM - 5:00 PM"
+                      className={inputClass}
+                    />
+                  </div>
+                ))}
               </div>
-            )}
+              {errors.hours_weekly && (
+                <p role="alert" className={errorClass}>
+                  {errors.hours_weekly}
+                </p>
+              )}
+            </fieldset>
 
-            {row.recurrence === "monthly_date" && (
-              <input
-                type="number"
-                min={1}
-                max={31}
-                aria-label={`Schedule ${i + 1} day of month`}
-                value={row.dayOfMonth}
-                onChange={(e) => setIrregularField(i, "dayOfMonth", e.target.value)}
-                placeholder="Day of month (1-31)"
-                className={inputClass}
-              />
-            )}
+            {/* Monthly / irregular schedule (#400) — kept lean per the weekly
+                fieldset's own precedent above: a repeatable row of plain
+                selects/inputs, not a calendar picker. Stored ALONGSIDE hours_weekly,
+                never replacing it — a venue (e.g. Lynn Gardens Baptist Church) can
+                have both. */}
+            <fieldset className="space-y-3">
+              <legend className={labelClass.replace("mb-1", "mb-2")}>
+                Monthly schedule <span className={hintClass}>(optional)</span>
+              </legend>
+              <p className="text-xs text-[var(--color-ink-400)] mb-2">
+                For a schedule the weekly hours above can&rsquo;t show, e.g. &ldquo;4th Tuesday of each month.&rdquo;
+              </p>
+              {values.hoursIrregular.map((row, i) => (
+                <div key={i} className={`space-y-2 ${fieldGroupClass}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <label
+                      id={`irregular-label-${i}`}
+                      htmlFor={`irregular-recurrence-${i}`}
+                      className="text-xs text-[var(--color-ink-500)]"
+                    >
+                      Schedule {i + 1}
+                    </label>
+                    {/* Named "Remove Schedule 2" from the visible label, so two
+                        schedules' buttons can be told apart. */}
+                    <button
+                      ref={(el) => {
+                        scheduleRemoveRefs.current[i] = el;
+                      }}
+                      id={`irregular-remove-${i}`}
+                      type="button"
+                      aria-labelledby={`irregular-remove-${i} irregular-label-${i}`}
+                      onClick={() => removeIrregularRow(i)}
+                      className={secondaryButtonClass}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <select
+                    id={`irregular-recurrence-${i}`}
+                    value={row.recurrence}
+                    onChange={(e) => setIrregularField(i, "recurrence", e.target.value as IrregularEntryDraft["recurrence"])}
+                    className={inputClass}
+                  >
+                    <option value="">Select a kind…</option>
+                    <option value="monthly_ordinal">A specific weekday each month (e.g. 4th Tuesday)</option>
+                    <option value="monthly_date">A fixed day of the month (e.g. the 15th)</option>
+                    <option value="other">Other (describe in the note)</option>
+                  </select>
 
-            {(row.recurrence === "monthly_ordinal" || row.recurrence === "monthly_date") && (
-              <input
-                type="text"
-                aria-label={`Schedule ${i + 1} time ranges`}
-                value={row.slots}
-                onChange={(e) => setIrregularField(i, "slots", e.target.value)}
-                placeholder="11:00 AM - 12:00 PM"
-                className={inputClass}
-              />
-            )}
+                  {row.recurrence === "monthly_ordinal" && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        aria-label={`Schedule ${i + 1} ordinal`}
+                        value={row.ordinal}
+                        onChange={(e) => setIrregularField(i, "ordinal", e.target.value as IrregularEntryDraft["ordinal"])}
+                        className={inputClass}
+                      >
+                        <option value="">1st, 2nd…</option>
+                        <option value="1">1st</option>
+                        <option value="2">2nd</option>
+                        <option value="3">3rd</option>
+                        <option value="4">4th</option>
+                        <option value="5">5th</option>
+                        <option value="last">Last</option>
+                      </select>
+                      <select
+                        aria-label={`Schedule ${i + 1} weekday`}
+                        value={row.weekday}
+                        onChange={(e) => setIrregularField(i, "weekday", e.target.value as IrregularEntryDraft["weekday"])}
+                        className={inputClass}
+                      >
+                        <option value="">Weekday…</option>
+                        {DISPLAY_DAY_KEYS.map((day) => (
+                          <option key={day} value={day}>
+                            {DAY_LABELS[day]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
-            <textarea
-              aria-label={`Schedule ${i + 1} note`}
-              rows={2}
-              value={row.note}
-              onChange={(e) => setIrregularField(i, "note", e.target.value)}
-              maxLength={FIELD_LIMITS.IRREGULAR_SCHEDULE_NOTE}
-              placeholder={
-                row.recurrence === "other"
-                  ? "Describe the schedule, e.g. \"3rd weekend, call ahead\""
-                  : "Note (optional)"
-              }
-              className={`${inputClass} resize-y min-h-[56px]`}
-            />
-          </div>
-        ))}
-        <button ref={addScheduleRef} type="button" onClick={addIrregularRow} className={secondaryButtonClass}>
-          + Add monthly schedule
-        </button>
-        {errors.hours_irregular && (
-          <p role="alert" className={errorClass}>
-            {errors.hours_irregular}
-          </p>
-        )}
-      </fieldset>
+                  {row.recurrence === "monthly_date" && (
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      aria-label={`Schedule ${i + 1} day of month`}
+                      value={row.dayOfMonth}
+                      onChange={(e) => setIrregularField(i, "dayOfMonth", e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      placeholder="Day of month (1-31)"
+                      className={inputClass}
+                    />
+                  )}
 
-      {/* SNAP / WIC tri-state */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <AdminSegmented
-            name="venue-snap"
-            legend="Accepts SNAP"
-            legendClass={labelClass}
-            options={TRI_STATE_OPTIONS}
-            value={values.acceptsSnap}
-            onChange={(v) => setField("acceptsSnap", v as TriStateValue)}
-          />
-        </div>
-        <div>
-          <AdminSegmented
-            name="venue-wic"
-            legend="Accepts WIC"
-            legendClass={labelClass}
-            options={TRI_STATE_OPTIONS}
-            value={values.acceptsWic}
-            onChange={(v) => setField("acceptsWic", v as TriStateValue)}
-          />
-        </div>
-      </div>
+                  {(row.recurrence === "monthly_ordinal" || row.recurrence === "monthly_date") && (
+                    <input
+                      type="text"
+                      aria-label={`Schedule ${i + 1} time ranges`}
+                      value={row.slots}
+                      onChange={(e) => setIrregularField(i, "slots", e.target.value)}
+                      placeholder="11:00 AM - 12:00 PM"
+                      className={inputClass}
+                    />
+                  )}
+
+                  <textarea
+                    aria-label={`Schedule ${i + 1} note`}
+                    rows={2}
+                    value={row.note}
+                    onChange={(e) => setIrregularField(i, "note", e.target.value)}
+                    maxLength={FIELD_LIMITS.IRREGULAR_SCHEDULE_NOTE}
+                    placeholder={
+                      row.recurrence === "other"
+                        ? "Describe the schedule, e.g. “3rd weekend, call ahead”"
+                        : "Note (optional)"
+                    }
+                    className={`${inputClass} resize-y min-h-[56px]`}
+                  />
+                </div>
+              ))}
+              <button ref={addScheduleRef} type="button" onClick={addIrregularRow} className={secondaryButtonClass}>
+                + Add monthly schedule
+              </button>
+              {errors.hours_irregular && (
+                <p role="alert" className={errorClass}>
+                  {errors.hours_irregular}
+                </p>
+              )}
+            </fieldset>
+
+            {/* SNAP / WIC tri-state */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <AdminSegmented
+                  name="venue-snap"
+                  legend="Accepts SNAP"
+                  legendClass={labelClass}
+                  options={TRI_STATE_OPTIONS}
+                  value={values.acceptsSnap}
+                  onChange={(v) => setField("acceptsSnap", v as TriStateValue)}
+                />
+              </div>
+              <div>
+                <AdminSegmented
+                  name="venue-wic"
+                  legend="Accepts WIC"
+                  legendClass={labelClass}
+                  options={TRI_STATE_OPTIONS}
+                  value={values.acceptsWic}
+                  onChange={(v) => setField("acceptsWic", v as TriStateValue)}
+                />
+              </div>
+            </div>
+          </>
+        );
+
+        if (values.category === "blessing_box") {
+          return (
+            <details className="group rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-1">
+              <summary
+                className={
+                  `-mx-2 flex min-h-12 touch-manipulation cursor-pointer list-none items-center justify-between gap-2 ` +
+                  `rounded-[var(--radius-sm)] px-2 text-sm font-medium text-[var(--color-ink-700)] ` +
+                  `transition-colors duration-150 hover:bg-[var(--color-sage-100)] ${PRESS_FEEDBACK} ${focusRingClass} ` +
+                  `[&::-webkit-details-marker]:hidden`
+                }
+              >
+                <span>
+                  Hours and SNAP/WIC <span className={hintClass}>(rarely needed for blessing boxes)</span>
+                </span>
+                <ChevronDown
+                  size={18}
+                  aria-hidden="true"
+                  className="shrink-0 text-[var(--color-ink-500)] transition-transform duration-150 group-open:rotate-180"
+                />
+              </summary>
+              <div className="mt-1 space-y-5 border-t border-[var(--color-bone-200)] py-4">{hoursAndBenefits}</div>
+            </details>
+          );
+        }
+
+        return hoursAndBenefits;
+      })()}
 
       {/* Phone */}
       <div>
@@ -1274,6 +1367,8 @@ export default function AddVenueForm({
         <input
           type="tel"
           id="venue-phone"
+          name="phone"
+          autoComplete="tel"
           value={values.phone}
           onChange={(e) => setField("phone", e.target.value)}
           maxLength={FIELD_LIMITS.SUGGEST_CONTACT}
@@ -1289,11 +1384,14 @@ export default function AddVenueForm({
         <input
           type="email"
           id="venue-email"
+          name="email"
           value={values.email}
           onChange={(e) => setField("email", e.target.value)}
+          onBlur={() => validateFieldOnBlur("email")}
           autoComplete="email"
           autoCapitalize="off"
           autoCorrect="off"
+          spellCheck={false}
           maxLength={FIELD_LIMITS.EMAIL}
           aria-invalid={errors.email ? "true" : undefined}
           aria-describedby={errors.email ? "venue-email-error" : undefined}
@@ -1314,6 +1412,10 @@ export default function AddVenueForm({
         <input
           type="url"
           id="venue-url"
+          name="url"
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
           value={values.url}
           onChange={(e) => setField("url", e.target.value)}
           maxLength={FIELD_LIMITS.SUGGEST_CONTACT}
@@ -1329,6 +1431,7 @@ export default function AddVenueForm({
         <input
           type="text"
           id="venue-operator"
+          name="operator"
           value={values.operator}
           onChange={(e) => setField("operator", e.target.value)}
           maxLength={FIELD_LIMITS.SUGGEST_VENUE_NAME}
@@ -1343,6 +1446,7 @@ export default function AddVenueForm({
         </label>
         <textarea
           id="venue-notes"
+          name="notes"
           rows={3}
           value={values.notes}
           onChange={(e) => setField("notes", e.target.value)}
@@ -1359,8 +1463,10 @@ export default function AddVenueForm({
         <input
           type="text"
           id="venue-source"
+          name="source"
           value={values.source}
           onChange={(e) => setField("source", e.target.value)}
+          onBlur={() => validateFieldOnBlur("source")}
           maxLength={FIELD_LIMITS.ADMIN_VENUE_SOURCE}
           // Last single-line field — "Outside Pueblo County" below is a checkbox.
           enterKeyHint="done"

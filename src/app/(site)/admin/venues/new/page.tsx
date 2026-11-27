@@ -62,7 +62,8 @@ import { loadAdminNavCounts } from "@/lib/adminNavCounts";
 import AdminNav from "@/components/AdminNav";
 import AddVenueForm, { type AddVenueFormValues } from "@/components/AddVenueForm";
 import ProposalCard from "@/components/ProposalCard";
-import { formPageBodyClass, pageTitleClass, sectionTitleClass } from "@/lib/adminCardStyles";
+import { adminShellWidthClass, formPageBodyClass, pageTitleClass, sectionTitleClass } from "@/lib/adminCardStyles";
+import { puebloDateKey } from "@/lib/eventTime";
 import { mapSubmissionPayloadToFormValues, mapAddProposalToFormValues } from "@/lib/adminVenueForm";
 import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@/lib/adminProposals";
 import type { NewVenuePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
@@ -155,25 +156,30 @@ export default async function NewVenuePage({
     loadAdminNavCounts(db),
   ]);
 
+  const now = new Date();
+  const todayYmd = puebloDateKey(now.getTime());
+
   return (
-    <main className="min-h-screen bg-[var(--color-bone-50)]">
+    <div className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="places" counts={navCounts} showActivity={identity.isOwner === true} />
-      <div className={formPageBodyClass}>
-        <h2 className={pageTitleClass}>Add a venue</h2>
-        {proposalPrefill && (
-          <section>
-            <h3 className={`mb-3 ${sectionTitleClass}`}>Suggested new place</h3>
-            <ProposalCard proposal={proposalPrefill.proposal} />
-          </section>
-        )}
-        {proposalPrefill ? (
-          <AddVenueForm initialValues={proposalPrefill.initialValues} proposalId={proposalPrefill.proposalId} />
-        ) : prefill ? (
-          <AddVenueForm initialValues={prefill.initialValues} submissionId={prefill.submissionId} />
-        ) : (
-          <AddVenueForm />
-        )}
-      </div>
-    </main>
+      <main id="admin-main" tabIndex={-1} className={adminShellWidthClass}>
+        <div className={formPageBodyClass}>
+          <h2 className={pageTitleClass}>Add a venue</h2>
+          {proposalPrefill && (
+            <section>
+              <h3 className={`mb-3 ${sectionTitleClass}`}>Suggested new place</h3>
+              <ProposalCard proposal={proposalPrefill.proposal} />
+            </section>
+          )}
+          {proposalPrefill ? (
+            <AddVenueForm initialValues={proposalPrefill.initialValues} proposalId={proposalPrefill.proposalId} todayYmd={todayYmd} />
+          ) : prefill ? (
+            <AddVenueForm initialValues={prefill.initialValues} submissionId={prefill.submissionId} todayYmd={todayYmd} />
+          ) : (
+            <AddVenueForm todayYmd={todayYmd} />
+          )}
+        </div>
+      </main>
+    </div>
   );
 }

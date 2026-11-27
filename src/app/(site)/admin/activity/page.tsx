@@ -64,9 +64,9 @@ export default async function ActivityPage({
   const nextUntil = page.nextUntil;
 
   return (
-    <main className="min-h-screen bg-[var(--color-bone-50)]">
+    <div className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="activity" counts={navCounts} showActivity />
-      <div className={pageBodyClass}>
+      <main id="admin-main" tabIndex={-1} className={pageBodyClass}>
         <h2 className={pageTitleClass}>Activity</h2>
         <ActivityLog
           days={days}
@@ -75,7 +75,7 @@ export default async function ActivityPage({
           olderHref={nextUntil ? olderHref(filters, nextUntil) : null}
           filtered={filtered}
         />
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

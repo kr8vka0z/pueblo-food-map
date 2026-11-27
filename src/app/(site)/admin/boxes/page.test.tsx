@@ -118,7 +118,7 @@ describe("BoxesPage (/admin/boxes) — auth guard", () => {
 
     render(await BoxesPage());
 
-    expect(screen.getByText("All boxes (1 in service)")).toBeDefined();
+    expect(screen.getByText("All boxes (2 total, 1 in service)")).toBeDefined();
     expect(screen.getByText("Active Box")).toBeDefined();
     expect(screen.getByText("Removed Box")).toBeDefined();
   });

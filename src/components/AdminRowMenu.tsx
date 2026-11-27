@@ -167,7 +167,7 @@ export default function AdminRowMenu({ labelledBy, items, disabled = false }: Ad
         onClick={() => (open ? close(false) : openMenu("first"))}
         onKeyDown={onButtonKeyDown}
         className={
-          "inline-flex h-12 w-12 items-center justify-center rounded-[var(--radius-md)] transition-colors duration-150 " +
+          "inline-flex h-12 w-12 touch-manipulation items-center justify-center rounded-[var(--radius-md)] transition-colors duration-150 " +
           "hover:bg-[var(--color-sage-100)] hover:text-[var(--color-ink-700)] " +
           PRESS_FEEDBACK +
           " " +
@@ -200,10 +200,12 @@ export default function AdminRowMenu({ labelledBy, items, disabled = false }: Ad
               tabIndex={-1}
               onClick={() => choose(item)}
               className={
-                "flex min-h-12 w-full items-center px-4 py-2 text-left text-sm transition-colors duration-150 " +
+                "flex min-h-12 w-full touch-manipulation items-center px-4 py-2 text-left text-sm transition-colors duration-150 " +
                 // The inset ring tells a keyboard stop from the pointer's fill (#926 decision 4).
                 "hover:bg-[var(--color-sage-100)] focus-visible:bg-[var(--color-sage-100)] focus-visible:outline-none " +
                 "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
+                PRESS_FEEDBACK +
+                " " +
                 (i === firstDanger ? "border-t border-[var(--color-bone-200)] " : "") +
                 (item.danger ? "text-[var(--color-danger)]" : "text-[var(--color-ink-700)]")
               }

@@ -168,6 +168,8 @@
    for every scroller inside the sheet. */
 html {
   overscroll-behavior-y: none;
+  /* Reserve scrollbar space so filtering/expanding lists never jumps horizontally. */
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -606,4 +608,71 @@ html:not([data-splash-seen]) [data-map-standin-pending] {
   text-shadow:
     -0.5px -0.5px 0 #fff, 0.5px -0.5px 0 #fff,
     -0.5px  0.5px 0 #fff, 0.5px  0.5px 0 #fff;
+}
+
+/* ─── Admin bone-tinted shimmer skeleton (admin/loading.tsx) ──────────────────
+   Bone-tinted placeholder blocks shaped like the loading page so cold admin
+   transitions answer the tap quickly without layout jump. */
+.pfm-skeleton {
+  --sk-base: var(--color-bone-100);
+  --sk-shine: var(--color-bone-50);
+  background: linear-gradient(90deg, var(--sk-base) 25%, var(--sk-shine) 50%, var(--sk-base) 75%);
+  background-size: 200% 100%;
+  animation: pfm-skeleton-sweep 1.4s linear infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes pfm-skeleton-sweep {
+  from { background-position: 200% 0; }
+  to   { background-position: 0 0; }
+}
+
+/* ─── Admin success tick (PublishPanel, EventForm) ────────────────────────────
+   Circle draws itself (260ms), then the tick draws inside it (470ms total) on
+   rare high-stakes completions. Reduced motion shows the mark already drawn. */
+.pfm-success-tick {
+  --tick-color: var(--color-sage-700);
+  --tick-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  fill: none;
+  stroke: var(--tick-color);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pfm-success-tick circle,
+.pfm-success-tick path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: pfm-tick-draw 260ms var(--tick-ease) forwards;
+}
+
+.pfm-success-tick path {
+  animation-delay: 210ms;
+}
+
+@keyframes pfm-tick-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* In-page View Transitions (used by admin list sort/filter via startViewTransition). */
+::view-transition-group(*) {
+  animation-duration: 0.25s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pfm-skeleton {
+    animation: none !important;
+    background: var(--sk-base);
+  }
+  .pfm-success-tick circle,
+  .pfm-success-tick path {
+    animation: none !important;
+    stroke-dashoffset: 0;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }

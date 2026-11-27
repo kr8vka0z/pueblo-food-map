@@ -132,7 +132,16 @@ function groupItemsByTarget(
 
 export default async function PlacesPage({
   searchParams,
-}: { searchParams?: Promise<{ show?: string; from?: string }> } = {}) {
+}: {
+  searchParams?: Promise<{
+    show?: string;
+    from?: string;
+    status?: string;
+    category?: string;
+    lane?: string;
+    q?: string;
+  }>;
+} = {}) {
   const { db, identity } = await getAdminDb(await headers()).catch(handlePageAuthError);
   // WHY one Promise.all: the reads are independent, and each D1 call is a
   // round trip to the primary (WNAM), so awaiting them in turn made this
@@ -172,14 +181,22 @@ export default async function PlacesPage({
   ];
   const { itemsByVenueId, addItems } = groupItemsByTarget(items, venues);
   const reviewRowCount = Object.values(itemsByVenueId).filter((i) => i.length > 0).length + addItems.length;
-  const { show, from } = searchParams ? await searchParams : {};
+  const { show, from, status, category, lane, q } = searchParams ? await searchParams : {};
+  const publishSummary = summarizePublishChanges(venues);
+  const hasPendingPublish =
+    !isStaging && (publishSummary.newDrafts > 0 || publishSummary.editedSincePublish > 0 || publishSummary.archived > 0);
 
   return (
-    <main className="min-h-screen bg-[var(--color-bone-50)]">
+    <div className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="places" counts={navCounts} showActivity={identity.isOwner === true} />
-      <div className={pageBodyClass}>
+      <main id="admin-main" tabIndex={-1} className={pageBodyClass}>
         <h2 className={pageTitleClass}>Places</h2>
-        <ToReviewSummaryBox reviewRowCount={reviewRowCount} proposals={proposals} submissionCount={submissions.length} />
+        <ToReviewSummaryBox
+          reviewRowCount={reviewRowCount}
+          proposals={proposals}
+          submissionCount={submissions.length}
+          secondaryAction={hasPendingPublish}
+        />
         <SourceSwitchPanel />
         {isStaging ? (
           // #673 pt.6: staging can never Publish (isProductionWorker() is
@@ -190,7 +207,7 @@ export default async function PlacesPage({
             Test site: publishing is turned off here.
           </p>
         ) : (
-          <PublishPanel summary={summarizePublishChanges(venues)} />
+          <PublishPanel summary={publishSummary} />
         )}
         <VenueListView
           venues={venues}
@@ -198,9 +215,13 @@ export default async function PlacesPage({
           itemsByVenueId={itemsByVenueId}
           addItems={addItems}
           initialShowReview={show === "review"}
-          initialSourceFilter={from === "public" ? "public" : undefined}
+          initialStatusFilter={status}
+          initialSourceFilter={from}
+          initialCategoryFilter={category}
+          initialLaneFilter={lane}
+          initialQuery={q}
         />
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

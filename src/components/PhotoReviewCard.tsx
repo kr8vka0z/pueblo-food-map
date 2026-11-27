@@ -110,11 +110,14 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
         <img
           src={`/api/admin/box-photos/${photo.id}/preview`}
           alt={`Photo submitted for ${photo.venue_name}`}
+          width={192}
+          height={192}
+          loading="lazy"
           // #677 Risk: this preview is what the admin judges the photo BY —
           // wide enough to actually see on desktop (>=180px), full width on
           // phones (same "preview must be big enough to judge" spec as the
           // box edit page's own card, which reuses this exact component).
-          className="h-56 w-full rounded-[var(--radius-md)] border border-[var(--color-bone-200)] object-cover sm:h-48 sm:w-48 sm:flex-none"
+          className="h-56 w-full rounded-[var(--radius-sm)] border border-[var(--color-bone-200)] object-cover sm:h-48 sm:w-48 sm:flex-none"
         />
         <div className="space-y-1">
           <p className={cardNameClass}>{photo.venue_name}</p>

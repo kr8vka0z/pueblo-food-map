@@ -37,13 +37,13 @@ export default async function AdminEventsPage() {
   ]);
 
   return (
-    <main className="min-h-screen bg-[var(--color-bone-50)]">
+    <div className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="events" counts={navCounts} showActivity={identity.isOwner === true} />
-      <div className={pageBodyClass}>
+      <main id="admin-main" tabIndex={-1} className={pageBodyClass}>
         <h2 className={pageTitleClass}>Events</h2>
         <EventSubmissionsList items={submissions} />
         <EventsList events={events} />
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

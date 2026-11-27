@@ -243,7 +243,7 @@ describe("PlacesPage — pending public submissions (#675)", () => {
 
     const table = screen.getByRole("table");
     const reportedRow = within(table).getByRole("row", { name: /Eastside Pantry/ });
-    expect(within(reportedRow).getByText(/Public: "Hours are wrong or out of date"/)).toBeDefined();
+    expect(within(reportedRow).getByText(/Public: “Hours are wrong or out of date”/)).toBeDefined();
     const otherRow = within(table).getByRole("row", { name: /Main Street Grocery/ });
     expect(within(otherRow).queryByText(/Public:/)).toBeNull();
     expect(screen.getByRole("link", { name: "Northside Pantry" }).getAttribute("href")).toBe(

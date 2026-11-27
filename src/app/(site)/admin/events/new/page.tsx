@@ -21,7 +21,7 @@ import AdminNav from "@/components/AdminNav";
 import EventForm, { type EventFormValues } from "@/components/EventForm";
 import { loadPendingEventSubmission, parseSubmissionPayload } from "@/lib/eventSubmissions";
 import { utcIsoToPuebloLocal } from "@/lib/eventTime";
-import { formPageBodyClass, pageTitleClass } from "@/lib/adminCardStyles";
+import { adminShellWidthClass, formPageBodyClass, pageTitleClass } from "@/lib/adminCardStyles";
 
 export default async function NewEventPage({ searchParams }: { searchParams?: Promise<{ from?: string }> }) {
   const { from } = searchParams ? await searchParams : {};
@@ -49,22 +49,24 @@ export default async function NewEventPage({ searchParams }: { searchParams?: Pr
       : null;
 
   return (
-    <main className="min-h-screen bg-[var(--color-bone-50)]">
+    <div className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={identity.email} active="events" counts={navCounts} showActivity={identity.isOwner === true} />
-      <div className={formPageBodyClass}>
-        <h2 className={pageTitleClass}>Add event</h2>
-        {/* WHY a notice inside the form, not a line under the title: admin page titles carry no subtitle (#926 decision 5). */}
-        <EventForm
-          venues={venues}
-          initialValues={fromSubmission?.values}
-          submissionId={fromSubmission?.id}
-          notice={
-            fromSubmission
-              ? "Sent in by the public. We couldn’t find the address on the map: press Find location or pick a place, then save the draft. The flyer is added when you save."
-              : undefined
-          }
-        />
-      </div>
-    </main>
+      <main id="admin-main" tabIndex={-1} className={adminShellWidthClass}>
+        <div className={formPageBodyClass}>
+          <h2 className={pageTitleClass}>Add event</h2>
+          {/* WHY a notice inside the form, not a line under the title: admin page titles carry no subtitle (#926 decision 5). */}
+          <EventForm
+            venues={venues}
+            initialValues={fromSubmission?.values}
+            submissionId={fromSubmission?.id}
+            notice={
+              fromSubmission
+                ? "Sent in by the public. We couldn’t find the address on the map: press Find location or pick a place, then save the draft. The flyer is added when you save."
+                : undefined
+            }
+          />
+        </div>
+      </main>
+    </div>
   );
 }

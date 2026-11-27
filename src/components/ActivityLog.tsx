@@ -11,6 +11,7 @@
 import Link from "next/link";
 import {
   cardClass,
+  controlLabelClass,
   emptyStateClass,
   focusRingClass,
   keepTogetherClass,
@@ -20,7 +21,8 @@ import {
   tagClass,
   type TagTone,
 } from "@/lib/adminCardStyles";
-import { ADMIN_PRIMARY_BUTTON, labelClass, inputClass } from "@/components/formClasses";
+import { ADMIN_PRIMARY_BUTTON, inputClass } from "@/components/formClasses";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import {
   ACTIVITY_TYPES,
   describeDevice,
@@ -56,10 +58,18 @@ function Tag({ tone, children }: { tone: keyof typeof TAG_TONE; children: React.
 
 function Ip({ ip }: { ip: string | null }) {
   if (!ip) return null;
+  const masked = maskIp(ip);
+  if (masked === ip) return <span className="tabular-nums">{ip}</span>;
   return (
-    <span title={ip} className="tabular-nums">
-      {maskIp(ip)}
-    </span>
+    <details className="inline">
+      <summary
+        title={ip}
+        className={`inline cursor-pointer list-none rounded-[var(--radius-sm)] tabular-nums underline decoration-dotted underline-offset-[0.2em] ${focusRingClass} [&::-webkit-details-marker]:hidden`}
+      >
+        {masked}
+      </summary>{" "}
+      <span className="tabular-nums text-[var(--color-ink-700)]">({ip})</span>
+    </details>
   );
 }
 
@@ -158,7 +168,7 @@ function ItemList({ items }: { items: ActivityItem[] }) {
               <summary
                 // The shared sage 100 tint under the pointer (#926 decision 1); -mx-2 px-2
                 // gives the tint room around the words without moving them.
-                className={`-mx-2 min-h-12 cursor-pointer rounded-[var(--radius-sm)] px-2 py-2 text-sm font-medium text-[var(--color-ink-700)] transition-colors duration-150 hover:bg-[var(--color-sage-100)] ${focusRingClass}`}
+                className={`-mx-2 min-h-12 touch-manipulation cursor-pointer rounded-[var(--radius-sm)] px-2 py-2 text-sm font-medium text-[var(--color-ink-700)] transition-colors duration-150 hover:bg-[var(--color-sage-100)] ${PRESS_FEEDBACK} ${focusRingClass}`}
               >
                 {itemTag(run[0])} {run.length} · show all
               </summary>
@@ -243,7 +253,7 @@ export default function ActivityLog({ days, filters, people, olderHref, filtered
     <div className="flex flex-col gap-5">
       <form method="get" action="/admin/activity" className={`${cardClass} grid gap-4 sm:grid-cols-2`}>
         <div>
-          <label htmlFor="activity-person" className={labelClass}>
+          <label htmlFor="activity-person" className={controlLabelClass}>
             Person
           </label>
           <select id="activity-person" name="person" defaultValue={filters.person} className={inputClass}>
@@ -257,7 +267,7 @@ export default function ActivityLog({ days, filters, people, olderHref, filtered
           </select>
         </div>
         <div>
-          <label htmlFor="activity-type" className={labelClass}>
+          <label htmlFor="activity-type" className={controlLabelClass}>
             Activity
           </label>
           <select id="activity-type" name="type" defaultValue={filters.type} className={inputClass}>
@@ -269,22 +279,29 @@ export default function ActivityLog({ days, filters, people, olderHref, filtered
           </select>
         </div>
         <div>
-          <label htmlFor="activity-from" className={labelClass}>
+          <label htmlFor="activity-from" className={controlLabelClass}>
             From
           </label>
           <input id="activity-from" type="date" name="from" defaultValue={filters.from} className={inputClass} />
         </div>
         <div>
-          <label htmlFor="activity-to" className={labelClass}>
+          <label htmlFor="activity-to" className={controlLabelClass}>
             To
           </label>
           <input id="activity-to" type="date" name="to" defaultValue={filters.to} className={inputClass} />
         </div>
         <div className="sm:col-span-2">
-          <label htmlFor="activity-q" className={labelClass}>
+          <label htmlFor="activity-q" className={controlLabelClass}>
             Place or box name
           </label>
-          <input id="activity-q" type="search" name="q" defaultValue={filters.q} className={inputClass} />
+          <input
+            id="activity-q"
+            type="search"
+            name="q"
+            defaultValue={filters.q}
+            placeholder="e.g. Pueblo Community Soup Kitchen"
+            className={inputClass}
+          />
         </div>
         <div className="flex gap-3 sm:col-span-2">
           {/* Fills the row beside Clear filters on a phone; its own width from 640 (#926). */}

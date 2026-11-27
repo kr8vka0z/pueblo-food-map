@@ -49,6 +49,7 @@ import type { PublishChangeSummary } from "@/lib/adminVenues";
 import { pluralize } from "@/lib/pluralize";
 import { cardClass, failureLineClass, linkClass, primaryButtonClass, tapLinkClass } from "@/lib/adminCardStyles";
 import AdminConfirm, { useAdminConfirm } from "@/components/AdminConfirm";
+import AdminSuccessTick from "@/components/AdminSuccessTick";
 import { busyButtonProps } from "@/components/formClasses";
 
 export interface PublishPanelProps {
@@ -97,8 +98,17 @@ function publishSuccessMessage(publishedCount: number, archivedCount: number): s
   return archivedCount > 0 ? `${pushed}, ${pluralize(archivedCount, "place")} removed` : pushed;
 }
 
-function buildConfirmQuestion({ newDrafts, editedSincePublish }: PublishChangeSummary): string {
-  return `Publish ${pluralize(newDrafts, "new place")} and ${pluralize(editedSincePublish, "edited place")} to the public map?`;
+function buildConfirmQuestion({ newDrafts, editedSincePublish, archived }: PublishChangeSummary): string {
+  const publishParts: string[] = [];
+  if (newDrafts > 0) publishParts.push(pluralize(newDrafts, "new place"));
+  if (editedSincePublish > 0) publishParts.push(pluralize(editedSincePublish, "edited place"));
+  if (publishParts.length > 0) {
+    return `Publish ${publishParts.join(" and ")} to the public map?`;
+  }
+  if (archived > 0) {
+    return `Remove ${pluralize(archived, "place")} from the public map?`;
+  }
+  return "Publish changes to the public map?";
 }
 
 /**
@@ -110,7 +120,7 @@ function buildConfirmQuestion({ newDrafts, editedSincePublish }: PublishChangeSu
  */
 function friendlyErrorMessage(status: number, error?: string): string {
   if (error === "publish_not_configured") {
-    return "The publish key isn't set up yet, so nothing was published. (Setup is tracked separately.)";
+    return "The publish key isn’t set up yet, so nothing was published. (Setup is tracked separately.)";
   }
   // #591: staging refused the publish before any GitHub call — checked
   // ahead of the generic 403/401 "session expired" branch below (same
@@ -119,10 +129,10 @@ function friendlyErrorMessage(status: number, error?: string): string {
     return "Publish only runs on the live production site. This is staging, so nothing was sent to GitHub.";
   }
   if (error === "github_commit_failed") {
-    return "Couldn't reach GitHub to publish. Nothing was changed. Try again in a moment.";
+    return "Couldn’t reach GitHub to publish. Nothing was changed. Try again in a moment.";
   }
   if (status === 422) {
-    return `Couldn't publish: something in a place's data didn't pass validation. Nothing was changed.${error ? ` (${error})` : ""}`;
+    return `Couldn’t publish: something in a place’s data didn’t pass validation. Nothing was changed.${error ? ` (${error})` : ""}`;
   }
   // 403 = origin denied or email not allowlisted; 401 = no valid Better Auth
   // session (no_session, see adminAuthErrors.ts). Both
@@ -133,7 +143,7 @@ function friendlyErrorMessage(status: number, error?: string): string {
   // WHY not "nothing was changed" here: a 500 or a lost connection can come
   // after GitHub already took the change request (route.ts step 5 runs
   // before step 6), so the honest answer is that we can't tell.
-  return "The publish didn't finish, so we can't tell whether the map changed. Reload the page to see what's still waiting, then try again.";
+  return "The publish didn’t finish, so we can’t tell whether the map changed. Reload the page to see what’s still waiting, then try again.";
 }
 
 export default function PublishPanel({ summary, reviewHref }: PublishPanelProps) {
@@ -177,7 +187,7 @@ export default function PublishPanel({ summary, reviewHref }: PublishPanelProps)
   return (
     <section className={cardClass}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-[var(--color-ink-700)]">
+        <p className="text-sm tabular-nums text-[var(--color-ink-700)]">
           {upToDate ? (
             "The public map is up to date."
           ) : (
@@ -224,20 +234,23 @@ export default function PublishPanel({ summary, reviewHref }: PublishPanelProps)
             onConfirm={handlePublish}
             onCancel={cancel}
           >
-            {archived > 0 && <>{pluralize(archived, "place")} will be removed. </>}
+            {archived > 0 && (newDrafts > 0 || editedSincePublish > 0) && <>{pluralize(archived, "place")} will be removed. </>}
             This opens a change request on GitHub that merges on its own.
           </AdminConfirm>
         </div>
       )}
 
       {state.status === "success" && (
-        <p aria-live="polite" className="mt-3 text-sm text-[var(--color-sage-700)]">
-          Published: {publishSuccessMessage(state.publishedCount, state.archivedCount)} to the public map. A{" "}
-          <a href={state.prUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
-            change request
-          </a>{" "}
-          was opened and set to auto-merge. It can take a minute for the map to update.
-        </p>
+        <div aria-live="polite" className="mt-3 flex items-start gap-2.5 text-sm text-[var(--color-sage-700)]">
+          <AdminSuccessTick size={22} />
+          <p>
+            Published: {publishSuccessMessage(state.publishedCount, state.archivedCount)} to the public map. A{" "}
+            <a href={state.prUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
+              change request
+            </a>{" "}
+            was opened and set to auto-merge. It can take a minute for the map to update.
+          </p>
+        </div>
       )}
 
       {state.status === "error" && (

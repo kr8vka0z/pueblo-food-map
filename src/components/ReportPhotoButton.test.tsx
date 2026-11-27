@@ -20,12 +20,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test("cancelling the inline confirmation never calls the flag route or window.confirm", async () => {
+test("cancelling the inline confirmation never calls the flag route or window.confirm and restores focus", async () => {
   const confirmSpy = vi.spyOn(window, "confirm");
   const user = userEvent.setup();
   render(<ReportPhotoButton photoId={42} locale="en" />);
 
-  await user.click(screen.getByRole("button", { name: "Report this photo" }));
+  const trigger = screen.getByRole("button", { name: "Report this photo" });
+  await user.click(trigger);
   expect(confirmSpy).not.toHaveBeenCalled();
 
   const cancelBtn = screen.getByRole("button", { name: "Cancel" });
@@ -33,7 +34,13 @@ test("cancelling the inline confirmation never calls the flag route or window.co
   await user.click(cancelBtn);
 
   expect(mockFetch).not.toHaveBeenCalled();
-  expect(screen.getByRole("button", { name: "Report this photo" })).toBeDefined();
+  expect(document.activeElement).toBe(trigger);
+
+  // Escape also closes the confirmation and restores focus to the trigger
+  await user.click(trigger);
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cancel" }));
+  await user.keyboard("{Escape}");
+  expect(document.activeElement).toBe(trigger);
 });
 
 test("confirming inline POSTs the flag route with a clientToken and shows a thank-you", async () => {

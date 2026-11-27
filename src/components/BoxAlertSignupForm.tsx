@@ -100,7 +100,7 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
     const err = validateEmail(email);
     if (err) {
       setEmailError(err);
-      document.getElementById("box-alert-email-error")?.focus();
+      document.getElementById("box-alert-email")?.focus();
       return;
     }
     setEmailError(undefined);
@@ -238,7 +238,10 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
         </button>
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={() => {
+            setEmailError(undefined);
+            setOpen(false);
+          }}
           className={SECONDARY_BTN}
         >
           {t("box.alerts.cancel", locale)}

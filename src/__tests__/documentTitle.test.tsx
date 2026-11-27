@@ -231,7 +231,7 @@ const EXPECTED_ES = {
   alertsConfirm: "Confirma tu correo · Pueblo Food Map",
   alertsStop: "Correos detenidos · Pueblo Food Map",
   report: "Reportar un problema: RMSER Community Garden · Pueblo Food Map",
-  boxHistory: "Test Blessing Box — Historial · Pueblo Food Map",
+  boxHistory: "Test Blessing Box: Historial · Pueblo Food Map",
   notFound: "Página no encontrada · Pueblo Food Map",
 } as const;
 

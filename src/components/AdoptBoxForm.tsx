@@ -126,7 +126,7 @@ export default function AdoptBoxForm({ boxId, open, onOpenChange }: AdoptBoxForm
     const errs = validateFields(displayName, email);
     if (errs.displayName || errs.email) {
       setFieldErrors(errs);
-      document.getElementById(errs.displayName ? "adopt-display-name-error" : "adopt-email-error")?.focus();
+      document.getElementById(errs.displayName ? "adopt-display-name" : "adopt-email")?.focus();
       return;
     }
     setFieldErrors({});
@@ -307,7 +307,10 @@ export default function AdoptBoxForm({ boxId, open, onOpenChange }: AdoptBoxForm
         </button>
         <button
           type="button"
-          onClick={() => onOpenChange(false)}
+          onClick={() => {
+            setFieldErrors({});
+            onOpenChange(false);
+          }}
           className={SECONDARY_BTN}
         >
           {t("box.adopt.cancel", locale)}

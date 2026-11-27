@@ -34,8 +34,9 @@ const FIELD_IDS: Record<SuggestField, string> = {
   submitterEmail: "suggest-email",
 };
 
+// size-[20px], not w-5/h-5: globals.css remaps --spacing-5 to 24px (see formClasses.ts).
 const CHECKBOX_CLASS =
-  "w-5 h-5 shrink-0 rounded border-[var(--color-ink-400)] " +
+  "size-[20px] shrink-0 rounded border-[var(--color-ink-400)] " +
   "accent-[var(--color-sage-600)] " +
   "focus-visible:outline-none focus-visible:ring-2 " +
   "focus-visible:ring-[var(--color-sage-500)]";

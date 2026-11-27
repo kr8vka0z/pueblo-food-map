@@ -150,7 +150,11 @@ export default function PublicForm<K extends string>({
   validate: (locale: Locale) => FieldErrors<NoInfer<K>>;
   /** The form's own JSON fields; `website` and `turnstileToken` are appended. */
   body: () => Record<string, unknown>;
-  children: (errors: FieldErrors<NoInfer<K>>, locale: Locale, onBlurField: (field: NoInfer<K>) => void) => ReactNode;
+  children: (
+    errors: FieldErrors<NoInfer<K>>,
+    locale: Locale,
+    onBlurField: (field: NoInfer<K>, opts?: { clear?: boolean }) => void,
+  ) => ReactNode;
   onSuccess?: () => void;
   /** Wraps the submit button (default: the button alone). */
   submitRow?: (submit: ReactNode) => ReactNode;
@@ -168,7 +172,14 @@ export default function PublicForm<K extends string>({
   // Synchronous guard against rapid double-submit clicks before React re-renders (#959).
   const submittingRef = useRef(false);
 
-  function onBlurField(field: K) {
+  function onBlurField(field: K, opts?: { clear?: boolean }) {
+    if (opts?.clear) {
+      setErrors((prev) => {
+        if (prev[field] === undefined) return prev;
+        return { ...prev, [field]: undefined };
+      });
+      return;
+    }
     const next = validate(locale);
     setErrors((prev) => {
       if (prev[field] === next[field]) return prev;
@@ -218,7 +229,7 @@ export default function PublicForm<K extends string>({
     }
   }
 
-  const { queued, queue } = useQueuedTurnstileSubmit<boolean>(
+  const { queued, queue, cancel } = useQueuedTurnstileSubmit<boolean>(
     turnstile.token,
     () => void runSubmit(),
     () => {
@@ -228,13 +239,15 @@ export default function PublicForm<K extends string>({
     },
   );
 
-  // If Turnstile reports an error while a submit is queued, unblock the form.
+  // If Turnstile reports an error while a submit is queued, cancel the queue and unblock immediately.
   useEffect(() => {
     if (!turnstile.error || !queued) return;
     queueMicrotask(() => {
+      cancel();
       submittingRef.current = false;
       setStatus("idle");
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cancel only wraps stable setPending; run only on error/queued transitions.
   }, [turnstile.error, queued]);
 
   function handleSubmit(e: React.FormEvent) {
@@ -245,8 +258,9 @@ export default function PublicForm<K extends string>({
     const firstError = (Object.keys(fieldIds) as K[]).find((k) => validationErrors[k]);
     if (firstError) {
       setErrors(validationErrors);
-      // Move focus to first error for screen-reader users
-      document.getElementById(`${fieldIds[firstError]}-error`)?.focus();
+      // Focus the already-mounted invalid control (which carries aria-invalid + aria-describedby)
+      // rather than the error <p> which hasn't committed yet on first invalid submit.
+      document.getElementById(fieldIds[firstError])?.focus();
       return;
     }
 
@@ -256,7 +270,10 @@ export default function PublicForm<K extends string>({
     } else {
       setStatus("submitting");
       queue(true);
-      turnstile.reset();
+      // Only reset when recovering from an earlier widget error — never abort an in-flight initial check.
+      if (turnstile.error) {
+        turnstile.reset();
+      }
     }
   }
 

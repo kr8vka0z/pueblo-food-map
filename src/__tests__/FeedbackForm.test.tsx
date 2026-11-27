@@ -438,4 +438,56 @@ describe("FeedbackForm — submit flow", () => {
     expect(body.turnstileToken).toBe("late-token");
     expect(await screen.findByText(/Thank you!/i)).toBeDefined();
   });
+
+  test("Turnstile error-callback while a submit is queued immediately re-enables Submit and allows retry (#959)", async () => {
+    let errorCb: (() => void) | undefined;
+    let tokenCb: ((tok: string) => void) | undefined;
+    const resetSpy = vi.fn(() => {
+      // Subsequent retry after reset succeeds with a fresh token
+      setTimeout(() => tokenCb?.("retry-token"), 0);
+    });
+    vi.stubGlobal("turnstile", {
+      render: vi.fn((_c: HTMLElement, opts: { callback?: (tok: string) => void; "error-callback"?: () => void }) => {
+        tokenCb = opts.callback;
+        errorCb = opts["error-callback"];
+        return "widget-err";
+      }),
+      reset: resetSpy,
+      remove: vi.fn(),
+    });
+    mockSuccess();
+    const user = userEvent.setup();
+    renderForm();
+
+    await selectFeedbackType(user, "positive");
+    await user.type(screen.getByLabelText(/Message/i), "Great map!");
+    await user.type(screen.getByLabelText(/Your email/i), "test@example.com");
+
+    // Queue submit before initial token arrives — must NOT reset an in-flight initial check
+    await user.click(screen.getByRole("button", { name: /Send feedback/i }));
+    expect(resetSpy).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /Sending…/i })).toBeDisabled();
+
+    // Widget errors — button must immediately re-enable with its normal label
+    errorCb?.();
+    await expectTurnstileError("en");
+    const retryBtn = await screen.findByRole("button", { name: /Send feedback/i });
+    expect(retryBtn).not.toBeDisabled();
+
+    // Retrying after error resets the widget, clears the error, and submits once token arrives
+    await user.click(retryBtn);
+    expect(resetSpy).toHaveBeenCalledOnce();
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledOnce());
+    expect(await screen.findByText(/Thank you!/i)).toBeDefined();
+  });
+
+  test("selecting a feedback type clears an existing feedbackType validation error (#959)", async () => {
+    const user = userEvent.setup();
+    renderForm();
+    await user.click(screen.getByRole("button", { name: /Send feedback/i }));
+    expect(screen.getByText(/Please select a feedback type/i)).toBeDefined();
+
+    await selectFeedbackType(user, "feature");
+    expect(screen.queryByText(/Please select a feedback type/i)).toBeNull();
+  });
 });

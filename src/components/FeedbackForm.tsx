@@ -90,8 +90,12 @@ export default function FeedbackForm() {
                       name="feedbackType"
                       value={key}
                       checked={selected}
-                      onChange={() => setFeedbackType(key)}
-                      className="h-5 w-5 shrink-0 accent-[var(--color-sage-600)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                      onChange={() => {
+                        setFeedbackType(key);
+                        onBlurField("feedbackType", { clear: true });
+                      }}
+                      // size-[20px], not h-5/w-5: globals.css remaps --spacing-5 to 24px.
+                      className="size-[20px] shrink-0 accent-[var(--color-sage-600)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
                     />
                     <span>{t(`feedback.type.${key}`, locale)}</span>
                   </label>

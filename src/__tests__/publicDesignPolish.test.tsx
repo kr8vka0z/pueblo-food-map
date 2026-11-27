@@ -69,7 +69,7 @@ describe("Public i18n em-dash ban (#958)", () => {
 });
 
 describe("Card forms inline validation (#959)", () => {
-  test("AdoptBoxForm validates name and email inline on submit without native popups", async () => {
+  test("AdoptBoxForm validates name and email inline on submit and moves focus to the first invalid input", async () => {
     const user = userEvent.setup();
     render(
       <LocaleProvider initialLocale="en">
@@ -80,9 +80,10 @@ describe("Card forms inline validation (#959)", () => {
 
     expect(screen.getByText(/Please enter your name/i)).toBeDefined();
     expect(screen.getByText(/Please enter your email address/i)).toBeDefined();
+    expect(document.activeElement).toBe(document.getElementById("adopt-display-name"));
   });
 
-  test("BoxAlertSignupForm validates email inline on submit", async () => {
+  test("BoxAlertSignupForm validates email inline on submit and moves focus to the email input", async () => {
     const user = userEvent.setup();
     render(
       <LocaleProvider initialLocale="en">
@@ -94,6 +95,7 @@ describe("Card forms inline validation (#959)", () => {
     await user.click(screen.getByRole("button", { name: /Sign me up/i }));
 
     expect(screen.getByText(/valid email address/i)).toBeDefined();
+    expect(document.activeElement).toBe(document.getElementById("box-alert-email"));
   });
 });
 

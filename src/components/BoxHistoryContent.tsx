@@ -73,7 +73,7 @@ export default function BoxHistoryContent({ box, allCheckins = [], approvedPhoto
   // <title> follows locale client-side (#589) — box.history.link's EN value
   // ("History") matches page.tsx generateMetadata's suffix exactly; box.name
   // is a proper noun, not translated, same as the metadata itself.
-  useDocumentTitle(pageDocumentTitle(`${box.name} — ${t("box.history.link", locale)}`));
+  useDocumentTitle(pageDocumentTitle(`${box.name}: ${t("box.history.link", locale)}`));
   const [page, setPage] = useState(1);
   const [statsPeriod, setStatsPeriod] = useState<PeriodKey>("30d");
 
@@ -109,7 +109,7 @@ export default function BoxHistoryContent({ box, allCheckins = [], approvedPhoto
         {/* #511 — box name is the page title. The log immediately follows,
             with no other section between title and log, so it's visible on
             first screen without scrolling (the page's own spec). */}
-        <h1 className="text-3xl font-normal text-[var(--color-ink-900)]" style={{ fontFamily: "var(--font-display)" }}>
+        <h1 className="text-3xl font-normal text-balance text-[var(--color-ink-900)]" style={{ fontFamily: "var(--font-display)" }}>
           {box.name}
         </h1>
 

@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // buildPageMetadata, not a bare title (#894): without it the layout's
   // homepage canonical and og:url made a shared report link preview as "/".
   return buildPageMetadata({
-    title: `${t("report.title", "en")} — ${venue.name}`,
+    title: `${t("report.title", "en")}: ${venue.name}`,
     description: t("report.subtitle", "en"),
     path: `/report/${venue.id}`,
   });
